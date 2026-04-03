@@ -10,7 +10,6 @@ target_include_directories(shared PUBLIC
 )
 
 add_subdirectory(lib/glfw)
-find_package(OpenGL REQUIRED)
 
 add_subdirectory(lib/enet)
 
