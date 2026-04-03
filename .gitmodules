@@ -7,3 +7,6 @@
 [submodule "lib/glad"]
 	path = lib/glad
 	url = https://github.com/Dav1dde/glad.git
+[submodule "lib/entt"]
+	path = lib/entt
+	url = https://github.com/skypjack/entt.git

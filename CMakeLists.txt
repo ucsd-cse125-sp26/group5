@@ -21,10 +21,12 @@ add_subdirectory("${GLAD_SOURCES_DIR}/cmake" glad_cmake)
 # Specify glad settings
 glad_add_library(glad_gl_core_46 REPRODUCIBLE API gl:core=4.6)
 
+add_subdirectory(lib/entt)
+
 add_executable(client)
 target_sources(client PRIVATE src/client/main.cpp)
-target_link_libraries(client PRIVATE shared glfw OpenGL::GL enet glad_gl_core_46)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 EnTT::EnTT)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
-target_link_libraries(server PRIVATE shared enet)
+target_link_libraries(server PRIVATE shared enet EnTT::EnTT)
