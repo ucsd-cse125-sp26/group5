@@ -51,6 +51,9 @@
             libGL
             libGLU
 
+            # Python (for glad)
+            (python3.withPackages (ps: [ ps.jinja2 ]))
+
             # Windows cross-compilation
             mingw.stdenv.cc
           ];
