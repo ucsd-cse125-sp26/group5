@@ -22,9 +22,23 @@ glad_add_library(glad_gl_core_46 REPRODUCIBLE API gl:core=4.6)
 
 add_subdirectory(lib/entt)
 
+add_library(imgui
+    lib/imgui/imgui.cpp
+    lib/imgui/imgui_draw.cpp
+    lib/imgui/imgui_tables.cpp
+    lib/imgui/imgui_widgets.cpp
+    lib/imgui/backends/imgui_impl_glfw.cpp
+    lib/imgui/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC
+    lib/imgui
+    lib/imgui/backends
+)
+target_link_libraries(imgui PUBLIC glfw glad_gl_core_46)
+
 add_executable(client)
 target_sources(client PRIVATE src/client/main.cpp)
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 EnTT::EnTT)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
