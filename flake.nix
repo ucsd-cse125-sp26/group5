@@ -1,5 +1,5 @@
 {
-  description = "A template for Nix based C++ project setup.";
+  description = "CSE 125 Game Project";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -13,30 +13,27 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-
-          overlays = [ ];
-
-          # config.allowUnfree = true;
+          crossSystem = null;
         };
+        mingw = pkgs.pkgsCross.mingwW64;
       in
       {
-        devShells.default = pkgs.mkShell rec {
+        devShells.default = pkgs.mkShell {
           name = "cse125-project";
 
           packages = with pkgs; [
             # Development Tools
-            clang
+            gcc
             cmake
             ninja
             gdb
             lldb
             clang-tools
-            clangStdenv
-            clang
+
+            # Windows cross-compilation
+            mingw.stdenv.cc
           ];
         };
-
-        packages.default = pkgs.callPackage ./default.nix { };
       }
     );
 }
