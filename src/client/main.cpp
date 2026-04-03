@@ -1,4 +1,5 @@
 #include <GLFW/glfw3.h>
+#include <glad/gl.h>
 
 #include <iostream>
 
@@ -22,6 +23,11 @@ int main() {
 
   /* Make the window's context current */
   glfwMakeContextCurrent(window);
+
+  // GLAD
+  int version = gladLoadGL(glfwGetProcAddress);
+  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
+         GLAD_VERSION_MINOR(version));
 
   /* Loop until the user closes the window */
   while (!glfwWindowShouldClose(window)) {
