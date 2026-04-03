@@ -50,9 +50,8 @@
             libGL
             libGLU
 
-            # Windows cross-compilation (MinGW + Clang)
+            # Windows cross-compilation
             mingw.stdenv.cc
-            llvmPackages.lld
           ];
 
           shellHook = ''
