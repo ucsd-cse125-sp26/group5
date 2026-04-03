@@ -58,13 +58,14 @@
           shellHook = ''
             export CC=clang
             export CXX=clang++
-            export CPLUS_INCLUDE_PATH="$(echo ${pkgs.gcc.cc}/include/c++/*/):$(echo ${pkgs.gcc.cc}/include/c++/*/x86_64-unknown-linux-gnu/):${pkgs.glibc.dev}/include:${pkgs.libGL.dev}/include''${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-              pkgs.wayland
-              pkgs.libxkbcommon
-              pkgs.libGL
-              pkgs.libx11
-            ]}:$LD_LIBRARY_PATH"
+            export LD_LIBRARY_PATH="${
+              pkgs.lib.makeLibraryPath [
+                pkgs.wayland
+                pkgs.libxkbcommon
+                pkgs.libGL
+                pkgs.libx11
+              ]
+            }:$LD_LIBRARY_PATH"
           '';
         };
       }
