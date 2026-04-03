@@ -12,10 +12,12 @@ target_include_directories(shared PUBLIC
 add_subdirectory(lib/glfw)
 find_package(OpenGL REQUIRED)
 
+add_subdirectory(lib/enet)
+
 add_executable(client)
 target_sources(client PRIVATE src/client/main.cpp)
-target_link_libraries(client PRIVATE shared glfw OpenGL::GL)
+target_link_libraries(client PRIVATE shared glfw OpenGL::GL enet)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
-target_link_libraries(server PRIVATE shared)
+target_link_libraries(server PRIVATE shared enet)
