@@ -23,16 +23,48 @@
 
           packages = with pkgs; [
             # Development Tools
-            gcc
+            clang
             cmake
             ninja
             gdb
             lldb
             clang-tools
+            pkg-config
 
-            # Windows cross-compilation
+            # GLFW deps (Wayland)
+            wayland
+            wayland-protocols
+            wayland-scanner
+            libxkbcommon
+
+            # GLFW deps (X11)
+            libx11
+            libxcursor
+            libxi
+            libxinerama
+            libxrandr
+            libxrender
+            xorgproto
+
+            # OpenGL
+            libGL
+            libGLU
+
+            # Windows cross-compilation (MinGW + Clang)
             mingw.stdenv.cc
+            llvmPackages.lld
           ];
+
+          shellHook = ''
+            export CC=clang
+            export CXX=clang++
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+              pkgs.wayland
+              pkgs.libxkbcommon
+              pkgs.libGL
+              pkgs.libx11
+            ]}:$LD_LIBRARY_PATH"
+          '';
         };
       }
     );

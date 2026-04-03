@@ -9,9 +9,12 @@ target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+add_subdirectory(lib/glfw)
+find_package(OpenGL REQUIRED)
+
 add_executable(client)
 target_sources(client PRIVATE src/client/main.cpp)
-target_link_libraries(client PRIVATE shared)
+target_link_libraries(client PRIVATE shared glfw OpenGL::GL)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
