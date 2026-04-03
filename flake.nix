@@ -24,6 +24,7 @@
           packages = with pkgs; [
             # Development Tools
             clang
+            gcc
             cmake
             ninja
             gdb

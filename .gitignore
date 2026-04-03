@@ -1,4 +1,5 @@
 .direnv
 .cache
 build
+build-linux-gcc
 build-windows
