@@ -1,7 +1,7 @@
 ---
 layout: page
-title: Final Projects
-permalink: /final-projects/
+title: Final Project
+permalink: /final-project/
 ---
 
 Put your final deliverables here (or link to them):
