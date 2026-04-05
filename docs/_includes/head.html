@@ -1,0 +1,18 @@
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>
+    {% if page.title %}
+      {{ page.title }} · {{ site.title }}
+    {% else %}
+      {{ site.title }}
+    {% endif %}
+  </title>
+
+  <link rel="stylesheet" href="{{ '/public/css/poole.css' | relative_url }}" />
+  <link rel="stylesheet" href="{{ '/public/css/syntax.css' | relative_url }}" />
+  <link rel="stylesheet" href="{{ '/public/css/hyde.css' | relative_url }}" />
+
+  <link rel="icon" href="{{ '/public/favicon.ico' | relative_url }}" />
+</head>

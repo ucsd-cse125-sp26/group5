@@ -1,0 +1,13 @@
+title: Team 5
+tagline: ""
+description: "CSE 125 Group 5"
+
+# Project Pages: https://<user>.github.io/<repo>/
+url: "https://rebeccachen.github.io"
+baseurl: "/group5"
+
+markdown: kramdown
+kramdown:
+  input: GFM
+
+permalink: pretty
