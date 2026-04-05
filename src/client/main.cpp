@@ -140,15 +140,15 @@ int main() {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
       currentKeys |= 0x08;
     }
-    if (currentKeys != previousKeys) {
+    if (currentKeys != previousKeys && currentKeys != 0) {
       printf("Sending packet with keys %d\n", currentKeys);
-      previousKeys = currentKeys;
       shared::InputPacket inputPacket;
       inputPacket.type = shared::PacketType::KEYBOARD_INPUT;
       inputPacket.keys = currentKeys;
       ENetPacket * packet = enet_packet_create (&inputPacket, sizeof(shared::InputPacket), ENET_PACKET_FLAG_RELIABLE);
       enet_peer_send (peer, 0, packet);
     }
+    previousKeys = currentKeys;
   }
 
   enet_peer_disconnect (peer, 0);
