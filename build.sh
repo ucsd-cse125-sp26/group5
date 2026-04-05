@@ -2,7 +2,7 @@
 
 set -e
 
-cmake -B build -G Ninja
+cmake -B build -G Ninja 
 (
 	cd build || exit
 	ninja
