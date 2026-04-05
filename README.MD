@@ -35,7 +35,6 @@ Use build_lsp.sh to make a compile_commands.json for clangd.  This should be run
 Run ./format.sh to format your code before comitting please.
 
 ## libraries
-
 We currently use GLFW, GLAD, ENet, EnTT, and Dear Imgui as external libraries for various functionality.
 
 ## Important links 
