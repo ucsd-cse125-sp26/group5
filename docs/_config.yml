@@ -3,8 +3,8 @@ tagline: ""
 description: "CSE 125 Group 5"
 
 # Project Pages: https://<user>.github.io/<repo>/
-url: "https://rebeccachen.github.io"
-baseurl: "/group5"
+url: "https://cse125.ucsd.edu"
+baseurl: "/2026/cse125g5"
 
 markdown: kramdown
 kramdown:
