@@ -9,6 +9,24 @@ Run `git submodule init` and `git submodule update` to clone all the submodules 
 
 You can use build.sh to build the project. You can also cross compile using build-windows.sh and build-linux-gcc.sh. The builds should support MacOS and Linux, we aren't sure about Windows.
 
+### Website (Jekyll) local preview
+
+The course website lives in `docs/` (Jekyll).
+
+### One-time setup
+cd docs
+gem install bundler
+bundle install
+
+### Run the local server
+cd docs
+bundle exec jekyll serve --livereload
+
+Now open:
+If _config.yml has baseurl: "/group5": http://127.0.0.1:4000/group5/
+If you want it at root instead: run bundle exec jekyll serve --baseurl "" and open http://127.0.0.1:4000/
+
+
 ## LSP support
 Use build_lsp.sh to make a compile_commands.json for clangd.  This should be run after the normal build.
 
