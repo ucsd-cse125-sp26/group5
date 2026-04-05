@@ -1,0 +1,60 @@
+#Project spec
+## Project Description
+What kind of game are you planning to build?
+What are the goals of the game, how do players win, how do they lose?
+What are the interesting or unique aspects to your game?
+What are the list of features of your game? Prioritize them into at least three categories: "Must Have", "Would Be Really Nice", and "Cool But Only If Ahead Of Schedule".
+## Group Management
+# What are the major roles in your group's management?
+Shengrui(Leon) Chen: Game logic
+Jacob Root: Graphics
+Ziyue Liu: networking
+Alain Zhang: Physics
+Rebecca: Modeling, art
+Sarah Balatbat: Modeling, art
+Phillip Mai: Game Logic
+How will decisions be made? By leader, consensus?
+Decisions will be made by consensus. In the event where there are ties, the leads of each subteam will be the main decision maker. I.e. if disagreeing on the structure of network architecture, the network lead will be making the ultimate decision. 
+How will you communicate and collaborate online?
+We have created a discord server as the center of our communication, hosting channels for brainstorming, storing important websites, art references, and subchannels for different aspects of the project. 
+How will you know when you're off schedule, and how will you deal with schedule slips?
+Outside of lectures, we have weekly full-team meetings every Tuesday, 2PM. We will roughly follow an AGILE SCRUM framework, described below:
+At the beginning of the meeting, each team member will talk about their progress since the last meeting. Then they can discuss challenges they faced, and ask teammates for help and opinions. 
+The team will come together and discuss the next step and assigning new tasks. 
+Each subteam should also dedicate a set amount of communication time/meeting outside of the main meeting for their respective topics. 
+Who will produce the weekly group status reports?
+We will create 1 full group report, based on the following material:
+Meeting notes from weekly’s briefing 
+Each individual will use the weekly report template to reflect on their own progress. The main accumulator will summarize our reflections. 
+When will you have your weekly group meetings (separate from the meeting with instructors)?
+Tuesday, 2 P.M.
+Project Development
+What are the development roles and who will handle them?
+What tools will you use?
+Communication: Discord 
+Main documentation: CSE 125 Main document 
+How will you do testing?
+Unit Tests
+Scenario Tests
+User Tests
+Game Playthroughs
+Unity Mockup Comparisons
+How will you do documentation (both internal group documentation as well as external player documentation)?
+Shared Google Drive folder to manage documents for each role
+README.txt
+Documentation in code (e.g. file headers, function headers, etc.)
+Project Schedule
+Define a set of milestones with a specific definition of what each milestone is, what it means to complete each milestone, and when you expect to complete them. Define the milestones at two scales, a high level set of key milestones like integration and minimal viable game, and a low level set of weekly milestones.
+
+# Project schedule:
+Week
+
+Art/Sound
+
+Graphics
+
+Networking
+
+Game Engine/Physics
+
+Game Logic
