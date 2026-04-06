@@ -4,9 +4,10 @@ title: Weekly Reports
 permalink: /weekly-reports/
 ---
 
-Add links or writeups for each week here.
+# Weekly individual report template link: https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz 
+--- 
 
-## Week 1
+## Week 1 Group report 
 
 ### What we did
 
@@ -29,8 +30,6 @@ The team brainstormed core mechanics and narrowed down to three game concepts, w
 
 **Idea 3 — Memory Realm (Narrative Co-op):** The most story-driven pitch. A gray, forgotten world restored across 3 maps (Courtyard → Town Street → Memory Summit). Each player has a unique ability, requiring asymmetric communication and synchronization. Restoring areas visually transforms them. Richest concept but likely the highest scope.
 
-
-
 ## Plan for next week
 The team has voted on the general framework of the game. For the following week, our plan is to: 
 - Solidify the format of the game by combining everyone's ideas. 
@@ -41,5 +40,3 @@ The team has voted on the general framework of the game. For the following week,
 N/A
 - **What blocked us**
 N/A
-
-
