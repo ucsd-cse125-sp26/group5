@@ -4,7 +4,7 @@ title: Weekly Reports
 permalink: /weekly-reports/
 ---
 
-# Weekly individual report template link: https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz 
+# [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz)
 --- 
 
 ## Week 1 Group report 
