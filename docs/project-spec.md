@@ -39,7 +39,7 @@ TBD.
 - Shengrui (Leon) Chen: Game Logic
 - Ziyue (Tim) Liu: Networking
 - Alain Zhang: Physics
-- Rebecca Chen: Art Direction, Web Dev, Modeling 
+- Rebecca Chen: Art Direction, Web Dev, Modeling
 - Sarah Balatbat: Art Direction, Modeling
 - Phillip Mai: Game Logic
 
@@ -74,6 +74,8 @@ One designated accumulator will summarize our reflections into the combined repo
 
 Tuesday, 2 P.M.
 
+Tech meeting: Friday, 2 P.M.
+
 ## Project Development
 
 ### Role Designations
@@ -102,10 +104,10 @@ Tuesday, 2 P.M.
 - Github Actions CI to prevent build breaks
 - Unit tests
 - Asserts within the code
-- Scenario tests
+- Server-side tick tests (setup a tick, make sure certain actions occur)
+- Server-client communications tests
 - User tests
 - Game playthroughs
-- Unity mockup comparisons
 
 ### Documentation
 
@@ -119,16 +121,29 @@ Tuesday, 2 P.M.
 
 ### High-Level Milestones
 
+Week 2: server/client synchronized graphics
+
+Week 4: engine feature sufficient; it should be possible to do most gameplay stuff with the engine in this state
+
+Week 7: gameplay complete; it should be possible to "play the game" now
+
+Week 9: feature-complete and hopefully we can do a feature freeze here to focus on reliability
+
 TBD. (Define what each milestone means, what “done” looks like, and target dates.)
 
 ### Low-Level Milestones
 
-TBD. (Weekly milestones.)
-
-#### Schedule Grid (Draft Template)
-
-| Week | Art/Sound | Graphics | Networking | Game Engine/Physics | Game Logic |
+| Week | Art/Sound | Graphics | Game Engine/Networking | Physics | Game Logic |
 |---|---|---|---|---|---|
-| TBD | TBD | TBD | TBD | TBD | TBD |
-| TBD | TBD | TBD | TBD | TBD | TBD |
+| 1 | TBD | Display a window | Exchange packets between a client/server | Think about physics | Think about game logic |
+| 2 | Figure out sound library | Render a cube that's backed by server-synchronized ECS | Propagate more attributes necessary for rendering + come up with the final architecture | Determine what is needed in terms of physics, decide on NIH syndrome or library, maybe some basic implementation | Plan out concept and pseudocode for game logic |
+| 3 | Play sounds | Import arbitrary models | Implement final ECS synchronization architecture | Movement and Collision | Loot spawning |
+| 4 | Play sounds backed by ECS | Textures and materials | Networking optimizations + Level loading | Terrain | Loot collection |
+| 5 | TBD | Animations | Any additional networking features that don't go through ECS | More precise bounding boxes + game logic enablement | Moving between levels/maps |
+| 6 | TBD | Lighting | Data use shrinkage/proper delta states | game logic enablement | Scoring, color restoration |
+| 7 | TBD | GUI? | Lobby system? | game logic enablement | Time limit+timer+level specific mechanics |
+| 8 | Add final sounds | Making everything fast and beautiful + bug fixes | cross-platform testing | game logic enablement | Level specific mechanics |
+| 9 | bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish |
+| 10 | Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing |
 
+The schedule for most technical things is probably fake past week 4 since from there we dont know how much time or effort things will require, and work prioritization will more liekly be driven by the needs of people as they implement things.
