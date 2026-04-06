@@ -35,7 +35,7 @@ TBD.
 
 ### Major Roles
 
-- Tech Lead: Jacob Root
+- Jacob Root: Tech Lead, Graphics
 - Shengrui (Leon) Chen: Game Logic
 - Ziyue (Tim) Liu: Networking
 - Alain Zhang: Physics
@@ -90,10 +90,18 @@ Tuesday, 2 P.M.
 
 - Communication: Discord
 - Main documentation: CSE 125 main document
+- Builds: CMake + Ninja
+- Graphics: OpenGL with GLFW and (maybe) GLM
+- Programming language: C++
+- Testing: Github actions + INSERT TEST LIBRARY HERE
+- Formatting/Linting: clang-format/clang-tidy
+- Networking: ENet
 
 ### Testing
 
+- Github Actions CI to prevent build breaks
 - Unit tests
+- Asserts within the code
 - Scenario tests
 - User tests
 - Game playthroughs
@@ -102,7 +110,7 @@ Tuesday, 2 P.M.
 ### Documentation
 
 - Shared Google Drive folder to manage documents for each role
-- README.txt
+- README.md
 - Documentation in code (e.g., file headers, function headers)
 - Doxygen-generated docs from C++ comments
 - Markdown files for architectural design
