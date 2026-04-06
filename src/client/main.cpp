@@ -1,14 +1,17 @@
 // clang-format off
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <entt/entt.hpp>
 // clang-format on
 
 #include <iostream>
 
 #include <enet/enet.h>
 #include "shared/hello.h"
-#include "cstring"
 #include "shared/protocol.h"
+#include "shared/components.h"
+#include "cstring"
+#include <map>
 
 int main() {
   std::cout << "Hello World Client";
@@ -69,6 +72,10 @@ int main() {
       return EXIT_FAILURE;
   }
 
+  entt::registry registry;
+  uint32_t myEntityId = UINT32_MAX;
+  std::map<uint32_t, entt::entity> entityMap;
+
   /* Initialize the library */
   if (!glfwInit()) return -1;
 
@@ -96,13 +103,64 @@ int main() {
     {
         switch (event.type)
         {
-        case ENET_EVENT_TYPE_RECEIVE:
-            printf("Received packet of length %zu\n", event.packet->dataLength);
+        case ENET_EVENT_TYPE_RECEIVE: {
+            auto type = static_cast<shared::PacketType>(event.packet->data[0]);
+            switch (type) {
+                case shared::PacketType::SPAWN_ENTITY: {
+                    shared::SpawnPacket spawnPacket;
+                    std::memcpy(&spawnPacket, event.packet->data, sizeof(shared::SpawnPacket));
+                    auto entity = registry.create();
+                    entityMap[spawnPacket.entityId] = entity;
+                    registry.emplace<shared::Position>(entity, spawnPacket.x, spawnPacket.y);
+                    registry.emplace<shared::Entity>(entity, spawnPacket.entityId);
+                    break;
+                }
+                case shared::PacketType::ASSIGN_ENTITY: {
+                    shared::AssignPacket assignPacket;
+                    std::memcpy(&assignPacket, event.packet->data, sizeof(shared::AssignPacket));
+                    myEntityId = assignPacket.entityId;
+                    break;
+                }
+                case shared::PacketType::DESPAWN_ENTITY: {
+                    shared::DespawnPacket despawnPacket;
+                    std::memcpy(&despawnPacket, event.packet->data, sizeof(shared::DespawnPacket));
+                    auto it = entityMap.find(despawnPacket.entityId);
+                    if (it != entityMap.end()) {
+                        registry.destroy(it->second);
+                        entityMap.erase(it);
+                        printf("Destroyed entity %d\n", despawnPacket.entityId);
+                    }
+                    break;
+                }
+                case shared::PacketType::UPDATE_POSITION: {
+                    shared::StateHeader stateHeader;
+                    std::memcpy(&stateHeader, event.packet->data, sizeof(shared::StateHeader));
+                    auto stateEntries =reinterpret_cast<shared::StateEntry*>(event.packet->data + sizeof(shared::StateHeader));
+                    for (int i = 0; i < stateHeader.count; i++) {
+                        auto it = entityMap.find(stateEntries[i].entityId);
+                        if (it != entityMap.end()) {
+                          registry.replace<shared::Position>(it->second, stateEntries[i].x, stateEntries[i].y);
+                        }
+                    }
+                    break;
+                }
+                default:
+                    printf("Received unknown packet type %d\n", type);
+                    break;
+            }
             /* Clean up the packet now that we're done using it. */
+
             enet_packet_destroy (event.packet);
-            
+            // log for verification
+            auto view = registry.view<shared::Entity, shared::Position>();
+            for (auto ent : view) {
+                auto& e = view.get<shared::Entity>(ent);
+                auto& p = view.get<shared::Position>(ent);
+                printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
+                      e.id == myEntityId ? " (me)" : "");
+            }
             break;
-          
+        }
         case ENET_EVENT_TYPE_DISCONNECT:
             printf ("%s disconnected.\n", event.peer -> data);
     
@@ -140,7 +198,7 @@ int main() {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
       currentKeys |= 0x08;
     }
-    if (currentKeys != previousKeys && currentKeys != 0) {
+    if (currentKeys != previousKeys) {
       printf("Sending packet with keys %d\n", currentKeys);
       shared::InputPacket inputPacket;
       inputPacket.type = shared::PacketType::KEYBOARD_INPUT;
