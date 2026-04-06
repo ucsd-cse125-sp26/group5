@@ -157,15 +157,15 @@ TBD. (Define what each milestone means, what “done” looks like, and target d
 
 | Week | Art/Sound | Graphics | Game Engine/Networking | Physics | Game Logic |
 |---|---|---|---|---|---|
-| 1 | TBD | Display a window | Exchange packets between a client/server | Think about physics | Think about game logic |
-| 2 | Figure out sound library | Render a cube that's backed by server-synchronized ECS | Propagate more attributes necessary for rendering + come up with the final architecture | Determine what is needed in terms of physics, decide on NIH syndrome or library, maybe some basic implementation | Plan out concept and pseudocode for game logic |
-| 3 | Play sounds | Import arbitrary models | Implement final ECS synchronization architecture | Movement and Collision | Loot spawning |
-| 4 | Play sounds backed by ECS | Textures and materials | Networking optimizations + Level loading | Terrain | Loot collection |
-| 5 | TBD | Animations | Any additional networking features that don't go through ECS | More precise bounding boxes + game logic enablement | Moving between levels/maps |
-| 6 | TBD | Lighting | Data use shrinkage/proper delta states | game logic enablement | Scoring, color restoration |
-| 7 | TBD | GUI? | Lobby system? | game logic enablement | Time limit+timer+level specific mechanics |
-| 8 | Add final sounds | Making everything fast and beautiful + bug fixes | cross-platform testing | game logic enablement | Level specific mechanics |
-| 9 | bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish |
-| 10 | Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing |
+| 1 | Brainstorm + learn Blender basics | Display a window | Exchange packets between a client/server | Think about physics | Think about game logic |
+| 2 | Concept art for character and map models, continue learning Blender | Render a cube that's backed by server-synchronized ECS | Propagate more attributes necessary for rendering + come up with the final architecture | Determine what is needed in terms of physics, decide on NIH syndrome or library, maybe some basic implementation | Plan out concept and pseudocode for game logic |
+| 3 | Concept art for character and map models, continue learning Blender | Import arbitrary models | Implement final ECS synchronization architecture | Movement and Collision | Loot spawning |
+| 4 | Basic modeling: landscape and character | Textures and materials | Networking optimizations + Level loading | Terrain | Loot collection |
+| 5 | Basic modeling: landscape and character | Animations | Any additional networking features that don't go through ECS | More precise bounding boxes + game logic enablement | Moving between levels/maps |
+| 6 | Refinement on models | Lighting | Data use shrinkage/proper delta states | game logic enablement | Scoring, color restoration |
+| 7 | Refinement on models | GUI? | Lobby system? | game logic enablement | Time limit+timer+level specific mechanics |
+| 8 | Refinement on models + model integration with code | Making everything fast and beautiful + bug fixes | cross-platform testing | game logic enablement | Level specific mechanics |
+| 9 | Model integration with code + bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish | bugfixes and polish |
+| 10 | Model integration with code + Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing | Demo prep + testing |
 
 The schedule for most technical things is probably fake past week 4 since from there we dont know how much time or effort things will require, and work prioritization will more liekly be driven by the needs of people as they implement things.
