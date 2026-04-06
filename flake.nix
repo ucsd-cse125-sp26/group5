@@ -54,6 +54,13 @@
             # Python (for glad)
             (python3.withPackages (ps: [ ps.jinja2 ]))
 
+            # Jekyll (docs site)
+            ruby
+            bundler
+
+            # Jekyll (docs site)
+            jekyll
+
             # Windows cross-compilation
             mingw.stdenv.cc
           ];
