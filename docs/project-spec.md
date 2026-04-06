@@ -39,8 +39,8 @@ TBD.
 - Shengrui (Leon) Chen: Game Logic
 - Ziyue (Tim) Liu: Networking
 - Alain Zhang: Physics
-- Rebecca Chen: Modeling, Art
-- Sarah Balatbat: Modeling, Art
+- Rebecca Chen: Art direction, Web Dev, Modeling 
+- Sarah Balatbat: Modeling
 - Phillip Mai: Game Logic
 
 ### Decision-Making
