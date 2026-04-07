@@ -3,4 +3,4 @@
 build
 build-linux-gcc
 build-windows
-sprint.md
+src/sprint.md
