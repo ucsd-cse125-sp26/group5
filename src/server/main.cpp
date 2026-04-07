@@ -191,11 +191,11 @@ int main() {
         stateHeader.type = shared::PacketType::UPDATE_POSITION;
         stateHeader.count = stateEntries.size();
         size_t totalSize = sizeof(shared::StateHeader) + sizeof(shared::StateEntry) * stateEntries.size();
-        ENetPacket * packet = enet_packet_create (&stateHeader, totalSize, 0);
+        ENetPacket * packet = enet_packet_create (&stateHeader, totalSize, ENET_PACKET_FLAG_RELIABLE);
 
         std::memcpy(packet->data, &stateHeader, sizeof(shared::StateHeader));
         std::memcpy(packet->data + sizeof(shared::StateHeader), stateEntries.data(), sizeof(shared::StateEntry) * stateEntries.size());
-        enet_host_broadcast(server, 1, packet);
+        enet_host_broadcast(server, 0, packet);
         // sleep for 50ms
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
