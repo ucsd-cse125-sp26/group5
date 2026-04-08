@@ -6,15 +6,34 @@ permalink: /project-spec/
 
 ## Project Description
 ### About this game: 
-[Game name] is a cozy game about retrieving fading memory. You play as employees of the memory recovery service, where you go into the client's dreams per their request to retrieve their fading memory, painting their favorite moments back to colors by collaboratly solving little puzzles, before the timer strikes and they wake up. Beware! You will have to work together as a team. 
+[Game name] is a cozy game about retrieving fading memory. You play as employees of the memory recovery service, where you go into the client's dreams per their request to retrieve their fading memory, painting their favorite moments back to colors by collaboratively solving little puzzles before the timer strikes and they wake up. Beware! You will have to work together as a team. 
 
 ### Landscape 
 In this initial version, we will only have one map, initially black and white- somewhat sad, right? There are several different regions on the map. Each region spawns one memory fragment randomly within their bound, each coming with their own little puzzle game. Each puzzle will require 4 players' interactions to solve. It is up to the players to decide how to collaborate. 
 
-### Character sprites 
-[Fill this in here!]
+### Character Design 
+Our models will draw some inspiration from *Overcooked* and *Webfishing*. We plan to have different character models that players can choose from when they play. The character models will be simple, having only a somewhat pill-shaped body, a head, and floating balls for hands for ease of modeling, rigging, and texturing as well as style.
+
+- Must-Have Designs
+  - Corgi
+  - Cat
+  - Goose
+  - Gurf
+- Would-Be-Nice Designs
+  - Dog: Siberian, Golden Retriever
+  - Cat: Black, Orange
+  - Mouse
+  
+
 ### Mini Puzzles 
-[Fill this in here!]
+Every memory fragment is retrieved when their associated puzzle is solved. Here is our list of puzzles.
+1. Maze: The memory service customer manifests in their dream in a maze. Each of the four players control one of four cardinal directions. The team must work together to quickly navigate the maze as the customer to retrieve the memory.
+2. Cube: Each player can only see one of four walls of a cube. Three walls have a hint to solve the puzzle on the fourth wall. This can be some permutation of numbers, shapes, colors, or words. The team must work together to figure out the hints and submit the correct permutation.
+3. Type: Each of four players have `n` words to type. All of them must type their words quickly and accurately to solve the puzzle.
+4. Memory: A randomly generated pattern of cards is shown to all the players for some set amount of time to remember. The cards will have a color, shape, and number on every card. The players will then have to recreate the pattern they were given. They are scored based on accuracy, and can proceed upon reaching a threshold. Otherwise, they'll have to retry the puzzle.
+5. Decrypt: The team is given an encrypted phrase. They \[ are given / must find out \] the key, then successfully decrypt the phrase.
+
+
 --- 
 ### 1. What kind of game are you planning to build?
 
