@@ -3,10 +3,13 @@ layout: page
 title: Weekly Reports
 permalink: /weekly-reports/
 ---
-
 # [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz)
 --- 
+# Week 2 Group report 
+### What we did    
+Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
 
+---
 ## Week 1 Group report 
 
 ### What we did
