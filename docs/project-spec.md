@@ -5,34 +5,38 @@ permalink: /project-spec/
 ---
 
 ## Project Description
+### About this game: 
+[Game name] is a cozy game about retrieving fading memory. You play as employees of the memory recovery service, where you go into the client's dreams per their request to retrieve their fading memory, painting their favorite moments back to colors by collaboratly solving little puzzles, before the timer strikes and they wake up. Beware! You will have to work together as a team. 
+
+### Landscape 
+In this initial version, we will only have one map, initially black and white- somewhat sad, right? There are several different regions on the map. Each region spawns one memory fragment randomly within their bound, each coming with their own little puzzle game. Each puzzle will require 4 players' interactions to solve. It is up to the players to decide how to collaborate. 
+
+### Character sprites 
+[Fill this in here!]
+### Mini Puzzles 
+[Fill this in here!]
+--- 
 ### 1. What kind of game are you planning to build?
 
-Our game is a 3D co-op collection game where a 4 or above players team move through a fading, gray world and restore it by collecting memory fragments. Players progress through connected sections of a decaying map,  completing tasks and collecting randomly spawned memory fragments that  bring color and life back to each area. The team must balance collecting as many fragments as possible against moving forward quickly to beat the previous speedrun record. 
+Our game is a 3D co-op experience where a team of four or more players take on the role of employees in a memory recovery service. Players enter a client’s fading dreamscape, a gray, decaying world, and work together to restore it by retrieving scattered memory fragments. As players explore the regions, they collaborate to recover these fragments, gradually bringing color and life back to each area. The team must communicate and coordinate effectively to navigate the dream before time runs out and the client wakes up.
 
 ### 2. What are the goals of the game, how do players win, how do they lose?
-There are two ideas for the game: either limited timed, or unlimited timed but based on beating previous record. 
-#### **Win:** 
-The team successfully reaches the final area having restored as much of the world as possible by collecting memory fragments and completing team tasks. 
+Our game is timed, meaning the players must finish solving all puzzles, else it is considered as a fail. A percentage bar will be given to show how much was completed at the end of the game. 
 
-The final score still needs to be thought out; It is based on either 
-  - The number of fragments collected    
-  - The speed of completion   
-  - Or both   
+#### **Win:** 
+The team successfully recolors the entire client’s dream by retrieving memory fragments and restoring key areas before the client wakes up. Success is measured by overall performance rather than a single condition.
 
 #### **Lose:** 
-Depending on our discussion, two possibilities: 
-1. The team fails to reach the final area before time runs out.
-2. The team did not beat its previous record. 
+The team fails if they are unable to recover enough of the client’s memories before the dream ends.
 
 #### **Replayability:** 
-After completing a run, players are scored on their progress and collection. Future runs encourage players to beat their previous time and score, creating a "beat your record" loop.
-
+Each run encourages players to replay dreams to improve coordination, and recover more fragments; The location of fragments will also differ each time, so they will have to find them. This creates both a “beat your previous performance” loop and a dynamic experience driven by randomized memory fragment generation.
 
 ### 3. What are the interesting or unique aspects to your game?
 - **A fading world brought back to life:** The world starts gray and colorless. As players collect memory fragments and complete area tasks, color is restored, making progress feel visually rewarding and emotionally meaningful.
 - **Memory fragments as loot:** Rather than generic collectibles, players are piecing together fragments of lost memory, which adds narrative intrigue and emotional investment.
 - **Speed vs. reward tension:** Players constantly choose between staying  longer in a section to collect more fragments (higher score) or pushing forward faster to beat the clock (better time). This creates meaningful moment-to-moment decision making.
-- **Required cooperation:** Certain doors, progress points, and  area-based tasks require multiple players to work together simultaneously, making communication and teamwork essential rather than optional.
+- **Required cooperation:** Completing the puzzles require multiple players to work together simultaneously, making communication and teamwork essential rather than optional.
 - **Replayable loop:** Memory fragments spawn randomly each run, threats vary, and players are incentivized to improve their time and score, giving the game strong replay value.
 
 ### 4. What are the list of features of your game? Prioritize them into at least three categories: "Must Have", "Would Be Really Nice", and "Cool But Only If Ahead Of Schedule".
@@ -43,8 +47,8 @@ After completing a run, players are scored on their progress and collection. Fut
     color as areas are completed
   - Time limit with a visible countdown/timer
   - Co-op task/door mechanics that require multiple players to proceed
-  - Win/lose condition based on reaching the final area before time expires, OR a "Beat your record" system 
-  - End-of-run score based on fragments colle cted and time taken
+  - Win/lose condition based on reaching the final area before time expires
+  - End-of-run score based on fragments collected and time taken
   - At least 1 map and 4 player models
 
 - **Would Be Really Nice**
