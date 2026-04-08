@@ -1,0 +1,51 @@
+\doxysection{protocol.\+h}
+\hypertarget{protocol_8h_source}{}\label{protocol_8h_source}\index{src/shared/protocol.h@{src/shared/protocol.h}}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{00001\ \textcolor{preprocessor}{\#pragma\ once}}
+\DoxyCodeLine{00002\ \textcolor{preprocessor}{\#include\ <cstdint>}}
+\DoxyCodeLine{00003\ }
+\DoxyCodeLine{00004\ \textcolor{keyword}{namespace\ }shared\ \{}
+\DoxyCodeLine{00005\ \ \ \ \ \textcolor{keyword}{enum\ class}\ PacketType\ :\ uint8\_t\ \{}
+\DoxyCodeLine{00006\ \ \ \ \ \ \ \ \ \textcolor{comment}{//\ input\ packets\ from\ client\ to\ server}}
+\DoxyCodeLine{00007\ \ \ \ \ \ \ \ \ KEYBOARD\_INPUT,}
+\DoxyCodeLine{00008\ \ \ \ \ \ \ \ \ \textcolor{comment}{//\ state\ update\ packets\ from\ server\ to\ client}}
+\DoxyCodeLine{00009\ \ \ \ \ \ \ \ \ UPDATE\_POSITION,}
+\DoxyCodeLine{00010\ \ \ \ \ \ \ \ \ SPAWN\_ENTITY,}
+\DoxyCodeLine{00011\ \ \ \ \ \ \ \ \ ASSIGN\_ENTITY,}
+\DoxyCodeLine{00012\ \ \ \ \ \ \ \ \ DESPAWN\_ENTITY,}
+\DoxyCodeLine{00013\ \ \ \ \ \};}
+\DoxyCodeLine{00014\ }
+\DoxyCodeLine{00015\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1AssignPacket}{AssignPacket}}\ \{}
+\DoxyCodeLine{00016\ \ \ \ \ \ \ \ \ PacketType\ type;}
+\DoxyCodeLine{00017\ \ \ \ \ \ \ \ \ uint32\_t\ entityId;}
+\DoxyCodeLine{00018\ \ \ \ \ \};}
+\DoxyCodeLine{00019\ }
+\DoxyCodeLine{00020\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1DespawnPacket}{DespawnPacket}}\ \{}
+\DoxyCodeLine{00021\ \ \ \ \ \ \ \ \ PacketType\ type;}
+\DoxyCodeLine{00022\ \ \ \ \ \ \ \ \ uint32\_t\ entityId;}
+\DoxyCodeLine{00023\ \ \ \ \ \};}
+\DoxyCodeLine{00024\ }
+\DoxyCodeLine{00025\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1SpawnPacket}{SpawnPacket}}\ \{}
+\DoxyCodeLine{00026\ \ \ \ \ \ \ \ \ PacketType\ type;}
+\DoxyCodeLine{00027\ \ \ \ \ \ \ \ \ uint32\_t\ entityId;}
+\DoxyCodeLine{00028\ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\ x,\ y;}
+\DoxyCodeLine{00029\ \ \ \ \ \};}
+\DoxyCodeLine{00030\ }
+\DoxyCodeLine{00031\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1StateHeader}{StateHeader}}\{}
+\DoxyCodeLine{00032\ \ \ \ \ \ \ \ \ PacketType\ type;}
+\DoxyCodeLine{00033\ \ \ \ \ \ \ \ \ uint8\_t\ count;}
+\DoxyCodeLine{00034\ \ \ \ \ \};}
+\DoxyCodeLine{00035\ }
+\DoxyCodeLine{00036\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1StateEntry}{StateEntry}}\ \{}
+\DoxyCodeLine{00037\ \ \ \ \ \ \ \ \ uint32\_t\ entityId;}
+\DoxyCodeLine{00038\ \ \ \ \ \ \ \ \ \textcolor{keywordtype}{float}\ x,\ y;}
+\DoxyCodeLine{00039\ \ \ \ \ \};}
+\DoxyCodeLine{00040\ }
+\DoxyCodeLine{00041\ \ \ \ \ \textcolor{keyword}{struct\ }\mbox{\hyperlink{structshared_1_1InputPacket}{InputPacket}}\ \{}
+\DoxyCodeLine{00042\ \ \ \ \ \ \ \ \ PacketType\ type;}
+\DoxyCodeLine{00043\ \ \ \ \ \ \ \ \ uint8\_t\ keys;}
+\DoxyCodeLine{00044\ \ \ \ \ \};}
+\DoxyCodeLine{00045\ \}}
+
+\end{DoxyCode}
