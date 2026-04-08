@@ -19,6 +19,9 @@ Run ./format.sh to format your code before comitting please.
 ## libraries
 We currently use GLFW, GLAD, ENet, EnTT, and Dear Imgui as external libraries for various functionality.
 
+## Documentation
+Run `doxygen Doxyfile` to generate HTML docs in `html/`.
+
 ## Website (Jekyll) local preview
 
 The course website lives in `docs/` (Jekyll).
