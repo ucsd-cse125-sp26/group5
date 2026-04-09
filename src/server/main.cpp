@@ -4,6 +4,8 @@
 #include "shared/protocol.h"
 #include <enet/enet.h>
 #include "shared/components.h"
+#include "shared/component_registry.h"
+#include "network.h"
 #include <map>
 #include <entt/entt.hpp>
 #include <thread>
@@ -41,6 +43,7 @@ void movement_system(entt::registry &registry, float dt) {
 int main() {
   std::cout << "Hello World Server";
   shared::hello();
+  shared::registerAllSyncedComponents();
   if (enet_initialize () != 0)
     {
         fprintf (stderr, "An error occurred while initializing ENet.\n");
@@ -177,25 +180,8 @@ int main() {
 
         float dt = 0.05f;
         movement_system(registry, dt);
+        broadcastState(server, registry);
 
-        auto view = registry.view<shared::Position>();
-        std::vector<shared::StateEntry> stateEntries;
-
-        for (auto entity: view) {
-          auto &position = view.get<shared::Position>(entity);
-          auto entityId = registry.get<shared::Entity>(entity).id;
-          stateEntries.push_back(shared::StateEntry{entityId, position.x, position.y});
-        }
-        
-        shared::StateHeader stateHeader;
-        stateHeader.type = shared::PacketType::UPDATE_POSITION;
-        stateHeader.count = stateEntries.size();
-        size_t totalSize = sizeof(shared::StateHeader) + sizeof(shared::StateEntry) * stateEntries.size();
-        ENetPacket * packet = enet_packet_create (&stateHeader, totalSize, ENET_PACKET_FLAG_RELIABLE);
-
-        std::memcpy(packet->data, &stateHeader, sizeof(shared::StateHeader));
-        std::memcpy(packet->data + sizeof(shared::StateHeader), stateEntries.data(), sizeof(shared::StateEntry) * stateEntries.size());
-        enet_host_broadcast(server, 0, packet);
         // sleep for 50ms
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
