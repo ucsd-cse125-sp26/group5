@@ -6,7 +6,7 @@ namespace shared {
         // input packets from client to server
         KEYBOARD_INPUT,
         // state update packets from server to client
-        UPDATE_POSITION,
+        UPDATE_ENTITY,
         SPAWN_ENTITY,
         ASSIGN_ENTITY,
         DESPAWN_ENTITY,
@@ -24,16 +24,6 @@ namespace shared {
 
     struct SpawnPacket {
         PacketType type;
-        uint32_t entityId;
-        float x, y;
-    };
-
-    struct StateHeader{
-        PacketType type;
-        uint8_t count;
-    };
-
-    struct StateEntry {
         uint32_t entityId;
         float x, y;
     };

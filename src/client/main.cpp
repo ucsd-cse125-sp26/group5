@@ -10,12 +10,16 @@
 #include "shared/hello.h"
 #include "shared/protocol.h"
 #include "shared/components.h"
+#include "shared/component_registry.h"
 #include "cstring"
 #include <map>
-
+#include "global.h"
+#include "network.h"
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
+  shared::registerAllSyncedComponents();
+
 
   GLFWwindow* window;
 
@@ -71,10 +75,6 @@ int main() {
       enet_host_destroy(client);
       return EXIT_FAILURE;
   }
-
-  entt::registry registry;
-  uint32_t myEntityId = UINT32_MAX;
-  std::map<uint32_t, entt::entity> entityMap;
 
   /* Initialize the library */
   if (!glfwInit()) return -1;
@@ -132,16 +132,8 @@ int main() {
                     }
                     break;
                 }
-                case shared::PacketType::UPDATE_POSITION: {
-                    shared::StateHeader stateHeader;
-                    std::memcpy(&stateHeader, event.packet->data, sizeof(shared::StateHeader));
-                    auto stateEntries =reinterpret_cast<shared::StateEntry*>(event.packet->data + sizeof(shared::StateHeader));
-                    for (int i = 0; i < stateHeader.count; i++) {
-                        auto it = entityMap.find(stateEntries[i].entityId);
-                        if (it != entityMap.end()) {
-                          registry.replace<shared::Position>(it->second, stateEntries[i].x, stateEntries[i].y);
-                        }
-                    }
+                case shared::PacketType::UPDATE_ENTITY: {
+                    update_entity_system(event.packet);
                     break;
                 }
                 default:
