@@ -47,6 +47,9 @@ If you want it at root instead: run bundle exec jekyll serve --baseurl "" and op
 
 ### Upload to cse125
 ```bash
+# If jekyll is onlty local, go into doc file: 
+bundle exec jekyll build && scp -P222 -r _site/*  jic098@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5
+
 jekyll build && scp -P222 -r _site/*  jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5
 ```
 
