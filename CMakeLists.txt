@@ -43,3 +43,8 @@ target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
 target_link_libraries(server PRIVATE shared enet EnTT::EnTT)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
