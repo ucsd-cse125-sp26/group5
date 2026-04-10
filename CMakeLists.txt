@@ -11,7 +11,10 @@ target_include_directories(shared PUBLIC
 
 add_subdirectory(lib/glfw)
 
+add_subdirectory(lib/glm)
+
 add_subdirectory(lib/enet)
+target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
 
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
@@ -47,7 +50,7 @@ target_sources(client PRIVATE
     src/client/client_network.cpp
     src/client/client_game.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm)
 
 add_executable(server)
 target_sources(server PRIVATE
