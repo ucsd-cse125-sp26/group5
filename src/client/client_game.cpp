@@ -8,6 +8,7 @@
 #include "shared/component_registry.h"
 #include "shared/components.h"
 #include "shared/protocol.h"
+#include <cassert>
 
 // ── Component deserialization helper ─────────────────────
 //
@@ -17,18 +18,23 @@
 static void deserializeComponents(ClientGame& game, entt::entity ent,
                                   const uint8_t* data, size_t& offset,
                                   size_t len) {
+  assert(offset + sizeof(uint16_t) <= len && "read overflows packet");
   uint16_t compCount;
   std::memcpy(&compCount, data + offset, sizeof(uint16_t));
   offset += sizeof(uint16_t);
   for (uint16_t c = 0; c < compCount; c++) {
     shared::ComponentTypeId cid;
+    assert(offset + sizeof(uint16_t) <= len && "read overflows packet");
     std::memcpy(&cid, data + offset, sizeof(uint16_t));
     offset += sizeof(uint16_t);
     uint16_t dataSize;
+    assert(offset + sizeof(uint16_t) <= len && "read overflows packet");
     std::memcpy(&dataSize, data + offset, sizeof(uint16_t));
     offset += sizeof(uint16_t);
-    auto& meta = shared::getComponentRegistry()[cid];
-    meta.deserialize(game.registry, ent, data + offset, dataSize);
+    assert(offset + dataSize <= len && "read overflows packet");
+    auto it = shared::getComponentRegistry().find(cid);
+    if(it == shared::getComponentRegistry().end()) return;
+    (it->second).deserialize(game.registry, ent, data + offset, dataSize);
     offset += dataSize;
   }
 }

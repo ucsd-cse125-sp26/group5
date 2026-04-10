@@ -13,7 +13,7 @@ class ServerNetwork;
 struct ServerGame {
   entt::registry registry;
   std::map<ENetPeer*, entt::entity> peerEntityMap;
-  uint8_t nextEntityId = 0;
+  uint32_t nextEntityId = 0;
 };
 
 void movement_system(entt::registry& registry, float dt);
