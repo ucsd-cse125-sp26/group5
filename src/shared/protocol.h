@@ -22,12 +22,6 @@ namespace shared {
         uint32_t entityId;
     };
 
-    struct SpawnPacket {
-        PacketType type;
-        uint32_t entityId;
-        float x, y;
-    };
-
     struct InputPacket {
         PacketType type;
         uint8_t keys;
