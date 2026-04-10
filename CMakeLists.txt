@@ -49,8 +49,15 @@ target_sources(client PRIVATE
     src/client/main.cpp
     src/client/client_network.cpp
     src/client/client_game.cpp
+    src/client/shaders.cpp
 )
 target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm)
+
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/shaders
+        $<TARGET_FILE_DIR:client>/shaders
+)
 
 add_executable(server)
 target_sources(server PRIVATE
