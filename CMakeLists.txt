@@ -30,6 +30,9 @@ glad_add_library(glad_gl_core_46 REPRODUCIBLE API gl:core=4.6)
 
 add_subdirectory(lib/entt)
 
+SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
+add_subdirectory(lib/assimp)
+
 add_library(imgui
     lib/imgui/imgui.cpp
     lib/imgui/imgui_draw.cpp
@@ -51,7 +54,7 @@ target_sources(client PRIVATE
     src/client/client_game.cpp
     src/client/shaders.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm assimp)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
