@@ -32,7 +32,7 @@ static void deserializeComponents(ClientGame& game, entt::entity ent,
     offset += sizeof(uint16_t);
     assert(offset + dataSize <= len && "read overflows packet");
     auto* meta = game.componentRegistry.find(cid);
-    if (!meta) return;
+    if (!meta) continue;
     meta->deserialize(game.registry, ent, data + offset, dataSize);
     offset += dataSize;
   }
