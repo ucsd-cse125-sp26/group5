@@ -2,13 +2,12 @@
 
 #include <GLFW/glfw3.h>
 
+#include <cassert>
 #include <cstring>
 
 #include "client_network.h"
-#include "shared/component_registry.h"
 #include "shared/components.h"
 #include "shared/protocol.h"
-#include <cassert>
 
 // ── Component deserialization helper ─────────────────────
 //
@@ -32,9 +31,9 @@ static void deserializeComponents(ClientGame& game, entt::entity ent,
     std::memcpy(&dataSize, data + offset, sizeof(uint16_t));
     offset += sizeof(uint16_t);
     assert(offset + dataSize <= len && "read overflows packet");
-    auto it = shared::getComponentRegistry().find(cid);
-    if(it == shared::getComponentRegistry().end()) return;
-    (it->second).deserialize(game.registry, ent, data + offset, dataSize);
+    auto* meta = game.componentRegistry.find(cid);
+    if (!meta) return;
+    meta->deserialize(game.registry, ent, data + offset, dataSize);
     offset += dataSize;
   }
 }

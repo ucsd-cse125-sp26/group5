@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 4.1)
 project(cse125-game)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_library(shared
     src/shared/hello.cpp)
@@ -12,6 +12,11 @@ target_include_directories(shared PUBLIC
 add_subdirectory(lib/glfw)
 
 add_subdirectory(lib/enet)
+
+add_library(zpp_bits INTERFACE)
+target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
+
+target_link_libraries(shared PUBLIC zpp_bits)
 
 # Path to glad directory
 set(GLAD_SOURCES_DIR "${PROJECT_SOURCE_DIR}/lib/glad/")
