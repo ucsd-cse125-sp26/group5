@@ -6,11 +6,13 @@
 #include <map>
 #include <vector>
 
+#include "shared/component_registry.h"
 #include "shared/protocol.h"
 
 class ServerNetwork;
 
 struct ServerGame {
+  shared::ComponentRegistry componentRegistry;
   entt::registry registry;
   std::map<ENetPeer*, entt::entity> peerEntityMap;
   uint32_t nextEntityId = 0;
@@ -24,5 +26,7 @@ void registerServerHandlers(ServerNetwork& network);
 // dirtyOnly is reserved for future delta updates — currently ignored (always
 // full snapshot).
 std::vector<uint8_t> serializeEntities(
-    entt::registry& registry, shared::PacketType packetType,
-    const std::vector<entt::entity>& entities, bool dirtyOnly);
+    entt::registry& registry,
+    const shared::ComponentRegistry& componentRegistry,
+    shared::PacketType packetType, const std::vector<entt::entity>& entities,
+    bool dirtyOnly);

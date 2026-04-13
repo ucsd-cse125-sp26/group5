@@ -4,7 +4,6 @@
 
 #include "server_game.h"
 #include "server_network.h"
-#include "shared/component_registry.h"
 #include "shared/components.h"
 #include "shared/hello.h"
 #include "shared/net/packet_utils.h"
@@ -13,9 +12,9 @@
 int main() {
   std::cout << "Hello World Server";
   shared::hello();
-  shared::registerAllSyncedComponents();
 
   ServerGame game;
+  game.componentRegistry = shared::createDefaultRegistry();
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -30,8 +29,9 @@ int main() {
     auto view = g.registry.view<shared::Entity>();
     for (auto ent : view) existing.push_back(ent);
     if (!existing.empty()) {
-      auto buf = serializeEntities(g.registry, shared::PacketType::SPAWN_ENTITY,
-                                   existing, false);
+      auto buf =
+          serializeEntities(g.registry, g.componentRegistry,
+                            shared::PacketType::SPAWN_ENTITY, existing, false);
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
@@ -45,8 +45,9 @@ int main() {
     g.registry.emplace<shared::Entity>(entity, g.nextEntityId);
 
     // Broadcast the new entity's full state to all clients
-    auto buf = serializeEntities(g.registry, shared::PacketType::SPAWN_ENTITY,
-                                 {entity}, false);
+    auto buf =
+        serializeEntities(g.registry, g.componentRegistry,
+                          shared::PacketType::SPAWN_ENTITY, {entity}, false);
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
     // Tell the new client which entity is theirs
@@ -73,23 +74,31 @@ int main() {
   };
 
   registerServerHandlers(network);
-
+  auto previousTime = std::chrono::high_resolution_clock::now();
+  const float fixedDt = 0.05f;
+  float accumulator = 0.0f;
   while (true) {
     network.poll(game);
 
-    float dt = 0.05f;
-    movement_system(game.registry, dt);
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float dt = std::chrono::duration<float>(currentTime - previousTime).count();
+    previousTime = currentTime;
+    accumulator += dt;
 
     // Broadcast delta state to all clients (dirtyOnly=false for now — full
     // snapshot every tick)
     std::vector<entt::entity> allEnts;
     auto view = game.registry.view<shared::Entity>();
     for (auto ent : view) allEnts.push_back(ent);
-    auto buf = serializeEntities(
-        game.registry, shared::PacketType::UPDATE_ENTITY, allEnts, false);
+    auto buf =
+        serializeEntities(game.registry, game.componentRegistry,
+                          shared::PacketType::UPDATE_ENTITY, allEnts, false);
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    while (accumulator >= fixedDt) {
+      movement_system(registry, fixedDt);
+      accumulator -= fixedDt;
+    }
   }
 
   network.shutdown();

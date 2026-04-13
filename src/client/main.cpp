@@ -8,15 +8,14 @@
 
 #include "client_game.h"
 #include "client_network.h"
-#include "shared/component_registry.h"
 #include "shared/hello.h"
 
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
-  shared::registerAllSyncedComponents();
 
   ClientGame game;
+  game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {

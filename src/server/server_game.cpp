@@ -3,7 +3,6 @@
 #include <cstring>
 
 #include "server_network.h"
-#include "shared/component_registry.h"
 #include "shared/components.h"
 
 // ── Movement system ──────────────────────────────────────
@@ -56,8 +55,10 @@ void registerServerHandlers(ServerNetwork& network) {
 // └─────────────────────────────────────────────────────────┘
 
 std::vector<uint8_t> serializeEntities(
-    entt::registry& registry, shared::PacketType packetType,
-    const std::vector<entt::entity>& entities, bool dirtyOnly) {
+    entt::registry& registry,
+    const shared::ComponentRegistry& componentRegistry,
+    shared::PacketType packetType, const std::vector<entt::entity>& entities,
+    bool dirtyOnly) {
   std::vector<uint8_t> buffer;
 
   size_t headerPos = buffer.size();
@@ -72,15 +73,15 @@ std::vector<uint8_t> serializeEntities(
     buffer.resize(buffer.size() + sizeof(uint32_t) + sizeof(uint16_t));
 
     uint16_t compCount = 0;
-    for (auto cid : shared::getSyncedComponentIds()) {
-      // dirtyOnly filtering reserved for future delta updates
+    for (auto cid : componentRegistry.syncedIds()) {
       (void)dirtyOnly;
 
-      auto& meta = shared::getComponentRegistry()[cid];
+      auto* meta = componentRegistry.find(cid);
+      if (!meta) continue;
       size_t before = buffer.size();
       buffer.resize(buffer.size() + sizeof(uint16_t) + sizeof(uint16_t));
       std::vector<uint8_t> compBuf;
-      if (meta.serialize(registry, ent, compBuf)) {
+      if (meta->serialize(registry, ent, compBuf)) {
         uint16_t dataSize = static_cast<uint16_t>(compBuf.size());
         std::memcpy(&buffer[before], &cid, sizeof(uint16_t));
         std::memcpy(&buffer[before + sizeof(uint16_t)], &dataSize,
