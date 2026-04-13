@@ -96,7 +96,7 @@ int main() {
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
     while (accumulator >= fixedDt) {
-      movement_system(registry, fixedDt);
+      movement_system(game.registry, fixedDt);
       accumulator -= fixedDt;
     }
   }
