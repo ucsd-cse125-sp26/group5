@@ -2,11 +2,37 @@
 
 ## Week 2
 1. What were your concrete goals for the week?
+My current goal for the week was to: 
+- Keep learning modeling and gather resources I need to create the model 
+- Keep all teammates in check for progress of whole tean 
+- Get basic model and design of the game set up, make sure everything is falling into place 
+- Communicate next steps
+- Update project spec
+
 2. What goals were you able to accomplish?
+- Learning blender modeling: Successfully familarized myself with modeling, Got assets and general plannings down for how to do the texture etc. 
+- Keep all teammates in check: it seems everyone's fine with keeping a general weekly reports document. This is good. I also make announcements on the **important** channel on discord. Everything is going smoothly on this part. 
+- Have a draft of how the map should look like in 3D. this is good. 
+- Communicated next step in today's meeting. 
+- Updated project spec from more ambiguous to more clear. 
+
 3. If the week went differently than you had planned, what were the reasons? 
+- I think I was able to get what I want to get done done. I create very careful plannings of what I need to do. 
 4. What are your specific goals for the next week?
+**Admin:**
+- Update project spec for new stories and new puzzles brainstormed (IMPORTANT)
+- Determine size of model 
+- Create group report from everyone 
+**Modeling** 
+- Assets: start modeling complex assets
+    - Rigging bear model 
+    - Start fallen star model 
+- Landscape: Wednesday, work with friend on advancing the draft 
+Prioritize the above instead of anything else 
 5. What did you learn this week, if anything (and did you expect to learn it)?
+- Learned a bunch of blender stuff and Im content with what I have done 
 6. What is your individual morale (which might be different from the overall group morale)?
+- As basically the team leader, I need to make sure communication is good. I am in good connection with my modeling team so that's great; I am not following up on the technical team but I have trust in Jacob as the tech lead, so I am not worried. 
 
 
 ## Week 1
