@@ -8,103 +8,102 @@ permalink: /game-logic/story/
 
 ---
 
-## High Concept
+## High concept
 
-In this world, memories can fade before people are ready to lose them.
-Your team works for a Memory Recovery Service: specialists who enter unstable dreamscapes and restore important memories before they disappear.
+Players work for a **Memory Recovery Service**: they enter one client’s fading dream and restore memories before time runs out.
 
-Each mission is one client, one dream, and one limited window before wake-up.
+**This mission’s client:** an **elderly person** revisiting their own **life story**—not a fantasy world, not a rescue from disaster. The team walks their dream **in order**, one major chapter at a time.
 
----
+### Why they are here (what leads to this session)
 
-## Setting
+The client **chose** this session: a **light, nostalgic** reason, not trauma. The service is framed as something **anyone** can use to **revisit and strengthen** memories—for **fun**, **warmth**, and **connection to their younger selves**. No accident plot, no medical crisis required for v1.
 
-The dream starts in grayscale.
-It is not just visual style: it represents missing emotional detail.
-Each region of the map contains a memory fragment tied to a cooperative puzzle.
-When players recover a fragment, the related part of the world regains color.
+**Why that helps the project:**
 
-As color returns, the dream feels more alive, warm, and coherent.
+- **Mood:** warmer and simpler to pitch than injury or loss.
+- **Seasons:** spring → winter now reads as **one full life**, ending in **old age**—which fits an elderly protagonist and a **winter “going home”** beat.
+- **Demo / intro:** one line works: *“An older person books a dream visit to remember their life.”* Optional **short manga panels** at start can stay minimal.
 
----
-
-## Player Role
-
-Players are not heroes fighting enemies; they are a small rescue team.
-Their job is to communicate, split tasks, and rebuild a person's most meaningful moments.
-
-Core team fantasy:
-- "We are in this together."
-- "We can still save what matters."
+**What that means for the scene:** tonight’s run is **their scheduled visit**. The gray dreamscape is **their memory landscape**; the four players are the crew **authorized to help** complete each chapter. Wake-up closes the window—the timer stays **diegetic** (dream ending).
 
 ---
 
-## Mission Loop (Per Run)
+## Map structure (logic-facing)
 
-1. **Drop In**: Team enters the client's dream.
-2. **Explore**: Search regions for memory fragments.
-3. **Engage Puzzle**: Trigger the puzzle linked to a fragment.
-4. **Cooperate**: Share information and perform role-based actions.
-5. **Recover Fragment**: Puzzle success restores part of memory.
-6. **Recolor Region**: Environment shifts from gray toward full color.
-7. **Repeat**: Continue until timer ends or objective threshold is met.
+**Keep from earlier design:**
 
-This loop is the emotional and gameplay core of the project.
+- **One continuous map**, four sections, **linear unlock** (finish section *n* before section *n* + 1).
+- **One playable area at a time** at the system level: players are **gated** to the current section’s bounds (even if the world looks connected).
+- **Story + pacing + implementation** stay easier than a fully open order.
 
----
+### Four seasons = four life chapters (updated v1)
 
-## Pacing and Tension
+| Order | Life chapter | Season | Notes |
+|------|----------------|--------|--------|
+| 1 | **Birth / beginning** | **Spring** | Soft, new, fragile |
+| 2 | **Childhood + teenage years** | **Summer** | Playful, growing, bright |
+| 3 | **College + adult working life** | **Autumn** | Transition, maturity; e.g. **researcher** career—optional **CSE bear** cameo in this zone if art wants it |
+| 4 | **Old age / “present” elder self** | **Winter** | Quiet, reflective; **fallen star** at the end as **home**, warmth, and **reunion with one’s younger selves** |
 
-The run is timed.
-Teams constantly decide between:
-- going deeper for more fragments and score,
-- or securing completion before wake-up.
-
-That tradeoff creates replay value and meaningful team calls.
+Seasons stay **symbolic and art-facing**: they structure the life arc and keep each section visually distinct on one map.
 
 ---
 
-## Ending States
+## Why linear (design summary)
 
-### Successful Ending
-
-The team restores enough memory before time runs out.
-The map reaches a vivid final state.
-A calm "memory stabilized" moment confirms the client is no longer losing that part of themselves.
-
-Suggested tone: relief, warmth, closure.
-
-### Incomplete Ending
-
-Time expires before sufficient recovery.
-Only parts of the world are recolored.
-The remaining gray regions represent memories that slipped away this run.
-
-Suggested tone: bittersweet, not punishment-focused.
-Players should feel motivated to retry and improve.
+| Angle | Point |
+|-------|--------|
+| **Story** | A life reads as a sequence: beginning → youth → adulthood → age. Order reinforces meaning. |
+| **Co-op** | Shared milestones; the team advances **together** instead of scattering across an open map. |
+| **Production** | Easier to scope, trigger puzzles, and avoid broken progression logic. |
 
 ---
 
-## Why This Story Works for Co-op
+## Gameplay loop (per run)
 
-- Every puzzle requires communication, which matches the narrative of "memory reconstruction as teamwork."
-- Visual restoration (gray -> color) makes progress instantly readable.
-- The timer supports urgency without changing the cozy core.
-- Randomized fragment placement supports replayability while keeping the same story frame.
+1. Optional **short intro** (e.g. manga panels) establishes the client and booking—keep it tiny.
+2. Enter the dream (grayscale / faded).
+3. **Section 1 → 4 in order:** co-op puzzle per section, **restore** that chapter, **local color payoff**, **unlock 2D story panel**.
+4. **End:** timer out (partial / fail) or full run completes—including **final emotional beat** at **winter** (e.g. fallen star / “home”).
 
----
-
-## Optional Expansion Hooks
-
-If schedule allows later:
-- short client-specific memory flavor text,
-- region themes tied to memory categories (family, travel, childhood),
-- end-of-run recap cards showing what was recovered.
-
-These are additive and do not block the core loop.
+**Co-op intent:** puzzles should **require or strongly assume all four players** so memory feels rebuilt by **shared effort**.
 
 ---
 
-## One-Sentence Plot Pitch
+## Gray → color (3D)
 
-"A co-op memory recovery team dives into fading dreams, solves role-based puzzles under time pressure, and restores a grayscale world to color before the client's memories are lost."
+The world starts **drained / gray**; each completed chapter brings **color and warmth** back to that part of the map.
+
+---
+
+## 2D panels (narrative payoff)
+
+After each **3D section**, a **2D panel** locks in that chapter’s emotional read. At the end, **four panels** can form **one full sequence**—the life they walked through together.
+
+*(Logic note: unlocking panel N uses the same server rule as “section N complete,” which also opens section N + 1.)*
+
+---
+
+## Pacing and tension
+
+The run stays **timed**. Tension is **finish the life walk before the dream ends**, not choosing region order.
+
+---
+
+## Ending states
+
+**Success:** All four chapters cleared in time; final assembly (panels + winter “home” beat).
+
+**Incomplete:** Partial progress; **bittersweet**, not punishing—encourages retry.
+
+---
+
+## Tone
+
+**Light, nostalgic, cooperative, dreamy**—emotional without being grim. Value comes from **atmosphere, shared progression, and reunion across a life**, not combat.
+
+---
+
+## One-sentence pitch
+
+Four specialists move **linearly through one elder’s life** (spring birth → winter home) in a single dream, **co-op puzzles** restore each chapter, **2D panels** anchor the story, and the clock stops when the dream ends.
