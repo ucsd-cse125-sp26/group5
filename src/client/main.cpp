@@ -29,6 +29,8 @@ int main() {
 
   if (!glfwInit()) return -1;
 
+  glfwWindowHint(GLFW_SAMPLES, 4);
+
   GLFWwindow* window =
       glfwCreateWindow(640, 480, "Hello World", nullptr, nullptr);
   if (!window) {
@@ -112,6 +114,7 @@ int main() {
                GL_STATIC_DRAW);
 
   glEnable(GL_DEPTH_TEST);
+  glEnable(GL_MULTISAMPLE);
 
   uint8_t prevKeys = 0;
   glUseProgram(shaderProgram);
@@ -121,8 +124,7 @@ int main() {
   while (!glfwWindowShouldClose(window)) {
     i += 1;
     network.poll(game);
-    printEntityPositions(game);
-
+    // printEntityPositions(game);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
