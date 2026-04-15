@@ -54,6 +54,7 @@ target_sources(client PRIVATE
     src/client/client_network.cpp
     src/client/client_game.cpp
     src/client/shaders.cpp
+    src/client/util.cpp
 )
 target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm assimp)
 
