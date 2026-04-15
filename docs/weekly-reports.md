@@ -6,8 +6,38 @@ permalink: /weekly-reports/
 # [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz)
 --- 
 # Week 2 Group report 
-### What we did    
 Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
+## Admin
+Updated game name, mechanics, solidified story and background. 
+
+## Modeling
+**Rebecca**  
+- For landscape: Gathered assets and planned textures, drafted 3D map layout
+- Updated project spec to be more concrete and clear
+- Kept team aligned via Discord announcements and weekly check-ins
+
+**Sarah** 
+- Contributing to puzzle design
+- For character model: Completed a tutorial more advanced than current game scope to build skill
+
+## Technical   
+**Jacob**   
+- Got a cube rendering — model rendering pipeline underway
+- Delegated tasks to two teammates with clear scope   
+
+**Tim**   
+- Pull request merged; network decoupled — client-to-server transmission working
+- Infrastructure in place; needs key bindings, input callbacks, and backend tweaks
+- Next: write additional callback functions (e.g. WASD movement generalized from hardcoded)  
+
+**Alain**
+- Set up Jolt physics engine in a separate branch and experimenting with it
+- Working on supporting classes (!)   
+
+**Leon & Philip** 
+- Story: Finished main storyline with linear structure
+- Helped settle type of puzzles centered around 4 phases of life, scaling from easy to hard
+
 
 ---
 ## Week 1 Group report 
