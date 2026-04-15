@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 4.1)
 project(cse125-game)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 add_library(shared
     src/shared/hello.cpp)
@@ -60,6 +61,12 @@ add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/src/client/shaders
         $<TARGET_FILE_DIR:client>/shaders
+)
+
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:client>/assets
 )
 
 add_executable(server)
