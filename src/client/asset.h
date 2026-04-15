@@ -8,6 +8,7 @@
 struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
+  glm::vec2 texture_coordinates;
 };
 
 struct MaterialSlot {
@@ -19,6 +20,7 @@ struct Material {
   MaterialSlot ambient;
   MaterialSlot diffuse;
   MaterialSlot specular;
+  MaterialSlot emissive;
   float shininess = 32.0f;
 };
 
@@ -35,4 +37,7 @@ struct Model {
   GLuint test;
 };
 
-Model* loadModel(std::string filename);
+Model* loadModel(const std::string& filename);
+Model* makeCubeModel();
+void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material);
+void Draw(GLuint shaderProgram, const Model& model, const glm::mat4& transform);

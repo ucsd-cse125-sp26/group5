@@ -5,7 +5,9 @@
 // clang-format on
 
 #include <iostream>
+#include <string>
 
+#include "asset.h"
 #include "client_game.h"
 #include "client_network.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -48,76 +50,44 @@ int main() {
   GLuint shaderProgram =
       loadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
 
-  // 24 vertices (4 per face) with per-face colors
-  // clang-format off
-  static const GLfloat vertices[] = {
-      // Back face - red
-      -0.5f, -0.5f, -0.5f,  0.8f, 0.2f, 0.2f,
-       0.5f, -0.5f, -0.5f,  0.8f, 0.2f, 0.2f,
-       0.5f,  0.5f, -0.5f,  0.8f, 0.2f, 0.2f,
-      -0.5f,  0.5f, -0.5f,  0.8f, 0.2f, 0.2f,
-      // Front face - green
-      -0.5f, -0.5f,  0.5f,  0.2f, 0.8f, 0.2f,
-       0.5f, -0.5f,  0.5f,  0.2f, 0.8f, 0.2f,
-       0.5f,  0.5f,  0.5f,  0.2f, 0.8f, 0.2f,
-      -0.5f,  0.5f,  0.5f,  0.2f, 0.8f, 0.2f,
-      // Left face - blue
-      -0.5f, -0.5f, -0.5f,  0.2f, 0.2f, 0.8f,
-      -0.5f,  0.5f, -0.5f,  0.2f, 0.2f, 0.8f,
-      -0.5f,  0.5f,  0.5f,  0.2f, 0.2f, 0.8f,
-      -0.5f, -0.5f,  0.5f,  0.2f, 0.2f, 0.8f,
-      // Right face - yellow
-       0.5f, -0.5f, -0.5f,  0.8f, 0.8f, 0.2f,
-       0.5f,  0.5f, -0.5f,  0.8f, 0.8f, 0.2f,
-       0.5f,  0.5f,  0.5f,  0.8f, 0.8f, 0.2f,
-       0.5f, -0.5f,  0.5f,  0.8f, 0.8f, 0.2f,
-      // Bottom face - cyan
-      -0.5f, -0.5f, -0.5f,  0.2f, 0.8f, 0.8f,
-       0.5f, -0.5f, -0.5f,  0.2f, 0.8f, 0.8f,
-       0.5f, -0.5f,  0.5f,  0.2f, 0.8f, 0.8f,
-      -0.5f, -0.5f,  0.5f,  0.2f, 0.8f, 0.8f,
-      // Top face - magenta
-      -0.5f,  0.5f, -0.5f,  0.8f, 0.2f, 0.8f,
-       0.5f,  0.5f, -0.5f,  0.8f, 0.2f, 0.8f,
-       0.5f,  0.5f,  0.5f,  0.8f, 0.2f, 0.8f,
-      -0.5f,  0.5f,  0.5f,  0.8f, 0.2f, 0.8f,
-  };
-  static const GLuint indices[] = {
-       0,  1,  2,   0,  2,  3,
-       4,  5,  6,   4,  6,  7,
-       8,  9, 10,   8, 10, 11,
-      12, 13, 14,  12, 14, 15,
-      16, 17, 18,  16, 18, 19,
-      20, 21, 22,  20, 22, 23,
-  };
-  // clang-format on
-
-  GLuint VBO, VAO;
-
-  glGenVertexArrays(1, &VAO);
-  glGenBuffers(1, &VBO);
-  glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat),
-                        (void*)0);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat),
-                        (void*)(3 * sizeof(GLfloat)));
-  glEnableVertexAttribArray(0);
-  glEnableVertexAttribArray(1);
-
-  unsigned int EBO;
-  glGenBuffers(1, &EBO);
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-               GL_STATIC_DRAW);
+  // Model* cube = loadModel("assets/rebecca/CSE125Test.glb");
+  Model* cube = loadModel("assets/bear/bear_full.obj");
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
   uint8_t prevKeys = 0;
   glUseProgram(shaderProgram);
+
+  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.direction"), -0.3f,
+              -1.0f, -0.4f);
+  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.ambient"), 0.2f,
+              0.2f, 0.2f);
+  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.diffuse"), 0.8f,
+              0.8f, 0.8f);
+  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.specular"), 1.0f,
+              1.0f, 1.0f);
+
+  for (int pl = 0; pl < 4; pl++) {
+    std::string prefix = "pointLights[" + std::to_string(pl) + "].";
+    glUniform1f(
+        glGetUniformLocation(shaderProgram, (prefix + "constant").c_str()),
+        1.0f);
+    glUniform1f(
+        glGetUniformLocation(shaderProgram, (prefix + "linear").c_str()), 0.0f);
+    glUniform1f(
+        glGetUniformLocation(shaderProgram, (prefix + "quadratic").c_str()),
+        0.0f);
+    glUniform3f(
+        glGetUniformLocation(shaderProgram, (prefix + "ambient").c_str()), 0.0f,
+        0.0f, 0.0f);
+    glUniform3f(
+        glGetUniformLocation(shaderProgram, (prefix + "diffuse").c_str()), 0.0f,
+        0.0f, 0.0f);
+    glUniform3f(
+        glGetUniformLocation(shaderProgram, (prefix + "specular").c_str()),
+        0.0f, 0.0f, 0.0f);
+  }
 
   GLuint i = 0;
 
@@ -133,10 +103,11 @@ int main() {
       auto& p = view.get<shared::Position>(ent);
       glm::mat4 model =
           glm::translate(glm::identity<glm::mat4>(), glm::vec3(p.x, p.y, 0.0));
-      model = glm::rotate(model, i * 0.01f * glm::pi<GLfloat>(),
+      model = glm::rotate(model, i * 0.001f * glm::pi<GLfloat>(),
                           glm::vec3(0.0, 1.0, 0.0));
-      model = glm::rotate(model, 1 * 0.25f * glm::pi<GLfloat>(),
-                          glm::vec3(1.0, 0.0, 0.0));
+      // model = glm::rotate(model, 1 * 0.25f * glm::pi<GLfloat>(),
+      //                    glm::vec3(1.0, 0.0, 0.0));
+      model = glm::scale(model, glm::vec3(0.1f));
       // trans = glm::rotate(trans, i * 0.01f * glm::pi<GLfloat>(),
       // glm::vec3(0.0, 0.0, 1.0));
 
@@ -159,12 +130,13 @@ int main() {
           glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
       glm::mat4 transform = projection * view * model;
-      unsigned int transformLoc =
-          glGetUniformLocation(shaderProgram, "transform");
-      glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
-
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-      glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
+                         GL_FALSE, glm::value_ptr(projection));
+      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1,
+                         GL_FALSE, glm::value_ptr(view));
+      glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
+                  cameraPos.y, cameraPos.z);
+      Draw(shaderProgram, *cube, model);
     }
     glfwSwapBuffers(window);
     glfwPollEvents();
