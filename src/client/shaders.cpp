@@ -5,9 +5,7 @@
 #include <sstream>
 #include <vector>
 
-static std::filesystem::path exeDir() {
-  return std::filesystem::canonical("/proc/self/exe").parent_path();
-}
+#include "util.h"
 
 static std::string readFile(const std::filesystem::path& path) {
   std::ifstream f(path);
