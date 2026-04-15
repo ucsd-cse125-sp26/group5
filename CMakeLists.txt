@@ -20,6 +20,9 @@ target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/incl
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
 
+add_library(stb_image INTERFACE)
+target_include_directories(stb_image INTERFACE lib/stb)
+
 target_link_libraries(shared PUBLIC zpp_bits)
 
 # Path to glad directory
@@ -55,8 +58,9 @@ target_sources(client PRIVATE
     src/client/client_game.cpp
     src/client/shaders.cpp
     src/client/util.cpp
+    src/client/asset.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm assimp)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm assimp stb_image)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
