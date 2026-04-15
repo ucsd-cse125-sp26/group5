@@ -14,16 +14,26 @@ Updated game name, mechanics, solidified story and background.
 **Rebecca**  
 - For landscape: Gathered assets and planned textures, drafted 3D map layout
 - Updated project spec to be more concrete and clear
-- Kept team aligned via Discord announcements and weekly check-ins
+- Kept team aligned via Discord announcements and weekly check-ins   
+
+![text](assets/week2/season_map.png)
+![text](assets/week2/elevation_map.png)
+![text](assets/week2/asset_map.png)
 
 **Sarah** 
-- Contributing to puzzle design
+- Contributed to finishing puzzle design
 - For character model: Completed a tutorial more advanced than current game scope to build skill
+    - base model sketch
+    - gurf sketch   
+![text](assets/week2/gurf_draft.png)
 
 ## Technical   
 **Jacob**   
 - Got a cube rendering — model rendering pipeline underway
 - Delegated tasks to two teammates with clear scope   
+![text](assets/week2/week2_jacob1.gif)
+![text](assets/week2/week2_jacob2.gif)
+
 
 **Tim**   
 - Pull request merged; network decoupled — client-to-server transmission working
