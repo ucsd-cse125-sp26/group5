@@ -75,7 +75,7 @@ int main() {
 
   registerServerHandlers(network);
   auto previousTime = std::chrono::high_resolution_clock::now();
-  const float fixedDt = 0.05f;
+  const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
   while (true) {
     network.poll(game);
@@ -85,19 +85,19 @@ int main() {
     previousTime = currentTime;
     accumulator += dt;
 
-    // Broadcast delta state to all clients (dirtyOnly=false for now — full
-    // snapshot every tick)
-    std::vector<entt::entity> allEnts;
-    auto view = game.registry.view<shared::Entity>();
-    for (auto ent : view) allEnts.push_back(ent);
-    auto buf =
-        serializeEntities(game.registry, game.componentRegistry,
-                          shared::PacketType::UPDATE_ENTITY, allEnts, false);
-    net::broadcastRaw(network.getHost(), buf.data(), buf.size());
-
     while (accumulator >= fixedDt) {
       movement_system(game.registry, fixedDt);
       accumulator -= fixedDt;
+
+      // Broadcast delta state to all clients (dirtyOnly=false for now — full
+      // snapshot every tick)
+      std::vector<entt::entity> allEnts;
+      auto view = game.registry.view<shared::Entity>();
+      for (auto ent : view) allEnts.push_back(ent);
+      auto buf =
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
+      net::broadcastRaw(network.getHost(), buf.data(), buf.size());
     }
   }
 
