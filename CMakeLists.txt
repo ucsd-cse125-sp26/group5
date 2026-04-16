@@ -30,11 +30,13 @@ set(GLAD_SOURCES_DIR "${PROJECT_SOURCE_DIR}/lib/glad/")
 # Path to glad cmake files
 add_subdirectory("${GLAD_SOURCES_DIR}/cmake" glad_cmake)
 # Specify glad settings
-glad_add_library(glad_gl_core_46 REPRODUCIBLE API gl:core=4.6)
+glad_add_library(glad_gl_core_41 REPRODUCIBLE API gl:core=4.1)
 
 add_subdirectory(lib/entt)
 
-SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
+if(NOT APPLE)
+  SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
+endif()
 add_subdirectory(lib/assimp)
 
 add_library(imgui
@@ -49,7 +51,7 @@ target_include_directories(imgui PUBLIC
     lib/imgui
     lib/imgui/backends
 )
-target_link_libraries(imgui PUBLIC glfw glad_gl_core_46)
+target_link_libraries(imgui PUBLIC glfw glad_gl_core_41)
 
 add_executable(client)
 target_sources(client PRIVATE
@@ -60,7 +62,7 @@ target_sources(client PRIVATE
     src/client/util.cpp
     src/client/asset.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT glm::glm assimp stb_image)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

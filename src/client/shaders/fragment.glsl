@@ -1,4 +1,4 @@
-#version 460 core
+#version 410 core
 in vec3 normalFromVert;
 in vec2 texCoordsFromVert;
 in vec3 fragPos;
