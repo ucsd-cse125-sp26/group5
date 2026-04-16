@@ -1,64 +1,41 @@
----
-layout: page
-title: Weekly Reports
-permalink: /weekly-reports/
----
-<!-- # [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz) -->
---- 
-# Week 2 Group report 
-Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
-## Admin
-Updated game name, mechanics, solidified story and background. 
+# [Rebecca] Weekly individual status report 
 
-## Modeling
-**Rebecca**  
-- For landscape: Gathered assets and planned textures, drafted 3D map layout
-- Updated project spec to be more concrete and clear
-- Kept team aligned via Discord announcements and weekly check-ins   
+## Week 2
+1. What were your concrete goals for the week?
+My current goal for the week was to: 
+- Keep learning modeling and gather resources I need to create the model 
+- Keep all teammates in check for progress of whole tean 
+- Get basic model and design of the game set up, make sure everything is falling into place 
+- Communicate next steps
+- Update project spec
 
-<img src="{{ '/assets/week2/season_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/elevation_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/asset_map.png' | relative_url }}" alt="text">
+2. What goals were you able to accomplish?
+- Learning blender modeling: Successfully familarized myself with modeling, Got assets and general plannings down for how to do the texture etc. 
+- Keep all teammates in check: it seems everyone's fine with keeping a general weekly reports document. This is good. I also make announcements on the **important** channel on discord. Everything is going smoothly on this part. 
+- Have a draft of how the map should look like in 3D. this is good. 
+- Communicated next step in today's meeting. 
+- Updated project spec from more ambiguous to more clear. 
 
-<!-- ![text](assets/week2/season_map.png)
-![text](assets/week2/elevation_map.png)
-![text](assets/week2/asset_map.png) -->
-
-**Sarah** 
-- Contributed to finishing puzzle design
-- For character model: Completed a tutorial more advanced than current game scope to build skill
-    - base model sketch
-    - gurf sketch   
-<img src="{{ '/assets/week2/gurf_draft.png' | relative_url }}" alt="text">
-<!-- ![text](assets/week2/gurf_draft.png) -->
-
-## Technical   
-**Jacob**   
-- Got a cube rendering — model rendering pipeline underway
-- Delegated tasks to two teammates with clear scope   
-<!-- ![text](assets/week2/week2_jacob1.gif)
-![text](assets/week2/week2_jacob2.gif) -->
-<img src="{{ '/assets/week2/week2_jacob1.gif' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/week2_jacob2.gif' | relative_url }}" alt="text">
+3. If the week went differently than you had planned, what were the reasons? 
+- I think I was able to get what I want to get done done. I create very careful plannings of what I need to do. 
+4. What are your specific goals for the next week?
+**Admin:**
+- Update project spec for new stories and new puzzles brainstormed (IMPORTANT)
+- Determine size of model 
+- Create group report from everyone 
+**Modeling** 
+- Assets: start modeling complex assets
+    - Rigging bear model 
+    - Start fallen star model 
+- Landscape: Wednesday, work with friend on advancing the draft 
+Prioritize the above instead of anything else 
+5. What did you learn this week, if anything (and did you expect to learn it)?
+- Learned a bunch of blender stuff and Im content with what I have done 
+6. What is your individual morale (which might be different from the overall group morale)?
+- As basically the team leader, I need to make sure communication is good. I am in good connection with my modeling team so that's great; I am not following up on the technical team but I have trust in Jacob as the tech lead, so I am not worried. 
 
 
-**Tim**   
-- Pull request merged; network decoupled — client-to-server transmission working
-- Infrastructure in place; needs key bindings, input callbacks, and backend tweaks
-- Next: write additional callback functions (e.g. WASD movement generalized from hardcoded)  
-
-**Alain**
-- Set up Jolt physics engine in a separate branch and experimenting with it
-- Working on supporting classes (!)   
-
-**Leon & Philip** 
-- Story: Finished main storyline with linear structure
-- Helped settle type of puzzles centered around 4 phases of life, scaling from easy to hard
-
-
----
-## Week 1 Group report 
-
+## Week 1
 ### What we did
 
 The team brainstormed core mechanics and narrowed down to three game concepts, with a focus on keeping scope manageable given the 10-week timeline + Initial project setup on github. 
@@ -90,3 +67,6 @@ The team has voted on the general framework of the game. For the following week,
 N/A
 - **What blocked us**
 N/A
+
+
+
