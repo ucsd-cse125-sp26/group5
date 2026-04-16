@@ -12,15 +12,25 @@ struct AssetInfo {
 };
 
 inline constexpr AssetInfo ASSETS[] = {
-    {"cube", "", 1.0f, 0.0f, 0.0f, 0.0f},
-    {"bear", "assets/bear/bear_full.obj", 0.0f, 0.0f, 0.70710678f, 0.70710678f},
+    {.name = "cube",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f},
+    {.name = "bear",
+     .filename = "assets/bear/bear_full.obj",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f},
 };
 
 inline constexpr std::size_t ASSET_COUNT = sizeof(ASSETS) / sizeof(ASSETS[0]);
 
 inline const AssetInfo* findAsset(std::string_view name) {
-  for (std::size_t i = 0; i < ASSET_COUNT; ++i) {
-    if (ASSETS[i].name == name) return &ASSETS[i];
+  for (const auto& i : ASSETS) {
+    if (i.name == name) return &i;
   }
   return nullptr;
 }

@@ -21,12 +21,20 @@
           dontDisableStatic = true;
           configureFlags = (old.configureFlags or [ ]) ++ [ "--enable-static" ];
         });
+        # Wrap clang-tidy so it can find system headers without polluting
+        # CPLUS_INCLUDE_PATH globally (which would break other builds).
+        clang-tidy-wrapped = pkgs.writeShellScriptBin "clang-tidy" ''
+          export CPLUS_INCLUDE_PATH="${pkgs.gcc.cc}/include/c++/${pkgs.gcc.cc.version}:${pkgs.gcc.cc}/include/c++/${pkgs.gcc.cc.version}/${pkgs.stdenv.hostPlatform.config}:${pkgs.glibc.dev}/include:${pkgs.clang}/resource-root/include''${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+          exec ${pkgs.clang-tools}/bin/clang-tidy "$@"
+        '';
       in
       {
         devShells.default = pkgs.mkShell {
           name = "cse125-project";
 
-          packages = with pkgs; [
+          packages = [
+            clang-tidy-wrapped
+          ] ++ (with pkgs; [
             # Development Tools
             clang
             gcc
@@ -68,7 +76,7 @@
 
             # Windows cross-compilation
             mingw.stdenv.cc
-          ];
+          ]);
 
           shellHook = ''
             export MINGW_PTHREAD_STATIC_LIB_DIR="${mingwPthreadsStatic}/lib"

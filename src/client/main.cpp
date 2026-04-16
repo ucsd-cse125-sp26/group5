@@ -169,7 +169,7 @@ int main() {
       if (const auto* info = shared::findAsset(renderInfo.modelName)) {
         modelOrient = glm::quat(info->qw, info->qx, info->qy, info->qz);
       }
-      glm::mat4 model = glm::identity<glm::mat4>();
+      auto model = glm::identity<glm::mat4>();
       model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
       model = glm::scale(model, glm::vec3(renderInfo.scale));
       model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelOrient);
