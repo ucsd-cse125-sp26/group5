@@ -58,6 +58,24 @@ bundle exec jekyll build && scp -P222 -r _site/*  jic098@cse125.ucsd.edu:/var/ww
 jekyll build && scp -P222 -r _site/*  jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5
 ```
 
+## Assets
+
+Assets are not tracked in git. They are stored on the CSE 125 server and synced manually.
+
+### Download assets from server
+
+```bash
+rsync -avz --progress -e 'ssh -p 222' jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/ assets/
+```
+
+### Upload assets to server
+
+```bash
+rsync -avz --progress -e 'ssh -p 222' assets/ jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/
+```
+
+The `-a` flag preserves file attributes and handles directories recursively. The `-z` flag compresses data during transfer. rsync only transfers files that have changed, so repeated syncs are fast.
+
 ## Important links 
 - [Group main document](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.ugr095ybe2nc) 
 - [Brainstorm whiteboard](https://excalidraw.com/#room=e75b50a0442682a79f02,f1qUrFmzmgYeGmBa12QS0A)
