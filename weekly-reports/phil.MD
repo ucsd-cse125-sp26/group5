@@ -1,64 +1,22 @@
----
-layout: page
-title: Weekly Reports
-permalink: /weekly-reports/
----
-<!-- # [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz) -->
---- 
-# Week 2 Group report 
-Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
-## Admin
-Updated game name, mechanics, solidified story and background. 
-
-## Modeling
-**Rebecca**  
-- For landscape: Gathered assets and planned textures, drafted 3D map layout
-- Updated project spec to be more concrete and clear
-- Kept team aligned via Discord announcements and weekly check-ins   
-
-<img src="{{ '/assets/week2/season_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/elevation_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/asset_map.png' | relative_url }}" alt="text">
-
-<!-- ![text](assets/week2/season_map.png)
-![text](assets/week2/elevation_map.png)
-![text](assets/week2/asset_map.png) -->
-
-**Sarah** 
-- Contributed to finishing puzzle design
-- For character model: Completed a tutorial more advanced than current game scope to build skill
-    - base model sketch
-    - gurf sketch   
-<img src="{{ '/assets/week2/gurf_draft.png' | relative_url }}" alt="text">
-<!-- ![text](assets/week2/gurf_draft.png) -->
-
-## Technical   
-**Jacob**   
-- Got a cube rendering — model rendering pipeline underway
-- Delegated tasks to two teammates with clear scope   
-<!-- ![text](assets/week2/week2_jacob1.gif)
-![text](assets/week2/week2_jacob2.gif) -->
-<img src="{{ '/assets/week2/week2_jacob1.gif' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/week2_jacob2.gif' | relative_url }}" alt="text">
+# Phillip's Weekly individual status report 
 
 
-**Tim**   
-- Pull request merged; network decoupled — client-to-server transmission working
-- Infrastructure in place; needs key bindings, input callbacks, and backend tweaks
-- Next: write additional callback functions (e.g. WASD movement generalized from hardcoded)  
+## Week 2
+1. What were your concrete goals for the week?  
+I mainly wanted to read over EnTT and learn more about ECS, as well as workout the specific details of the game such as mini puzzles, story line, and logical progression.
+2. What goals were you able to accomplish?  
+I was able to work out with Leon our ideas for the game and reconcile them with Rebecca and Sarah's ideas so that we all get on the same page regarding mini puzzles and the progression of the gameplay/storyline. I was only able to read over EnTT and ECS very briefly. 
+3. If the week went differently than you had planned, what were the reasons?  
+Another one of my classes (ECE 196) is significantly more busy than I had anticipated, and I was not able to spend nearly as much time on this class as I wanted.
+4. What are your specific goals for the next week?  
+I would like to read more about EnTT and ECS and figure out how Leon and I will begin implementing the game's logic. I am hoping that ECE 196 is more of a front-loaded class, which would allow me to devote more time to this game project once most of my other obligations are taken care of. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I did not learn too much this week, given that I was not able to read over EnTT/ECS as much as I had wanted. However, I did get the overall gist of what ECS is and how it applies to creating game entities and how they work.
+6. What is your individual morale (which might be different from the overall group morale)?  
+I am honestly feeling very unsure about how much I will be able to contribute in this project. My schedule outside of this class is much worse than I thought it would be, so I hope that the next few weeks go much better than the past week did in terms of outside obligations. I am really passionate about this project and I would like to see myself contribute my own fair share and feel like a better teammate to my group.
 
-**Alain**
-- Set up Jolt physics engine in a separate branch and experimenting with it
-- Working on supporting classes (!)   
 
-**Leon & Philip** 
-- Story: Finished main storyline with linear structure
-- Helped settle type of puzzles centered around 4 phases of life, scaling from easy to hard
-
-
----
-## Week 1 Group report 
-
+## Week 1
 ### What we did
 
 The team brainstormed core mechanics and narrowed down to three game concepts, with a focus on keeping scope manageable given the 10-week timeline + Initial project setup on github. 
@@ -90,3 +48,6 @@ The team has voted on the general framework of the game. For the following week,
 N/A
 - **What blocked us**
 N/A
+
+
+

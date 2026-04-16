@@ -6,10 +6,18 @@ permalink: /project-spec/
 
 ## Project Description
 ### About this game: 
-[Game name] is a cozy game about retrieving fading memory. You play as employees of the memory recovery service, where you go into the client's dreams per their request to retrieve their fading memory, painting their favorite moments back to colors by collaboratively solving little puzzles before the timer strikes and they wake up. Beware! You will have to work together as a team. 
+**Recollection** is a cozy game about retrieving fading memory. You play as employees of the memory recovery service, where you go into the client's dreams per their request to retrieve their fading memory, painting their favorite moments back to colors by collaboratively solving little puzzles before the timer strikes and they wake up. Beware! You will have to work together as a team. The demo map features and elderly client, who came to simply retrieve and recollect their good memories in their life. :) 
 
 ### Landscape 
-In this initial version, we will only have one map, initially black and white- somewhat sad, right? There are several different regions on the map. Each region spawns one memory fragment randomly within their bound, each coming with their own little puzzle game. Each puzzle will require 4 players' interactions to solve. It is up to the players to decide how to collaborate. 
+The initial version features a map rendered in black and white. The map is divided into 4 regions signifying the client's elderhood, adulthood, teenage and college years, and infancy. Each region will randomly spawns one memory fragment within its bounds, which is tied to a small puzzle that requires input from all 4 players to solve, though how they choose to collaborate is up to them. After the puzzle is solved, the map will be painted with beautiful color, signifying the recollection of current area being complete.   
+**All players must be in the same region and progress through subsequent maps together, in a "reversed" linear order, in hope of capturing the feeling of "traveling back in time".**   
+
+| Time of Life | Season | Time of Day | Main Assets | Puzzle |
+|---|---|---|---|---|    
+| Elderly (80 yrs) | Winter | Starry night with Aurora | Winter Trees, winter shrubs, snowly landscape, the moon | Maze |
+| Adulthood and middle age (40 - 80 yrs) | Autumn | Afternoon with Sunset | CSE Bear, Autumn red trees, smol mushrooms, yellow grass/ wheat field | Typing puzzle |
+| Teenage years and college (20 - 40 yrs) | Summer | Noon | Bone fire, Summer lush Trees, | Decription |
+| Infancy and childhood (0 - 20 yrs) | Spring | Dawn with Sunrise | Fallen Star, Flowers, Bushes | Tangram, Last main puzzle |
 
 ### Character Design 
 Our models will draw some inspiration from *Overcooked* and *Webfishing*. We plan to have different character models that players can choose from when they play. The character models will be simple, having only a somewhat pill-shaped body, a head, and floating balls for hands for ease of modeling, rigging, and texturing as well as style.
@@ -32,7 +40,6 @@ Every memory fragment is retrieved when their associated puzzle is solved. Here 
 3. Type: Each of four players have `n` words to type. All of them must type their words quickly and accurately to solve the puzzle.
 4. Memory: A randomly generated pattern of cards is shown to all the players for some set amount of time to remember. The cards will have a color, shape, and number on every card. The players will then have to recreate the pattern they were given. They are scored based on accuracy, and can proceed upon reaching a threshold. Otherwise, they'll have to retry the puzzle.
 5. Decrypt: The team is given an encrypted phrase. They \[ are given / must find out \] the key, then successfully decrypt the phrase.
-
 
 --- 
 ### 1. What kind of game are you planning to build?
