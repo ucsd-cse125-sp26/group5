@@ -12,12 +12,37 @@
 // ── Movement system ──────────────────────────────────────
 
 void movement_system(entt::registry& registry, float dt) {
+  const float sensitivity = 0.002f;
+  const float pitchLimit = glm::half_pi<float>() - 0.01f;
+
   auto view =
       registry.view<shared::Position, shared::Velocity, shared::PlayerInput>();
   for (auto entity : view) {
     auto& position = view.get<shared::Position>(entity);
     auto& velocity = view.get<shared::Velocity>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
+
+    // Apply mouse look: yaw from mouseDx, pitch from mouseDy
+    if (input.mouseDx != 0.0f) {
+      float yawDelta = -input.mouseDx * sensitivity;
+      glm::quat q(position.qw, position.qx, position.qy, position.qz);
+      glm::quat yawQ = glm::angleAxis(yawDelta, glm::vec3(0, 0, 1));
+      q = glm::normalize(yawQ * q);
+      position.qw = q.w;
+      position.qx = q.x;
+      position.qy = q.y;
+      position.qz = q.z;
+    }
+
+    if (registry.all_of<shared::Camera>(entity)) {
+      auto& cam = registry.get<shared::Camera>(entity);
+      cam.pitch = std::clamp(cam.pitch - input.mouseDy * sensitivity,
+                             -pitchLimit, pitchLimit);
+    }
+
+    // Clear mouse deltas after processing
+    input.mouseDx = 0.0f;
+    input.mouseDy = 0.0f;
 
     float yaw = std::atan2(
         2.0f * (position.qw * position.qz + position.qx * position.qy),
@@ -76,29 +101,10 @@ void registerServerHandlers(ServerNetwork& network) {
         if (it == game.peerEntityMap.end()) return;
         auto ent = it->second;
 
-        game.registry.replace<shared::PlayerInput>(ent, pkt.keys);
-
-        const float sensitivity = 0.002f;
-        const float pitchLimit = glm::half_pi<float>() - 0.01f;
-
-        if (game.registry.all_of<shared::Camera>(ent)) {
-          auto& cam = game.registry.get<shared::Camera>(ent);
-          cam.pitch = std::clamp(cam.pitch - pkt.mouseDy * sensitivity,
-                                 -pitchLimit, pitchLimit);
-        }
-
-        if (game.registry.all_of<shared::Position>(ent) &&
-            pkt.mouseDx != 0.0f) {
-          auto& pos = game.registry.get<shared::Position>(ent);
-          float yawDelta = -pkt.mouseDx * sensitivity;
-          glm::quat q(pos.qw, pos.qx, pos.qy, pos.qz);
-          glm::quat yawQ = glm::angleAxis(yawDelta, glm::vec3(0, 0, 1));
-          q = glm::normalize(yawQ * q);
-          pos.qw = q.w;
-          pos.qx = q.x;
-          pos.qy = q.y;
-          pos.qz = q.z;
-        }
+        auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
+        playerInput.keys = pkt.keys;
+        playerInput.mouseDx += pkt.mouseDx;
+        playerInput.mouseDy += pkt.mouseDy;
       });
 }
 
