@@ -28,3 +28,6 @@
 [submodule "lib/stb"]
 	path = lib/stb
 	url = https://github.com/nothings/stb.git
+[submodule "lib/jolt"]
+	path = lib/jolt
+	url = https://github.com/jrouwe/JoltPhysics

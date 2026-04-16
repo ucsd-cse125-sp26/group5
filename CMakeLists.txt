@@ -51,6 +51,8 @@ endif()
 SET(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
+set(PHYSICS_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt)
+add_subdirectory(lib/jolt/Build)
 
 add_library(imgui
     lib/imgui/imgui.cpp
@@ -76,7 +78,7 @@ target_sources(client PRIVATE
     src/client/util.cpp
     src/client/asset.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -108,6 +110,7 @@ add_executable(client_link_smoke src/client/link_smoke.cpp)
 target_link_libraries(client_link_smoke PRIVATE
     shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image
 )
+target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm Jolt)
 
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
