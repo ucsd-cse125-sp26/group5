@@ -1,4 +1,10 @@
-# [Rebecca] Weekly individual status report 
+---
+layout: page
+title: Jiaying Chen — Individual Report
+permalink: /project-spec/jiaying-chen-individual-report/
+---
+
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
 ## Week 2
 1. What were your concrete goals for the week?
@@ -67,6 +73,8 @@ The team has voted on the general framework of the game. For the following week,
 N/A
 - **What blocked us**
 N/A
+
+
 
 
 
