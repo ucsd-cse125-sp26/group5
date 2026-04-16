@@ -15,7 +15,7 @@
 	url = https://github.com/ocornut/imgui.git
 [submodule "lib/zpp_bits"]
 	path = lib/zpp_bits
-	url = git@github.com:eyalz800/zpp_bits.git
+	url = https://github.com/eyalz800/zpp_bits.git
 [submodule "lib/googletest"]
 	path = lib/googletest
 	url = https://github.com/google/googletest.git
