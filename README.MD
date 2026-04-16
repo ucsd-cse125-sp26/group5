@@ -24,7 +24,11 @@ Run `doxygen Doxyfile` to generate HTML docs in `html/`.
 
 ## Website (Jekyll) local preview
 
-The course website lives in `docs/` (Jekyll).
+The course website lives in `docs/` (Jekyll).   
+**Note**: to render images, you must put the image into the `docs/assets/`, preferably in the respective weeks folder. For example, if your file is `'/assets/week2/season_map.png'`, 
+```html
+<img src="{{ '/assets/week2/season_map.png' | relative_url }}" alt="text">
+```
 
 ### One-time setup
 ```bash
@@ -50,6 +54,7 @@ If you want it at root instead: run bundle exec jekyll serve --baseurl "" and op
 # If jekyll is onlty local, go into doc file: 
 bundle exec jekyll build && scp -P222 -r _site/*  jic098@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5
 
+# Else: 
 jekyll build && scp -P222 -r _site/*  jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5
 ```
 
