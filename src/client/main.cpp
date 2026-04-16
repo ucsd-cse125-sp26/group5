@@ -6,13 +6,18 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 #include "asset.h"
+#include "client/util.h"
 #include "client_game.h"
 #include "client_network.h"
 #include "glm/ext/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "shaders.h"
+#include "shared/assets.h"
+#include "shared/components.h"
 #include "shared/hello.h"
 
 int main() {
@@ -42,6 +47,10 @@ int main() {
 
   glfwMakeContextCurrent(window);
 
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  if (glfwRawMouseMotionSupported())
+    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
   int version = gladLoadGL(glfwGetProcAddress);
   printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
@@ -50,8 +59,19 @@ int main() {
   GLuint shaderProgram =
       loadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
 
-  // Model* cube = loadModel("assets/rebecca/CSE125Test.glb");
-  Model* cube = loadModel("assets/bear/bear_full.obj");
+  std::unordered_map<std::string, Model*> models;
+  for (const auto& asset : shared::ASSETS) {
+    Model* m = asset.filename.empty() ? makeCubeModel()
+                                      : loadModel(std::string(asset.filename));
+    if (!m) {
+      fprintf(stderr, "Failed to load asset '%s' (%s)\n",
+              std::string(asset.name).c_str(),
+              std::string(asset.filename).c_str());
+      continue;
+    }
+    models[std::string(asset.name)] = m;
+    printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
@@ -91,55 +111,82 @@ int main() {
 
   GLuint i = 0;
 
+  glm::mat4 projection;
+  projection =
+      glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+  glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
+                     GL_FALSE, glm::value_ptr(projection));
+
   while (!glfwWindowShouldClose(window)) {
     i += 1;
     network.poll(game);
     // printEntityPositions(game);
 
+    glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
+    glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
+    const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+
+    auto selfIt = game.entityMap.find(game.myEntityId);
+    if (selfIt != game.entityMap.end() && game.registry.valid(selfIt->second) &&
+        game.registry.all_of<shared::Position, shared::Camera>(
+            selfIt->second)) {
+      const auto& p = game.registry.get<shared::Position>(selfIt->second);
+      const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
+
+      glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
+      glm::quat pitchRot =
+          glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+      glm::vec3 forward = playerRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
+
+      cameraPos = glm::vec3(p.x, p.y, p.z + cam.ht);
+      cameraTarget = cameraPos + forward;
+    } else {
+      continue;
+    }
+
+    glm::mat4 viewMat = glm::lookAt(cameraPos, cameraTarget, worldUp);
+
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE,
+                       glm::value_ptr(viewMat));
+    glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
+                cameraPos.y, cameraPos.z);
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    auto view = game.registry.view<shared::Entity, shared::Position>();
+    auto view =
+        game.registry
+            .view<shared::Entity, shared::Position, shared::RenderInfo>();
     for (auto ent : view) {
       auto& p = view.get<shared::Position>(ent);
-      glm::mat4 model =
-          glm::translate(glm::identity<glm::mat4>(), glm::vec3(p.x, p.y, 0.0));
-      model = glm::rotate(model, i * 0.001f * glm::pi<GLfloat>(),
-                          glm::vec3(0.0, 1.0, 0.0));
-      // model = glm::rotate(model, 1 * 0.25f * glm::pi<GLfloat>(),
-      //                    glm::vec3(1.0, 0.0, 0.0));
-      model = glm::scale(model, glm::vec3(0.1f));
-      // trans = glm::rotate(trans, i * 0.01f * glm::pi<GLfloat>(),
-      // glm::vec3(0.0, 0.0, 1.0));
+      auto& renderInfo = view.get<shared::RenderInfo>(ent);
+      auto& entity = view.get<shared::Entity>(ent);
+      if (entity.id == selfIt->first) {
+        continue;
+      }
+      Model* modelAsset = models[renderInfo.modelName];
+      glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
+      glm::quat modelOrient(1.0f, 0.0f, 0.0f, 0.0f);
+      if (const auto* info = shared::findAsset(renderInfo.modelName)) {
+        modelOrient = glm::quat(info->qw, info->qx, info->qy, info->qz);
+      }
+      glm::mat4 model = glm::identity<glm::mat4>();
+      model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
+      model = glm::scale(model, glm::vec3(renderInfo.scale));
+      model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelOrient);
 
-      glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 10.0f);
-
-      glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-      glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
-
-      glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-      glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection));
-
-      glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
-
-      glm::mat4 view = glm::identity<glm::mat4>();
-
-      view = glm::lookAt(cameraPos, cameraTarget, cameraUp);
-
-      glm::mat4 projection;
-      projection =
-          glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
-      glm::mat4 transform = projection * view * model;
-      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
-                         GL_FALSE, glm::value_ptr(projection));
-      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1,
-                         GL_FALSE, glm::value_ptr(view));
-      glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
-                  cameraPos.y, cameraPos.z);
-      Draw(shaderProgram, *cube, model);
+      Draw(shaderProgram, *modelAsset, model);
     }
     glfwSwapBuffers(window);
     glfwPollEvents();
+
+    // ESC releases the cursor; left-click re-captures it.
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) ==
+                   GLFW_PRESS &&
+               glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
 
     processInput(window, network, prevKeys);
   }

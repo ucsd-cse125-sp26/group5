@@ -80,7 +80,7 @@ target_sources(server PRIVATE
     src/server/server_network.cpp
     src/server/server_game.cpp
 )
-target_link_libraries(server PRIVATE shared enet EnTT::EnTT)
+target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
 
 include(CTest)
 if(BUILD_TESTING)

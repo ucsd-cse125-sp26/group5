@@ -1,12 +1,24 @@
 #pragma once
 #include <cstdint>
+#include <string>
 namespace shared {
 struct Position {
-  float x, y;
+  float x, y, z;
+  float qw, qx, qy, qz;
 };
 
 struct Velocity {
-  float dx, dy;
+  float dx, dy, dz;
+};
+
+struct RenderInfo {
+  std::string modelName;
+  float scale;
+};
+
+struct Camera {
+  float pitch;
+  float ht;
 };
 
 struct Entity {
