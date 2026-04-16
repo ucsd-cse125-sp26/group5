@@ -1,13 +1,10 @@
-# [SARAH] Weekly individual status report 
+---
+layout: page
+title: Sarah Balatbat — Individual Report
+permalink: /project-spec/sarah-balatbat-individual-report/
+---
 
-
-## Week [Number]
-1. What were your concrete goals for the week?
-2. What goals were you able to accomplish?
-3. If the week went differently than you had planned, what were the reasons? 
-4. What are your specific goals for the next week?
-5. What did you learn this week, if anything (and did you expect to learn it)?
-6. What is your individual morale (which might be different from the overall group morale)?
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
 ## Week 2
 ### Goals
@@ -32,12 +29,13 @@
       - Set D: Provide one letter as the key without disclosing it's a Caesar cipher (also involves codebreaking, likely even more difficult than Set C)
 - Concept art
   - Sketched base model: Disjointed head, body, and spherical hands. Markers for ears. Roughly inspired by Webfishing, Overcooked, and Mii Plaza player models.
-  ![Base model concept art](./sarah-refs/wk2-base-model-concept-art.jpg)
+  <img src="{{ '/assets/week2/sarah/wk2-sarah-base-model-concept-art.jpg' | relative_url }}" alt="Base model concept art">
   - Sketched Gurf model: Same disjointed pieces as base model, but some different proportions to emphasize Gurf's chubbiness. There are also ideas of emotes as a Would-Be-Nice feature.
-  ![Gurf model concept art](./sarah-refs/wk2-gurf-concept-art.jpg)
+  <img src="{{ '/assets/week2/sarah/wk2-gurf-concept-art.jpg' | relative_url }}" alt="Gurf model concept art">
 - Modeling progress
   - Followed a [Blender tutorial](https://youtu.be/FwkPW5LEGs8) for creating a low-polygon cat.
-  ![Low poly cat progress on Blender (front orthographic)](./sarah-refs/wk2-tutorial1.png) ![Low poly cat progress on Blender (right orthographic)](./sarah-refs/wk2-tutorial2.png)
+  <img src="{{ '/assets/week2/sarah/wk2-tutorial1.png' | relative_url }}" alt="Low poly cat progress on Blender (front orthographic)">
+  <img src="{{ '/assets/week2/sarah/wk2-tutorial2.png' | relative_url }}" alt="Low poly cat progress on Blender (right orthographic)">
 
 
 ### Progress Evaluation
@@ -94,6 +92,8 @@ Brainstormed core mechanics with the team and narrowed down to three game concep
   - Lots of ideas for brainstorming
 - **What blocked us**
   - Consensus voting
+
+
 
 
 

@@ -1,5 +1,10 @@
-# Phillip's Weekly individual status report 
+---
+layout: page
+title: Phillip Mai — Individual Report
+permalink: /project-spec/phillip-mai-individual-report/
+---
 
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
 ## Week 2
 1. What were your concrete goals for the week?  
