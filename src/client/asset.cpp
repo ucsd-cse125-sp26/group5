@@ -377,11 +377,14 @@ void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material) {
 void Draw(GLuint shaderProgram, const Model& model,
           const glm::mat4& transform) {
   GLint transformLoc = glGetUniformLocation(shaderProgram, "model");
+  GLint normalMatLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
     glm::mat4 final = transform * instanceTransform;
+    glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
     glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(final));
+    glUniformMatrix3fv(normalMatLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
     Draw(shaderProgram, mesh, material);
   }
 }
