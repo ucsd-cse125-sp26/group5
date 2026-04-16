@@ -3,6 +3,7 @@ project(cse125-game)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+# set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
     src/shared/hello.cpp)
@@ -16,6 +17,8 @@ add_subdirectory(lib/glm)
 
 add_subdirectory(lib/enet)
 target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
+
+target_include_directories(enet PUBLIC lib/enet/include)
 
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)

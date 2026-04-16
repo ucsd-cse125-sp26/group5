@@ -1,0 +1,9 @@
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  modernize-*,
+  performance-*,
+  -modernize-use-trailing-return-type
+
+HeaderFilterRegex: 'src/.*'
+FormatStyle: file
