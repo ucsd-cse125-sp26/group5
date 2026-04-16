@@ -17,13 +17,13 @@
 #include "glm/gtc/type_ptr.hpp"
 
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
-  return glm::vec3(v.x, v.y, v.z);
+  return {v.x, v.y, v.z};
 }
 static inline glm::vec2 vec2_cast(const aiVector3D& v) {
-  return glm::vec2(v.x, v.y);
+  return {v.x, v.y};
 }  // it's aiVector3D because assimp's texture coordinates use that
 static inline glm::quat quat_cast(const aiQuaternion& q) {
-  return glm::quat(q.w, q.x, q.y, q.z);
+  return {q.w, q.x, q.y, q.z};
 }
 static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) {
   return glm::transpose(glm::make_mat4(&m.a1));
@@ -66,7 +66,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     if (pixel_order == GL_RGBA) {
       stbi_image_free(pixels);
     }
-    return MaterialSlot{glm::vec3(1.0f), id};
+    return MaterialSlot{.constant = glm::vec3(1.0f), .texture = id};
   }
 
   aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);  // default white
@@ -98,7 +98,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  return MaterialSlot{glm::vec3(1.0f), id};
+  return MaterialSlot{.constant = glm::vec3(1.0f), .texture = id};
 }
 
 Model* loadModel(const std::string& filename) {
@@ -111,11 +111,11 @@ Model* loadModel(const std::string& filename) {
       importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
-    std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
-    return NULL;
+    std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << '\n';
+    return nullptr;
   }
 
-  Model* model = new Model();
+  auto* model = new Model();
   if (!model) return nullptr;
 
   for (int i = 0; i < scene->mNumMaterials; i++) {
@@ -230,36 +230,36 @@ Model* makeCubeModel() {
   // Face order: back, front, left, right, bottom, top (matches the palette
   // below; each face samples one texel of a 6x1 diffuse texture).
   const Face faces[6] = {
-      {{0, 0, -1},
-       {{-0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {-0.5f, 0.5f, -0.5f}}},
-      {{0, 0, 1},
-       {{-0.5f, -0.5f, 0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f}}},
-      {{-1, 0, 0},
-       {{-0.5f, -0.5f, -0.5f},
-        {-0.5f, 0.5f, -0.5f},
-        {-0.5f, 0.5f, 0.5f},
-        {-0.5f, -0.5f, 0.5f}}},
-      {{1, 0, 0},
-       {{0.5f, -0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {0.5f, -0.5f, 0.5f}}},
-      {{0, -1, 0},
-       {{-0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, -0.5f},
-        {0.5f, -0.5f, 0.5f},
-        {-0.5f, -0.5f, 0.5f}}},
-      {{0, 1, 0},
-       {{-0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, -0.5f},
-        {0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f}}},
+      {.normal = {0, 0, -1},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f}}},
+      {.normal = {0, 0, 1},
+       .corners = {{-0.5f, -0.5f, 0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f}}},
+      {.normal = {-1, 0, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, 0.5f},
+                   {-0.5f, -0.5f, 0.5f}}},
+      {.normal = {1, 0, 0},
+       .corners = {{0.5f, -0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {0.5f, -0.5f, 0.5f}}},
+      {.normal = {0, -1, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {-0.5f, -0.5f, 0.5f}}},
+      {.normal = {0, 1, 0},
+       .corners = {{-0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f}}},
   };
 
   std::vector<Vertex> vertices;
@@ -267,11 +267,11 @@ Model* makeCubeModel() {
   std::vector<GLuint> indices;
   indices.reserve(36);
   for (int f = 0; f < 6; f++) {
-    GLuint base = static_cast<GLuint>(vertices.size());
+    auto base = static_cast<GLuint>(vertices.size());
     float u = (f + 0.5f) / 6.0f;
     glm::vec2 uv(u, 0.5f);
-    for (int c = 0; c < 4; c++) {
-      vertices.push_back({faces[f].corners[c], faces[f].normal, uv});
+    for (auto corner : faces[f].corners) {
+      vertices.push_back({corner, faces[f].normal, uv});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -325,13 +325,15 @@ Model* makeCubeModel() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  Model* model = new Model();
+  auto* model = new Model();
 
   Material material;
-  material.ambient = {glm::vec3(1.0f), diffuseTex};
-  material.diffuse = {glm::vec3(1.0f), diffuseTex};
-  material.specular = {glm::vec3(1.0f), makeSolidTexture(255, 255, 255, 255)};
-  material.emissive = {glm::vec3(1.0f), makeSolidTexture(0, 0, 0, 255)};
+  material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.specular = {.constant = glm::vec3(1.0f),
+                       .texture = makeSolidTexture(255, 255, 255, 255)};
+  material.emissive = {.constant = glm::vec3(1.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -370,7 +372,7 @@ void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material) {
               material.shininess);
 
   glBindVertexArray(mesh.vao);
-  glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, 0);
+  glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
   glBindVertexArray(0);
 }
 
