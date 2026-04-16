@@ -127,12 +127,36 @@ void processInput(GLFWwindow* window, ClientNetwork& network,
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= 0x02;
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= 0x04;
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= 0x08;
+  if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= 0x80;
+  if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= 0x40;
+  if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= 0x20;
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= 0x10;
 
-  if (keys != prevKeys) {
-    printf("Sending packet with keys %d\n", keys);
+  static bool mouseInit = false;
+  static double prevMouseX = 0.0, prevMouseY = 0.0;
+  float mouseDx = 0.0f, mouseDy = 0.0f;
+  bool captured = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
+  if (captured) {
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
+    if (mouseInit) {
+      mouseDx = static_cast<float>(mouseX - prevMouseX);
+      mouseDy = static_cast<float>(mouseY - prevMouseY);
+    } else {
+      mouseInit = true;
+    }
+    prevMouseX = mouseX;
+    prevMouseY = mouseY;
+  } else {
+    mouseInit = false;  // re-prime on next capture
+  }
+
+  if (keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f) {
     shared::InputPacket pkt;
-    pkt.type = shared::PacketType::KEYBOARD_INPUT;
+    pkt.type = shared::PacketType::INPUT;
     pkt.keys = keys;
+    pkt.mouseDx = mouseDx;
+    pkt.mouseDy = mouseDy;
     network.send(pkt);
   }
   prevKeys = keys;
