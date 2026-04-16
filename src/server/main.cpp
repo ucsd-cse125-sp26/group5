@@ -48,6 +48,8 @@ int main() {
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
     g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                             InputKeys(0), 0.0f, 0.0f);
+    JPH::BodyID bodyId = createPlayerBody(g, 0.0f, 0.0f, 2.0f);
+    g.registry.emplace<shared::PhysicsBody>(entity, bodyId.GetIndexAndSequenceNumber());
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -94,6 +96,8 @@ int main() {
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
+  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+
   while (true) {
     network.poll(game);
 
@@ -101,12 +105,27 @@ int main() {
     float dt = std::chrono::duration<float>(currentTime - previousTime).count();
     previousTime = currentTime;
     accumulator += dt;
-
+    auto& bodyInterface = game.physicsSystem.GetBodyInterface();
     while (accumulator >= fixedDt) {
       input_tick(game.registry);
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
+
+      // Step Jolt physics
+      game.physicsSystem.Update(fixedDt, 1, game.tempAllocator, game.jobSystem);
+      //printf("Jolt step ok\n");
+
+      // Sync Jolt positions back into ECS
+      auto physicsView = game.registry.view<shared::Position, shared::PhysicsBody>();
+      for (auto ent : physicsView) {
+        auto& pos = physicsView.get<shared::Position>(ent);
+        auto& pb = physicsView.get<shared::PhysicsBody>(ent);
+        JPH::RVec3 joltPos = bodyInterface.GetPosition(pb.bodyId);
+        pos.x = joltPos.GetX();
+        pos.y = joltPos.GetY();
+        pos.z = joltPos.GetZ();
+      }
       accumulator -= fixedDt;
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full

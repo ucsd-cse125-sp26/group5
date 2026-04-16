@@ -3,6 +3,8 @@
 #include <string>
 
 #include "input.h"
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
 
 namespace shared {
 struct Position {
@@ -51,6 +53,10 @@ struct DirectionalLight {
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
+};
+
+struct PhysicsBody {
+  uint32_t bodyId;
 };
 
 }  // namespace shared

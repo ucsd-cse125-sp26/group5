@@ -12,6 +12,10 @@
 #include "shared/components.h"
 
 constexpr float kHeldKeyScaleFactor = 1.1f;
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+
+// ── Movement system ──────────────────────────────────────
 
 // Process input on tick
 void input_tick(entt::registry& registry) {
@@ -260,4 +264,26 @@ std::vector<uint8_t> serializeEntities(
               sizeof(uint16_t));
 
   return buffer;
+}
+
+JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
+  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+
+  JPH::CapsuleShapeSettings capsuleSettings(0.5f, 0.5f);
+  JPH::ShapeSettings::ShapeResult capsuleResult = capsuleSettings.Create();
+  JPH::ShapeRefC shape = capsuleResult.Get();
+
+  JPH::BodyCreationSettings settings(
+    shape,
+    JPH::RVec3(x, y, z),
+    JPH::Quat::sIdentity(),
+    JPH::EMotionType::Dynamic,
+    Layers::MOVING
+  );
+  settings.mGravityFactor = 1.0f;
+  settings.mFriction = 0.5f;
+
+  JPH::Body* body = bodyInterface.CreateBody(settings);
+  bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+  return body->GetID();
 }
