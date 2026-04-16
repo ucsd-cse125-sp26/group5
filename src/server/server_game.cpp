@@ -82,7 +82,7 @@ std::vector<uint8_t> serializeEntities(
       buffer.resize(buffer.size() + sizeof(uint16_t) + sizeof(uint16_t));
       std::vector<uint8_t> compBuf;
       if (meta->serialize(registry, ent, compBuf)) {
-        uint16_t dataSize = static_cast<uint16_t>(compBuf.size());
+        auto dataSize = static_cast<uint16_t>(compBuf.size());
         std::memcpy(&buffer[before], &cid, sizeof(uint16_t));
         std::memcpy(&buffer[before + sizeof(uint16_t)], &dataSize,
                     sizeof(uint16_t));
