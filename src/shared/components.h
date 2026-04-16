@@ -27,6 +27,8 @@ struct Entity {
 
 struct PlayerInput {
   uint8_t keys;
+  float mouseDx;
+  float mouseDy;
 };
 
 }  // namespace shared
