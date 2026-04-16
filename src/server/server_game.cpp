@@ -1,27 +1,91 @@
 #include "server_game.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 
+#include "glm/gtc/constants.hpp"
+#include "glm/gtc/quaternion.hpp"
 #include "server_network.h"
 #include "shared/components.h"
 
 // ── Movement system ──────────────────────────────────────
 
 void movement_system(entt::registry& registry, float dt) {
+  const float sensitivity = 0.002f;
+  const float pitchLimit = glm::half_pi<float>() - 0.01f;
+
   auto view =
       registry.view<shared::Position, shared::Velocity, shared::PlayerInput>();
   for (auto entity : view) {
     auto& position = view.get<shared::Position>(entity);
     auto& velocity = view.get<shared::Velocity>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
-    velocity.dx = 0;
-    velocity.dy = 0;
-    if (input.keys & 0x01) velocity.dy = 10.0f;
-    if (input.keys & 0x02) velocity.dx = -10.0f;
-    if (input.keys & 0x04) velocity.dy = -10.0f;
-    if (input.keys & 0x08) velocity.dx = 10.0f;
+
+    // Apply mouse look: yaw from mouseDx, pitch from mouseDy
+    if (input.mouseDx != 0.0f) {
+      float yawDelta = -input.mouseDx * sensitivity;
+      glm::quat q(position.qw, position.qx, position.qy, position.qz);
+      glm::quat yawQ = glm::angleAxis(yawDelta, glm::vec3(0, 0, 1));
+      q = glm::normalize(yawQ * q);
+      position.qw = q.w;
+      position.qx = q.x;
+      position.qy = q.y;
+      position.qz = q.z;
+    }
+
+    if (registry.all_of<shared::Camera>(entity)) {
+      auto& cam = registry.get<shared::Camera>(entity);
+      cam.pitch = std::clamp(cam.pitch - input.mouseDy * sensitivity,
+                             -pitchLimit, pitchLimit);
+    }
+
+    // Clear mouse deltas after processing
+    input.mouseDx = 0.0f;
+    input.mouseDy = 0.0f;
+
+    float yaw = std::atan2(
+        2.0f * (position.qw * position.qz + position.qx * position.qy),
+        1.0f - 2.0f * (position.qy * position.qy + position.qz * position.qz));
+    float cy = std::cos(yaw);
+    float sy = std::sin(yaw);
+    // At yaw=0, forward=+y, right=+x (matches the old axis convention).
+    float fwdX = -sy, fwdY = cy;
+    float rightX = cy, rightY = sy;
+
+    float fwdInput = 0.0f, strafeInput = 0.0f;
+    if (input.keys & 0x01) fwdInput += 1.0f;     // W
+    if (input.keys & 0x04) fwdInput -= 1.0f;     // S
+    if (input.keys & 0x08) strafeInput += 1.0f;  // D
+    if (input.keys & 0x02) strafeInput -= 1.0f;  // A
+
+    const float speed = 10.0f;
+    velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
+    velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
+
+    if (input.keys & 0x10)
+      velocity.dz = 10.0f;
+    else if (position.z > 0)
+      velocity.dz = -10.0f;
+
     position.x += velocity.dx * dt;
     position.y += velocity.dy * dt;
+    position.z += velocity.dz * dt;
+    position.z = fmax(position.z, 0);
+  }
+}
+
+// Model modification system
+void render_model_change(entt::registry& registry, float dt) {
+  auto view = registry.view<shared::RenderInfo, shared::PlayerInput>();
+  for (auto entity : view) {
+    auto& renderInfo = view.get<shared::RenderInfo>(entity);
+    auto& input = view.get<shared::PlayerInput>(entity);
+    if (input.keys & 0x80) {
+      renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+    }
+    if (input.keys & 0x20) renderInfo.scale *= 1.1;
+    if (input.keys & 0x40) renderInfo.scale /= 1.1;
   }
 }
 
@@ -29,13 +93,18 @@ void movement_system(entt::registry& registry, float dt) {
 
 void registerServerHandlers(ServerNetwork& network) {
   network.dispatcher().on(
-      shared::PacketType::KEYBOARD_INPUT,
+      shared::PacketType::INPUT,
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.peerEntityMap.find(sender);
         if (it == game.peerEntityMap.end()) return;
-        game.registry.replace<shared::PlayerInput>(it->second, pkt.keys);
+        auto ent = it->second;
+
+        auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
+        playerInput.keys = pkt.keys;
+        playerInput.mouseDx += pkt.mouseDx;
+        playerInput.mouseDy += pkt.mouseDy;
       });
 }
 
