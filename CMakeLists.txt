@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 4.1)
 project(cse125-game)
 
 set(CMAKE_CXX_STANDARD 20)
+# set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
     src/shared/hello.cpp)
@@ -12,6 +13,8 @@ target_include_directories(shared PUBLIC
 add_subdirectory(lib/glfw)
 
 add_subdirectory(lib/enet)
+
+target_include_directories(enet PUBLIC lib/enet/include)
 
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
