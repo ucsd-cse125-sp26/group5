@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 4.1)
 project(cse125-game)
 
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
@@ -12,12 +13,18 @@ target_include_directories(shared PUBLIC
 
 add_subdirectory(lib/glfw)
 
+add_subdirectory(lib/glm)
+
 add_subdirectory(lib/enet)
+target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
 
 target_include_directories(enet PUBLIC lib/enet/include)
 
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
+
+add_library(stb_image INTERFACE)
+target_include_directories(stb_image INTERFACE lib/stb)
 
 target_link_libraries(shared PUBLIC zpp_bits)
 
@@ -26,9 +33,14 @@ set(GLAD_SOURCES_DIR "${PROJECT_SOURCE_DIR}/lib/glad/")
 # Path to glad cmake files
 add_subdirectory("${GLAD_SOURCES_DIR}/cmake" glad_cmake)
 # Specify glad settings
-glad_add_library(glad_gl_core_46 REPRODUCIBLE API gl:core=4.6)
+glad_add_library(glad_gl_core_41 REPRODUCIBLE API gl:core=4.1)
 
 add_subdirectory(lib/entt)
+
+if(NOT APPLE)
+  SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
+endif()
+add_subdirectory(lib/assimp)
 
 add_library(imgui
     lib/imgui/imgui.cpp
@@ -42,15 +54,30 @@ target_include_directories(imgui PUBLIC
     lib/imgui
     lib/imgui/backends
 )
-target_link_libraries(imgui PUBLIC glfw glad_gl_core_46)
+target_link_libraries(imgui PUBLIC glfw glad_gl_core_41)
 
 add_executable(client)
 target_sources(client PRIVATE
     src/client/main.cpp
     src/client/client_network.cpp
     src/client/client_game.cpp
+    src/client/shaders.cpp
+    src/client/util.cpp
+    src/client/asset.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image)
+
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/shaders
+        $<TARGET_FILE_DIR:client>/shaders
+)
+
+add_custom_command(TARGET client POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:client>/assets
+)
 
 add_executable(server)
 target_sources(server PRIVATE
@@ -58,10 +85,10 @@ target_sources(server PRIVATE
     src/server/server_network.cpp
     src/server/server_game.cpp
 )
-target_link_libraries(server PRIVATE shared enet EnTT::EnTT)
+target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
 
 include(CTest)
-if(BUILD_TESTING)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     # GoogleTest lives in lib/googletest (git submodule). Pin version with:
     #   cd lib/googletest && git checkout v1.14.0
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

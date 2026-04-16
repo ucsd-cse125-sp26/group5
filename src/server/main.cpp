@@ -39,9 +39,12 @@ int main() {
     peer->data = (void*)"Client information";
     auto entity = g.registry.create();
     g.peerEntityMap[peer] = entity;
-    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f);
+    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+                                         0.0f, 0.0f);
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0));
+    g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
+    g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
+    g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0), 0.0f, 0.0f);
     g.registry.emplace<shared::Entity>(entity, g.nextEntityId);
 
     // Broadcast the new entity's full state to all clients
@@ -75,7 +78,7 @@ int main() {
 
   registerServerHandlers(network);
   auto previousTime = std::chrono::high_resolution_clock::now();
-  const float fixedDt = 0.05f;
+  const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
   while (true) {
     network.poll(game);
@@ -85,19 +88,20 @@ int main() {
     previousTime = currentTime;
     accumulator += dt;
 
-    // Broadcast delta state to all clients (dirtyOnly=false for now — full
-    // snapshot every tick)
-    std::vector<entt::entity> allEnts;
-    auto view = game.registry.view<shared::Entity>();
-    for (auto ent : view) allEnts.push_back(ent);
-    auto buf =
-        serializeEntities(game.registry, game.componentRegistry,
-                          shared::PacketType::UPDATE_ENTITY, allEnts, false);
-    net::broadcastRaw(network.getHost(), buf.data(), buf.size());
-
     while (accumulator >= fixedDt) {
       movement_system(game.registry, fixedDt);
+      render_model_change(game.registry, fixedDt);
       accumulator -= fixedDt;
+
+      // Broadcast delta state to all clients (dirtyOnly=false for now — full
+      // snapshot every tick)
+      std::vector<entt::entity> allEnts;
+      auto view = game.registry.view<shared::Entity>();
+      for (auto ent : view) allEnts.push_back(ent);
+      auto buf =
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
+      net::broadcastRaw(network.getHost(), buf.data(), buf.size());
     }
   }
 

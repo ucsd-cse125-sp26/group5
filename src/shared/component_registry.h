@@ -72,11 +72,15 @@ class ComponentRegistry {
 enum ComponentIds : ComponentTypeId {
   CID_POSITION = 1,
   CID_VELOCITY = 2,
+  CID_RENDERINFO = 3,
+  CID_CAMERA = 4,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
   ComponentRegistry reg;
   reg.registerComponent<Position>(CID_POSITION);
+  reg.registerComponent<RenderInfo>(CID_RENDERINFO);
+  reg.registerComponent<Camera>(CID_CAMERA);
   return reg;
 }
 
