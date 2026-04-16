@@ -83,7 +83,7 @@ target_sources(server PRIVATE
 target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
 
 include(CTest)
-if(BUILD_TESTING)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     # GoogleTest lives in lib/googletest (git submodule). Pin version with:
     #   cd lib/googletest && git checkout v1.14.0
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

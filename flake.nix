@@ -16,6 +16,11 @@
           crossSystem = null;
         };
         mingw = pkgs.pkgsCross.mingwW64;
+
+        mingwPthreadsStatic = mingw.windows.mingw_w64_pthreads.overrideAttrs (old: {
+          dontDisableStatic = true;
+          configureFlags = (old.configureFlags or [ ]) ++ [ "--enable-static" ];
+        });
       in
       {
         devShells.default = pkgs.mkShell {
@@ -66,6 +71,7 @@
           ];
 
           shellHook = ''
+            export MINGW_PTHREAD_STATIC_LIB_DIR="${mingwPthreadsStatic}/lib"
             export CC=clang
             export CXX=clang++
             export LD_LIBRARY_PATH="${

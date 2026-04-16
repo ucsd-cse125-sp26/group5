@@ -102,10 +102,13 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
 }
 
 Model* loadModel(const std::string& filename) {
-  auto base = exeDir();
+  // MinGW's std::filesystem::path::string_type is wstring, so the implicit
+  // conversions that work on Linux don't work here. Convert explicitly.
+  const std::string baseStr = exeDir().string();
+  const std::string fullPath = (exeDir() / filename).string();
   Assimp::Importer importer;
   const aiScene* scene = importer.ReadFile(
-      base / filename, aiProcess_Triangulate | aiProcess_FlipUVs);
+      fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
     std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
@@ -118,10 +121,12 @@ Model* loadModel(const std::string& filename) {
   for (int i = 0; i < scene->mNumMaterials; i++) {
     aiMaterial* aimat = scene->mMaterials[i];
     Material result;
-    result.ambient = loadMaterial(aimat, aiTextureType_AMBIENT, scene, base);
-    result.diffuse = loadMaterial(aimat, aiTextureType_DIFFUSE, scene, base);
-    result.specular = loadMaterial(aimat, aiTextureType_SPECULAR, scene, base);
-    result.emissive = loadMaterial(aimat, aiTextureType_EMISSIVE, scene, base);
+    result.ambient = loadMaterial(aimat, aiTextureType_AMBIENT, scene, baseStr);
+    result.diffuse = loadMaterial(aimat, aiTextureType_DIFFUSE, scene, baseStr);
+    result.specular =
+        loadMaterial(aimat, aiTextureType_SPECULAR, scene, baseStr);
+    result.emissive =
+        loadMaterial(aimat, aiTextureType_EMISSIVE, scene, baseStr);
     aimat->Get(AI_MATKEY_SHININESS, result.shininess);
     model->materials.push_back(result);
   }
