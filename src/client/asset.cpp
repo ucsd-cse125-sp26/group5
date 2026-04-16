@@ -107,8 +107,8 @@ Model* loadModel(const std::string& filename) {
   const std::string baseStr = exeDir().string();
   const std::string fullPath = (exeDir() / filename).string();
   Assimp::Importer importer;
-  const aiScene* scene = importer.ReadFile(
-      fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
+  const aiScene* scene =
+      importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
     std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
