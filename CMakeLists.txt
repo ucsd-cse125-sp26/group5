@@ -38,8 +38,10 @@ target_link_libraries(imgui PUBLIC glfw glad_gl_core_46)
 
 add_executable(client)
 target_sources(client PRIVATE src/client/main.cpp)
+target_include_directories(client PRIVATE lib/enet/include)
 target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_46 imgui EnTT::EnTT)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
+target_include_directories(server PRIVATE lib/enet/include)
 target_link_libraries(server PRIVATE shared enet EnTT::EnTT)
