@@ -174,4 +174,3 @@ std::vector<uint8_t> serializeEntities(
 
   return buffer;
 }
-
