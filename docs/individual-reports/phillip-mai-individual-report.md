@@ -1,38 +1,24 @@
-# [Rebecca] Weekly individual status report 
+---
+layout: page
+title: Phillip Mai — Individual Report
+permalink: /project-spec/phillip-mai-individual-report/
+---
+
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
 ## Week 2
-1. What were your concrete goals for the week?
-My current goal for the week was to: 
-- Keep learning modeling and gather resources I need to create the model 
-- Keep all teammates in check for progress of whole tean 
-- Get basic model and design of the game set up, make sure everything is falling into place 
-- Communicate next steps
-- Update project spec
-
-2. What goals were you able to accomplish?
-- Learning blender modeling: Successfully familarized myself with modeling, Got assets and general plannings down for how to do the texture etc. 
-- Keep all teammates in check: it seems everyone's fine with keeping a general weekly reports document. This is good. I also make announcements on the **important** channel on discord. Everything is going smoothly on this part. 
-- Have a draft of how the map should look like in 3D. this is good. 
-- Communicated next step in today's meeting. 
-- Updated project spec from more ambiguous to more clear. 
-
-3. If the week went differently than you had planned, what were the reasons? 
-- I think I was able to get what I want to get done done. I create very careful plannings of what I need to do. 
-4. What are your specific goals for the next week?
-**Admin:**
-- Update project spec for new stories and new puzzles brainstormed (IMPORTANT)
-- Determine size of model 
-- Create group report from everyone 
-**Modeling** 
-- Assets: start modeling complex assets
-    - Rigging bear model 
-    - Start fallen star model 
-- Landscape: Wednesday, work with friend on advancing the draft 
-Prioritize the above instead of anything else 
-5. What did you learn this week, if anything (and did you expect to learn it)?
-- Learned a bunch of blender stuff and Im content with what I have done 
-6. What is your individual morale (which might be different from the overall group morale)?
-- As basically the team leader, I need to make sure communication is good. I am in good connection with my modeling team so that's great; I am not following up on the technical team but I have trust in Jacob as the tech lead, so I am not worried. 
+1. What were your concrete goals for the week?  
+I mainly wanted to read over EnTT and learn more about ECS, as well as workout the specific details of the game such as mini puzzles, story line, and logical progression.
+2. What goals were you able to accomplish?  
+I was able to work out with Leon our ideas for the game and reconcile them with Rebecca and Sarah's ideas so that we all get on the same page regarding mini puzzles and the progression of the gameplay/storyline. I was only able to read over EnTT and ECS very briefly. 
+3. If the week went differently than you had planned, what were the reasons?  
+Another one of my classes (ECE 196) is significantly more busy than I had anticipated, and I was not able to spend nearly as much time on this class as I wanted.
+4. What are your specific goals for the next week?  
+I would like to read more about EnTT and ECS and figure out how Leon and I will begin implementing the game's logic. I am hoping that ECE 196 is more of a front-loaded class, which would allow me to devote more time to this game project once most of my other obligations are taken care of. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I did not learn too much this week, given that I was not able to read over EnTT/ECS as much as I had wanted. However, I did get the overall gist of what ECS is and how it applies to creating game entities and how they work.
+6. What is your individual morale (which might be different from the overall group morale)?  
+I am honestly feeling very unsure about how much I will be able to contribute in this project. My schedule outside of this class is much worse than I thought it would be, so I hope that the next few weeks go much better than the past week did in terms of outside obligations. I am really passionate about this project and I would like to see myself contribute my own fair share and feel like a better teammate to my group.
 
 
 ## Week 1
