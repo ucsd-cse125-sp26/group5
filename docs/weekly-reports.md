@@ -4,13 +4,51 @@ title: Weekly Reports
 permalink: /weekly-reports/
 ---
 <!-- # [Weekly individual report template](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.1udl1fbsowz) -->
+---
+
+## Individual Reports
+
+- [Shengrui_Chen_Individual_Report]({{ '/project-spec/shengrui-chen-individual-report/' | relative_url }})
+- [Ziyue_Liu_Individual_Report]({{ '/project-spec/ziyue-liu-individual-report/' | relative_url }})
+- [Jiaying_Chen_Individual_Report]({{ '/project-spec/jiaying-chen-individual-report/' | relative_url }})
+- [Phillip_Mai_Individual_Report]({{ '/project-spec/phillip-mai-individual-report/' | relative_url }})
+- [Sarah_Balatbat_Individual_Report]({{ '/project-spec/sarah-balatbat-individual-report/' | relative_url }})
+- [Jacob_Root_Individual_Report]({{ '/project-spec/jacob-root-individual-report/' | relative_url }})
+- [Alain_Zhang_Individual_Report]({{ '/project-spec/alain-zhang-individual-report/' | relative_url }})
+
+Individual report Template: 
+```
+
+## Week [Number]
+1. What were your concrete goals for the week?
+2. What goals were you able to accomplish?
+3. If the week went differently than you had planned, what were the reasons? 
+4. What are your specific goals for the next week?
+5. What did you learn this week, if anything (and did you expect to learn it)?
+6. What is your individual morale (which might be different from the overall group morale)?
+```
+**IMPORTANT**!   
+When importing images, make sure to put the images in the respective folder. For example, files for Sarah, Week 2 goes in `docs/assets/week2/sarah`. To link the images, use the following format: 
+```html
+<img src="{{ '/assets/weekX/name/filename.jpg' | relative_url }}" alt="six seven">
+```
+For example: 
+```html
+<img src="{{ '/assets/week2/sarah/wk2-sarah-base-model-concept-art.jpg' | relative_url }}" alt="Base model concept art">
+```
+Even if normal markdown format might work on your machine, it will NOT work on the actual website. 
+
+**Troubleshooting**  
+Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
+
 --- 
-# Week 2 Group report 
+
+## Week 2 Group report 
 Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
-## Admin
+### Admin
 Updated game name, mechanics, solidified story and background. 
 
-## Modeling
+### Modeling
 **Rebecca**  
 - For landscape: Gathered assets and planned textures, drafted 3D map layout
 - Updated project spec to be more concrete and clear
@@ -32,7 +70,7 @@ Updated game name, mechanics, solidified story and background.
 <img src="{{ '/assets/week2/gurf_draft.png' | relative_url }}" alt="text">
 <!-- ![text](assets/week2/gurf_draft.png) -->
 
-## Technical   
+### Technical   
 **Jacob**   
 - Got a cube rendering — model rendering pipeline underway
 - Delegated tasks to two teammates with clear scope   
@@ -54,7 +92,6 @@ Updated game name, mechanics, solidified story and background.
 **Leon & Philip** 
 - Story: Finished main storyline with linear structure
 - Helped settle type of puzzles centered around 4 phases of life, scaling from easy to hard
-
 
 ---
 ## Week 1 Group report 

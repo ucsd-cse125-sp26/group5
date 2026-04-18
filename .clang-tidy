@@ -1,0 +1,13 @@
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  modernize-*,
+  performance-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  -performance-no-int-to-ptr,
+  -performance-enum-size,
+  -modernize-use-integer-sign-comparison
+
+HeaderFilterRegex: 'src/.*'
+FormatStyle: file
