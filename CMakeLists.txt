@@ -40,6 +40,8 @@ add_subdirectory(lib/entt)
 if(NOT APPLE)
   SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
 endif()
+SET(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
 
 add_library(imgui
@@ -73,11 +75,13 @@ add_custom_command(TARGET client POST_BUILD
         $<TARGET_FILE_DIR:client>/shaders
 )
 
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:client>/assets
-)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_custom_command(TARGET client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:client>/assets
+    )
+endif()
 
 add_executable(server)
 target_sources(server PRIVATE

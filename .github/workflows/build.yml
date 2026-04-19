@@ -122,7 +122,9 @@ jobs:
           submodules: recursive
 
       - name: Install deps
-        run: brew install cmake ninja
+        run: |
+          brew install cmake ninja
+          python3 -m pip install --break-system-packages jinja2
 
       - name: Build
         run: bash ./build.sh
@@ -152,6 +154,9 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
 
       - uses: lukka/get-cmake@latest
+
+      - name: Install jinja2
+        run: python -m pip install jinja2
 
       - name: Build
         shell: cmd
