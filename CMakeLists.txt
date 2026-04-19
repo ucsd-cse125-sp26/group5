@@ -99,6 +99,11 @@ target_sources(server PRIVATE
 )
 target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
 
+add_executable(client_link_smoke src/client/link_smoke.cpp)
+target_link_libraries(client_link_smoke PRIVATE
+    shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image
+)
+
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     # GoogleTest lives in lib/googletest (git submodule). Pin version with:
@@ -106,4 +111,5 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     add_subdirectory(lib/googletest EXCLUDE_FROM_ALL)
     add_subdirectory(tests)
+    add_test(NAME client_link_smoke COMMAND client_link_smoke)
 endif()
