@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  linux-nix:
-    name: linux-gcc + windows-cross (nix)
+  linux-gcc-nix:
+    name: linux-gcc (nix)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,11 +16,8 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Build linux-gcc
+      - name: Build
         run: nix develop -c bash ./build-linux-gcc.sh
-
-      - name: Build windows-mingw-cross
-        run: nix develop -c bash ./build-windows.sh
 
       - name: ctest
         working-directory: build-linux-gcc
@@ -37,6 +34,19 @@ jobs:
               exit 1
             fi
           '
+
+  windows-cross-nix:
+    name: windows-mingw-cross (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build
+        run: nix develop -c bash ./build-windows.sh
 
   linux-clang-tidy:
     name: linux-clang + clang-tidy (nix)
