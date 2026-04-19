@@ -229,7 +229,7 @@ jobs:
       - name: Build
         shell: cmd
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
           cmake --build build
 
       - name: ctest
