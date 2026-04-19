@@ -23,14 +23,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: nix-community/cache-nix-action@v6
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
+      - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build
         run: nix develop .#ci -c bash ./build-linux-gcc.sh
@@ -73,14 +66,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: nix-community/cache-nix-action@v6
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
+      - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build
         run: nix develop .#ci -c bash ./build-windows.sh
@@ -107,14 +93,7 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - uses: nix-community/cache-nix-action@v6
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
+      - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build
         run: nix develop .#ci -c bash ./build.sh
