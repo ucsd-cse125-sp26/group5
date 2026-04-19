@@ -141,7 +141,7 @@ jobs:
           python -m pip install jinja2
 
       - name: Build
-        run: bash ./build.sh
+        run: bash ./build.sh "-DPython_EXECUTABLE=$pythonLocation/bin/python"
 
       - name: ctest
         working-directory: build
@@ -184,7 +184,7 @@ jobs:
       - name: Build
         shell: cmd
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe"
           cmake --build build
 
       - name: ctest
