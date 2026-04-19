@@ -30,7 +30,8 @@
 
         ciPackages = [
           clang-tidy-wrapped
-        ] ++ (with pkgs; [
+        ]
+        ++ (with pkgs; [
           # Development Tools
           clang
           gcc
