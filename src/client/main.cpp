@@ -28,8 +28,7 @@ int main() {
   game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
 
-  if (!network.connect("localhost", 7777))
-  {
+  if (!network.connect("localhost", 7777)) {
     return EXIT_FAILURE;
   }
 
