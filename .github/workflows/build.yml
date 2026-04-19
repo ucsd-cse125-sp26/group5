@@ -235,12 +235,16 @@ jobs:
   windows-native:
     name: Windows (MSVC)
     runs-on: windows-latest
+    env:
+      # sccache + MSVC + assimp forces /Zi + /Fd which sccache can't cache.
+      # Disable launchers for this job only; other jobs keep sccache.
+      CMAKE_C_COMPILER_LAUNCHER: ""
+      CMAKE_CXX_COMPILER_LAUNCHER: ""
+      SCCACHE_GHA_ENABLED: "false"
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: ilammy/msvc-dev-cmd@v1
 
@@ -256,7 +260,7 @@ jobs:
       - name: Build
         shell: cmd
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe" -DCMAKE_C_COMPILER_LAUNCHER= -DCMAKE_CXX_COMPILER_LAUNCHER=
           cmake --build build
 
       - name: ctest
