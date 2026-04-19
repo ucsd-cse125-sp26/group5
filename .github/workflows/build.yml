@@ -15,11 +15,11 @@ jobs:
     name: linux-gcc (nix)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: DeterminateSystems/nix-installer-action@main
 
@@ -42,7 +42,7 @@ jobs:
             fi
           '
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-x64
           path: |
@@ -56,18 +56,18 @@ jobs:
     name: windows-mingw-cross (nix)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: DeterminateSystems/nix-installer-action@main
 
       - name: Build
         run: nix develop -c bash ./build-windows.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-x64-mingw
           path: |
@@ -81,11 +81,11 @@ jobs:
     name: linux-clang + clang-tidy (nix)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: DeterminateSystems/nix-installer-action@main
 
@@ -120,11 +120,11 @@ jobs:
     name: linux (apt, no nix)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Install deps
         run: |
@@ -160,20 +160,18 @@ jobs:
     name: macOS (brew, no nix)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Install deps
-        run: |
-          brew install cmake ninja
-          python -m pip install jinja2
+      - name: Install jinja2
+        run: python -m pip install jinja2
 
       - name: Build
         run: bash ./build.sh "-DPython_EXECUTABLE=$pythonLocation/bin/python"
@@ -197,7 +195,7 @@ jobs:
           wait "$pid" 2>/dev/null
           exit 0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-arm64
           path: |
@@ -211,17 +209,17 @@ jobs:
     name: Windows (MSVC)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
-      - uses: mozilla-actions/sccache-action@v0.0.7
+      - uses: mozilla-actions/sccache-action@v0.0.9
 
       - uses: ilammy/msvc-dev-cmd@v1
 
       - uses: lukka/get-cmake@latest
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -249,7 +247,7 @@ jobs:
           }
           Stop-Process -Id $p.Id
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-x64-msvc
           path: |
