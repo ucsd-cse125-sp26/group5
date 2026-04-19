@@ -1,0 +1,175 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux-nix:
+    name: linux-gcc + windows-cross (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build linux-gcc
+        run: nix develop -c bash ./build-linux-gcc.sh
+
+      - name: Build windows-mingw-cross
+        run: nix develop -c bash ./build-windows.sh
+
+      - name: ctest
+        working-directory: build-linux-gcc
+        run: nix develop -c ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          nix develop -c bash -c '
+            set +e
+            timeout 3s ./build-linux-gcc/server
+            code=$?
+            if [ "$code" != "124" ]; then
+              echo "server exited with $code (expected 124 from timeout)"
+              exit 1
+            fi
+          '
+
+  linux-clang-tidy:
+    name: linux-clang + clang-tidy (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build
+        run: nix develop -c bash ./build.sh
+
+      - name: ctest
+        working-directory: build
+        run: nix develop -c ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          nix develop -c bash -c '
+            set +e
+            timeout 3s ./build/server
+            code=$?
+            if [ "$code" != "124" ]; then
+              echo "server exited with $code (expected 124 from timeout)"
+              exit 1
+            fi
+          '
+
+      - name: clang-tidy check
+        run: |
+          nix develop -c bash -c '
+            find src -name "*.cpp" | xargs clang-tidy --fix -p build \
+              --header-filter=".*" --exclude-header-filter="(lib|build)/.*"
+          '
+          git diff --exit-code -- src/
+
+  linux-native:
+    name: linux (apt, no nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential ninja-build pkg-config \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev \
+            libxrandr-dev libxrender-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            python3-jinja2
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Build
+        run: bash ./build.sh
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          set +e
+          timeout 3s ./build/server
+          code=$?
+          if [ "$code" != "124" ]; then
+            echo "server exited with $code (expected 124 from timeout)"
+            exit 1
+          fi
+
+  macos-native:
+    name: macOS (brew, no nix)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install deps
+        run: brew install cmake ninja
+
+      - name: Build
+        run: bash ./build.sh
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          set +e
+          timeout 3s ./build/server
+          code=$?
+          if [ "$code" != "124" ]; then
+            echo "server exited with $code (expected 124 from timeout)"
+            exit 1
+          fi
+
+  windows-native:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Build
+        shell: cmd
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure -C Release
+
+      - name: Server smoke test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "build\server.exe" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 3
+          if ($p.HasExited) {
+            Write-Error "server exited early with code $($p.ExitCode)"
+            exit 1
+          }
+          Stop-Process -Id $p.Id
