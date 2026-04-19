@@ -25,7 +25,7 @@ target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/incl
 target_include_directories(enet PUBLIC lib/enet/include)
 
 if(WIN32)
-    target_link_libraries(enet PUBLIC ws2_32 winmm)
+    target_link_libraries(enet ws2_32 winmm)
 endif()
 
 add_library(zpp_bits INTERFACE)
