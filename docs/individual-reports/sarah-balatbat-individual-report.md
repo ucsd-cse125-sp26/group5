@@ -5,6 +5,24 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 3
+### Goals
+- [ ] Continue tutorial for rigging lesson
+- [ ] Start modeling base model
+- [ ] Create concept art for other MVPs
+  - [ ] Goose
+  - [x] Corgi
+  - [ ] Mouse
+- [ ] Create decryption puzzle symbols
+
+### Achieved
+- Corgi concept art
+  - Created and iterated on design with Rebecca
+  
+### Progress Evaluation
+### Upcoming Goals
+### Lessons Learned
+### Individual Morale
 
 ## Week 2
 ### Goals
