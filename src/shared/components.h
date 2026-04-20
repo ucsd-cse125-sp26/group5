@@ -1,6 +1,9 @@
 #pragma once
 #include <cstdint>
 #include <string>
+
+#include "input.h"
+
 namespace shared {
 struct Position {
   float x, y, z;
@@ -26,7 +29,9 @@ struct Entity {
 };
 
 struct PlayerInput {
-  uint8_t keys;
+  InputKeys keys;
+  InputKeys keys_prev;
+  InputKeys keys_newly_pressed;
   float mouseDx;
   float mouseDy;
 };

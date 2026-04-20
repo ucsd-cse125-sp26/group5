@@ -76,7 +76,7 @@ int main() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  uint8_t prevKeys = 0;
+  InputKeys prevKeys = 0;
   glUseProgram(shaderProgram);
 
   glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.direction"), -0.3f,

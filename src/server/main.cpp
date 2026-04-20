@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <thread>
 
@@ -6,6 +7,7 @@
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
+#include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -44,7 +46,8 @@ int main() {
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0), 0.0f, 0.0f);
+    g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
+                                            InputKeys(0), 0.0f, 0.0f);
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -86,6 +89,7 @@ int main() {
     accumulator += dt;
 
     while (accumulator >= fixedDt) {
+      input_tick(game.registry);
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
       accumulator -= fixedDt;
