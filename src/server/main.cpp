@@ -53,6 +53,13 @@ int main() {
                           shared::PacketType::SPAWN_ENTITY, {entity}, false);
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
+    shared::PuzzleStatePacket puzzleStatePkt;
+    puzzleStatePkt.type = shared::PacketType::PUZZLE_STATE;
+    puzzleStatePkt.puzzleID = g.puzzleID;
+    puzzleStatePkt.localPuzzleTimeMs = g.localPuzzleTimeMs;
+    puzzleStatePkt.puzzleStatus = g.puzzleStatus;
+    net::sendPacket(peer, puzzleStatePkt);
+
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
@@ -92,6 +99,9 @@ int main() {
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
       accumulator -= fixedDt;
+      if(game.puzzleStatus == 1) {
+        game.localPuzzleTimeMs += fixedDt * 1000;
+      }
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)
@@ -102,6 +112,13 @@ int main() {
           serializeEntities(game.registry, game.componentRegistry,
                             shared::PacketType::UPDATE_ENTITY, allEnts, false);
       net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+
+      shared::PuzzleStatePacket ps{};
+      ps.type = shared::PacketType::PUZZLE_STATE;
+      ps.puzzleID = game.puzzleID;
+      ps.localPuzzleTimeMs = game.localPuzzleTimeMs;
+      ps.puzzleStatus = game.puzzleStatus;
+      net::broadcastPacket(network.getHost(), ps);
     }
   }
 

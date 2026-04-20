@@ -13,6 +13,9 @@ struct ClientGame {
   entt::registry registry;
   std::map<uint32_t, entt::entity> entityMap;
   uint32_t myEntityId = UINT32_MAX;
+  uint8_t puzzleStatus = 0; //0 = inactive, 1 = in progress, 2 = solved, 3 = failed
+  uint16_t puzzleID = 0;
+  uint32_t localPuzzleTimeMs = 0;
 };
 
 void registerClientHandlers(ClientNetwork& network);

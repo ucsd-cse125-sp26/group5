@@ -10,6 +10,7 @@ enum class PacketType : uint8_t {
   SPAWN_ENTITY,
   ASSIGN_ENTITY,
   DESPAWN_ENTITY,
+  PUZZLE_STATE,
 };
 
 struct AssignPacket {
@@ -27,5 +28,12 @@ struct InputPacket {
   uint8_t keys;
   float mouseDx;
   float mouseDy;
+};
+
+struct PuzzleStatePacket {
+  PacketType type;
+  uint16_t puzzleID = 0;
+  uint8_t puzzleStatus = 0;
+  uint32_t localPuzzleTimeMs = 0;
 };
 }  // namespace shared

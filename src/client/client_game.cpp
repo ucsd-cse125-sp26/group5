@@ -116,6 +116,17 @@ void registerClientHandlers(ClientNetwork& network) {
           }
         }
       });
+
+  network.dispatcher().on(
+    shared::PacketType::PUZZLE_STATE,
+    [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+      shared::PuzzleStatePacket pkt;
+      std::memcpy(&pkt, data, sizeof(pkt));
+      game.activePuzzleID = pkt.puzzleID;
+      game.localPuzzleTimeMs = pkt.localPuzzleTimeMs;
+      game.puzzleStatus = pkt.puzzleStatus;
+    }
+  );
 }
 
 // ── Input ────────────────────────────────────────────────

@@ -16,6 +16,9 @@ struct ServerGame {
   entt::registry registry;
   std::map<ENetPeer*, entt::entity> peerEntityMap;
   uint32_t nextEntityId = 0;
+  uint8_t puzzleStatus = 0; //0 = inactive, 1 = in progress, 2 = solved, 3 = failed
+  uint16_t puzzleID = 0;
+  uint32_t localPuzzleTimeMs = 0;
 };
 
 void movement_system(entt::registry& registry, float dt);
