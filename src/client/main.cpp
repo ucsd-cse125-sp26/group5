@@ -29,7 +29,7 @@ int main() {
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  test_step(game);
+  //test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -128,18 +128,19 @@ int main() {
   while (!glfwWindowShouldClose(window)) {
     i += 1;
     network.poll(game);
+    syncToRender(game);
     // printEntityPositions(game);
 
     glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
     glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
     const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
 
-    auto selfIt = game.entityMap.find(game.myEntityId);
-    if (selfIt != game.entityMap.end() && game.registry.valid(selfIt->second) &&
-        game.registry.all_of<shared::Position, shared::Camera>(
+    auto selfIt = game.renderEntityMap.find(game.renderEntityId);
+    if (selfIt != game.renderEntityMap.end() && game.renderRegistry.valid(selfIt->second) &&
+        game.renderRegistry.all_of<shared::Position, shared::Camera>(
             selfIt->second)) {
-      const auto& p = game.registry.get<shared::Position>(selfIt->second);
-      const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
+      const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
+      const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
 
       glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
       glm::quat pitchRot =
@@ -162,7 +163,7 @@ int main() {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     auto view =
-        game.registry
+        game.renderRegistry
             .view<shared::Entity, shared::Position, shared::RenderInfo>();
     for (auto ent : view) {
       auto& p = view.get<shared::Position>(ent);
