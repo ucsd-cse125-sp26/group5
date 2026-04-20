@@ -37,7 +37,7 @@ int main() {
 
     // Create the new player entity
     peer->data = (void*)"Client information";
-    auto entity = g.registry.create();
+    auto [entity_id, entity] = new_entity(g);
     g.peerEntityMap[peer] = entity;
     g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                          0.0f, 0.0f);
@@ -45,7 +45,6 @@ int main() {
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
     g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0), 0.0f, 0.0f);
-    g.registry.emplace<shared::Entity>(entity, g.nextEntityId);
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -56,10 +55,8 @@ int main() {
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = g.nextEntityId;
+    assignPkt.entityId = entity_id;
     net::sendPacket(peer, assignPkt);
-
-    g.nextEntityId++;
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {

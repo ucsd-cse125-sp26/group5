@@ -20,6 +20,7 @@ struct ServerGame {
 
 void movement_system(entt::registry& registry, float dt);
 void render_model_change(entt::registry& registry, float dt);
+std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
 
 // Serializes a set of entities and their synced components into a packet

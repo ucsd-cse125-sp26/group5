@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
+#include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server_network.h"
@@ -87,6 +89,15 @@ void render_model_change(entt::registry& registry, float dt) {
     if (input.keys & 0x20) renderInfo.scale *= 1.1;
     if (input.keys & 0x40) renderInfo.scale /= 1.1;
   }
+}
+
+// Entity creation helper
+std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
+  auto entity = g.registry.create();
+  auto id = g.nextEntityId;
+  g.registry.emplace<shared::Entity>(entity, id);
+  g.nextEntityId++;
+  return {id, entity};
 }
 
 // ── Packet handlers ──────────────────────────────────────
