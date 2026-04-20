@@ -22,10 +22,6 @@ void movement_system(entt::registry& registry, float dt);
 void render_model_change(entt::registry& registry, float dt);
 void registerServerHandlers(ServerNetwork& network);
 
-// Serializes a set of entities and their synced components into a packet
-// buffer. packetType controls the header byte (SPAWN_ENTITY or UPDATE_ENTITY).
-// dirtyOnly is reserved for future delta updates — currently ignored (always
-// full snapshot).
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,
     const shared::ComponentRegistry& componentRegistry,
