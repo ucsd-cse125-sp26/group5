@@ -77,6 +77,15 @@ int main() {
   };
 
   registerServerHandlers(network);
+  // Create hardcoded light entity
+  auto [light_entity_id, light_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(light_entity, "cube", 0.2f);
+  game.registry.emplace<shared::PointLight>(
+      light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
+      0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -92,6 +101,7 @@ int main() {
       input_tick(game.registry);
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
+      hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
       accumulator -= fixedDt;
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full

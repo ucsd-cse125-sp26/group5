@@ -151,6 +151,39 @@ int main() {
     glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
                 cameraPos.y, cameraPos.z);
 
+    // Update point lights from PointLight components
+    {
+      int plIdx = 0;
+      auto lightView = game.registry.view<shared::PointLight>();
+      for (auto ent : lightView) {
+        if (plIdx >= 4) break;
+        auto& pl = lightView.get<shared::PointLight>(ent);
+        std::string prefix = "pointLights[" + std::to_string(plIdx) + "].";
+        glUniform3f(
+            glGetUniformLocation(shaderProgram, (prefix + "position").c_str()),
+            pl.px, pl.py, pl.pz);
+        glUniform1f(
+            glGetUniformLocation(shaderProgram, (prefix + "constant").c_str()),
+            pl.constant);
+        glUniform1f(
+            glGetUniformLocation(shaderProgram, (prefix + "linear").c_str()),
+            pl.linear);
+        glUniform1f(
+            glGetUniformLocation(shaderProgram, (prefix + "quadratic").c_str()),
+            pl.quadratic);
+        glUniform3f(
+            glGetUniformLocation(shaderProgram, (prefix + "ambient").c_str()),
+            pl.ambientR, pl.ambientG, pl.ambientB);
+        glUniform3f(
+            glGetUniformLocation(shaderProgram, (prefix + "diffuse").c_str()),
+            pl.diffuseR, pl.diffuseG, pl.diffuseB);
+        glUniform3f(
+            glGetUniformLocation(shaderProgram, (prefix + "specular").c_str()),
+            pl.specularR, pl.specularG, pl.specularB);
+        plIdx++;
+      }
+    }
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     auto view =

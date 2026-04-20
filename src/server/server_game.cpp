@@ -102,7 +102,40 @@ void render_model_change(entt::registry& registry, float dt) {
 
 // Temporary - used to demonstrate server-controlled point light
 void hardcoded_spinning_light(entt::registry& registry, float dt,
-                              uint32_t light_entity_id) {}
+                              uint32_t light_entity_id) {
+  static float angle = 0.0f;
+  angle += dt * 1.0f;  // 1 radian/sec
+
+  const float radius = 5.0f;
+  const float height = 3.0f;
+
+  auto view =
+      registry.view<shared::Position, shared::PointLight, shared::Entity>();
+  for (auto entity : view) {
+    auto& eid = view.get<shared::Entity>(entity);
+    if (eid.id != light_entity_id) continue;
+
+    auto& pos = view.get<shared::Position>(entity);
+    auto& light = view.get<shared::PointLight>(entity);
+
+    pos.x = radius * std::cos(angle);
+    pos.y = radius * std::sin(angle);
+    pos.z = height;
+
+    // Orient the cube to face the origin
+    glm::vec3 p(pos.x, pos.y, pos.z);
+    glm::vec3 dir = glm::normalize(-p);
+    glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
+    pos.qw = q.w;
+    pos.qx = q.x;
+    pos.qy = q.y;
+    pos.qz = q.z;
+
+    light.px = pos.x;
+    light.py = pos.y;
+    light.pz = pos.z;
+  }
+}
 
 // Entity creation helper
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
