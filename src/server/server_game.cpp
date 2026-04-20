@@ -11,6 +11,8 @@
 #include "server_network.h"
 #include "shared/components.h"
 
+constexpr float kHeldKeyScaleFactor = 1.1f;
+
 // Process input on tick
 void input_tick(entt::registry& registry) {
   auto view = registry.view<shared::PlayerInput>();
@@ -103,6 +105,16 @@ void render_model_change(entt::registry& registry, float dt) {
 // Temporary - used to demonstrate server-controlled point light
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t light_entity_id) {
+  bool brighten = false;
+  bool dim = false;
+
+  auto input_view = registry.view<shared::PlayerInput>();
+  for (auto entity : input_view) {
+    auto& input = input_view.get<shared::PlayerInput>(entity);
+    if (input.keys & KEY_LIGHT_BRIGHT) brighten = true;
+    if (input.keys & KEY_LIGHT_DIM) dim = true;
+  }
+
   static float angle = 0.0f;
   angle += dt * 1.0f;  // 1 radian/sec
 
@@ -134,6 +146,23 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     light.px = pos.x;
     light.py = pos.y;
     light.pz = pos.z;
+
+    if (brighten) {
+      light.diffuseR *= kHeldKeyScaleFactor;
+      light.diffuseG *= kHeldKeyScaleFactor;
+      light.diffuseB *= kHeldKeyScaleFactor;
+      light.specularR *= kHeldKeyScaleFactor;
+      light.specularG *= kHeldKeyScaleFactor;
+      light.specularB *= kHeldKeyScaleFactor;
+    }
+    if (dim) {
+      light.diffuseR /= kHeldKeyScaleFactor;
+      light.diffuseG /= kHeldKeyScaleFactor;
+      light.diffuseB /= kHeldKeyScaleFactor;
+      light.specularR /= kHeldKeyScaleFactor;
+      light.specularG /= kHeldKeyScaleFactor;
+      light.specularB /= kHeldKeyScaleFactor;
+    }
   }
 }
 
