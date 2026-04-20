@@ -115,6 +115,7 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     if (input.keys & KEY_LIGHT_DIM) dim = true;
   }
 
+  // Sure, whatever. This will be removed later
   static float angle = 0.0f;
   angle += dt * 1.0f;  // 1 radian/sec
 
