@@ -79,15 +79,6 @@ int main() {
   InputKeys prevKeys = 0;
   glUseProgram(shaderProgram);
 
-  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.direction"), -0.3f,
-              -1.0f, -0.4f);
-  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.ambient"), 0.2f,
-              0.2f, 0.2f);
-  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.diffuse"), 0.8f,
-              0.8f, 0.8f);
-  glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.specular"), 1.0f,
-              1.0f, 1.0f);
-
   for (int pl = 0; pl < 4; pl++) {
     std::string prefix = "pointLights[" + std::to_string(pl) + "].";
     glUniform1f(
@@ -150,6 +141,23 @@ int main() {
                        glm::value_ptr(viewMat));
     glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
                 cameraPos.y, cameraPos.z);
+
+    // Update directional light from DirectionalLight component
+    {
+      auto dlView = game.registry.view<shared::DirectionalLight>();
+      for (auto ent : dlView) {
+        auto& dl = dlView.get<shared::DirectionalLight>(ent);
+        glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.direction"),
+                    dl.dirX, dl.dirY, dl.dirZ);
+        glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.ambient"),
+                    dl.ambientR, dl.ambientG, dl.ambientB);
+        glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.diffuse"),
+                    dl.diffuseR, dl.diffuseG, dl.diffuseB);
+        glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.specular"),
+                    dl.specularR, dl.specularG, dl.specularB);
+        break;  // Only use the first one
+      }
+    }
 
     // Update point lights from PointLight components
     {
