@@ -85,10 +85,12 @@ inline void cloneRegistry(const ComponentRegistry& compReg,
   std::map<uint32_t, entt::entity>& dstMap){
   
   // delete old entities in dst
-  for (auto [entityId, dstEntity] : dstMap) {
-    if (srcMap.find(entityId) == srcMap.end()) {
-      dst.destroy(dstEntity);
-      dstMap.erase(entityId);
+  for (auto it = dstMap.begin(); it != dstMap.end();) {
+    if (srcMap.find(it->first) == srcMap.end()) {
+      dst.destroy(it->second);
+      it = dstMap.erase(it);
+    } else {
+      it++;
     }
   }
   // create new entities in dst
@@ -110,7 +112,7 @@ inline void cloneRegistry(const ComponentRegistry& compReg,
 }
 enum ComponentIds : ComponentTypeId {
   CID_POSITION = 1,
-  CID_VELOCITY = 2,
+  CID_ENTITY = 2,
   CID_RENDERINFO = 3,
   CID_CAMERA = 4,
 };
@@ -118,6 +120,7 @@ enum ComponentIds : ComponentTypeId {
 inline ComponentRegistry createDefaultRegistry() {
   ComponentRegistry reg;
   reg.registerComponent<Position>(CID_POSITION);
+  reg.registerComponent<Entity>(CID_ENTITY);
   reg.registerComponent<RenderInfo>(CID_RENDERINFO);
   reg.registerComponent<Camera>(CID_CAMERA);
   return reg;
