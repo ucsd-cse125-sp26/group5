@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "client/spsc_queue.h"
 #include "client_network.h"
 #include "shared/components.h"
 #include "shared/protocol.h"
@@ -125,7 +126,7 @@ void syncToRender(ClientGame& game) {
 
 // ── Input ────────────────────────────────────────────────
 
-void processInput(GLFWwindow* window, ClientNetwork& network,
+void processInput(GLFWwindow* window, SpscQueue<shared::InputPacket, 256>& inputQueue,
                   uint8_t& prevKeys) {
   uint8_t keys = 0;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= 0x01;
@@ -162,7 +163,7 @@ void processInput(GLFWwindow* window, ClientNetwork& network,
     pkt.keys = keys;
     pkt.mouseDx = mouseDx;
     pkt.mouseDy = mouseDy;
-    network.send(pkt);
+    inputQueue.tryPush(pkt);
   }
   prevKeys = keys;
 }
@@ -175,6 +176,6 @@ void printEntityPositions(const ClientGame& game) {
     auto& e = view.get<shared::Entity>(ent);
     auto& p = view.get<shared::Position>(ent);
     printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
-           e.id == game.myEntityId ? " (me)" : "");
+           e.id == game.renderEntityId ? " (me)" : "");
   }
 }

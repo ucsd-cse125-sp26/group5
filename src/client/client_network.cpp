@@ -78,6 +78,7 @@ void ClientNetwork::poll(ClientGame& game) {
       case ENET_EVENT_TYPE_RECEIVE:
         dispatcher_.dispatch(game, event.peer, event.packet);
         enet_packet_destroy(event.packet);
+        game.snapshotDirty.store(true, std::memory_order_release);
         break;
 
       case ENET_EVENT_TYPE_DISCONNECT:
@@ -89,5 +90,12 @@ void ClientNetwork::poll(ClientGame& game) {
       default:
         break;
     }
+  }
+}
+
+void ClientNetwork::drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue) {
+  shared::InputPacket pkt;
+  while (inputQueue.tryPop(pkt)) {
+    send(pkt);
   }
 }

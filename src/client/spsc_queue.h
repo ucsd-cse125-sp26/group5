@@ -5,7 +5,7 @@
 #include <atomic>
 
 template<typename data_T, std::size_t size_T>
-class spsc_queue {
+class SpscQueue {
 public:
     static_assert(size_T >= 2, "Queue size must be at least 2");
     static_assert(std::popcount(size_T) == 1, "Size of the queue must be power of 2");
