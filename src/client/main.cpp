@@ -7,11 +7,11 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 #include "asset.h"
 #include "client/util.h"
-#include <thread>
 #include "client_game.h"
 #include "client_network.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -30,7 +30,7 @@ int main() {
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  //test_step(game);
+  // test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -128,20 +128,21 @@ int main() {
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(window)) {
     i += 1;
-    // this is not race condition, because the snapshotDirty is only set to true in the network thread
-    // set to false in the main thread
+    // this is not race condition, because the snapshotDirty is only set to true
+    // in the network thread set to false in the main thread
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::lock_guard<std::mutex> lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
     }
-    
+
     glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
     glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
     const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
 
     auto selfIt = game.renderEntityMap.find(game.renderEntityId);
-    if (selfIt != game.renderEntityMap.end() && game.renderRegistry.valid(selfIt->second) &&
+    if (selfIt != game.renderEntityMap.end() &&
+        game.renderRegistry.valid(selfIt->second) &&
         game.renderRegistry.all_of<shared::Position, shared::Camera>(
             selfIt->second)) {
       const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);

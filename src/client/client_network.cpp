@@ -93,7 +93,8 @@ void ClientNetwork::poll(ClientGame& game) {
   }
 }
 
-void ClientNetwork::drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue) {
+void ClientNetwork::drainInputQueue(
+    SpscQueue<shared::InputPacket, 256>& inputQueue) {
   shared::InputPacket pkt;
   while (inputQueue.tryPop(pkt)) {
     send(pkt);

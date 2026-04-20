@@ -2,9 +2,9 @@
 #include <enet/enet.h>
 
 #include "client_game.h"
-#include "spsc_queue.h"
 #include "shared/net/packet_handler.h"
 #include "shared/net/packet_utils.h"
+#include "spsc_queue.h"
 
 class ClientNetwork {
  public:
