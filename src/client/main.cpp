@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 // clang-format on
 
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -20,12 +21,15 @@
 #include "shared/components.h"
 #include "shared/hello.h"
 
+void test_step(ClientGame& game);
+
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -199,4 +203,23 @@ int main() {
   network.shutdown();
   glfwTerminate();
   return 0;
+}
+
+
+void test_step_one(ClientGame& game) {
+  auto src = game.networkRegistry.create();
+  game.networkRegistry.emplace<shared::Position>(src, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.networkRegistry.emplace<shared::RenderInfo>(src, "cube", 1.0f);
+  game.networkRegistry.emplace<shared::Camera>(src, 0.0f, 1.0f);
+  game.networkEntityMap[1] = src;
+
+  shared::cloneRegistry(game.componentRegistry, game.networkRegistry, game.networkEntityMap, game.renderRegistry, game.renderEntityMap);
+  assert(game.renderEntityMap.size() == 1);
+  auto dst = game.renderEntityMap[1];
+  assert((game.renderRegistry.all_of<shared::Position, shared::RenderInfo, shared::Camera>(dst)));
+  assert(game.renderRegistry.get<shared::Position>(dst).x == 0.0f);
+  assert(game.renderRegistry.get<shared::RenderInfo>(dst).modelName == "cube");
+  assert(game.renderRegistry.get<shared::Camera>(dst).ht == 1.0f);
+
+  std::cout << "Test step passed" << std::endl;
 }

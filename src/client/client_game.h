@@ -12,6 +12,12 @@ struct ClientGame {
   shared::ComponentRegistry componentRegistry;
   entt::registry registry;
   std::map<uint32_t, entt::entity> entityMap;
+
+  entt::registry renderRegistry;
+  std::map<uint32_t, entt::entity> renderEntityMap;
+
+  entt::registry networkRegistry;
+  std::map<uint32_t, entt::entity> networkEntityMap;
   uint32_t myEntityId = UINT32_MAX;
 };
 
