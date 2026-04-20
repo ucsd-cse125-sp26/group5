@@ -131,7 +131,7 @@ int main() {
     // this is not race condition, because the snapshotDirty is only set to true
     // in the network thread set to false in the main thread
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
-      std::lock_guard<std::mutex> lock(game.snapshotMutex);
+      std::scoped_lock lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
     }
@@ -216,7 +216,7 @@ int main() {
 void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
   while (game.running.load(std::memory_order_acquire)) {
     {
-      std::lock_guard<std::mutex> lock(game.snapshotMutex);
+      std::scoped_lock lock(game.snapshotMutex);
       network.poll(game);
     }
     network.drainInputQueue(game.inputQueue);
