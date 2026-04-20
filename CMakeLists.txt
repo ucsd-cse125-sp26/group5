@@ -91,18 +91,6 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     )
 endif()
 
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/shaders
-        $<TARGET_FILE_DIR:client>/shaders
-)
-
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:client>/assets
-)
-
 # this is for testing purposes
 add_library(server_lib STATIC
     src/server/server_network.cpp
