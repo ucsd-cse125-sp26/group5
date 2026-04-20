@@ -3,6 +3,10 @@ project(cse125-game)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
+if(WIN32)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
@@ -19,6 +23,10 @@ add_subdirectory(lib/enet)
 target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
 
 target_include_directories(enet PUBLIC lib/enet/include)
+
+if(WIN32)
+    target_link_libraries(enet ws2_32 winmm)
+endif()
 
 add_library(zpp_bits INTERFACE)
 target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
@@ -40,6 +48,8 @@ add_subdirectory(lib/entt)
 if(NOT APPLE)
   SET(ASSIMP_BUILD_ZLIB ON CACHE BOOL "build zlib")
 endif()
+SET(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
 
 add_library(imgui
@@ -73,11 +83,13 @@ add_custom_command(TARGET client POST_BUILD
         $<TARGET_FILE_DIR:client>/shaders
 )
 
-add_custom_command(TARGET client POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:client>/assets
-)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_custom_command(TARGET client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:client>/assets
+    )
+endif()
 
 add_executable(server)
 target_sources(server PRIVATE
@@ -87,6 +99,11 @@ target_sources(server PRIVATE
 )
 target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
 
+add_executable(client_link_smoke src/client/link_smoke.cpp)
+target_link_libraries(client_link_smoke PRIVATE
+    shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image
+)
+
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     # GoogleTest lives in lib/googletest (git submodule). Pin version with:
@@ -94,4 +111,5 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     add_subdirectory(lib/googletest EXCLUDE_FROM_ALL)
     add_subdirectory(tests)
+    add_test(NAME client_link_smoke COMMAND client_link_smoke)
 endif()
