@@ -21,7 +21,7 @@ using DeserializeFn = std::function<size_t(
     entt::registry& reg, entt::entity entity, const uint8_t* data, size_t len)>;
 
 using CloneFn = std::function<void(entt::registry& src, entt::entity srcEnt,
-  entt::registry& dst, entt::entity dstEnt)>;
+                                   entt::registry& dst, entt::entity dstEnt)>;
 struct ComponentMeta {
   SerializeFn serialize;
   DeserializeFn deserialize;
@@ -53,8 +53,8 @@ class ComponentRegistry {
           r.emplace_or_replace<T>(e, comp);
           return in.position();
         },
-        [](entt :: registry& src, entt::entity srcEnt,
-          entt::registry& dst, entt::entity dstEnt) {
+        [](entt ::registry& src, entt::entity srcEnt, entt::registry& dst,
+           entt::entity dstEnt) {
           if (!src.all_of<T>(srcEnt)) return;
           auto& srcComp = src.get<T>(srcEnt);
           dst.emplace_or_replace<T>(dstEnt, srcComp);
@@ -78,12 +78,10 @@ class ComponentRegistry {
   std::vector<ComponentTypeId> syncedIds_;
 };
 
-inline void cloneRegistry(const ComponentRegistry& compReg,
-  entt::registry& src,
-  const std::map<uint32_t, entt::entity>& srcMap,
-  entt::registry& dst,
-  std::map<uint32_t, entt::entity>& dstMap){
-  
+inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
+                          const std::map<uint32_t, entt::entity>& srcMap,
+                          entt::registry& dst,
+                          std::map<uint32_t, entt::entity>& dstMap) {
   // delete old entities in dst
   for (auto it = dstMap.begin(); it != dstMap.end();) {
     if (srcMap.find(it->first) == srcMap.end()) {
