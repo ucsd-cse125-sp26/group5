@@ -11,6 +11,7 @@
 
 #include "asset.h"
 #include "client/util.h"
+#include <thread>
 #include "client_game.h"
 #include "client_network.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -22,7 +23,7 @@
 #include "shared/hello.h"
 
 void test_step(ClientGame& game);
-
+void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
@@ -124,13 +125,16 @@ int main() {
       glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
   glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
                      GL_FALSE, glm::value_ptr(projection));
-
+  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(window)) {
     i += 1;
-    network.poll(game);
-    syncToRender(game);
-    // printEntityPositions(game);
-
+    {
+      std::lock_guard<std::mutex> lock(game.snapshotMutex);
+      if (game.snapshotDirty.load(std::memory_order_acquire)) {
+        syncToRender(game);
+        game.snapshotDirty.store(false, std::memory_order_release);
+      }
+    }
     glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
     glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
     const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
@@ -197,30 +201,23 @@ int main() {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(window, network, prevKeys);
+    processInput(window, game.inputQueue, prevKeys);
   }
-
-  network.disconnect();
-  network.shutdown();
+  game.running.store(false, std::memory_order_release);
+  networkThread.join();
   glfwTerminate();
   return 0;
 }
 
-
-void test_step_one(ClientGame& game) {
-  auto src = game.networkRegistry.create();
-  game.networkRegistry.emplace<shared::Position>(src, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
-  game.networkRegistry.emplace<shared::RenderInfo>(src, "cube", 1.0f);
-  game.networkRegistry.emplace<shared::Camera>(src, 0.0f, 1.0f);
-  game.networkEntityMap[1] = src;
-
-  shared::cloneRegistry(game.componentRegistry, game.networkRegistry, game.networkEntityMap, game.renderRegistry, game.renderEntityMap);
-  assert(game.renderEntityMap.size() == 1);
-  auto dst = game.renderEntityMap[1];
-  assert((game.renderRegistry.all_of<shared::Position, shared::RenderInfo, shared::Camera>(dst)));
-  assert(game.renderRegistry.get<shared::Position>(dst).x == 0.0f);
-  assert(game.renderRegistry.get<shared::RenderInfo>(dst).modelName == "cube");
-  assert(game.renderRegistry.get<shared::Camera>(dst).ht == 1.0f);
-
-  std::cout << "Test step passed" << std::endl;
+void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
+  while (game.running.load(std::memory_order_acquire)) {
+    {
+      std::lock_guard<std::mutex> lock(game.snapshotMutex);
+      network.poll(game);
+    }
+    network.drainInputQueue(game.inputQueue);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  network.disconnect();
+  network.shutdown();
 }
