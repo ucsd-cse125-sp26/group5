@@ -1,7 +1,9 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
+#include <mutex>
 
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
