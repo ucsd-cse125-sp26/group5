@@ -128,13 +128,14 @@ int main() {
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(window)) {
     i += 1;
-    {
+    // this is not race condition, because the snapshotDirty is only set to true in the network thread
+    // set to false in the main thread
+    if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::lock_guard<std::mutex> lock(game.snapshotMutex);
-      if (game.snapshotDirty.load(std::memory_order_acquire)) {
-        syncToRender(game);
-        game.snapshotDirty.store(false, std::memory_order_release);
-      }
+      syncToRender(game);
+      game.snapshotDirty.store(false, std::memory_order_release);
     }
+    
     glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
     glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
     const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
@@ -154,6 +155,8 @@ int main() {
       cameraPos = glm::vec3(p.x, p.y, p.z + cam.ht);
       cameraTarget = cameraPos + forward;
     } else {
+      glfwSwapBuffers(window);
+      glfwPollEvents();
       continue;
     }
 
