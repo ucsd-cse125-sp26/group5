@@ -36,4 +36,14 @@ struct PlayerInput {
   float mouseDy;
 };
 
+struct PointLight {
+  float px, py, pz;
+  float constant;
+  float linear;
+  float quadratic;
+  float ambientR, ambientG, ambientB;
+  float diffuseR, diffuseG, diffuseB;
+  float specularR, specularG, specularB;
+};
+
 }  // namespace shared
