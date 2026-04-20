@@ -1,0 +1,268 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
+
+jobs:
+  linux-gcc-nix:
+    name: linux-gcc (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build
+        run: nix develop .#ci -c bash ./build-linux-gcc.sh
+
+      - name: ctest
+        working-directory: build-linux-gcc
+        run: nix develop .#ci -c ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          nix develop .#ci -c bash -c '
+            set +e
+            timeout 3s ./build-linux-gcc/server
+            code=$?
+            if [ "$code" != "124" ]; then
+              echo "server exited with $code (expected 124 from timeout)"
+              exit 1
+            fi
+          '
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-x64
+          path: |
+            build-linux-gcc/client
+            build-linux-gcc/server
+            build-linux-gcc/shaders/
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-cross-nix:
+    name: windows-mingw-cross (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build
+        run: nix develop .#ci -c bash ./build-windows.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-mingw
+          path: |
+            build-windows/client.exe
+            build-windows/server.exe
+            build-windows/shaders/
+          if-no-files-found: error
+          retention-days: 1
+
+  linux-clang-tidy:
+    name: linux-clang + clang-tidy (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build
+        run: nix develop .#ci -c bash ./build.sh
+
+      - name: ctest
+        working-directory: build
+        run: nix develop .#ci -c ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          nix develop .#ci -c bash -c '
+            set +e
+            timeout 3s ./build/server
+            code=$?
+            if [ "$code" != "124" ]; then
+              echo "server exited with $code (expected 124 from timeout)"
+              exit 1
+            fi
+          '
+
+      - name: clang-tidy check
+        run: |
+          nix develop .#ci -c bash -c '
+            find src -name "*.cpp" | xargs clang-tidy --fix -p build \
+              --header-filter=".*" --exclude-header-filter="(lib|build)/.*"
+          '
+          git diff --exit-code -- src/
+
+  linux-native:
+    name: linux (apt, no nix)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential ninja-build pkg-config \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev \
+            libxrandr-dev libxrender-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            python3-jinja2
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Build
+        run: bash ./build.sh
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          set +e
+          timeout 3s ./build/server
+          code=$?
+          if [ "$code" != "124" ]; then
+            echo "server exited with $code (expected 124 from timeout)"
+            exit 1
+          fi
+
+  macos-native:
+    name: macOS (brew, no nix)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install jinja2
+        run: python -m pip install jinja2
+
+      - name: Build
+        run: bash ./build.sh "-DPython_EXECUTABLE=$pythonLocation/bin/python"
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Server smoke test
+        run: |
+          set +e
+          ./build/server &
+          pid=$!
+          sleep 3
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid"
+            echo "server exited early with $?"
+            exit 1
+          fi
+          kill "$pid" 2>/dev/null
+          wait "$pid" 2>/dev/null
+          exit 0
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-arm64
+          path: |
+            build/client
+            build/server
+            build/shaders/
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-native:
+    name: Windows (MSVC)
+    runs-on: windows-latest
+    env:
+      # sccache + MSVC + assimp forces /Zi + /Fd which sccache can't cache.
+      # Disable launchers for this job only; other jobs keep sccache.
+      CMAKE_C_COMPILER_LAUNCHER: ""
+      CMAKE_CXX_COMPILER_LAUNCHER: ""
+      SCCACHE_GHA_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - uses: lukka/get-cmake@latest
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install jinja2
+        run: python -m pip install jinja2
+
+      - name: Build
+        shell: cmd
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython_EXECUTABLE="%pythonLocation%\python.exe" -DCMAKE_C_COMPILER_LAUNCHER= -DCMAKE_CXX_COMPILER_LAUNCHER=
+          cmake --build build
+
+      - name: ctest
+        working-directory: build
+        run: ctest --output-on-failure -C Release
+
+      - name: Server smoke test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "build\server.exe" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 3
+          if ($p.HasExited) {
+            Write-Error "server exited early with code $($p.ExitCode)"
+            exit 1
+          }
+          Stop-Process -Id $p.Id
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-msvc
+          path: |
+            build/client.exe
+            build/server.exe
+            build/shaders/
+          if-no-files-found: error
+          retention-days: 1
