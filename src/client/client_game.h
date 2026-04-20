@@ -4,8 +4,8 @@
 #include <map>
 
 #include "shared/component_registry.h"
-#include "spsc_queue.h"
 #include "shared/protocol.h"
+#include "spsc_queue.h"
 
 struct GLFWwindow;
 class ClientNetwork;
@@ -30,6 +30,7 @@ struct ClientGame {
 
 void syncToRender(ClientGame& game);
 void registerClientHandlers(ClientNetwork& network);
-void processInput(GLFWwindow* window, SpscQueue<shared::InputPacket, 256>& inputQueue,
+void processInput(GLFWwindow* window,
+                  SpscQueue<shared::InputPacket, 256>& inputQueue,
                   uint8_t& prevKeys);
 void printEntityPositions(const ClientGame& game);

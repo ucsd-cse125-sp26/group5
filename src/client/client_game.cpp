@@ -121,12 +121,15 @@ void registerClientHandlers(ClientNetwork& network) {
 
 void syncToRender(ClientGame& game) {
   game.renderEntityId = game.networkEntityId;
-  shared::cloneRegistry(game.componentRegistry, game.networkRegistry, game.networkEntityMap, game.renderRegistry, game.renderEntityMap);
+  shared::cloneRegistry(game.componentRegistry, game.networkRegistry,
+                        game.networkEntityMap, game.renderRegistry,
+                        game.renderEntityMap);
 }
 
 // ── Input ────────────────────────────────────────────────
 
-void processInput(GLFWwindow* window, SpscQueue<shared::InputPacket, 256>& inputQueue,
+void processInput(GLFWwindow* window,
+                  SpscQueue<shared::InputPacket, 256>& inputQueue,
                   uint8_t& prevKeys) {
   uint8_t keys = 0;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= 0x01;
