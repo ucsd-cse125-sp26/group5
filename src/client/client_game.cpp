@@ -121,16 +121,16 @@ void registerClientHandlers(ClientNetwork& network) {
 // ── Input ────────────────────────────────────────────────
 
 void processInput(GLFWwindow* window, ClientNetwork& network,
-                  uint8_t& prevKeys) {
-  uint8_t keys = 0;
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= 0x01;
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= 0x02;
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= 0x04;
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= 0x08;
-  if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= 0x80;
-  if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= 0x40;
-  if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= 0x20;
-  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= 0x10;
+                  InputKeys& prevKeys) {
+  InputKeys keys = 0;
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+  if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
+  if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
+  if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
