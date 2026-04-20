@@ -36,7 +36,7 @@ static void deserializeComponents(ClientGame& game, entt::entity ent,
       offset += dataSize;
       continue;
     }
-    meta->deserialize(game.registry, ent, data + offset, dataSize);
+    meta->deserialize(game.networkRegistry, ent, data + offset, dataSize);
     offset += dataSize;
   }
 }
@@ -57,9 +57,9 @@ void registerClientHandlers(ClientNetwork& network) {
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
           offset += sizeof(uint32_t);
 
-          auto entity = game.registry.create();
-          game.entityMap[entityId] = entity;
-          game.registry.emplace<shared::Entity>(entity, entityId);
+          auto entity = game.networkRegistry.create();
+          game.networkEntityMap[entityId] = entity;
+          game.networkRegistry.emplace<shared::Entity>(entity, entityId);
           deserializeComponents(game, entity, data, offset, len);
         }
       });
@@ -69,7 +69,7 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::AssignPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        game.myEntityId = pkt.entityId;
+        game.networkEntityId = pkt.entityId;
       });
 
   network.dispatcher().on(
@@ -77,10 +77,10 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.entityMap.find(pkt.entityId);
-        if (it != game.entityMap.end()) {
-          game.registry.destroy(it->second);
-          game.entityMap.erase(it);
+        auto it = game.networkEntityMap.find(pkt.entityId);
+        if (it != game.networkEntityMap.end()) {
+          game.networkRegistry.destroy(it->second);
+          game.networkEntityMap.erase(it);
           printf("Destroyed entity %d\n", pkt.entityId);
         }
       });
@@ -98,8 +98,8 @@ void registerClientHandlers(ClientNetwork& network) {
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
           offset += sizeof(uint32_t);
 
-          auto it = game.entityMap.find(entityId);
-          if (it != game.entityMap.end()) {
+          auto it = game.networkEntityMap.find(entityId);
+          if (it != game.networkEntityMap.end()) {
             deserializeComponents(game, it->second, data, offset, len);
           } else {
             // Entity not known — skip its components
@@ -116,6 +116,11 @@ void registerClientHandlers(ClientNetwork& network) {
           }
         }
       });
+}
+
+void syncToRender(ClientGame& game) {
+  game.renderEntityId = game.networkEntityId;
+  shared::cloneRegistry(game.componentRegistry, game.networkRegistry, game.networkEntityMap, game.renderRegistry, game.renderEntityMap);
 }
 
 // ── Input ────────────────────────────────────────────────
@@ -165,7 +170,7 @@ void processInput(GLFWwindow* window, ClientNetwork& network,
 // ── Debug ────────────────────────────────────────────────
 
 void printEntityPositions(const ClientGame& game) {
-  auto view = game.registry.view<shared::Entity, shared::Position>();
+  auto view = game.renderRegistry.view<shared::Entity, shared::Position>();
   for (auto ent : view) {
     auto& e = view.get<shared::Entity>(ent);
     auto& p = view.get<shared::Position>(ent);
