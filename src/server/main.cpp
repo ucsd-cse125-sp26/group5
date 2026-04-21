@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <thread>
 
@@ -46,6 +47,7 @@ int main() {
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
     g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0), 0.0f, 0.0f);
     g.registry.emplace<shared::Entity>(entity, g.nextEntityId);
+    g.registry.emplace<DirtyTracker>(entity);
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -93,15 +95,23 @@ int main() {
       render_model_change(game.registry, fixedDt);
       accumulator -= fixedDt;
 
-      // Broadcast delta state to all clients (dirtyOnly=false for now — full
-      // snapshot every tick)
+      // Broadcast delta state to all clients. serializeEntities() skips
+      // entities whose DirtyTracker mask is zero and, for the rest, only
+      // writes component ids whose bit is set — then clears the mask.
+      // If nothing changed this tick, the packet has a 3-byte header
+      // (PacketType + entityCount=0) and we drop it on the floor.
       std::vector<entt::entity> allEnts;
       auto view = game.registry.view<shared::Entity>();
       for (auto ent : view) allEnts.push_back(ent);
       auto buf =
           serializeEntities(game.registry, game.componentRegistry,
-                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
-      net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+                            shared::PacketType::UPDATE_ENTITY, allEnts, true);
+      uint16_t entityCount = 0;
+      std::memcpy(&entityCount, buf.data() + sizeof(shared::PacketType),
+                  sizeof(uint16_t));
+      if (entityCount > 0) {
+        net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      }
     }
   }
 
