@@ -9,6 +9,19 @@
 #include "server_network.h"
 #include "shared/components.h"
 
+namespace {
+
+// Helper: set the dirty bit for `id` on `entity` if it has a DirtyTracker.
+// Entities without a tracker (e.g. in tests) silently no-op.
+inline void markDirty(entt::registry& registry, entt::entity entity,
+                      shared::ComponentTypeId id) {
+  if (auto* tracker = registry.try_get<DirtyTracker>(entity)) {
+    tracker->mark(id);
+  }
+}
+
+}  // namespace
+
 // ── Movement system ──────────────────────────────────────
 
 void movement_system(entt::registry& registry, float dt) {
@@ -72,6 +85,17 @@ void movement_system(entt::registry& registry, float dt) {
     position.y += velocity.dy * dt;
     position.z += velocity.dz * dt;
     position.z = fmax(position.z, 0);
+
+    // Position (x,y,z,quat) is mutated on every tick this system runs, so
+    // mark it dirty unconditionally. Camera is only mutated when the mouse
+    // moves vertically, but mouseDy was already consumed above — capture it
+    // beforehand if we want to be precise. For now, mark Camera dirty
+    // whenever this system runs on an entity that has one; cost is small
+    // because only player entities run this system.
+    markDirty(registry, entity, shared::CID_POSITION);
+    if (registry.all_of<shared::Camera>(entity)) {
+      markDirty(registry, entity, shared::CID_CAMERA);
+    }
   }
 }
 
@@ -81,11 +105,20 @@ void render_model_change(entt::registry& registry, float dt) {
   for (auto entity : view) {
     auto& renderInfo = view.get<shared::RenderInfo>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
+    bool changed = false;
     if (input.keys & 0x80) {
       renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+      changed = true;
     }
-    if (input.keys & 0x20) renderInfo.scale *= 1.1;
-    if (input.keys & 0x40) renderInfo.scale /= 1.1;
+    if (input.keys & 0x20) {
+      renderInfo.scale *= 1.1;
+      changed = true;
+    }
+    if (input.keys & 0x40) {
+      renderInfo.scale /= 1.1;
+      changed = true;
+    }
+    if (changed) markDirty(registry, entity, shared::CID_RENDERINFO);
   }
 }
 
@@ -122,6 +155,15 @@ void registerServerHandlers(ServerNetwork& network) {
 // ├─────────────────────────────────────────────────────────┤
 // │ ...more entities...                                     │
 // └─────────────────────────────────────────────────────────┘
+//
+// When `dirtyOnly` is true, entities whose DirtyTracker mask is zero are
+// skipped entirely (they contribute nothing to the packet), and for each
+// remaining entity only component ids whose bit is set are serialized.
+// The mask is cleared on every serialized entity after its components are
+// written, so the next tick starts from a clean slate.
+//
+// Entities that lack a DirtyTracker are always serialized in full — this
+// keeps behavior unchanged for unit tests and any non-networked use.
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,
@@ -137,13 +179,19 @@ std::vector<uint8_t> serializeEntities(
   for (auto ent : entities) {
     if (!registry.valid(ent) || !registry.all_of<shared::Entity>(ent)) continue;
 
+    DirtyTracker* tracker =
+        dirtyOnly ? registry.try_get<DirtyTracker>(ent) : nullptr;
+    if (dirtyOnly && tracker != nullptr && !tracker->any()) {
+      continue;
+    }
+
     uint32_t entityId = registry.get<shared::Entity>(ent).id;
     size_t entityHeaderPos = buffer.size();
     buffer.resize(buffer.size() + sizeof(uint32_t) + sizeof(uint16_t));
 
     uint16_t compCount = 0;
     for (auto cid : componentRegistry.syncedIds()) {
-      (void)dirtyOnly;
+      if (dirtyOnly && tracker != nullptr && !tracker->test(cid)) continue;
 
       auto* meta = componentRegistry.find(cid);
       if (!meta) continue;
@@ -166,6 +214,8 @@ std::vector<uint8_t> serializeEntities(
     std::memcpy(&buffer[entityHeaderPos + sizeof(uint32_t)], &compCount,
                 sizeof(uint16_t));
     entityCount++;
+
+    if (dirtyOnly && tracker != nullptr) tracker->clear();
   }
 
   std::memcpy(&buffer[headerPos], &packetType, sizeof(shared::PacketType));
