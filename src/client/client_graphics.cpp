@@ -45,8 +45,7 @@ bool setupCameraMatrix(GLuint shaderProgram, const ClientGame& game) {
     const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
 
     glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
-    glm::quat pitchRot =
-        glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
     glm::vec3 forward = playerRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
     cameraPos = glm::vec3(p.x, p.y, p.z + cam.ht);
@@ -114,8 +113,8 @@ void updatePointLights(GLuint shaderProgram, const ClientGame& game) {
 
 void renderEntities(GLuint shaderProgram, ClientGame& game,
                     std::unordered_map<std::string, Model*>& models) {
-  auto view =
-      game.registry.view<shared::Entity, shared::Position, shared::RenderInfo>();
+  auto view = game.registry
+                  .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
