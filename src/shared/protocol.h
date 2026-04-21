@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "input.h"
+
 namespace shared {
 enum class PacketType : uint8_t {
   // input packets from client to server
@@ -24,7 +26,7 @@ struct DespawnPacket {
 
 struct InputPacket {
   PacketType type;
-  uint8_t keys;
+  InputKeys keys;
   float mouseDx;
   float mouseDy;
 };

@@ -71,6 +71,7 @@ target_sources(client PRIVATE
     src/client/main.cpp
     src/client/client_network.cpp
     src/client/client_game.cpp
+    src/client/client_graphics.cpp
     src/client/shaders.cpp
     src/client/util.cpp
     src/client/asset.cpp
