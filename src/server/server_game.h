@@ -22,8 +22,11 @@ struct DirtyTracker {
   uint32_t mask = 0;
 
   void mark(shared::ComponentTypeId id) { mask |= (1u << id); }
-  bool test(shared::ComponentTypeId id) const { return (mask >> id) & 1u; }
-  bool any() const { return mask != 0; }
+  [[nodiscard]] bool test(shared::ComponentTypeId id) const {
+    return (mask >> id) & 1u;
+  }
+  [[nodiscard]] bool any() const { return mask != 0; }
+
   void clear() { mask = 0; }
 };
 
