@@ -12,7 +12,7 @@ permalink: /game-logic/story/
 
 Players work for a **Memory Recovery Service**: they enter one client’s fading dream and restore memories before time runs out.
 
-**This mission’s client:** an **elderly person** revisiting their own **life story**—not a fantasy world, not a rescue from disaster. The team walks their dream **in order**, one major chapter at a time.
+**This mission’s client:** an **elderly person** revisiting their own **life story**—not a fantasy world, not a rescue from disaster. The team moves through the dream in **reverse life order**: from **old age** back toward **childhood**, one major chapter at a time ("traveling back in time").
 
 ### Why they are here (what leads to this session)
 
@@ -21,8 +21,8 @@ The client **chose** this session: a **light, nostalgic** reason, not trauma. Th
 **Why that helps the project:**
 
 - **Mood:** warmer and simpler to pitch than injury or loss.
-- **Seasons:** spring → winter now reads as **one full life**, ending in **old age**—which fits an elderly protagonist and a **winter “going home”** beat.
-- **Demo / intro:** one line works: *“An older person books a dream visit to remember their life.”* Optional **short manga panels** at start can stay minimal.
+- **Seasons and order:** play runs **Winter → Autumn → Summer → Spring**—from **present-day elder self** back to **earliest memories**.
+- **Demo / intro:** one line works: *“An older person books a dream visit to remember their life—starting from who they are now and walking backward.”* Optional **short manga panels** at start can stay minimal.
 
 **What that means for the scene:** tonight’s run is **their scheduled visit**. The gray dreamscape is **their memory landscape**; the four players are the crew **authorized to help** complete each chapter. Wake-up closes the window—the timer stays **diegetic** (dream ending).
 
@@ -30,30 +30,30 @@ The client **chose** this session: a **light, nostalgic** reason, not trauma. Th
 
 ## Map structure (logic-facing)
 
-**Keep from earlier design:**
+**Aligned with project spec:**
 
-- **One continuous map**, four sections, **linear unlock** (finish section *n* before section *n* + 1).
-- **One playable area at a time** at the system level: players are **gated** to the current section’s bounds (even if the world looks connected).
+- **One continuous map**, four sections, **linear unlock** in reverse order: finish **Winter** before **Autumn**, then **Summer**, then **Spring**.
+- **One playable area at a time** at the system level: players are **gated** to the current section’s bounds (even if the world looks connected). **All four players must be in the same region** before progressing.
 - **Story + pacing + implementation** stay easier than a fully open order.
 
-### Four seasons = four life chapters (updated v1)
+### Four seasons = four life chapters (play order)
 
-| Order | Life chapter | Season | Notes |
+| Play order | Life chapter | Season | Notes |
 |------|----------------|--------|--------|
-| 1 | **Birth / beginning** | **Spring** | Soft, new, fragile |
-| 2 | **Childhood + teenage years** | **Summer** | Playful, growing, bright |
-| 3 | **College + adult working life** | **Autumn** | Transition, maturity; e.g. **researcher** career—optional **CSE bear** cameo in this zone if art wants it |
-| 4 | **Old age / “present” elder self** | **Winter** | Quiet, reflective; **fallen star** at the end as **home**, warmth, and **reunion with one’s younger selves** |
+| 1 | **Elderhood** | **Winter** | First chapter in the run. Puzzle focus: maze. |
+| 2 | **Adulthood / middle age** | **Autumn** | Transition and maturity; optional CSE bear cameo if art wants it. |
+| 3 | **Teenage years and college** | **Summer** | Bright, high-energy middle chapter. |
+| 4 | **Infancy and childhood** | **Spring** | Final chapter in the run; closing emotional beat. |
 
 Seasons stay **symbolic and art-facing**: they structure the life arc and keep each section visually distinct on one map.
 
 ---
 
-## Why linear (design summary)
+## Why linear (reverse) order
 
 | Angle | Point |
 |-------|--------|
-| **Story** | A life reads as a sequence: beginning → youth → adulthood → age. Order reinforces meaning. |
+| **Story** | Backward progression reinforces memory recovery: from who the client is now toward earliest memories. |
 | **Co-op** | Shared milestones; the team advances **together** instead of scattering across an open map. |
 | **Production** | Easier to scope, trigger puzzles, and avoid broken progression logic. |
 
@@ -63,8 +63,8 @@ Seasons stay **symbolic and art-facing**: they structure the life arc and keep e
 
 1. Optional **short intro** (e.g. manga panels) establishes the client and booking—keep it tiny.
 2. Enter the dream (grayscale / faded).
-3. **Section 1 → 4 in order:** co-op puzzle per section, **restore** that chapter, **local color payoff**, **unlock 2D story panel**.
-4. **End:** timer out (partial / fail) or full run completes—including **final emotional beat** at **winter** (e.g. fallen star / “home”).
+3. **Winter → Autumn → Summer → Spring:** one co-op puzzle per section, restore that chapter, unlock the next section and a story panel.
+4. **End:** timer out (partial/fail) or full run completion, with the final beat in **Spring**.
 
 **Co-op intent:** puzzles should **require or strongly assume all four players** so memory feels rebuilt by **shared effort**.
 
@@ -78,7 +78,7 @@ The world starts **drained / gray**; each completed chapter brings **color and w
 
 ## 2D panels (narrative payoff)
 
-After each **3D section**, a **2D panel** locks in that chapter’s emotional read. At the end, **four panels** can form **one full sequence**—the life they walked through together.
+After each **3D section**, a **2D panel** locks in that chapter’s emotional read. In play order, panels follow **Winter → ... → Spring**.
 
 *(Logic note: unlocking panel N uses the same server rule as “section N complete,” which also opens section N + 1.)*
 
@@ -86,13 +86,13 @@ After each **3D section**, a **2D panel** locks in that chapter’s emotional re
 
 ## Pacing and tension
 
-The run stays **timed**. Tension is **finish the life walk before the dream ends**, not choosing region order.
+The run stays **timed**. Tension is finishing the backward walk through memory before the dream ends.
 
 ---
 
 ## Ending states
 
-**Success:** All four chapters cleared in time; final assembly (panels + winter “home” beat).
+**Success:** All four chapters cleared in time (through **Spring**), with final panel assembly.
 
 **Incomplete:** Partial progress; **bittersweet**, not punishing—encourages retry.
 
@@ -106,4 +106,4 @@ The run stays **timed**. Tension is **finish the life walk before the dream ends
 
 ## One-sentence pitch
 
-Four specialists move **linearly through one elder’s life** (spring birth → winter home) in a single dream, **co-op puzzles** restore each chapter, **2D panels** anchor the story, and the clock stops when the dream ends.
+Four specialists move **backward through one elder’s life**—**Winter first, Spring last**—in a single dream; co-op puzzles restore each chapter while the clock counts down.
