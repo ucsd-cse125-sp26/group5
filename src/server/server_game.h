@@ -71,6 +71,7 @@ public:
       default: return "UNKNOWN";
     }
   }
+
 private:
   JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
 };
@@ -85,7 +86,6 @@ public:
     }
   }
 };
-
 
 struct ServerGame {
   shared::ComponentRegistry componentRegistry;
@@ -135,6 +135,7 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
 JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z);
+void createFloor(ServerGame& game);
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,

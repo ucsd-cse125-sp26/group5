@@ -17,6 +17,7 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  createFloor(game);
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
