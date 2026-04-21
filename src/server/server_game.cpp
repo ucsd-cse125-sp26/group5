@@ -287,3 +287,24 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
   return body->GetID();
 }
+
+void createFloor(ServerGame& game) {
+  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+
+  // Large flat box as the floor
+  JPH::BoxShapeSettings floorShapeSettings(JPH::Vec3(100.0f, 100.0f, 1.0f));
+  floorShapeSettings.SetEmbedded();
+  JPH::ShapeSettings::ShapeResult floorShapeResult = floorShapeSettings.Create();
+  JPH::ShapeRefC floorShape = floorShapeResult.Get();
+
+  JPH::BodyCreationSettings floorSettings(
+    floorShape,
+    JPH::RVec3(0.0f, 0.0f, -1.0f),  // just below z=0
+    JPH::Quat::sIdentity(),
+    JPH::EMotionType::Static,        // doesn't move
+    Layers::NON_MOVING               // static layer
+  );
+
+  JPH::Body* floor = bodyInterface.CreateBody(floorSettings);
+  bodyInterface.AddBody(floor->GetID(), JPH::EActivation::DontActivate);
+}
