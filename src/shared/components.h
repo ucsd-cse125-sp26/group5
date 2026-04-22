@@ -55,6 +55,9 @@ struct DirectionalLight {
   float specularR, specularG, specularB;
 };
 
+// struct PhysicsBody {
+//   JPH::BodyID bodyId;
+// };
 struct PhysicsBody {
   uint32_t bodyId;
 };

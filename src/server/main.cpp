@@ -122,7 +122,7 @@ int main() {
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::RVec3 joltPos = bodyInterface.GetPosition(pb.bodyId);
+        JPH::RVec3 joltPos = bodyInterface.GetPosition(JPH::BodyID(pb.bodyId));
         pos.x = joltPos.GetX();
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();
