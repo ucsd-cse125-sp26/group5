@@ -91,43 +91,7 @@ void updatePointLights(const Shader& shader, const ClientGame& game) {
   }
 }
 
-// clang-format off
-static const float skyboxVertices[] = {
-    -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
-
-    -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
-    -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
-
-     1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
-
-    -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
-
-    -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,   1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f,  1.0f, -1.0f,
-
-    -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f,  1.0f,
-};
-// clang-format on
-
-GLuint initSkyboxVAO() {
-  GLuint vao, vbo;
-  glGenVertexArrays(1, &vao);
-  glGenBuffers(1, &vbo);
-  glBindVertexArray(vao);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
-               GL_STATIC_DRAW);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-  glBindVertexArray(0);
-  return vao;
-}
-
-void drawSkybox(const Shader& shader, GLuint skyboxVAO, GLuint cubemapTexture,
+void drawSkybox(const Shader& shader, const Skybox& skybox,
                 const CameraState& camera, const glm::mat4& projection) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
@@ -136,9 +100,9 @@ void drawSkybox(const Shader& shader, GLuint skyboxVAO, GLuint cubemapTexture,
   shader.setMat4("view", skyboxView);
   shader.setMat4("projection", projection);
 
-  glBindVertexArray(skyboxVAO);
+  glBindVertexArray(skybox.vao);
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.cubemapTexture);
   glDrawArrays(GL_TRIANGLES, 0, 36);
   glBindVertexArray(0);
   glDepthFunc(GL_LESS);

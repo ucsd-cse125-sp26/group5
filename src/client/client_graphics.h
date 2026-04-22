@@ -23,6 +23,5 @@ void updateDirectionalLight(const Shader& shader, const ClientGame& game);
 void updatePointLights(const Shader& shader, const ClientGame& game);
 void renderEntities(const Shader& shader, ClientGame& game,
                     std::unordered_map<std::string, Model*>& models);
-GLuint initSkyboxVAO();
-void drawSkybox(const Shader& shader, GLuint skyboxVAO, GLuint cubemapTexture,
+void drawSkybox(const Shader& shader, const Skybox& skybox,
                 const CameraState& camera, const glm::mat4& projection);

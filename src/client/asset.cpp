@@ -389,14 +389,17 @@ void Draw(const Shader& shader, const Model& model,
   }
 }
 
-GLuint loadCubemap(const std::vector<std::string>& faces) {
+static GLuint loadCubemap(const std::string& directory) {
+  const std::string suffixes[] = {"px.png", "nx.png", "py.png",
+                                  "ny.png", "pz.png", "nz.png"};
   GLuint textureID;
   glGenTextures(1, &textureID);
   glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
   int width, height, nrChannels;
-  for (unsigned int i = 0; i < faces.size(); i++) {
-    const std::string fullPath = (exeDir() / faces[i]).string();
+  for (unsigned int i = 0; i < 6; i++) {
+    const std::string fullPath =
+        (exeDir() / directory / suffixes[i]).string();
     unsigned char* data =
         stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
     if (data) {
@@ -404,7 +407,7 @@ GLuint loadCubemap(const std::vector<std::string>& faces) {
                    height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
       stbi_image_free(data);
     } else {
-      std::cout << "Cubemap tex failed to load at path: " << faces[i] << '\n';
+      std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, 1, 1, 0,
                    GL_RGBA, GL_UNSIGNED_BYTE, pink);
@@ -417,4 +420,42 @@ GLuint loadCubemap(const std::vector<std::string>& faces) {
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
   return textureID;
+}
+
+// clang-format off
+static const float skyboxVertices[] = {
+    -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f,  1.0f,
+};
+// clang-format on
+
+Skybox loadSkybox(const std::string& directory) {
+  // Create VAO for the skybox cube
+  GLuint vao, vbo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  glBindVertexArray(vao);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
+               GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+  glBindVertexArray(0);
+
+  return Skybox{.vao = vao, .cubemapTexture = loadCubemap(directory)};
 }

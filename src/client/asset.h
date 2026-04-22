@@ -39,10 +39,15 @@ struct Model {
   GLuint test;
 };
 
+struct Skybox {
+  GLuint vao;
+  GLuint cubemapTexture;
+};
+
 class Shader;
 
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel();
-GLuint loadCubemap(const std::vector<std::string>& faces);
+Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
