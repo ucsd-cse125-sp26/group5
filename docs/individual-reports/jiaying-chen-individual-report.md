@@ -6,6 +6,34 @@ permalink: /project-spec/jiaying-chen-individual-report/
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
+## Week 3 
+1. What where your concrete goals for the week? 
+- Create a basic sketch of what the game should actaully look like, with colors and assets created. 
+- Finish creating the rough landscape. 
+- Mayby start looking into assets
+
+2. What goals were you able to accomplish?
+I was able to finish the sketch! This sketch contains: 
+    1. Color of what the map should look like ✅
+    2. Vibe of the game - the atmosphere ✅
+    3. Assets each part of the map ✅
+
+However, I started doing landscape and realize it's actually more time consuming to get things to look good than I thought. So I will be spending more time on that. 
+
+3. If the week went differently than you had planned, what were the reasons? 
+Underestimation of how time consuming the landscaping task is; I also think I should redo parts of it because I just don't like how it looks currrently. Also joined a hackathon that took the life out of me this weekend. 
+
+4. What are your specific goals for the next week?
+- Finish landscaping for sure; Start coloring the entire map and creating the path. 
+- Start creating the assets and actually start coloring things there. 
+
+
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Lots of modeling things, I think I gained a better intuition of how modeling works as a whole. So this is good.
+
+6. What is your individual morale (which might be different from the overall group morale)?
+I am trying my best to keep a balance to make sure I dont burn out, so far I have been doing a good job. 
+
 ## Week 2
 1. What were your concrete goals for the week?
 My current goal for the week was to: 
