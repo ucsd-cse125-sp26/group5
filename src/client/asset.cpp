@@ -223,7 +223,7 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   return id;
 }
 
-Model* makeCubeModel() {
+Model* makeCubeModel(const shared::CubeSpec& spec) {
   struct Face {
     glm::vec3 normal;
     glm::vec3 corners[4];
@@ -310,19 +310,11 @@ Model* makeCubeModel() {
   glBindVertexArray(0);
 
   // 6x1 diffuse palette, one texel per face (matches `faces` order above).
-  uint8_t palette[6 * 4] = {
-      204, 51,  51,  255,  // back    - red
-      51,  204, 51,  255,  // front   - green
-      51,  51,  204, 255,  // left    - blue
-      204, 204, 51,  255,  // right   - yellow
-      51,  204, 204, 255,  // bottom  - cyan
-      204, 51,  204, 255,  // top     - magenta
-  };
   GLuint diffuseTex;
   glGenTextures(1, &diffuseTex);
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 6, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               palette);
+               spec.palette);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -333,8 +325,10 @@ Model* makeCubeModel() {
   material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
   material.specular = {.constant = glm::vec3(1.0f),
                        .texture = makeSolidTexture(255, 255, 255, 255)};
-  material.emissive = {.constant = glm::vec3(1.0f),
-                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {
+      .constant = glm::vec3(1.0f),
+      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
+                                  spec.emissive[2], spec.emissive[3])};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -398,8 +392,7 @@ static GLuint loadCubemap(const std::string& directory) {
 
   int width, height, nrChannels;
   for (unsigned int i = 0; i < 6; i++) {
-    const std::string fullPath =
-        (exeDir() / directory / suffixes[i]).string();
+    const std::string fullPath = (exeDir() / directory / suffixes[i]).string();
     unsigned char* data =
         stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
     if (data) {

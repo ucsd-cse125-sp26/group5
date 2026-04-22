@@ -108,8 +108,7 @@ static void updatePointLights(const Shader& shader, const ClientGame& game) {
 }
 
 static void drawSkybox(const Shader& shader, const Skybox& skybox,
-                       const CameraState& camera,
-                       const glm::mat4& projection) {
+                       const CameraState& camera, const glm::mat4& projection) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
@@ -141,7 +140,8 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
     model = glm::scale(model, glm::vec3(renderInfo.scale));
-    model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelAsset->orientation);
+    model = model * glm::mat4_cast(rotation) *
+            glm::mat4_cast(modelAsset->orientation);
 
     Draw(shader, *modelAsset, model);
   }
@@ -177,8 +177,8 @@ bool Graphics::load(int width, int height) {
                        "shaders/fragment_skybox.glsl");
 
   for (const auto& asset : shared::ASSETS) {
-    Model* m = asset.filename.empty() ? makeCubeModel()
-                                      : loadModel(std::string(asset.filename));
+    Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
+                              : loadModel(std::string(asset.filename));
     if (!m) {
       fprintf(stderr, "Failed to load asset '%s' (%s)\n",
               std::string(asset.name).c_str(),
@@ -202,9 +202,9 @@ bool Graphics::load(int width, int height) {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  projection = glm::perspective(glm::radians(45.0f),
-                                static_cast<float>(width) / static_cast<float>(height),
-                                0.1f, 100.0f);
+  projection = glm::perspective(
+      glm::radians(45.0f),
+      static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
 
   shader->use();
   shader->setMat4("projection", projection);
@@ -232,9 +232,7 @@ void Graphics::render(ClientGame& game) {
   drawSkybox(*skyboxShader, skyboxes[skyboxDir], *camera, projection);
 }
 
-void Graphics::swap() {
-  glfwSwapBuffers(window);
-}
+void Graphics::swap() { glfwSwapBuffers(window); }
 
 void Graphics::destroy() {
   shader.reset();

@@ -81,7 +81,7 @@ int main() {
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(light_entity, "cube", 0.2f);
+  game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f);
   // TODO: at some point the point light will be removed from this entity and it
   // will just handle directional
   game.registry.emplace<shared::PointLight>(
