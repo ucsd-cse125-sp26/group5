@@ -129,14 +129,10 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     }
     Model* modelAsset = models[renderInfo.modelName];
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
-    glm::quat modelOrient(1.0f, 0.0f, 0.0f, 0.0f);
-    if (const auto* info = shared::findAsset(renderInfo.modelName)) {
-      modelOrient = glm::quat(info->qw, info->qx, info->qy, info->qz);
-    }
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
     model = glm::scale(model, glm::vec3(renderInfo.scale));
-    model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelOrient);
+    model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelAsset->orientation);
 
     Draw(shader, *modelAsset, model);
   }
@@ -180,6 +176,7 @@ bool Graphics::load(int width, int height) {
               std::string(asset.filename).c_str());
       continue;
     }
+    m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
