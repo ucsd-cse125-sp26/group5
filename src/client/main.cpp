@@ -26,7 +26,7 @@ int main() {
   registerClientHandlers(network);
 
   Graphics graphics;
-  if (!graphics.load(640, 480)) {
+  if (!graphics.load(960, 600)) {
     return EXIT_FAILURE;
   }
 

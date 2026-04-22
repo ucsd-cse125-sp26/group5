@@ -7,6 +7,7 @@
 
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/quaternion_float.hpp"
+#include "shared/assets.h"
 
 struct Vertex {
   glm::vec3 position;
@@ -49,7 +50,7 @@ struct Skybox {
 class Shader;
 
 Model* loadModel(const std::string& filename);
-Model* makeCubeModel();
+Model* makeCubeModel(const shared::CubeSpec& spec);
 Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
