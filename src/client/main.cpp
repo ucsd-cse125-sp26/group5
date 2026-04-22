@@ -12,7 +12,7 @@
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
-#include "glm/gtc/type_ptr.hpp"
+#include "glm/ext/matrix_clip_space.hpp"
 #include "shaders.h"
 #include "shared/assets.h"
 #include "shared/components.h"
@@ -58,10 +58,9 @@ int main() {
          GLAD_VERSION_MINOR(version));
 
   // Load shaders
-  GLuint shaderProgram =
-      loadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
-  GLuint skyboxShaderProgram =
-      loadShaders("shaders/vertex_skybox.glsl", "shaders/fragment_skybox.glsl");
+  Shader shader("shaders/vertex.glsl", "shaders/fragment.glsl");
+  Shader skyboxShader("shaders/vertex_skybox.glsl",
+                      "shaders/fragment_skybox.glsl");
 
   std::unordered_map<std::string, Model*> models;
   for (const auto& asset : shared::ASSETS) {
@@ -91,15 +90,14 @@ int main() {
   glEnable(GL_MULTISAMPLE);
 
   InputKeys prevKeys = 0;
-  glUseProgram(shaderProgram);
+  shader.use();
 
-  initPointLights(shaderProgram);
+  initPointLights(shader);
   GLuint i = 0;
 
   glm::mat4 projection =
       glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-  glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
-                     GL_FALSE, glm::value_ptr(projection));
+  shader.setMat4("projection", projection);
 
   while (!glfwWindowShouldClose(window)) {
     i += 1;
@@ -109,17 +107,14 @@ int main() {
     if (!camera) {
       continue;
     }
-    setupCameraMatrix(shaderProgram, *camera);
-
-    updateDirectionalLight(shaderProgram, game);
-    updatePointLights(shaderProgram, game);
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glUseProgram(shaderProgram);
-    renderEntities(shaderProgram, game, models);
-    drawSkybox(skyboxShaderProgram, skyboxVAO, cubemapTexture, *camera,
-               projection);
+    shader.use();
+    setupCameraMatrix(shader, *camera);
+    updateDirectionalLight(shader, game);
+    updatePointLights(shader, game);
+    renderEntities(shader, game, models);
+    drawSkybox(skyboxShader, skyboxVAO, cubemapTexture, *camera, projection);
     glfwSwapBuffers(window);
     glfwPollEvents();
 
@@ -134,6 +129,9 @@ int main() {
 
     processInput(window, network, prevKeys);
   }
+
+  shader.destroy();
+  skyboxShader.destroy();
 
   network.disconnect();
   network.shutdown();

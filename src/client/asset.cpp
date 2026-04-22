@@ -11,6 +11,7 @@
 #include "assimp/material.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
+#include "client/shaders.h"
 #include "client/util.h"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -351,43 +352,40 @@ Model* makeCubeModel() {
   return model;
 }
 
-void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material) {
+void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, material.ambient.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.ambient"), 0);
+  shader.setInt("material.ambient", 0);
 
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, material.diffuse.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.diffuse"), 1);
+  shader.setInt("material.diffuse", 1);
 
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_2D, material.specular.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.specular"), 2);
+  shader.setInt("material.specular", 2);
 
   glActiveTexture(GL_TEXTURE3);
   glBindTexture(GL_TEXTURE_2D, material.emissive.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.emissive"), 3);
+  shader.setInt("material.emissive", 3);
 
-  glUniform1f(glGetUniformLocation(shaderProgram, "material.shininess"),
-              material.shininess);
+  shader.setFloat("material.shininess", material.shininess);
 
   glBindVertexArray(mesh.vao);
   glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
   glBindVertexArray(0);
 }
 
-void Draw(GLuint shaderProgram, const Model& model,
+void Draw(const Shader& shader, const Model& model,
           const glm::mat4& transform) {
-  GLint transformLoc = glGetUniformLocation(shaderProgram, "model");
-  GLint normalMatLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
     glm::mat4 final = transform * instanceTransform;
     glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
-    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(final));
-    glUniformMatrix3fv(normalMatLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-    Draw(shaderProgram, mesh, material);
+    shader.setMat4("model", final);
+    shader.setMat3("normalMatrix", normalMatrix);
+    Draw(shader, mesh, material);
   }
 }
 

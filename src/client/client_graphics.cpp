@@ -7,7 +7,8 @@
 #include "glm/ext/quaternion_float.hpp"
 #include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/ext/vector_float3.hpp"
-#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/quaternion.hpp"
+#include "shaders.h"
 #include "shared/assets.h"
 #include "shared/components.h"
 
@@ -15,26 +16,15 @@
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-void initPointLights(GLuint shaderProgram) {
+void initPointLights(const Shader& shader) {
   for (int pl = 0; pl < 4; pl++) {
     std::string prefix = "pointLights[" + std::to_string(pl) + "].";
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "constant").c_str()),
-        1.0f);
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "linear").c_str()), 0.0f);
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "quadratic").c_str()),
-        0.0f);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "ambient").c_str()), 0.0f,
-        0.0f, 0.0f);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "diffuse").c_str()), 0.0f,
-        0.0f, 0.0f);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "specular").c_str()),
-        0.0f, 0.0f, 0.0f);
+    shader.setFloat(prefix + "constant", 1.0f);
+    shader.setFloat(prefix + "linear", 0.0f);
+    shader.setFloat(prefix + "quadratic", 0.0f);
+    shader.setVec3(prefix + "ambient", 0.0f, 0.0f, 0.0f);
+    shader.setVec3(prefix + "diffuse", 0.0f, 0.0f, 0.0f);
+    shader.setVec3(prefix + "specular", 0.0f, 0.0f, 0.0f);
   }
 }
 
@@ -63,57 +53,40 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   return CameraState{.position = pos, .view = view};
 }
 
-void setupCameraMatrix(GLuint shaderProgram, const CameraState& camera) {
-  glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE,
-                     glm::value_ptr(camera.view));
-  glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), camera.position.x,
-              camera.position.y, camera.position.z);
+void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
+  shader.setMat4("view", camera.view);
+  shader.setVec3("viewPos", camera.position.x, camera.position.y,
+                 camera.position.z);
 }
 
-void updateDirectionalLight(GLuint shaderProgram, const ClientGame& game) {
+void updateDirectionalLight(const Shader& shader, const ClientGame& game) {
   auto dlView = game.registry.view<shared::DirectionalLight>();
   for (auto ent : dlView) {
     auto& dl = dlView.get<shared::DirectionalLight>(ent);
-    glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.direction"),
-                dl.dirX, dl.dirY, dl.dirZ);
-    glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.ambient"),
-                dl.ambientR, dl.ambientG, dl.ambientB);
-    glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.diffuse"),
-                dl.diffuseR, dl.diffuseG, dl.diffuseB);
-    glUniform3f(glGetUniformLocation(shaderProgram, "dirLight.specular"),
-                dl.specularR, dl.specularG, dl.specularB);
+    shader.setVec3("dirLight.direction", dl.dirX, dl.dirY, dl.dirZ);
+    shader.setVec3("dirLight.ambient", dl.ambientR, dl.ambientG, dl.ambientB);
+    shader.setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG, dl.diffuseB);
+    shader.setVec3("dirLight.specular", dl.specularR, dl.specularG,
+                   dl.specularB);
     break;
   }
 }
 
-void updatePointLights(GLuint shaderProgram, const ClientGame& game) {
+void updatePointLights(const Shader& shader, const ClientGame& game) {
   int plIdx = 0;
   auto lightView = game.registry.view<shared::PointLight>();
   for (auto ent : lightView) {
     if (plIdx >= 4) break;
     auto& pl = lightView.get<shared::PointLight>(ent);
     std::string prefix = "pointLights[" + std::to_string(plIdx) + "].";
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "position").c_str()),
-        pl.px, pl.py, pl.pz);
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "constant").c_str()),
-        pl.constant);
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "linear").c_str()),
-        pl.linear);
-    glUniform1f(
-        glGetUniformLocation(shaderProgram, (prefix + "quadratic").c_str()),
-        pl.quadratic);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "ambient").c_str()),
-        pl.ambientR, pl.ambientG, pl.ambientB);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "diffuse").c_str()),
-        pl.diffuseR, pl.diffuseG, pl.diffuseB);
-    glUniform3f(
-        glGetUniformLocation(shaderProgram, (prefix + "specular").c_str()),
-        pl.specularR, pl.specularG, pl.specularB);
+    shader.setVec3(prefix + "position", pl.px, pl.py, pl.pz);
+    shader.setFloat(prefix + "constant", pl.constant);
+    shader.setFloat(prefix + "linear", pl.linear);
+    shader.setFloat(prefix + "quadratic", pl.quadratic);
+    shader.setVec3(prefix + "ambient", pl.ambientR, pl.ambientG, pl.ambientB);
+    shader.setVec3(prefix + "diffuse", pl.diffuseR, pl.diffuseG, pl.diffuseB);
+    shader.setVec3(prefix + "specular", pl.specularR, pl.specularG,
+                   pl.specularB);
     plIdx++;
   }
 }
@@ -154,16 +127,14 @@ GLuint initSkyboxVAO() {
   return vao;
 }
 
-void drawSkybox(GLuint skyboxShader, GLuint skyboxVAO, GLuint cubemapTexture,
+void drawSkybox(const Shader& shader, GLuint skyboxVAO, GLuint cubemapTexture,
                 const CameraState& camera, const glm::mat4& projection) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
-  glUseProgram(skyboxShader);
-  glUniformMatrix4fv(glGetUniformLocation(skyboxShader, "view"), 1, GL_FALSE,
-                     glm::value_ptr(skyboxView));
-  glUniformMatrix4fv(glGetUniformLocation(skyboxShader, "projection"), 1,
-                     GL_FALSE, glm::value_ptr(projection));
+  shader.use();
+  shader.setMat4("view", skyboxView);
+  shader.setMat4("projection", projection);
 
   glBindVertexArray(skyboxVAO);
   glActiveTexture(GL_TEXTURE0);
@@ -173,7 +144,7 @@ void drawSkybox(GLuint skyboxShader, GLuint skyboxVAO, GLuint cubemapTexture,
   glDepthFunc(GL_LESS);
 }
 
-void renderEntities(GLuint shaderProgram, ClientGame& game,
+void renderEntities(const Shader& shader, ClientGame& game,
                     std::unordered_map<std::string, Model*>& models) {
   auto view = game.registry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
@@ -195,6 +166,6 @@ void renderEntities(GLuint shaderProgram, ClientGame& game,
     model = glm::scale(model, glm::vec3(renderInfo.scale));
     model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelOrient);
 
-    Draw(shaderProgram, *modelAsset, model);
+    Draw(shader, *modelAsset, model);
   }
 }

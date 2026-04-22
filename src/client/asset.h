@@ -39,8 +39,10 @@ struct Model {
   GLuint test;
 };
 
+class Shader;
+
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel();
 GLuint loadCubemap(const std::vector<std::string>& faces);
-void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material);
-void Draw(GLuint shaderProgram, const Model& model, const glm::mat4& transform);
+void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
+void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
