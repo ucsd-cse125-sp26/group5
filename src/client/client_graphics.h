@@ -1,15 +1,17 @@
 #pragma once
 
 #include <optional>
+#include <string>
 #include <unordered_map>
 
 #include "asset.h"
 #include "client/client_game.h"
+#include "client/shaders.h"
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
 
-class Shader;
+struct GLFWwindow;
 
 struct CameraState {
   glm::vec3 position;
@@ -17,11 +19,17 @@ struct CameraState {
 };
 
 std::optional<CameraState> computeCamera(const ClientGame& game);
-void initPointLights(const Shader& shader);
-void setupCameraMatrix(const Shader& shader, const CameraState& camera);
-void updateDirectionalLight(const Shader& shader, const ClientGame& game);
-void updatePointLights(const Shader& shader, const ClientGame& game);
-void renderEntities(const Shader& shader, ClientGame& game,
-                    std::unordered_map<std::string, Model*>& models);
-void drawSkybox(const Shader& shader, const Skybox& skybox,
-                const CameraState& camera, const glm::mat4& projection);
+
+struct Graphics {
+  GLFWwindow* window = nullptr;
+  std::optional<Shader> shader;
+  std::optional<Shader> skyboxShader;
+  std::unordered_map<std::string, Model*> models;
+  std::unordered_map<std::string, Skybox> skyboxes;
+  glm::mat4 projection{1.0f};
+
+  bool load(int width, int height);
+  void render(ClientGame& game);
+  void swap();
+  void destroy();
+};

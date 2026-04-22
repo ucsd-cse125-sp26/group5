@@ -1,14 +1,20 @@
+// clang-format off
+#include <glad/gl.h>
+#include <GLFW/glfw3.h>
+// clang-format on
+
 #include "client_graphics.h"
 
 #include <cmath>
+#include <iostream>
 #include <string>
 
+#include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
 #include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/quaternion.hpp"
-#include "shaders.h"
 #include "shared/assets.h"
 #include "shared/components.h"
 
@@ -16,7 +22,7 @@
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-void initPointLights(const Shader& shader) {
+static void initPointLights(const Shader& shader) {
   for (int pl = 0; pl < 4; pl++) {
     std::string prefix = "pointLights[" + std::to_string(pl) + "].";
     shader.setFloat(prefix + "constant", 1.0f);
@@ -53,13 +59,14 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   return CameraState{.position = pos, .view = view};
 }
 
-void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
+static void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
   shader.setMat4("view", camera.view);
   shader.setVec3("viewPos", camera.position.x, camera.position.y,
                  camera.position.z);
 }
 
-void updateDirectionalLight(const Shader& shader, const ClientGame& game) {
+static void updateDirectionalLight(const Shader& shader,
+                                   const ClientGame& game) {
   auto dlView = game.registry.view<shared::DirectionalLight>();
   for (auto ent : dlView) {
     auto& dl = dlView.get<shared::DirectionalLight>(ent);
@@ -72,7 +79,7 @@ void updateDirectionalLight(const Shader& shader, const ClientGame& game) {
   }
 }
 
-void updatePointLights(const Shader& shader, const ClientGame& game) {
+static void updatePointLights(const Shader& shader, const ClientGame& game) {
   int plIdx = 0;
   auto lightView = game.registry.view<shared::PointLight>();
   for (auto ent : lightView) {
@@ -91,8 +98,9 @@ void updatePointLights(const Shader& shader, const ClientGame& game) {
   }
 }
 
-void drawSkybox(const Shader& shader, const Skybox& skybox,
-                const CameraState& camera, const glm::mat4& projection) {
+static void drawSkybox(const Shader& shader, const Skybox& skybox,
+                       const CameraState& camera,
+                       const glm::mat4& projection) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
@@ -108,8 +116,8 @@ void drawSkybox(const Shader& shader, const Skybox& skybox,
   glDepthFunc(GL_LESS);
 }
 
-void renderEntities(const Shader& shader, ClientGame& game,
-                    std::unordered_map<std::string, Model*>& models) {
+static void renderEntities(const Shader& shader, ClientGame& game,
+                           std::unordered_map<std::string, Model*>& models) {
   auto view = game.registry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
@@ -132,4 +140,101 @@ void renderEntities(const Shader& shader, ClientGame& game,
 
     Draw(shader, *modelAsset, model);
   }
+}
+
+bool Graphics::load(int width, int height) {
+  if (!glfwInit()) return false;
+
+  glfwWindowHint(GLFW_SAMPLES, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+  window = glfwCreateWindow(width, height, "Hello World", nullptr, nullptr);
+  if (!window) {
+    glfwTerminate();
+    return false;
+  }
+
+  glfwMakeContextCurrent(window);
+
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  if (glfwRawMouseMotionSupported())
+    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
+  int version = gladLoadGL(glfwGetProcAddress);
+  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
+         GLAD_VERSION_MINOR(version));
+
+  shader.emplace("shaders/vertex.glsl", "shaders/fragment.glsl");
+  skyboxShader.emplace("shaders/vertex_skybox.glsl",
+                       "shaders/fragment_skybox.glsl");
+
+  for (const auto& asset : shared::ASSETS) {
+    Model* m = asset.filename.empty() ? makeCubeModel()
+                                      : loadModel(std::string(asset.filename));
+    if (!m) {
+      fprintf(stderr, "Failed to load asset '%s' (%s)\n",
+              std::string(asset.name).c_str(),
+              std::string(asset.filename).c_str());
+      continue;
+    }
+    models[std::string(asset.name)] = m;
+    printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  for (const auto& sb : shared::SKYBOXES) {
+    skyboxes[std::string(sb.name)] = loadSkybox(std::string(sb.directory));
+    printf("Loaded skybox: %s\n", std::string(sb.name).c_str());
+  }
+
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_MULTISAMPLE);
+
+  projection = glm::perspective(glm::radians(45.0f),
+                                static_cast<float>(width) / static_cast<float>(height),
+                                0.1f, 100.0f);
+
+  shader->use();
+  shader->setMat4("projection", projection);
+  initPointLights(*shader);
+
+  return true;
+}
+
+void Graphics::render(ClientGame& game) {
+  auto camera = computeCamera(game);
+  if (!camera) return;
+
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  shader->use();
+  setupCameraMatrix(*shader, *camera);
+  updateDirectionalLight(*shader, game);
+  updatePointLights(*shader, game);
+  renderEntities(*shader, game, models);
+  drawSkybox(*skyboxShader, skyboxes["default"], *camera, projection);
+}
+
+void Graphics::swap() {
+  glfwSwapBuffers(window);
+}
+
+void Graphics::destroy() {
+  shader.reset();
+  skyboxShader.reset();
+
+  for (auto& [name, model] : models) {
+    delete model;
+  }
+  models.clear();
+  skyboxes.clear();
+
+  if (window) {
+    glfwDestroyWindow(window);
+    window = nullptr;
+  }
+  glfwTerminate();
 }
