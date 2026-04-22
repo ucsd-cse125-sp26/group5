@@ -87,9 +87,7 @@ int main() {
   game.registry.emplace<shared::PointLight>(
       light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
       0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-  game.registry.emplace<shared::DirectionalLight>(light_entity, -0.3f, -1.0f,
-                                                  -0.4f, 0.2f, 0.2f, 0.2f, 0.8f,
-                                                  0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::Scene>(light_entity, "sunny");
 
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
@@ -107,6 +105,7 @@ int main() {
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
+      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full

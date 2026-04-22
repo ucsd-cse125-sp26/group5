@@ -65,18 +65,27 @@ static void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
                  camera.position.z);
 }
 
+static const shared::SceneInfo* currentScene(const ClientGame& game) {
+  auto sceneView = game.registry.view<shared::Scene>();
+  for (auto ent : sceneView) {
+    auto& scene = sceneView.get<shared::Scene>(ent);
+    auto* info = shared::findScene(scene.name);
+    if (info) return info;
+  }
+  return nullptr;
+}
+
 static void updateDirectionalLight(const Shader& shader,
                                    const ClientGame& game) {
-  auto dlView = game.registry.view<shared::DirectionalLight>();
-  for (auto ent : dlView) {
-    auto& dl = dlView.get<shared::DirectionalLight>(ent);
-    shader.setVec3("dirLight.direction", dl.dirX, dl.dirY, dl.dirZ);
-    shader.setVec3("dirLight.ambient", dl.ambientR, dl.ambientG, dl.ambientB);
-    shader.setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG, dl.diffuseB);
-    shader.setVec3("dirLight.specular", dl.specularR, dl.specularG,
-                   dl.specularB);
-    break;
-  }
+  auto* info = currentScene(game);
+  if (!info) return;
+  shader.setVec3("dirLight.direction", info->dirX, info->dirY, info->dirZ);
+  shader.setVec3("dirLight.ambient", info->ambientR, info->ambientG,
+                 info->ambientB);
+  shader.setVec3("dirLight.diffuse", info->diffuseR, info->diffuseG,
+                 info->diffuseB);
+  shader.setVec3("dirLight.specular", info->specularR, info->specularG,
+                 info->specularB);
 }
 
 static void updatePointLights(const Shader& shader, const ClientGame& game) {
@@ -181,9 +190,13 @@ bool Graphics::load(int width, int height) {
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
-  for (const auto& sb : shared::SKYBOXES) {
-    skyboxes[std::string(sb.name)] = loadSkybox(std::string(sb.directory));
-    printf("Loaded skybox: %s\n", std::string(sb.name).c_str());
+  for (const auto& sc : shared::SCENES) {
+    std::string dir = std::string(sc.skyboxDirectory);
+    if (skyboxes.find(dir) == skyboxes.end()) {
+      skyboxes[dir] = loadSkybox(dir);
+      printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
+             dir.c_str());
+    }
   }
 
   glEnable(GL_DEPTH_TEST);
@@ -212,7 +225,11 @@ void Graphics::render(ClientGame& game) {
   updateDirectionalLight(*shader, game);
   updatePointLights(*shader, game);
   renderEntities(*shader, game, models);
-  drawSkybox(*skyboxShader, skyboxes["default"], *camera, projection);
+
+  auto* sceneInfo = currentScene(game);
+  std::string skyboxDir =
+      sceneInfo ? std::string(sceneInfo->skyboxDirectory) : "assets/skybox-1";
+  drawSkybox(*skyboxShader, skyboxes[skyboxDir], *camera, projection);
 }
 
 void Graphics::swap() {
