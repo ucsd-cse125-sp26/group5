@@ -1,5 +1,6 @@
 #include "client_graphics.h"
 
+#include <cmath>
 #include <string>
 
 #include "glm/ext/matrix_transform.hpp"
@@ -9,6 +10,10 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+
+// Skybox images use Y-up; the game uses Z-up.
+// cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
+static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
 void initPointLights(GLuint shaderProgram) {
   for (int pl = 0; pl < 4; pl++) {
@@ -33,34 +38,36 @@ void initPointLights(GLuint shaderProgram) {
   }
 }
 
-bool setupCameraMatrix(GLuint shaderProgram, const ClientGame& game) {
-  glm::vec3 cameraPos(0.0f, 0.0f, 10.0f);
-  glm::vec3 cameraTarget(0.0f, 0.0f, 0.0f);
-  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
-
+std::optional<CameraState> computeCamera(const ClientGame& game) {
   auto selfIt = game.entityMap.find(game.myEntityId);
-  if (selfIt != game.entityMap.end() && game.registry.valid(selfIt->second) &&
-      game.registry.all_of<shared::Position, shared::Camera>(selfIt->second)) {
-    const auto& p = game.registry.get<shared::Position>(selfIt->second);
-    const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
-
-    glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
-    glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
-    glm::vec3 forward = playerRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
-
-    cameraPos = glm::vec3(p.x, p.y, p.z + cam.ht);
-    cameraTarget = cameraPos + forward;
-  } else {
-    return false;
+  if (selfIt == game.entityMap.end() || !game.registry.valid(selfIt->second) ||
+      !game.registry.all_of<shared::Position, shared::Camera>(selfIt->second)) {
+    return std::nullopt;
   }
+  const auto& p = game.registry.get<shared::Position>(selfIt->second);
+  const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
 
-  glm::mat4 viewMat = glm::lookAt(cameraPos, cameraTarget, worldUp);
+  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
+  // Extract yaw only so entity pitch/roll doesn't tilt the camera.
+  glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
+  flat.z = 0.0f;
+  flat = glm::normalize(flat);
+  float yaw = std::atan2(-flat.x, flat.y);
+  glm::quat yawRot = glm::angleAxis(yaw, glm::vec3(0.0f, 0.0f, 1.0f));
+  glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+  glm::vec3 forward = yawRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
+  glm::mat4 view = glm::lookAt(pos, pos + forward, worldUp);
+  return CameraState{.position = pos, .view = view};
+}
+
+void setupCameraMatrix(GLuint shaderProgram, const CameraState& camera) {
   glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE,
-                     glm::value_ptr(viewMat));
-  glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), cameraPos.x,
-              cameraPos.y, cameraPos.z);
-  return true;
+                     glm::value_ptr(camera.view));
+  glUniform3f(glGetUniformLocation(shaderProgram, "viewPos"), camera.position.x,
+              camera.position.y, camera.position.z);
 }
 
 void updateDirectionalLight(GLuint shaderProgram, const ClientGame& game) {
@@ -109,6 +116,61 @@ void updatePointLights(GLuint shaderProgram, const ClientGame& game) {
         pl.specularR, pl.specularG, pl.specularB);
     plIdx++;
   }
+}
+
+// clang-format off
+static const float skyboxVertices[] = {
+    -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f,  1.0f,
+};
+// clang-format on
+
+GLuint initSkyboxVAO() {
+  GLuint vao, vbo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  glBindVertexArray(vao);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
+               GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+  glBindVertexArray(0);
+  return vao;
+}
+
+void drawSkybox(GLuint skyboxShader, GLuint skyboxVAO, GLuint cubemapTexture,
+                const CameraState& camera, const glm::mat4& projection) {
+  glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
+
+  glDepthFunc(GL_LEQUAL);
+  glUseProgram(skyboxShader);
+  glUniformMatrix4fv(glGetUniformLocation(skyboxShader, "view"), 1, GL_FALSE,
+                     glm::value_ptr(skyboxView));
+  glUniformMatrix4fv(glGetUniformLocation(skyboxShader, "projection"), 1,
+                     GL_FALSE, glm::value_ptr(projection));
+
+  glBindVertexArray(skyboxVAO);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+  glDrawArrays(GL_TRIANGLES, 0, 36);
+  glBindVertexArray(0);
+  glDepthFunc(GL_LESS);
 }
 
 void renderEntities(GLuint shaderProgram, ClientGame& game,

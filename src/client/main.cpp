@@ -60,6 +60,8 @@ int main() {
   // Load shaders
   GLuint shaderProgram =
       loadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
+  GLuint skyboxShaderProgram =
+      loadShaders("shaders/vertex_skybox.glsl", "shaders/fragment_skybox.glsl");
 
   std::unordered_map<std::string, Model*> models;
   for (const auto& asset : shared::ASSETS) {
@@ -75,6 +77,16 @@ int main() {
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
+  GLuint skyboxVAO = initSkyboxVAO();
+  GLuint cubemapTexture = loadCubemap({
+      "assets/skybox-1/px.png",
+      "assets/skybox-1/nx.png",
+      "assets/skybox-1/py.png",
+      "assets/skybox-1/ny.png",
+      "assets/skybox-1/pz.png",
+      "assets/skybox-1/nz.png",
+  });
+
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
@@ -84,8 +96,7 @@ int main() {
   initPointLights(shaderProgram);
   GLuint i = 0;
 
-  glm::mat4 projection;
-  projection =
+  glm::mat4 projection =
       glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
   glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
                      GL_FALSE, glm::value_ptr(projection));
@@ -94,16 +105,21 @@ int main() {
     i += 1;
     network.poll(game);
     // printEntityPositions(game);
-    if (!setupCameraMatrix(shaderProgram, game)) {
+    auto camera = computeCamera(game);
+    if (!camera) {
       continue;
     }
+    setupCameraMatrix(shaderProgram, *camera);
 
     updateDirectionalLight(shaderProgram, game);
     updatePointLights(shaderProgram, game);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(shaderProgram);
     renderEntities(shaderProgram, game, models);
+    drawSkybox(skyboxShaderProgram, skyboxVAO, cubemapTexture, *camera,
+               projection);
     glfwSwapBuffers(window);
     glfwPollEvents();
 
