@@ -89,6 +89,12 @@ int main() {
       0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
   game.registry.emplace<shared::Scene>(light_entity, "sunny");
 
+  // Create floor entity (large cube, top surface at z=0)
+  auto [floor_entity_id, floor_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
+
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
