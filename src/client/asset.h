@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/quaternion_float.hpp"
 
 struct Vertex {
   glm::vec3 position;
@@ -36,6 +37,7 @@ struct Model {
   std::vector<Mesh> meshes;
   std::vector<Material> materials;
   std::vector<std::pair<unsigned int, glm::mat4>> mesh_instances;
+  glm::quat orientation{1.0f, 0.0f, 0.0f, 0.0f};
   GLuint test;
 };
 
