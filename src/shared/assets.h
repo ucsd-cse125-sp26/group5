@@ -35,20 +35,41 @@ inline const AssetInfo* findAsset(std::string_view name) {
   return nullptr;
 }
 
-struct SkyboxInfo {
+struct SceneInfo {
   std::string_view name;
-  std::string_view directory;  // contains px.png, nx.png, py.png, ny.png, pz.png, nz.png
+  std::string_view skyboxDirectory;
+  float dirX, dirY, dirZ;
+  float ambientR, ambientG, ambientB;
+  float diffuseR, diffuseG, diffuseB;
+  float specularR, specularG, specularB;
 };
 
-inline constexpr SkyboxInfo SKYBOXES[] = {
-    {.name = "default", .directory = "assets/skybox-1"},
+inline constexpr SceneInfo SCENES[] = {
+    {.name = "sunny",
+     .skyboxDirectory = "assets/skybox-1",
+     .dirX = 0.3f, .dirY = 1.0f, .dirZ = 0.4f,
+     .ambientR = 0.2f, .ambientG = 0.2f, .ambientB = 0.2f,
+     .diffuseR = 0.8f, .diffuseG = 0.8f, .diffuseB = 0.8f,
+     .specularR = 1.0f, .specularG = 1.0f, .specularB = 1.0f},
+    {.name = "overcast",
+     .skyboxDirectory = "assets/skybox-2",
+     .dirX = 0.0f, .dirY = -1.0f, .dirZ = -0.3f,
+     .ambientR = 0.3f, .ambientG = 0.3f, .ambientB = 0.35f,
+     .diffuseR = 0.35f, .diffuseG = 0.35f, .diffuseB = 0.4f,
+     .specularR = 0.1f, .specularG = 0.1f, .specularB = 0.1f},
+    {.name = "night",
+     .skyboxDirectory = "assets/skybox-3",
+     .dirX = 0.0f, .dirY = 0.0f, .dirZ = -1.0f,
+     .ambientR = 0.02f, .ambientG = 0.02f, .ambientB = 0.05f,
+     .diffuseR = 0.0f, .diffuseG = 0.0f, .diffuseB = 0.0f,
+     .specularR = 0.0f, .specularG = 0.0f, .specularB = 0.0f},
 };
 
-inline constexpr std::size_t SKYBOX_COUNT =
-    sizeof(SKYBOXES) / sizeof(SKYBOXES[0]);
+inline constexpr std::size_t SCENE_COUNT =
+    sizeof(SCENES) / sizeof(SCENES[0]);
 
-inline const SkyboxInfo* findSkybox(std::string_view name) {
-  for (const auto& s : SKYBOXES) {
+inline const SceneInfo* findScene(std::string_view name) {
+  for (const auto& s : SCENES) {
     if (s.name == name) return &s;
   }
   return nullptr;
