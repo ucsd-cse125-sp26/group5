@@ -76,15 +76,12 @@ int main() {
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
-  GLuint skyboxVAO = initSkyboxVAO();
-  GLuint cubemapTexture = loadCubemap({
-      "assets/skybox-1/px.png",
-      "assets/skybox-1/nx.png",
-      "assets/skybox-1/py.png",
-      "assets/skybox-1/ny.png",
-      "assets/skybox-1/pz.png",
-      "assets/skybox-1/nz.png",
-  });
+  std::unordered_map<std::string, Skybox> skyboxes;
+  for (const auto& sb : shared::SKYBOXES) {
+    skyboxes[std::string(sb.name)] =
+        loadSkybox(std::string(sb.directory));
+    printf("Loaded skybox: %s\n", std::string(sb.name).c_str());
+  }
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
@@ -114,7 +111,7 @@ int main() {
     updateDirectionalLight(shader, game);
     updatePointLights(shader, game);
     renderEntities(shader, game, models);
-    drawSkybox(skyboxShader, skyboxVAO, cubemapTexture, *camera, projection);
+    drawSkybox(skyboxShader, skyboxes["default"], *camera, projection);
     glfwSwapBuffers(window);
     glfwPollEvents();
 
