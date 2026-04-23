@@ -34,5 +34,5 @@ void syncToRender(ClientGame& game);
 void registerClientHandlers(ClientNetwork& network);
 void processInput(GLFWwindow* window,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  uint8_t& prevKeys);
+                  InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);

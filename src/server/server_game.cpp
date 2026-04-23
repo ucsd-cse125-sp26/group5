@@ -2,15 +2,28 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
+#include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server_network.h"
 #include "shared/components.h"
 
-// ── Movement system ──────────────────────────────────────
+constexpr float kHeldKeyScaleFactor = 1.1f;
 
+// Process input on tick
+void input_tick(entt::registry& registry) {
+  auto view = registry.view<shared::PlayerInput>();
+  for (auto entity : view) {
+    auto& playerInput = view.get<shared::PlayerInput>(entity);
+    playerInput.keys_newly_pressed = ~playerInput.keys_prev & playerInput.keys;
+    playerInput.keys_prev = playerInput.keys;
+  }
+}
+
+// ── Movement system ──────────────────────────────────────
 void movement_system(entt::registry& registry, float dt) {
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
@@ -54,16 +67,16 @@ void movement_system(entt::registry& registry, float dt) {
     float rightX = cy, rightY = sy;
 
     float fwdInput = 0.0f, strafeInput = 0.0f;
-    if (input.keys & 0x01) fwdInput += 1.0f;     // W
-    if (input.keys & 0x04) fwdInput -= 1.0f;     // S
-    if (input.keys & 0x08) strafeInput += 1.0f;  // D
-    if (input.keys & 0x02) strafeInput -= 1.0f;  // A
+    if (input.keys & KEY_FORWARD) fwdInput += 1.0f;
+    if (input.keys & KEY_BACKWARD) fwdInput -= 1.0f;
+    if (input.keys & KEY_RIGHT) strafeInput += 1.0f;
+    if (input.keys & KEY_LEFT) strafeInput -= 1.0f;
 
     const float speed = 10.0f;
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 
-    if (input.keys & 0x10)
+    if (input.keys & KEY_JUMP)
       velocity.dz = 10.0f;
     else if (position.z > 0)
       velocity.dz = -10.0f;
@@ -81,12 +94,86 @@ void render_model_change(entt::registry& registry, float dt) {
   for (auto entity : view) {
     auto& renderInfo = view.get<shared::RenderInfo>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
-    if (input.keys & 0x80) {
+    if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
       renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
     }
-    if (input.keys & 0x20) renderInfo.scale *= 1.1;
-    if (input.keys & 0x40) renderInfo.scale /= 1.1;
+    if (input.keys & KEY_MODEL_BIGGER) renderInfo.scale *= 1.1;
+    if (input.keys & KEY_MODEL_SMALLER) renderInfo.scale /= 1.1;
   }
+}
+
+// Temporary - used to demonstrate server-controlled point light
+void hardcoded_spinning_light(entt::registry& registry, float dt,
+                              uint32_t light_entity_id) {
+  bool brighten = false;
+  bool dim = false;
+
+  auto input_view = registry.view<shared::PlayerInput>();
+  for (auto entity : input_view) {
+    auto& input = input_view.get<shared::PlayerInput>(entity);
+    if (input.keys & KEY_LIGHT_BRIGHT) brighten = true;
+    if (input.keys & KEY_LIGHT_DIM) dim = true;
+  }
+
+  // Sure, whatever. This will be removed later
+  static float angle = 0.0f;
+  angle += dt * 1.0f;  // 1 radian/sec
+
+  const float radius = 5.0f;
+  const float height = 3.0f;
+
+  auto view =
+      registry.view<shared::Position, shared::PointLight, shared::Entity>();
+  for (auto entity : view) {
+    auto& eid = view.get<shared::Entity>(entity);
+    if (eid.id != light_entity_id) continue;
+
+    auto& pos = view.get<shared::Position>(entity);
+    auto& light = view.get<shared::PointLight>(entity);
+
+    pos.x = radius * std::cos(angle);
+    pos.y = radius * std::sin(angle);
+    pos.z = height;
+
+    // Orient the cube to face the origin
+    glm::vec3 p(pos.x, pos.y, pos.z);
+    glm::vec3 dir = glm::normalize(-p);
+    glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
+    pos.qw = q.w;
+    pos.qx = q.x;
+    pos.qy = q.y;
+    pos.qz = q.z;
+
+    light.px = pos.x;
+    light.py = pos.y;
+    light.pz = pos.z;
+
+    if (brighten) {
+      light.diffuseR *= kHeldKeyScaleFactor;
+      light.diffuseG *= kHeldKeyScaleFactor;
+      light.diffuseB *= kHeldKeyScaleFactor;
+      light.specularR *= kHeldKeyScaleFactor;
+      light.specularG *= kHeldKeyScaleFactor;
+      light.specularB *= kHeldKeyScaleFactor;
+    }
+    if (dim) {
+      light.diffuseR /= kHeldKeyScaleFactor;
+      light.diffuseG /= kHeldKeyScaleFactor;
+      light.diffuseB /= kHeldKeyScaleFactor;
+      light.specularR /= kHeldKeyScaleFactor;
+      light.specularG /= kHeldKeyScaleFactor;
+      light.specularB /= kHeldKeyScaleFactor;
+    }
+  }
+}
+
+// Entity creation helper
+std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
+  auto entity = g.registry.create();
+  auto id = g.nextEntityId;
+  g.registry.emplace<shared::Entity>(entity, id);
+  g.nextEntityId++;
+  return {id, entity};
 }
 
 // ── Packet handlers ──────────────────────────────────────

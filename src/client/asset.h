@@ -1,3 +1,4 @@
+#pragma once
 #include <glad/gl.h>
 
 #include <string>
