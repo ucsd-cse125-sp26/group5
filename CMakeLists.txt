@@ -71,6 +71,7 @@ target_sources(client PRIVATE
     src/client/main.cpp
     src/client/client_network.cpp
     src/client/client_game.cpp
+    src/client/client_graphics.cpp
     src/client/shaders.cpp
     src/client/util.cpp
     src/client/asset.cpp
@@ -91,13 +92,17 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     )
 endif()
 
-add_executable(server)
-target_sources(server PRIVATE
-    src/server/main.cpp
+# this is for testing purposes
+add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
 )
-target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm)
+target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm)
+
+add_executable(server)
+target_sources(server PRIVATE src/server/main.cpp)
+target_link_libraries(server PRIVATE server_lib)
 
 add_executable(client_link_smoke src/client/link_smoke.cpp)
 target_link_libraries(client_link_smoke PRIVATE
