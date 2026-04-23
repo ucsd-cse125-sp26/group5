@@ -59,8 +59,12 @@ The team continued development across graphics, networking, physics, and puzzle 
   <img src="{{ '/assets/week3/rebecca/autumn.PNG' | relative_url }}" alt="Autumn">
   <img src="{{ '/assets/week3/rebecca/winter.PNG' | relative_url }}" alt="Winter">
 </div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+<img src="{{ '/assets/week3/rebecca/color1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/color2.png' | relative_url }}" alt="thing">
+</div>
+<img src="{{ '/assets/week3/rebecca/model1.png' | relative_url }}" alt="thing">
 <img src="{{ '/assets/week3/rebecca/rebecca1.png' | relative_url }}" alt="text">
-
 **Sarah**
 - Came up with detailed design for character. 
 <img src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
