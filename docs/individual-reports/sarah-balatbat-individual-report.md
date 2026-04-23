@@ -8,7 +8,7 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 ## Week 3
 ### Goals
 - [ ] Continue tutorial for rigging lesson
-- [ ] Start modeling base model
+- [x] Start modeling base model
 - [ ] Create concept art for other MVPs
   - [ ] Goose
   - [x] Corgi
@@ -18,11 +18,46 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 ### Achieved
 - Corgi concept art
   - Created and iterated on design with Rebecca
+    <img src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="Corgi model concept art">
+    <img src="{{ '/assets/week3/sarah/corgi-rebecca.jpg' | relative_url }}" alt="Corgi model concept art iteration">
+  - Created front and profile view references for modeling
+    <img src="{{ '/assets/week3/sarah/sarah4.jpg' | relative_url }}" alt="Corgi model reference sheet">
+- Base model
+  - Created base model front and profile ref sheet
+    <img src="{{ '/assets/week3/sarah/sarah3.jpg' | relative_url }}" alt="Base model reference sheet">
+  - Started base model on Blender
+    <img src="{{ '/assets/week3/sarah/sarah5.jpg' | relative_url }}" alt="Base model">
+    <img src="{{ '/assets/week3/sarah/sarah6.jpg' | relative_url }}" alt="Base model front view">
+    <img src="{{ '/assets/week3/sarah/sarah7.jpg' | relative_url }}" alt="Base model side view">
+- Other character design ideas - "Would-Be-Nice" category
+  - Fox
+  - Moose
   
 ### Progress Evaluation
+
+Progress went slower than I hoped due to other coursework (again). Also experienced some mild anxiety regarding starting modeling, but this anxiety happens with most things I know I need to start soon. 
+
 ### Upcoming Goals
+
+- [ ] Create concept art for other MVPs
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+- [ ] Continue tutorial for rigging lesson
+
 ### Lessons Learned
+
+- There are a lot of Blender shortcuts to learn, so I'm trying to keep my mind open to learning them. 
+- Unexpected things can come up during development (i.e., sickness) so I need to be realistic with the progress I do in a week and be okay with that.
+- Inkscape is useful for making the reference sheets with vector images, will probably adopt it into the character design pipeline.
+
 ### Individual Morale
+
+Still holding onto the motivation of being able to play my character. Got sick so that's frustrating, can't really avoid that when it's transmitted within the household. Other courses also stressing me out (like CSE 123) and getting in the way of development. I get worried I won't be able to do enough with the time and energy that I have. I feel like I'm lagging behind compared to everyone else on the team. Hopefully changes next week.
 
 ## Week 2
 ### Goals
