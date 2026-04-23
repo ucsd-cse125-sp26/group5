@@ -20,20 +20,19 @@ int main() {
   auto& bodyInterface = game.physicsSystem.GetBodyInterface();
 
   auto [box_id, box_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(box_entity, "cube", 1.0f);
   JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
   boxShapeSettings.SetEmbedded();
   JPH::ShapeRefC boxShape = boxShapeSettings.Create().Get();
   JPH::BodyCreationSettings boxBodySettings(
-    boxShape, JPH::RVec3(5.0f, 5.0f, 0.0f),
-    JPH::Quat::sIdentity(),
-    JPH::EMotionType::Static,
-    Layers::NON_MOVING
-  );
+      boxShape, JPH::RVec3(5.0f, 5.0f, 0.0f), JPH::Quat::sIdentity(),
+      JPH::EMotionType::Static, Layers::NON_MOVING);
   JPH::Body* boxBody = bodyInterface.CreateBody(boxBodySettings);
   bodyInterface.AddBody(boxBody->GetID(), JPH::EActivation::DontActivate);
-  game.registry.emplace<shared::PhysicsBody>(box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
+  game.registry.emplace<shared::PhysicsBody>(
+      box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
 
   auto [floor_id, floorEntity] = new_entity(game);
   game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f,
@@ -153,7 +152,8 @@ int main() {
         pos.z = joltPos.GetZ();
       }
       accumulator -= fixedDt;
-      auto debugView = game.registry.view<shared::Position, shared::PhysicsBody>();
+      auto debugView =
+          game.registry.view<shared::Position, shared::PhysicsBody>();
       for (auto ent : debugView) {
         auto& pos = debugView.get<shared::Position>(ent);
         printf("z: %f\n", pos.z);

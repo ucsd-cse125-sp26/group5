@@ -283,10 +283,10 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
   settings.mGravityFactor = 1.0f;
   settings.mFriction = 0.5f;
 
-  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | 
-                         JPH::EAllowedDOFs::TranslationY | 
-                         JPH::EAllowedDOFs::TranslationZ;
-  settings.mMotionQuality = JPH::EMotionQuality::LinearCast; 
+  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
+                          JPH::EAllowedDOFs::TranslationY |
+                          JPH::EAllowedDOFs::TranslationZ;
+  settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
   JPH::Body* body = bodyInterface.CreateBody(settings);
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
