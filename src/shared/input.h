@@ -13,3 +13,4 @@ constexpr InputKeys KEY_MODEL_SMALLER = 1 << 6;
 constexpr InputKeys KEY_MODEL_BIGGER = 1 << 7;
 constexpr InputKeys KEY_LIGHT_DIM = 1 << 8;
 constexpr InputKeys KEY_LIGHT_BRIGHT = 1 << 9;
+constexpr InputKeys KEY_CYCLE_SCENE = 1 << 10;
