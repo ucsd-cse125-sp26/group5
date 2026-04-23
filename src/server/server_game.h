@@ -130,6 +130,7 @@ struct ServerGame {
         std::thread::hardware_concurrency() - 1);
     physicsSystem.Init(1024, 0, 1024, 1024, broadPhaseLayerInterface,
                        objectVsBroadPhaseLayerFilter, objectLayerPairFilter);
+    physicsSystem.SetGravity(JPH::Vec3(0.0f, 0.0f, -18.0f));
   }
 
   ~ServerGame() {

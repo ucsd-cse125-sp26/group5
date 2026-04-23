@@ -17,8 +17,25 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  auto floorEntity = game.registry.create();
-  game.registry.emplace<shared::Entity>(floorEntity, game.nextEntityId++);
+  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+
+  auto [box_id, box_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(box_entity, "cube", 1.0f);
+  JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
+  boxShapeSettings.SetEmbedded();
+  JPH::ShapeRefC boxShape = boxShapeSettings.Create().Get();
+  JPH::BodyCreationSettings boxBodySettings(
+    boxShape, JPH::RVec3(5.0f, 5.0f, 0.0f),
+    JPH::Quat::sIdentity(),
+    JPH::EMotionType::Static,
+    Layers::NON_MOVING
+  );
+  JPH::Body* boxBody = bodyInterface.CreateBody(boxBodySettings);
+  bodyInterface.AddBody(boxBody->GetID(), JPH::EActivation::DontActivate);
+  game.registry.emplace<shared::PhysicsBody>(box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
+
+  auto [floor_id, floorEntity] = new_entity(game);
   game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(floorEntity, "floor", 1.0f);
@@ -57,7 +74,7 @@ int main() {
     g.registry.emplace<shared::PlayerInput>(
         entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
         static_cast<InputKeys>(0), 0.0f, 0.0f);
-    JPH::BodyID bodyId = createPlayerBody(g, 0.0f, 0.0f, 2.0f);
+    JPH::BodyID bodyId = createPlayerBody(g, 0.0f, 0.0f, 5.0f);
     g.registry.emplace<shared::PhysicsBody>(entity,
                                             bodyId.GetIndexAndSequenceNumber());
 
@@ -106,7 +123,6 @@ int main() {
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
 
   while (true) {
     network.poll(game);
@@ -137,6 +153,11 @@ int main() {
         pos.z = joltPos.GetZ();
       }
       accumulator -= fixedDt;
+      auto debugView = game.registry.view<shared::Position, shared::PhysicsBody>();
+      for (auto ent : debugView) {
+        auto& pos = debugView.get<shared::Position>(ent);
+        printf("z: %f\n", pos.z);
+      }
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)

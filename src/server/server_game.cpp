@@ -88,7 +88,7 @@ void movement_system(ServerGame& game, float dt) {
     float verticalVel = currentVel.GetZ();
 
     // Jump
-    if (input.keys & 0x10) verticalVel = 10.0f;
+    if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
 
     // Set velocity on Jolt body instead of manually moving position
     bodyInterface.SetLinearVelocity(
@@ -282,6 +282,11 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
                                      JPH::EMotionType::Dynamic, Layers::MOVING);
   settings.mGravityFactor = 1.0f;
   settings.mFriction = 0.5f;
+
+  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX | 
+                         JPH::EAllowedDOFs::TranslationY | 
+                         JPH::EAllowedDOFs::TranslationZ;
+  settings.mMotionQuality = JPH::EMotionQuality::LinearCast; 
 
   JPH::Body* body = bodyInterface.CreateBody(settings);
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
