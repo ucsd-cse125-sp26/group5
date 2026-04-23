@@ -17,7 +17,12 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  createFloor(game);
+  auto floorEntity = game.registry.create();
+  game.registry.emplace<shared::Entity>(floorEntity, game.nextEntityId++);
+  game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(floorEntity, "floor", 1.0f);
+  JPH::BodyID floorBodyId = createFloor(game);
+  game.registry.emplace<shared::PhysicsBody>(floorEntity, floorBodyId.GetIndexAndSequenceNumber());
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -106,10 +111,9 @@ int main() {
     float dt = std::chrono::duration<float>(currentTime - previousTime).count();
     previousTime = currentTime;
     accumulator += dt;
-    auto& bodyInterface = game.physicsSystem.GetBodyInterface();
     while (accumulator >= fixedDt) {
       input_tick(game.registry);
-      movement_system(game.registry, fixedDt);
+      movement_system(game, fixedDt);
       render_model_change(game.registry, fixedDt);
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
 

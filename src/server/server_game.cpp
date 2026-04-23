@@ -11,9 +11,10 @@
 #include "server_network.h"
 #include "shared/components.h"
 
-constexpr float kHeldKeyScaleFactor = 1.1f;
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+
+constexpr float kHeldKeyScaleFactor = 1.1f;
 
 // ── Movement system ──────────────────────────────────────
 
@@ -28,18 +29,21 @@ void input_tick(entt::registry& registry) {
 }
 
 // ── Movement system ──────────────────────────────────────
-void movement_system(entt::registry& registry, float dt) {
+
+void movement_system(ServerGame& game, float dt) {
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
+  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
 
-  auto view =
-      registry.view<shared::Position, shared::Velocity, shared::PlayerInput>();
+  auto view = game.registry.view<shared::Position, shared::Velocity, shared::PlayerInput, shared::PhysicsBody>();
   for (auto entity : view) {
     auto& position = view.get<shared::Position>(entity);
     auto& velocity = view.get<shared::Velocity>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
+    auto& pb = view.get<shared::PhysicsBody>(entity);
+    JPH::BodyID bodyId(pb.bodyId);
 
-    // Apply mouse look: yaw from mouseDx, pitch from mouseDy
+    // Apply mouse look
     if (input.mouseDx != 0.0f) {
       float yawDelta = -input.mouseDx * sensitivity;
       glm::quat q(position.qw, position.qx, position.qy, position.qz);
@@ -51,13 +55,12 @@ void movement_system(entt::registry& registry, float dt) {
       position.qz = q.z;
     }
 
-    if (registry.all_of<shared::Camera>(entity)) {
-      auto& cam = registry.get<shared::Camera>(entity);
+    if (game.registry.all_of<shared::Camera>(entity)) {
+      auto& cam = game.registry.get<shared::Camera>(entity);
       cam.pitch = std::clamp(cam.pitch - input.mouseDy * sensitivity,
                              -pitchLimit, pitchLimit);
     }
 
-    // Clear mouse deltas after processing
     input.mouseDx = 0.0f;
     input.mouseDy = 0.0f;
 
@@ -66,7 +69,6 @@ void movement_system(entt::registry& registry, float dt) {
         1.0f - 2.0f * (position.qy * position.qy + position.qz * position.qz));
     float cy = std::cos(yaw);
     float sy = std::sin(yaw);
-    // At yaw=0, forward=+y, right=+x (matches the old axis convention).
     float fwdX = -sy, fwdY = cy;
     float rightX = cy, rightY = sy;
 
@@ -80,15 +82,15 @@ void movement_system(entt::registry& registry, float dt) {
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 
-    if (input.keys & KEY_JUMP)
-      velocity.dz = 10.0f;
-    else if (position.z > 0)
-      velocity.dz = -10.0f;
+    // Get current vertical velocity from Jolt to preserve gravity
+    JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
+    float verticalVel = currentVel.GetZ();
 
-    position.x += velocity.dx * dt;
-    position.y += velocity.dy * dt;
-    position.z += velocity.dz * dt;
-    position.z = fmax(position.z, 0);
+    // Jump
+    if (input.keys & 0x10) verticalVel = 10.0f;
+
+    // Set velocity on Jolt body instead of manually moving position
+    bodyInterface.SetLinearVelocity(bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
   }
 }
 
@@ -288,23 +290,20 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
   return body->GetID();
 }
 
-void createFloor(ServerGame& game) {
+JPH::BodyID createFloor(ServerGame& game) {
   auto& bodyInterface = game.physicsSystem.GetBodyInterface();
-
-  // Large flat box as the floor
   JPH::BoxShapeSettings floorShapeSettings(JPH::Vec3(100.0f, 100.0f, 1.0f));
   floorShapeSettings.SetEmbedded();
   JPH::ShapeSettings::ShapeResult floorShapeResult = floorShapeSettings.Create();
   JPH::ShapeRefC floorShape = floorShapeResult.Get();
-
   JPH::BodyCreationSettings floorSettings(
     floorShape,
-    JPH::RVec3(0.0f, 0.0f, -1.0f),  // just below z=0
+    JPH::RVec3(0.0f, 0.0f, -1.0f),
     JPH::Quat::sIdentity(),
-    JPH::EMotionType::Static,        // doesn't move
-    Layers::NON_MOVING               // static layer
+    JPH::EMotionType::Static,
+    Layers::NON_MOVING
   );
-
   JPH::Body* floor = bodyInterface.CreateBody(floorSettings);
   bodyInterface.AddBody(floor->GetID(), JPH::EActivation::DontActivate);
+  return floor->GetID();
 }

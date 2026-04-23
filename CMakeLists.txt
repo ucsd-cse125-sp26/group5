@@ -22,8 +22,6 @@ add_subdirectory(lib/glm)
 add_subdirectory(lib/enet)
 target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
 
-target_include_directories(enet PUBLIC lib/enet/include)
-
 if(WIN32)
     target_link_libraries(enet ws2_32 winmm)
 endif()
@@ -111,7 +109,6 @@ add_executable(client_link_smoke src/client/link_smoke.cpp)
 target_link_libraries(client_link_smoke PRIVATE
     shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image
 )
-target_link_libraries(server PRIVATE shared enet EnTT::EnTT glm::glm Jolt)
 
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
