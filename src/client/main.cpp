@@ -51,7 +51,6 @@ int main() {
     processInput(graphics.window, network, prevKeys);
   }
 
-  graphics.destroy();
   network.disconnect();
   network.shutdown();
   return 0;

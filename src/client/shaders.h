@@ -19,7 +19,6 @@ class Shader {
   Shader& operator=(const Shader&) = delete;
 
   void use() const;
-  void destroy();
   GLuint id() const;
 
   void setInt(const std::string& name, int value) const;

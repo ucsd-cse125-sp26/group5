@@ -100,14 +100,6 @@ Shader& Shader::operator=(Shader&& other) noexcept {
 
 void Shader::use() const { glUseProgram(m_id); }
 
-void Shader::destroy() {
-  if (m_id) {
-    glDeleteProgram(m_id);
-    m_id = 0;
-  }
-  m_locationCache.clear();
-}
-
 GLuint Shader::id() const { return m_id; }
 
 GLint Shader::getLocation(const std::string& name) const {

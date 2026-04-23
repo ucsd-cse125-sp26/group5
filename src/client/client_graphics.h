@@ -31,5 +31,5 @@ struct Graphics {
   bool load(int width, int height);
   void render(ClientGame& game);
   void swap();
-  void destroy();
+  ~Graphics();
 };
