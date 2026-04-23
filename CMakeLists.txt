@@ -51,7 +51,9 @@ SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
 set(PHYSICS_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt)
 add_subdirectory(lib/jolt/Build)
-target_compile_options(Jolt PRIVATE -Wno-array-bounds)
+if(NOT MSVC)
+  target_compile_options(Jolt PRIVATE -Wno-array-bounds)
+endif()
 
 add_library(imgui
     lib/imgui/imgui.cpp
