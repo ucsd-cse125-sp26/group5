@@ -1,90 +1,106 @@
 #pragma once
+
+// clang-format off
+#include <Jolt/Jolt.h> // NOLINT
+// clang-format on
+
+#include <Jolt/Core/Factory.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Core/TempAllocator.h>
+#include <Jolt/Physics/Body/BodyActivationListener.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/PhysicsSettings.h>
+#include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/RegisterTypes.h>
 #include <enet/enet.h>
 
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
+#include <thread>
 #include <vector>
 
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
 
-#include <Jolt/Jolt.h>
-#include <Jolt/RegisterTypes.h>
-#include <Jolt/Core/Factory.h>
-#include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/PhysicsSettings.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-
-#include <thread>
-
 class ServerNetwork;
 
 // Jolt requires you to define object layers
 namespace Layers {
-  static constexpr JPH::ObjectLayer NON_MOVING = 0;
-  static constexpr JPH::ObjectLayer MOVING = 1;
-  static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
-};
+static constexpr JPH::ObjectLayer NON_MOVING = 0;
+static constexpr JPH::ObjectLayer MOVING = 1;
+static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
+};  // namespace Layers
 
 // Tells Jolt which layers can collide with each other
 class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
-public:
-  bool ShouldCollide(JPH::ObjectLayer a, JPH::ObjectLayer b) const override {
+ public:
+  [[nodiscard]] bool ShouldCollide(JPH::ObjectLayer a,
+                                   JPH::ObjectLayer b) const override {
     switch (a) {
-      case Layers::NON_MOVING: return b == Layers::MOVING;
-      case Layers::MOVING: return true;
-      default: return false;
+      case Layers::NON_MOVING:
+        return b == Layers::MOVING;
+      case Layers::MOVING:
+        return true;
+      default:
+        return false;
     }
   }
 };
 
 // Broadphase layers (coarse collision detection)
 namespace BroadPhaseLayers {
-  static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
-  static constexpr JPH::BroadPhaseLayer MOVING(1);
-  static constexpr JPH::uint NUM_LAYERS(2);
-};
+static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
+static constexpr JPH::BroadPhaseLayer MOVING(1);
+static constexpr JPH::uint NUM_LAYERS(2);
+};  // namespace BroadPhaseLayers
 
 class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
-public:
+ public:
   BPLayerInterfaceImpl() {
     mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
     mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
   }
-  JPH::uint GetNumBroadPhaseLayers() const override {
+  [[nodiscard]] JPH::uint GetNumBroadPhaseLayers() const override {
     return BroadPhaseLayers::NUM_LAYERS;
   }
-  JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer layer) const override {
+  [[nodiscard]] JPH::BroadPhaseLayer GetBroadPhaseLayer(
+      JPH::ObjectLayer layer) const override {
     JPH_ASSERT(layer < Layers::NUM_LAYERS);
     return mObjectToBroadPhase[layer];
   }
-  #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
-  const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override {
+#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
+  const char* GetBroadPhaseLayerName(
+      JPH::BroadPhaseLayer layer) const override {
     switch ((JPH::BroadPhaseLayer::Type)layer) {
-      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::NON_MOVING: return "NON_MOVING";
-      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::MOVING: return "MOVING";
-      default: return "UNKNOWN";
+      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::NON_MOVING:
+        return "NON_MOVING";
+      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::MOVING:
+        return "MOVING";
+      default:
+        return "UNKNOWN";
     }
   }
-  #endif
+#endif
 
-private:
+ private:
   JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
 };
 
-class ObjectVsBroadPhaseLayerFilterImpl : public JPH::ObjectVsBroadPhaseLayerFilter {
-public:
-  bool ShouldCollide(JPH::ObjectLayer layer, JPH::BroadPhaseLayer bpLayer) const override {
+class ObjectVsBroadPhaseLayerFilterImpl
+    : public JPH::ObjectVsBroadPhaseLayerFilter {
+ public:
+  [[nodiscard]] bool ShouldCollide(
+      JPH::ObjectLayer layer, JPH::BroadPhaseLayer bpLayer) const override {
     switch (layer) {
-      case Layers::NON_MOVING: return bpLayer == BroadPhaseLayers::MOVING;
-      case Layers::MOVING: return true;
-      default: return false;
+      case Layers::NON_MOVING:
+        return bpLayer == BroadPhaseLayers::MOVING;
+      case Layers::MOVING:
+        return true;
+      default:
+        return false;
     }
   }
 };
@@ -100,7 +116,7 @@ struct ServerGame {
   BPLayerInterfaceImpl broadPhaseLayerInterface;
   ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhaseLayerFilter;
   ObjectLayerPairFilterImpl objectLayerPairFilter;
-  //JPH::TempAllocatorImpl tempAllocator{10 * 1024 * 1024}; // 10MB
+  // JPH::TempAllocatorImpl tempAllocator{10 * 1024 * 1024}; // 10MB
   JPH::TempAllocatorImpl* tempAllocator = nullptr;
   JPH::JobSystemThreadPool* jobSystem = nullptr;
 
@@ -110,14 +126,10 @@ struct ServerGame {
     JPH::RegisterTypes();
     tempAllocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
     jobSystem = new JPH::JobSystemThreadPool(
-      JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
-      std::thread::hardware_concurrency() - 1);
-    physicsSystem.Init(
-      1024, 0, 1024, 1024,
-      broadPhaseLayerInterface,
-      objectVsBroadPhaseLayerFilter,
-      objectLayerPairFilter
-    );
+        JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
+        std::thread::hardware_concurrency() - 1);
+    physicsSystem.Init(1024, 0, 1024, 1024, broadPhaseLayerInterface,
+                       objectVsBroadPhaseLayerFilter, objectLayerPairFilter);
   }
 
   ~ServerGame() {

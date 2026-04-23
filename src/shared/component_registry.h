@@ -53,13 +53,16 @@ class ComponentRegistry {
     syncedIds_.push_back(id);
   }
 
-  const std::unordered_map<ComponentTypeId, ComponentMeta>& meta() const {
+  [[nodiscard]] const std::unordered_map<ComponentTypeId, ComponentMeta>& meta()
+      const {
     return meta_;
   }
 
-  const std::vector<ComponentTypeId>& syncedIds() const { return syncedIds_; }
+  [[nodiscard]] const std::vector<ComponentTypeId>& syncedIds() const {
+    return syncedIds_;
+  }
 
-  const ComponentMeta* find(ComponentTypeId id) const {
+  [[nodiscard]] const ComponentMeta* find(ComponentTypeId id) const {
     auto it = meta_.find(id);
     return it != meta_.end() ? &it->second : nullptr;
   }

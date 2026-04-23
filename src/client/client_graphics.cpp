@@ -123,6 +123,7 @@ void renderEntities(GLuint shaderProgram, ClientGame& game,
       continue;
     }
     Model* modelAsset = models[renderInfo.modelName];
+    if (!modelAsset) continue;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     glm::quat modelOrient(1.0f, 0.0f, 0.0f, 0.0f);
     if (const auto* info = shared::findAsset(renderInfo.modelName)) {
