@@ -64,6 +64,7 @@ public:
     JPH_ASSERT(layer < Layers::NUM_LAYERS);
     return mObjectToBroadPhase[layer];
   }
+  #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
   const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer layer) const override {
     switch ((JPH::BroadPhaseLayer::Type)layer) {
       case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::NON_MOVING: return "NON_MOVING";
@@ -71,6 +72,7 @@ public:
       default: return "UNKNOWN";
     }
   }
+  #endif
 
 private:
   JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
