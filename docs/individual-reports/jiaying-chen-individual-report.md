@@ -20,6 +20,14 @@ I was able to finish the sketch! This sketch contains:
 
 However, I started doing landscape and realize it's actually more time consuming to get things to look good than I thought. So I will be spending more time on that. 
 
+<img src="{{ '/assets/week3/rebecca/color1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/color2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model3.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model4.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model5.png' | relative_url }}" alt="thing">
+
 3. If the week went differently than you had planned, what were the reasons? 
 Underestimation of how time consuming the landscaping task is; I also think I should redo parts of it because I just don't like how it looks currrently. Also joined a hackathon that took the life out of me this weekend. 
 
