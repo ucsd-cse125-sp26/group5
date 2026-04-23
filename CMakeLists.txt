@@ -51,6 +51,11 @@ SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
 set(PHYSICS_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt)
 add_subdirectory(lib/jolt/Build)
+if(MSVC)
+  set_target_properties(Jolt PROPERTIES
+    MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
+  )
+endif()
 if(NOT MSVC)
   target_compile_options(Jolt PRIVATE -Wno-array-bounds)
 endif()
