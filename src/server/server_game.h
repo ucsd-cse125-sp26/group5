@@ -128,14 +128,14 @@ struct ServerGame {
 };
 
 void input_tick(entt::registry& registry);
-void movement_system(entt::registry& registry, float dt);
+void movement_system(ServerGame& game, float dt);
 void render_model_change(entt::registry& registry, float dt);
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t lightEntity);
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
 JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z);
-void createFloor(ServerGame& game);
+JPH::BodyID createFloor(ServerGame& game);
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,
