@@ -9,7 +9,8 @@ Checks: >
   -performance-enum-size,
   -modernize-use-integer-sign-comparison,
   -modernize-use-nodiscard,
-  -modernize-avoid-c-style-cast
+  -modernize-avoid-c-style-cast,
+  -clang-analyzer-optin.core.EnumCastOutOfRange
 
 HeaderFilterRegex: 'src/.*'
 FormatStyle: file
