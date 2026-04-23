@@ -5,5 +5,4 @@ build-linux-gcc
 build-windows
 src/sprint.md
 html/
-latex/
-assets/
+/assets/
