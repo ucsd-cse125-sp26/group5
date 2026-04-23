@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <thread>
 
@@ -6,6 +7,7 @@
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
+#include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -37,15 +39,15 @@ int main() {
 
     // Create the new player entity
     peer->data = (void*)"Client information";
-    auto entity = g.registry.create();
+    auto [entity_id, entity] = new_entity(g);
     g.peerEntityMap[peer] = entity;
     g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                          0.0f, 0.0f);
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, uint8_t(0), 0.0f, 0.0f);
-    g.registry.emplace<shared::Entity>(entity, g.nextEntityId);
+    g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
+                                            InputKeys(0), 0.0f, 0.0f);
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -56,10 +58,8 @@ int main() {
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = g.nextEntityId;
+    assignPkt.entityId = entity_id;
     net::sendPacket(peer, assignPkt);
-
-    g.nextEntityId++;
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
@@ -77,6 +77,20 @@ int main() {
   };
 
   registerServerHandlers(network);
+  // Create hardcoded light entity
+  auto [light_entity_id, light_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(light_entity, "cube", 0.2f);
+  // TODO: at some point the point light will be removed from this entity and it
+  // will just handle directional
+  game.registry.emplace<shared::PointLight>(
+      light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
+      0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::DirectionalLight>(light_entity, -0.3f, -1.0f,
+                                                  -0.4f, 0.2f, 0.2f, 0.2f, 0.8f,
+                                                  0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -89,8 +103,10 @@ int main() {
     accumulator += dt;
 
     while (accumulator >= fixedDt) {
+      input_tick(game.registry);
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
+      hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
       accumulator -= fixedDt;
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
