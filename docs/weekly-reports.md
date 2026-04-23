@@ -96,6 +96,7 @@ The team continued development across graphics, networking, physics, and puzzle 
 - In progress / upcoming: shadows, debug console
 <img src="{{ '/assets/week3/jacob/jacob1.png' | relative_url }}" alt="text">
 <img src="{{ '/assets/week3/jacob/jacob2.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/week2_jacob3.png' | relative_url }}" alt="text" style="width:100%;">
 
 **Phil**
 - Read about packets and ECS
