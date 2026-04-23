@@ -5,7 +5,7 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
-## Week 2
+## Week 3
 1. What were your concrete goals for the week?  
 I wanted to implement a base puzzle for all the puzzle games to be extended from. I didn't have many other goals besides that.
 2. What goals were you able to accomplish?  
