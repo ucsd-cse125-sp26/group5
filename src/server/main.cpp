@@ -19,10 +19,12 @@ int main() {
   game.componentRegistry = shared::createDefaultRegistry();
   auto floorEntity = game.registry.create();
   game.registry.emplace<shared::Entity>(floorEntity, game.nextEntityId++);
-  game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(floorEntity, "floor", 1.0f);
   JPH::BodyID floorBodyId = createFloor(game);
-  game.registry.emplace<shared::PhysicsBody>(floorEntity, floorBodyId.GetIndexAndSequenceNumber());
+  game.registry.emplace<shared::PhysicsBody>(
+      floorEntity, floorBodyId.GetIndexAndSequenceNumber());
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -52,10 +54,12 @@ int main() {
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
-                                            InputKeys(0), 0.0f, 0.0f);
+    g.registry.emplace<shared::PlayerInput>(
+        entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
+        static_cast<InputKeys>(0), 0.0f, 0.0f);
     JPH::BodyID bodyId = createPlayerBody(g, 0.0f, 0.0f, 2.0f);
-    g.registry.emplace<shared::PhysicsBody>(entity, bodyId.GetIndexAndSequenceNumber());
+    g.registry.emplace<shared::PhysicsBody>(entity,
+                                            bodyId.GetIndexAndSequenceNumber());
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -71,7 +75,7 @@ int main() {
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
-    printf("%s disconnected.\n", (const char*)peer->data);
+    printf("%s disconnected.\n", static_cast<const char*>(peer->data));
     auto entity = g.peerEntityMap[peer];
 
     shared::DespawnPacket despawnPkt;
@@ -119,10 +123,11 @@ int main() {
 
       // Step Jolt physics
       game.physicsSystem.Update(fixedDt, 1, game.tempAllocator, game.jobSystem);
-      //printf("Jolt step ok\n");
+      // printf("Jolt step ok\n");
 
       // Sync Jolt positions back into ECS
-      auto physicsView = game.registry.view<shared::Position, shared::PhysicsBody>();
+      auto physicsView =
+          game.registry.view<shared::Position, shared::PhysicsBody>();
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);

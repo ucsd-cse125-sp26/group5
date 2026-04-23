@@ -1,5 +1,8 @@
 #include "server_game.h"
 
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -10,9 +13,6 @@
 #include "glm/gtc/quaternion.hpp"
 #include "server_network.h"
 #include "shared/components.h"
-
-#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
-#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
@@ -35,7 +35,8 @@ void movement_system(ServerGame& game, float dt) {
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
   auto& bodyInterface = game.physicsSystem.GetBodyInterface();
 
-  auto view = game.registry.view<shared::Position, shared::Velocity, shared::PlayerInput, shared::PhysicsBody>();
+  auto view = game.registry.view<shared::Position, shared::Velocity,
+                                 shared::PlayerInput, shared::PhysicsBody>();
   for (auto entity : view) {
     auto& position = view.get<shared::Position>(entity);
     auto& velocity = view.get<shared::Velocity>(entity);
@@ -90,7 +91,8 @@ void movement_system(ServerGame& game, float dt) {
     if (input.keys & 0x10) verticalVel = 10.0f;
 
     // Set velocity on Jolt body instead of manually moving position
-    bodyInterface.SetLinearVelocity(bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    bodyInterface.SetLinearVelocity(
+        bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
   }
 }
 
@@ -275,13 +277,9 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
   JPH::ShapeSettings::ShapeResult capsuleResult = capsuleSettings.Create();
   JPH::ShapeRefC shape = capsuleResult.Get();
 
-  JPH::BodyCreationSettings settings(
-    shape,
-    JPH::RVec3(x, y, z),
-    JPH::Quat::sIdentity(),
-    JPH::EMotionType::Dynamic,
-    Layers::MOVING
-  );
+  JPH::BodyCreationSettings settings(shape, JPH::RVec3(x, y, z),
+                                     JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Dynamic, Layers::MOVING);
   settings.mGravityFactor = 1.0f;
   settings.mFriction = 0.5f;
 
@@ -294,15 +292,12 @@ JPH::BodyID createFloor(ServerGame& game) {
   auto& bodyInterface = game.physicsSystem.GetBodyInterface();
   JPH::BoxShapeSettings floorShapeSettings(JPH::Vec3(100.0f, 100.0f, 1.0f));
   floorShapeSettings.SetEmbedded();
-  JPH::ShapeSettings::ShapeResult floorShapeResult = floorShapeSettings.Create();
+  JPH::ShapeSettings::ShapeResult floorShapeResult =
+      floorShapeSettings.Create();
   JPH::ShapeRefC floorShape = floorShapeResult.Get();
   JPH::BodyCreationSettings floorSettings(
-    floorShape,
-    JPH::RVec3(0.0f, 0.0f, -1.0f),
-    JPH::Quat::sIdentity(),
-    JPH::EMotionType::Static,
-    Layers::NON_MOVING
-  );
+      floorShape, JPH::RVec3(0.0f, 0.0f, -1.0f), JPH::Quat::sIdentity(),
+      JPH::EMotionType::Static, Layers::NON_MOVING);
   JPH::Body* floor = bodyInterface.CreateBody(floorSettings);
   bodyInterface.AddBody(floor->GetID(), JPH::EActivation::DontActivate);
   return floor->GetID();

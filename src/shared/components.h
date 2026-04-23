@@ -1,10 +1,11 @@
 #pragma once
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
+
 #include <cstdint>
 #include <string>
 
 #include "input.h"
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/BodyID.h>
 
 namespace shared {
 struct Position {
