@@ -11,6 +11,7 @@
 #include "assimp/material.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
+#include "client/shaders.h"
 #include "client/util.h"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -222,7 +223,7 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   return id;
 }
 
-Model* makeCubeModel() {
+Model* makeCubeModel(const shared::CubeSpec& spec) {
   struct Face {
     glm::vec3 normal;
     glm::vec3 corners[4];
@@ -309,19 +310,11 @@ Model* makeCubeModel() {
   glBindVertexArray(0);
 
   // 6x1 diffuse palette, one texel per face (matches `faces` order above).
-  uint8_t palette[6 * 4] = {
-      204, 51,  51,  255,  // back    - red
-      51,  204, 51,  255,  // front   - green
-      51,  51,  204, 255,  // left    - blue
-      204, 204, 51,  255,  // right   - yellow
-      51,  204, 204, 255,  // bottom  - cyan
-      204, 51,  204, 255,  // top     - magenta
-  };
   GLuint diffuseTex;
   glGenTextures(1, &diffuseTex);
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 6, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               palette);
+               spec.palette);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -332,8 +325,10 @@ Model* makeCubeModel() {
   material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
   material.specular = {.constant = glm::vec3(1.0f),
                        .texture = makeSolidTexture(255, 255, 255, 255)};
-  material.emissive = {.constant = glm::vec3(1.0f),
-                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {
+      .constant = glm::vec3(1.0f),
+      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
+                                  spec.emissive[2], spec.emissive[3])};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -351,42 +346,109 @@ Model* makeCubeModel() {
   return model;
 }
 
-void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material) {
+void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, material.ambient.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.ambient"), 0);
+  shader.setInt("material.ambient", 0);
 
   glActiveTexture(GL_TEXTURE1);
   glBindTexture(GL_TEXTURE_2D, material.diffuse.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.diffuse"), 1);
+  shader.setInt("material.diffuse", 1);
 
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_2D, material.specular.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.specular"), 2);
+  shader.setInt("material.specular", 2);
 
   glActiveTexture(GL_TEXTURE3);
   glBindTexture(GL_TEXTURE_2D, material.emissive.texture);
-  glUniform1i(glGetUniformLocation(shaderProgram, "material.emissive"), 3);
+  shader.setInt("material.emissive", 3);
 
-  glUniform1f(glGetUniformLocation(shaderProgram, "material.shininess"),
-              material.shininess);
+  shader.setFloat("material.shininess", material.shininess);
 
   glBindVertexArray(mesh.vao);
   glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
   glBindVertexArray(0);
 }
 
-void Draw(GLuint shaderProgram, const Model& model,
+void Draw(const Shader& shader, const Model& model,
           const glm::mat4& transform) {
-  GLint transformLoc = glGetUniformLocation(shaderProgram, "model");
-  GLint normalMatLoc = glGetUniformLocation(shaderProgram, "normalMatrix");
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
     glm::mat4 final = transform * instanceTransform;
     glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
-    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(final));
-    glUniformMatrix3fv(normalMatLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-    Draw(shaderProgram, mesh, material);
+    shader.setMat4("model", final);
+    shader.setMat3("normalMatrix", normalMatrix);
+    Draw(shader, mesh, material);
   }
+}
+
+static GLuint loadCubemap(const std::string& directory) {
+  const std::string suffixes[] = {"px.png", "nx.png", "py.png",
+                                  "ny.png", "pz.png", "nz.png"};
+  GLuint textureID;
+  glGenTextures(1, &textureID);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+  int width, height, nrChannels;
+  for (unsigned int i = 0; i < 6; i++) {
+    const std::string fullPath = (exeDir() / directory / suffixes[i]).string();
+    unsigned char* data =
+        stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
+    if (data) {
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, width,
+                   height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      stbi_image_free(data);
+    } else {
+      std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
+      unsigned char pink[] = {255, 0, 255, 255};
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, 1, 1, 0,
+                   GL_RGBA, GL_UNSIGNED_BYTE, pink);
+    }
+  }
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+  return textureID;
+}
+
+// clang-format off
+static const float skyboxVertices[] = {
+    -1.0f,  1.0f, -1.0f,  -1.0f, -1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,   1.0f,  1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f, -1.0f, -1.0f,  -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,   1.0f, -1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f,  1.0f, -1.0f,   1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,   1.0f, -1.0f,  1.0f,  -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,   1.0f,  1.0f, -1.0f,   1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,  -1.0f,  1.0f,  1.0f,  -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,  -1.0f, -1.0f,  1.0f,   1.0f, -1.0f,  1.0f,
+};
+// clang-format on
+
+Skybox loadSkybox(const std::string& directory) {
+  // Create VAO for the skybox cube
+  GLuint vao, vbo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  glBindVertexArray(vao);
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
+               GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+  glBindVertexArray(0);
+
+  return Skybox{.vao = vao, .cubemapTexture = loadCubemap(directory)};
 }
