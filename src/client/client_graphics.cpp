@@ -227,14 +227,18 @@ void Graphics::render(ClientGame& game) {
   renderEntities(*shader, game, models);
 
   auto* sceneInfo = currentScene(game);
-  std::string skyboxDir =
-      sceneInfo ? std::string(sceneInfo->skyboxDirectory) : "assets/skybox-1";
-  drawSkybox(*skyboxShader, skyboxes[skyboxDir], *camera, projection);
+  if (sceneInfo) {
+    std::string skyboxDir = std::string(sceneInfo->skyboxDirectory);
+    auto it = skyboxes.find(skyboxDir);
+    if (it != skyboxes.end()) {
+      drawSkybox(*skyboxShader, it->second, *camera, projection);
+    }
+  }
 }
 
 void Graphics::swap() { glfwSwapBuffers(window); }
 
-void Graphics::destroy() {
+Graphics::~Graphics() {
   shader.reset();
   skyboxShader.reset();
 

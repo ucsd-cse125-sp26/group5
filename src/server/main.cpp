@@ -91,7 +91,7 @@ int main() {
 
   // Create floor entity (large cube, top surface at z=0)
   auto [floor_entity_id, floor_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.0f,
+  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
