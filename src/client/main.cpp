@@ -22,6 +22,7 @@ int main() {
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  // test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
