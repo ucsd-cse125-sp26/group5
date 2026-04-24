@@ -114,8 +114,6 @@ void render_model_change(entt::registry& registry, float dt) {
   }
 }
 
-constexpr float kHeldKeyScaleFactor = 1.01f;
-
 // Temporary - used to demonstrate server-controlled point light
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t light_entity_id) {
