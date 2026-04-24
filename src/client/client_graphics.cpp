@@ -166,6 +166,7 @@ bool Graphics::load(int width, int height) {
   }
 
   glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);  // vsync: cap to display refresh rate
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   if (glfwRawMouseMotionSupported())
