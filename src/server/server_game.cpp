@@ -351,17 +351,12 @@ JPH::BodyID createMeshBody(ServerGame& game, const std::string& filename,
   }
 
   float halfX = (maxX - minX) / 2.0f * scale;
-  float halfY = (maxY - minY) / 2.0f * scale;
-  float halfZ = (maxZ - minZ) / 2.0f * scale;
+  float halfY = (maxZ - minZ) / 2.0f * scale;
+  float halfZ = (maxY - minY) / 2.0f * scale;
 
-  // use actual mesh center in model space for all axes
-  float meshCenterX = (maxX + minX) / 2.0f;
-  float meshCenterY = (maxY + minY) / 2.0f;
-  float meshCenterZ = (maxZ + minZ) / 2.0f;
-
-  float centerX = x + meshCenterX * scale;
-  float centerY = y + meshCenterZ * scale;
-  float centerZ = z + meshCenterY * scale;
+  float centerX = x;
+  float centerY = y;
+  float centerZ = z;
 
   JPH::BoxShapeSettings boxSettings(JPH::Vec3(halfX, halfY, halfZ));
   boxSettings.SetEmbedded();
