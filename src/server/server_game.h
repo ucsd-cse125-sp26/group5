@@ -1,5 +1,4 @@
 #pragma once
-
 // clang-format off
 #include <Jolt/Jolt.h> // NOLINT
 // clang-format on
@@ -151,6 +150,8 @@ std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
 JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z);
 JPH::BodyID createFloor(ServerGame& game);
+JPH::BodyID createMeshBody(ServerGame& game, const std::string& filename,
+                           float x, float y, float z, float scale = 1.0f);
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,

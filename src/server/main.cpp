@@ -34,6 +34,15 @@ int main() {
   game.registry.emplace<shared::PhysicsBody>(
       box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
 
+  auto [bear_id, bear_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(bear_entity, 10.0f, 0.0f, 0.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(bear_entity, "bear", 0.5f);
+  JPH::BodyID bearBodyId = createMeshBody(game, "assets/bear/bear_full.obj",
+                                          10.0f, 0.0f, 0.0f, 0.5f);
+  game.registry.emplace<shared::PhysicsBody>(
+      bear_entity, bearBodyId.GetIndexAndSequenceNumber());
+
   auto [floor_id, floorEntity] = new_entity(game);
   game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
@@ -152,12 +161,6 @@ int main() {
         pos.z = joltPos.GetZ();
       }
       accumulator -= fixedDt;
-      auto debugView =
-          game.registry.view<shared::Position, shared::PhysicsBody>();
-      for (auto ent : debugView) {
-        auto& pos = debugView.get<shared::Position>(ent);
-        printf("z: %f\n", pos.z);
-      }
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)
