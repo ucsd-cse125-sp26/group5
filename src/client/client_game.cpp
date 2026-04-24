@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstring>
+#include "shared/simple_profiler.h"
 
 #include "client_network.h"
 #include "shared/components.h"
@@ -17,6 +18,7 @@
 static void deserializeComponents(ClientGame& game, entt::entity ent,
                                   const uint8_t* data, size_t& offset,
                                   size_t len) {
+  SIMPLE_PROFILE_SCOPE("Deserialize Components");
   assert(offset + sizeof(uint16_t) <= len && "read overflows packet");
   uint16_t compCount;
   std::memcpy(&compCount, data + offset, sizeof(uint16_t));

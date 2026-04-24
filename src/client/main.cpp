@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+#include "shared/simple_profiler.h"
+
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
@@ -33,6 +35,7 @@ int main() {
   InputKeys prevKeys = 0;
 
   while (!glfwWindowShouldClose(graphics.window)) {
+    SIMPLE_PROFILE_FRAME_START();
     network.poll(game);
     graphics.render(game);
     graphics.swap();
@@ -49,6 +52,7 @@ int main() {
     }
 
     processInput(graphics.window, network, prevKeys);
+    SIMPLE_PROFILE_FRAME_END("Client");
   }
 
   network.disconnect();
