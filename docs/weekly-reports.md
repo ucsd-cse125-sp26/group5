@@ -41,10 +41,83 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 **Troubleshooting**  
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
+---
+## Week 3 Group report
+The team continued development across graphics, networking, physics, and puzzle systems.
+
+## Modeling
+**Rebecca**
+- Came up with detailed light and environment study for the game. 
+- Continuing to deepen understanding of blender application, started basic modeling. 
+<!-- <img src="{{ '/assets/week3/rebecca/spring.PNG' | relative_url }}" alt="text">
+<img src="{{ '/assets/week3/rebecca/summer.PNG' | relative_url }}" alt="text">
+<img src="{{ '/assets/week3/rebecca/autumn.PNG' | relative_url }}" alt="text">
+<img src="{{ '/assets/week3/rebecca/winter.PNG' | relative_url }}" alt="text"> -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week3/rebecca/spring.PNG' | relative_url }}" alt="Spring">
+  <img src="{{ '/assets/week3/rebecca/summer.PNG' | relative_url }}" alt="Summer">
+  <img src="{{ '/assets/week3/rebecca/autumn.PNG' | relative_url }}" alt="Autumn">
+  <img src="{{ '/assets/week3/rebecca/winter.PNG' | relative_url }}" alt="Winter">
+</div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+<img src="{{ '/assets/week3/rebecca/color1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/color2.png' | relative_url }}" alt="thing">
+</div>
+<img src="{{ '/assets/week3/rebecca/model1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/rebecca1.png' | relative_url }}" alt="text">
+**Sarah**
+- Came up with detailed design for character. 
+<img src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week3/sarah/sarah2.png' | relative_url }}" alt="text">
+  <img src="{{ '/assets/week3/sarah/sarah3.png' | relative_url }}" alt="text">
+  <img src="{{ '/assets/week3/sarah/sarah4.png' | relative_url }}" alt="text">
+  <img src="{{ '/assets/week3/sarah/sarah5.png' | relative_url }}" alt="text">
+  <img src="{{ '/assets/week3/sarah/sarah6.png' | relative_url }}" alt="text">
+  <img src="{{ '/assets/week3/sarah/sarah7.png' | relative_url }}" alt="text">
+</div>
+## Technical
+
+**Alain**
+- Hooked up floor to body (100×100 grid)
+- Focused on collision detection
+- Working on debug mode for wireframing
+
+**Tim**
+- Implemented 2 straps using 2 registries
+- Identified small latency issue; investigating root cause
+- Issues observed with velocity, working to improve smoothness and reduce stuttering
+- Registry is currently single-threaded (used for client-side rendering); moving to multi-threaded introduces shared resource contention
+- Experimenting with tick rate adjustments; needs end-to-end testing to isolate the source of jumping between two clients
+- Investigating tick rate, registry locking, and render code complexity
+- May collaborate with Jacob if render code proves too complex
+
+**Jacob**
+- Set up GitHub Actions CI
+- Cleaned up graphics code
+- Revamped input handling for easier extensibility
+- Completed: Skybox
+- In progress / upcoming: shadows, debug console
+<img src="{{ '/assets/week3/jacob/jacob1.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week3/jacob/jacob2.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/week2_jacob3.png' | relative_url }}" alt="text" style="width:100%;">
+
+**Phil**
+- Read about packets and ECS
+- Implemented a packet system for puzzle state
+- Exploring use of ECS for puzzle state instead of additional packages
+- Packet system is convertible into ECS
+
+**Leon**
+- Collaborating with graphics team to create puzzle
+- Currently using package-based approach
+
 --- 
 
 ## Week 2 Group report 
 Based on established idea of game mechanics, the team dug further into solidifying our game's story and structure. We came up with a better project spec. 
+<img src="{{ '/assets/week2/group-report/w2_meeting_1.png' | relative_url }}" alt="text" style="width:100%;">
+
 ### Admin
 Updated game name, mechanics, solidified story and background. 
 
@@ -54,9 +127,9 @@ Updated game name, mechanics, solidified story and background.
 - Updated project spec to be more concrete and clear
 - Kept team aligned via Discord announcements and weekly check-ins   
 
-<img src="{{ '/assets/week2/season_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/elevation_map.png' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/asset_map.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/season_map.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/elevation_map.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/asset_map.png' | relative_url }}" alt="text">
 
 <!-- ![text](assets/week2/season_map.png)
 ![text](assets/week2/elevation_map.png)
@@ -67,7 +140,7 @@ Updated game name, mechanics, solidified story and background.
 - For character model: Completed a tutorial more advanced than current game scope to build skill
     - base model sketch
     - gurf sketch   
-<img src="{{ '/assets/week2/gurf_draft.png' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/gurf_draft.png' | relative_url }}" alt="text">
 <!-- ![text](assets/week2/gurf_draft.png) -->
 
 ### Technical   
@@ -76,8 +149,8 @@ Updated game name, mechanics, solidified story and background.
 - Delegated tasks to two teammates with clear scope   
 <!-- ![text](assets/week2/week2_jacob1.gif)
 ![text](assets/week2/week2_jacob2.gif) -->
-<img src="{{ '/assets/week2/week2_jacob1.gif' | relative_url }}" alt="text">
-<img src="{{ '/assets/week2/week2_jacob2.gif' | relative_url }}" alt="text">
+<img src="{{ '/assets/week2/group-report/week2_jacob1.gif' | relative_url }}" alt="text" style="width:100%;">
+<img src="{{ '/assets/week2/group-report/week2_jacob2.gif' | relative_url }}" alt="text" style="width:100%;">
 
 
 **Tim**   
@@ -99,6 +172,8 @@ Updated game name, mechanics, solidified story and background.
 ### What we did
 
 The team brainstormed core mechanics and narrowed down to three game concepts, with a focus on keeping scope manageable given the 10-week timeline + Initial project setup on github. 
+<img src="{{ '/assets/week1/w1_meeting_1.png' | relative_url }}" alt="text" style="width:100%;">
+<img src="{{ '/assets/week1/w1_meeting_2.png' | relative_url }}" alt="text" style="width:100%;">
 
 **Code & Repo setup** 
 - Repo/build/tooling scaffolded: cross-platform build scripts (build.sh, build-windows.sh, build-linux-gcc.sh), CMake project (CMakeLists.txt), and clangd support via compile_commands.json + build_lsp.sh.
