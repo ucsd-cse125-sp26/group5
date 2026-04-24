@@ -133,6 +133,7 @@ void processInput(GLFWwindow* window, ClientNetwork& network,
   if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
   if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
+  if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;

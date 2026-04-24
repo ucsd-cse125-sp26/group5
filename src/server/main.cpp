@@ -118,15 +118,19 @@ int main() {
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(light_entity, "cube", 0.2f);
+  game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f);
   // TODO: at some point the point light will be removed from this entity and it
   // will just handle directional
   game.registry.emplace<shared::PointLight>(
       light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
       0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-  game.registry.emplace<shared::DirectionalLight>(light_entity, -0.3f, -1.0f,
-                                                  -0.4f, 0.2f, 0.2f, 0.2f, 0.8f,
-                                                  0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::Scene>(light_entity, "sunny");
+
+  // Create floor entity (large cube, top surface at z=0)
+  auto [floor_entity_id, floor_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
@@ -160,6 +164,7 @@ int main() {
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();
       }
+      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
