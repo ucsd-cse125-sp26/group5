@@ -106,7 +106,7 @@ add_library(server_lib STATIC
     src/server/server_game.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt)
+target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt/Build/..)
 
 add_executable(server)
