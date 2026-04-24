@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include "shared/simple_profiler.h"
 
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
@@ -12,6 +11,7 @@
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/simple_profiler.h"
 
 // Process input on tick
 void input_tick(entt::registry& registry) {
@@ -23,7 +23,6 @@ void input_tick(entt::registry& registry) {
     playerInput.keys_prev = playerInput.keys;
   }
 }
-
 
 // ── Movement system ──────────────────────────────────────
 void movement_system(entt::registry& registry, float dt) {

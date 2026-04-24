@@ -8,12 +8,11 @@
 #include <iostream>
 #include <thread>
 
-#include "shared/simple_profiler.h"
-
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
 #include "shared/hello.h"
+#include "shared/simple_profiler.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
