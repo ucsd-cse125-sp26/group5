@@ -1,6 +1,7 @@
 #include "client_network.h"
 
 #include <cstdio>
+
 #include "shared/simple_profiler.h"
 
 bool ClientNetwork::connect(const char* host, uint16_t port,

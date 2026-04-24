@@ -131,7 +131,7 @@ int main() {
     // Yield control to the OS briefly if we have plenty of time.
     // This stops the server from spin-locking the CPU at 100%.
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    
+
     SIMPLE_PROFILE_FRAME_END("Server");
   }
 

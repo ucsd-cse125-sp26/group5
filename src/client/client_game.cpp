@@ -4,12 +4,12 @@
 
 #include <cassert>
 #include <cstring>
-#include "shared/simple_profiler.h"
 
 #include "client/spsc_queue.h"
 #include "client_network.h"
 #include "shared/components.h"
 #include "shared/protocol.h"
+#include "shared/simple_profiler.h"
 
 // ── Component deserialization helper ─────────────────────
 //
