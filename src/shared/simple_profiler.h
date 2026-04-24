@@ -6,8 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace shared {
-namespace profiler {
+namespace shared::profiler {
 
 inline std::unordered_map<std::string, double> frame_stats;
 inline std::chrono::time_point<std::chrono::high_resolution_clock> frame_start;
@@ -53,8 +52,9 @@ inline void end_frame(const char* context = "Frame") {
 
     std::vector<std::pair<std::string, double>> stats(frame_stats.begin(),
                                                       frame_stats.end());
-    std::sort(stats.begin(), stats.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::ranges::sort(stats, [](const auto& a, const auto& b) {
+      return a.second > b.second;
+    });
 
     for (const auto& stat : stats) {
       double avg_stat_time = stat.second / 60.0;
@@ -72,8 +72,7 @@ inline void end_frame(const char* context = "Frame") {
   }
 }
 
-}  // namespace profiler
-}  // namespace shared
+}  // namespace shared::profiler
 
 #ifdef ENABLE_PROFILING
 #define SIMPLE_PROFILE_SCOPE(name) \
