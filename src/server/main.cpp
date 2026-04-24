@@ -20,7 +20,7 @@ int main() {
   auto& bodyInterface = game.physicsSystem.GetBodyInterface();
 
   auto [box_id, box_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f,
+  game.registry.emplace<shared::Position>(box_entity, 5.0f, 10.0f, 0.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(box_entity, "cube", 1.0f);
   JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
@@ -35,11 +35,11 @@ int main() {
       box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
 
   auto [bear_id, bear_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(bear_entity, 10.0f, 0.0f, 0.0f, 1.0f,
+  game.registry.emplace<shared::Position>(bear_entity, 10.0f, 0.0f, -1.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(bear_entity, "bear", 0.5f);
   JPH::BodyID bearBodyId = createMeshBody(game, "assets/bear/bear_full.obj",
-                                          10.0f, 0.0f, 0.0f, 0.5f);
+                                          10.0f, 0.0f, -1.0f, 0.5f);
   game.registry.emplace<shared::PhysicsBody>(
       bear_entity, bearBodyId.GetIndexAndSequenceNumber());
 
