@@ -1,6 +1,7 @@
 #include "client_network.h"
 
 #include <cstdio>
+#include "shared/simple_profiler.h"
 
 bool ClientNetwork::connect(const char* host, uint16_t port,
                             uint32_t timeoutMs) {
@@ -72,6 +73,7 @@ void ClientNetwork::shutdown() {
 }
 
 void ClientNetwork::poll(ClientGame& game) {
+  SIMPLE_PROFILE_SCOPE("Network Poll");
   ENetEvent event;
   while (enet_host_service(client_, &event, 0) > 0) {
     switch (event.type) {

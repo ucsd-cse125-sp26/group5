@@ -17,6 +17,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/simple_profiler.h"
 
 // Skybox images use Y-up; the game uses Z-up.
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
@@ -214,6 +215,7 @@ bool Graphics::load(int width, int height) {
 }
 
 void Graphics::render(ClientGame& game) {
+  SIMPLE_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
 

@@ -1,6 +1,7 @@
 #include "server_network.h"
 
 #include <cstdio>
+#include "shared/simple_profiler.h"
 
 bool ServerNetwork::init(uint16_t port, size_t maxClients) {
   if (enet_initialize() != 0) {
@@ -30,8 +31,7 @@ void ServerNetwork::shutdown() {
   enet_deinitialize();
 }
 
-void ServerNetwork::poll(ServerGame& game) {
-  ENetEvent event;
+void ServerNetwork::poll(ServerGame& game) {  SIMPLE_PROFILE_SCOPE("Network Poll");  ENetEvent event;
   while (enet_host_service(host_, &event, 0) > 0) {
     switch (event.type) {
       case ENET_EVENT_TYPE_CONNECT:
