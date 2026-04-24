@@ -4,17 +4,18 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include "shared/simple_profiler.h"
 
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server_network.h"
+#include "shared/assets.h"
 #include "shared/components.h"
-
-constexpr float kHeldKeyScaleFactor = 1.1f;
 
 // Process input on tick
 void input_tick(entt::registry& registry) {
+  SIMPLE_PROFILE_SCOPE("Input Tick");
   auto view = registry.view<shared::PlayerInput>();
   for (auto entity : view) {
     auto& playerInput = view.get<shared::PlayerInput>(entity);
@@ -23,8 +24,10 @@ void input_tick(entt::registry& registry) {
   }
 }
 
+
 // ── Movement system ──────────────────────────────────────
 void movement_system(entt::registry& registry, float dt) {
+  SIMPLE_PROFILE_SCOPE("Movement System");
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
 
@@ -102,6 +105,8 @@ void render_model_change(entt::registry& registry, float dt) {
   }
 }
 
+constexpr float kHeldKeyScaleFactor = 1.01f;
+
 // Temporary - used to demonstrate server-controlled point light
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t light_entity_id) {
@@ -115,7 +120,6 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     if (input.keys & KEY_LIGHT_DIM) dim = true;
   }
 
-  // Sure, whatever. This will be removed later
   static float angle = 0.0f;
   angle += dt * 1.0f;  // 1 radian/sec
 
@@ -164,6 +168,32 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
       light.specularG /= kHeldKeyScaleFactor;
       light.specularB /= kHeldKeyScaleFactor;
     }
+  }
+}
+
+void scene_cycle_system(entt::registry& registry) {
+  bool cycle = false;
+  auto inputView = registry.view<shared::PlayerInput>();
+  for (auto entity : inputView) {
+    auto& input = inputView.get<shared::PlayerInput>(entity);
+    if (input.keys_newly_pressed & KEY_CYCLE_SCENE) {
+      cycle = true;
+      break;
+    }
+  }
+  if (!cycle) return;
+
+  auto sceneView = registry.view<shared::Scene>();
+  for (auto entity : sceneView) {
+    auto& scene = sceneView.get<shared::Scene>(entity);
+    for (std::size_t i = 0; i < shared::SCENE_COUNT; i++) {
+      if (shared::SCENES[i].name == scene.name) {
+        scene.name =
+            std::string(shared::SCENES[(i + 1) % shared::SCENE_COUNT].name);
+        return;
+      }
+    }
+    scene.name = std::string(shared::SCENES[0].name);
   }
 }
 

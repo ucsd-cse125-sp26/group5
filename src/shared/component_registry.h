@@ -115,7 +115,7 @@ enum ComponentIds : ComponentTypeId {
   CID_CAMERA = 4,
   CID_VELOCITY = 5,
   CID_POINTLIGHT = 6,
-  CID_DIRECTIONALLIGHT = 7,
+  CID_SCENE = 7,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
@@ -125,7 +125,7 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<RenderInfo>(CID_RENDERINFO);
   reg.registerComponent<Camera>(CID_CAMERA);
   reg.registerComponent<PointLight>(CID_POINTLIGHT);
-  reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
+  reg.registerComponent<Scene>(CID_SCENE);
   return reg;
 }
 

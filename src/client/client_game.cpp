@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstring>
+#include "shared/simple_profiler.h"
 
 #include "client/spsc_queue.h"
 #include "client_network.h"
@@ -18,6 +19,7 @@
 static void deserializeComponents(ClientGame& game, entt::entity ent,
                                   const uint8_t* data, size_t& offset,
                                   size_t len) {
+  SIMPLE_PROFILE_SCOPE("Deserialize Components");
   assert(offset + sizeof(uint16_t) <= len && "read overflows packet");
   uint16_t compCount;
   std::memcpy(&compCount, data + offset, sizeof(uint16_t));
@@ -142,6 +144,7 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
   if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
+  if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;

@@ -76,6 +76,29 @@ rsync -avz --progress -e 'ssh -p 222' assets/ jaroot@cse125.ucsd.edu:/var/www/ht
 
 The `-a` flag preserves file attributes and handles directories recursively. The `-z` flag compresses data during transfer. rsync only transfers files that have changed, so repeated syncs are fast.
 
+## Profiling with Tracy
+
+To diagnose performance and stuttering issues, you can compile the client and server with Tracy Profiling enabled using:
+
+```bash
+./build-profiling.sh
+```
+
+By default, any profiled executable will attempt to bind to port **8086**. To run multiple clients/servers simultaneously for profiling, use the `TRACY_PORT` environment variable to launch each process on a different port:
+
+```bash
+# Terminal 1: Launch Server
+TRACY_PORT=8086 ./build/server
+
+# Terminal 2: Launch Client 1
+TRACY_PORT=8087 ./build/client
+
+# Terminal 3: Launch Client 2
+TRACY_PORT=8088 ./build/client
+```
+
+Open the Tracy Profiler UI application (e.g., install via `brew install tracy` if on macOS) and connect to the specific instance using `127.0.0.1:<PORT>` (e.g., `127.0.0.1:8087`).
+
 ## Important links 
 - [Group main document](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.ugr095ybe2nc) 
 - [Brainstorm whiteboard](https://excalidraw.com/#room=e75b50a0442682a79f02,f1qUrFmzmgYeGmBa12QS0A)
