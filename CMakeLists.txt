@@ -96,6 +96,7 @@ endif()
 add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
+    src/server/server_level_loader.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm)
