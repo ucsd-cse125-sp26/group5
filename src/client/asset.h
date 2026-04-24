@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/quaternion_float.hpp"
+#include "shared/assets.h"
 
 struct Vertex {
   glm::vec3 position;
@@ -36,10 +38,19 @@ struct Model {
   std::vector<Mesh> meshes;
   std::vector<Material> materials;
   std::vector<std::pair<unsigned int, glm::mat4>> mesh_instances;
+  glm::quat orientation{1.0f, 0.0f, 0.0f, 0.0f};
   GLuint test;
 };
 
+struct Skybox {
+  GLuint vao;
+  GLuint cubemapTexture;
+};
+
+class Shader;
+
 Model* loadModel(const std::string& filename);
-Model* makeCubeModel();
-void Draw(GLuint shaderProgram, const Mesh& mesh, const Material& material);
-void Draw(GLuint shaderProgram, const Model& model, const glm::mat4& transform);
+Model* makeCubeModel(const shared::CubeSpec& spec);
+Skybox loadSkybox(const std::string& directory);
+void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
+void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
