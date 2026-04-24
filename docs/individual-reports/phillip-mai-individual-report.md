@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 3
+1. What were your concrete goals for the week?  
+I wanted to implement a base puzzle for all the puzzle games to be extended from. I didn't have many other goals besides that.
+2. What goals were you able to accomplish?  
+I was able to implement the puzzle state packets that handle the data to be sent across server and client for the puzzle games. I was also able to learn more about how packets and ECS work together
+3. If the week went differently than you had planned, what were the reasons?  
+I actually got more done than I thought I did, mainly in terms of code comprehension and figuring out how packets work with networking and how they integrate with ECS. 
+4. What are your specific goals for the next week?  
+I would like to learn more about ECS. Jacob informed Leon and I that we should rather be implementing our game logic only with ECS, rather than worrying about packets and networking since that has already been taken care of. So this week I want to figure out how to implement the puzzle logic using ECS without worrying about the networking aspect. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I learned a lot about packets and how they work with ECS. The packets handle sending data across server and client and ECS uses the packets to update the entity components with the new data. 
+6. What is your individual morale (which might be different from the overall group morale)?  
+I am feeling a little better this week compared to last week, because I was able to get through a few big hurdles with ECE 196 and I am hopeful that I will be able to contribute more time and effort into this class from now on. The things I learned this week also give me more confidence and boost my morale. 
+
 
 ## Week 2
 1. What were your concrete goals for the week?  
