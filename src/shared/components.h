@@ -50,24 +50,11 @@ struct Scene {
   std::string name;
 };
 
-enum class RunPhase : uint8_t{
-  LOBBY,
-  INPROGRESS,
-  FINISHED
-};
+enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
 
-enum class Outcome : uint8_t{
-  UNDECIDED,
-  WIN,
-  LOSE
-};
+enum class Outcome : uint8_t { UNDECIDED, WIN, LOSE };
 
-enum class SectionSeasonMap : uint8_t {
-  WINTER,
-  FALL,
-  SUMMER,
-  SPRING
-};
+enum class SectionSeasonMap : uint8_t { WINTER, FALL, SUMMER, SPRING };
 
 struct RunState {
   RunPhase phase = RunPhase::LOBBY;
@@ -76,7 +63,7 @@ struct RunState {
 
 struct GameSection {
   SectionSeasonMap currentActiveSeason = SectionSeasonMap::WINTER;
-  uint8_t sectionsCompleted = 0;   // count 0 to 4
+  uint8_t sectionsCompleted = 0;  // count 0 to 4
 };
 
 struct PuzzleComponent {
@@ -90,9 +77,10 @@ struct TimeComponent {
   uint32_t timeLimitMs = 0;
 };
 
-struct SectionController { 
-  SectionSeasonMap type = SectionSeasonMap::WINTER;  //the season map of this section
-  uint32_t puzzleID = 0; //The puzzle linked to this section
+struct SectionController {
+  SectionSeasonMap type =
+      SectionSeasonMap::WINTER;  // the season map of this section
+  uint32_t puzzleID = 0;         // the puzzle linked to this section
   bool unlocked = false;
   bool completed = false;
 };
@@ -107,17 +95,17 @@ enum class DoorState : uint8_t {
 struct SectionDoorComponent {
   DoorState state = DoorState::CLOSED;
   uint8_t requiredPlayers = 4;
-  uint32_t sectionID = 0; //the section this door is linked to
-  
-  //track the physical animation
+  uint32_t sectionID = 0;  // the section this door is linked to
+
+  // track the physical animation
   float currentZ = 0.0f;
-  float targetOpenZ = -10.0f; // Where the door should end up
+  float targetOpenZ = -10.0f;  // where the door should end up
 };
 
 struct SwitchComponent {
-  uint32_t parent = 0; //what entity is this switch linked to (door, puzzle, etc)
+  uint32_t parent =
+      0;  // what entity this switch is linked to (door, puzzle, etc)
   bool switchOn = false;
 };
-
 
 }  // namespace shared
