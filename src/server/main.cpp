@@ -10,6 +10,7 @@
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/simple_profiler.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -81,15 +82,19 @@ int main() {
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(light_entity, "cube", 0.2f);
+  game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f);
   // TODO: at some point the point light will be removed from this entity and it
   // will just handle directional
   game.registry.emplace<shared::PointLight>(
       light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
       0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-  game.registry.emplace<shared::DirectionalLight>(light_entity, -0.3f, -1.0f,
-                                                  -0.4f, 0.2f, 0.2f, 0.2f, 0.8f,
-                                                  0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::Scene>(light_entity, "sunny");
+
+  // Create floor entity (large cube, top surface at z=0)
+  auto [floor_entity_id, floor_entity] = new_entity(game);
+  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
@@ -107,8 +112,10 @@ int main() {
       movement_system(game.registry, fixedDt);
       render_model_change(game.registry, fixedDt);
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
+      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
+      SIMPLE_PROFILE_SCOPE("Broadcast State");
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)
       std::vector<entt::entity> allEnts;
@@ -118,7 +125,13 @@ int main() {
           serializeEntities(game.registry, game.componentRegistry,
                             shared::PacketType::UPDATE_ENTITY, allEnts, false);
       net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      SIMPLE_PROFILE_FRAME_END("Server");
+      SIMPLE_PROFILE_FRAME_START();
     }
+
+    // Yield control to the OS briefly if we have plenty of time.
+    // This stops the server from spin-locking the CPU at 100%.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
   network.shutdown();
