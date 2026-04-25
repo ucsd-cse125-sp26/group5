@@ -4,6 +4,11 @@ project(cse125-game)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+option(ENABLE_PROFILING "Enable Simple Profiler" OFF)
+if(ENABLE_PROFILING)
+    add_compile_definitions(ENABLE_PROFILING)
+endif()
+
 if(WIN32)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
