@@ -97,7 +97,7 @@ int main() {
   game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
   auto previousTime = std::chrono::high_resolution_clock::now();
-  const float fixedDt = 1.0f / 200.0f;
+  const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
   while (true) {
     network.poll(game);
