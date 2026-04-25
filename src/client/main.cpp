@@ -4,19 +4,24 @@
 #include <entt/entt.hpp>
 // clang-format on
 
+#include <cassert>
 #include <iostream>
+#include <thread>
 
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
 #include "shared/hello.h"
+#include "shared/simple_profiler.h"
 
+void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  // test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -32,8 +37,16 @@ int main() {
 
   InputKeys prevKeys = 0;
 
+  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(graphics.window)) {
-    network.poll(game);
+    SIMPLE_PROFILE_FRAME_START();
+
+    if (game.snapshotDirty.load(std::memory_order_acquire)) {
+      std::scoped_lock lock(game.snapshotMutex);
+      syncToRender(game);
+      game.snapshotDirty.store(false, std::memory_order_release);
+    }
+
     graphics.render(game);
     graphics.swap();
     glfwPollEvents();
@@ -48,10 +61,24 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, network, prevKeys);
+    processInput(graphics.window, game.inputQueue, prevKeys);
+    SIMPLE_PROFILE_FRAME_END("Client");
   }
 
+  game.running.store(false, std::memory_order_release);
+  networkThread.join();
+  return 0;
+}
+
+void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
+  while (game.running.load(std::memory_order_acquire)) {
+    {
+      std::scoped_lock lock(game.snapshotMutex);
+      network.poll(game);
+    }
+    network.drainInputQueue(game.inputQueue);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
   network.disconnect();
   network.shutdown();
-  return 0;
 }
