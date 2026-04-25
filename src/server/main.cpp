@@ -10,6 +10,7 @@
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/simple_profiler.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -114,6 +115,7 @@ int main() {
       scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
+      SIMPLE_PROFILE_SCOPE("Broadcast State");
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)
       std::vector<entt::entity> allEnts;
@@ -123,7 +125,13 @@ int main() {
           serializeEntities(game.registry, game.componentRegistry,
                             shared::PacketType::UPDATE_ENTITY, allEnts, false);
       net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      SIMPLE_PROFILE_FRAME_END("Server");
+      SIMPLE_PROFILE_FRAME_START();
     }
+
+    // Yield control to the OS briefly if we have plenty of time.
+    // This stops the server from spin-locking the CPU at 100%.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
   network.shutdown();

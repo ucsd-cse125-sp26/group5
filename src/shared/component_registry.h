@@ -20,9 +20,12 @@ using SerializeFn = std::function<bool(entt::registry& reg, entt::entity entity,
 using DeserializeFn = std::function<size_t(
     entt::registry& reg, entt::entity entity, const uint8_t* data, size_t len)>;
 
+using CloneFn = std::function<void(entt::registry& src, entt::entity srcEnt,
+                                   entt::registry& dst, entt::entity dstEnt)>;
 struct ComponentMeta {
   SerializeFn serialize;
   DeserializeFn deserialize;
+  CloneFn clone;
 };
 
 class ComponentRegistry {
@@ -49,6 +52,12 @@ class ComponentRegistry {
           if (zpp::bits::failure(in(comp))) return 0;
           r.emplace_or_replace<T>(e, comp);
           return in.position();
+        },
+        [](entt ::registry& src, entt::entity srcEnt, entt::registry& dst,
+           entt::entity dstEnt) {
+          if (!src.all_of<T>(srcEnt)) return;
+          auto& srcComp = src.get<T>(srcEnt);
+          dst.emplace_or_replace<T>(dstEnt, srcComp);
         }};
     syncedIds_.push_back(id);
   }
@@ -69,18 +78,50 @@ class ComponentRegistry {
   std::vector<ComponentTypeId> syncedIds_;
 };
 
+inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
+                          const std::map<uint32_t, entt::entity>& srcMap,
+                          entt::registry& dst,
+                          std::map<uint32_t, entt::entity>& dstMap) {
+  // delete old entities in dst
+  for (auto it = dstMap.begin(); it != dstMap.end();) {
+    if (srcMap.find(it->first) == srcMap.end()) {
+      dst.destroy(it->second);
+      it = dstMap.erase(it);
+    } else {
+      it++;
+    }
+  }
+  // create new entities in dst
+  for (auto [entityId, srcEntity] : srcMap) {
+    if (dstMap.find(entityId) != dstMap.end()) {
+      continue;
+    }
+    auto dstEntity = dst.create();
+    dstMap[entityId] = dstEntity;
+  }
+  // clone components from src to dst
+  for (auto [entityId, srcEntity] : srcMap) {
+    auto dstEntity = dstMap[entityId];
+    for (auto id : compReg.syncedIds()) {
+      auto meta = compReg.find(id);
+      meta->clone(src, srcEntity, dst, dstEntity);
+    }
+  }
+}
 enum ComponentIds : ComponentTypeId {
   CID_POSITION = 1,
-  CID_VELOCITY = 2,
+  CID_ENTITY = 2,
   CID_RENDERINFO = 3,
   CID_CAMERA = 4,
-  CID_POINTLIGHT = 5,
-  CID_SCENE = 6,
+  CID_VELOCITY = 5,
+  CID_POINTLIGHT = 6,
+  CID_SCENE = 7,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
   ComponentRegistry reg;
   reg.registerComponent<Position>(CID_POSITION);
+  reg.registerComponent<Entity>(CID_ENTITY);
   reg.registerComponent<RenderInfo>(CID_RENDERINFO);
   reg.registerComponent<Camera>(CID_CAMERA);
   reg.registerComponent<PointLight>(CID_POINTLIGHT);

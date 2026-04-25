@@ -11,9 +11,11 @@
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/simple_profiler.h"
 
 // Process input on tick
 void input_tick(entt::registry& registry) {
+  SIMPLE_PROFILE_SCOPE("Input Tick");
   auto view = registry.view<shared::PlayerInput>();
   for (auto entity : view) {
     auto& playerInput = view.get<shared::PlayerInput>(entity);
@@ -24,6 +26,7 @@ void input_tick(entt::registry& registry) {
 
 // ── Movement system ──────────────────────────────────────
 void movement_system(entt::registry& registry, float dt) {
+  SIMPLE_PROFILE_SCOPE("Movement System");
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
 

@@ -17,6 +17,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/simple_profiler.h"
 
 // Skybox images use Y-up; the game uses Z-up.
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
@@ -35,13 +36,15 @@ static void initPointLights(const Shader& shader) {
 }
 
 std::optional<CameraState> computeCamera(const ClientGame& game) {
-  auto selfIt = game.entityMap.find(game.myEntityId);
-  if (selfIt == game.entityMap.end() || !game.registry.valid(selfIt->second) ||
-      !game.registry.all_of<shared::Position, shared::Camera>(selfIt->second)) {
+  auto selfIt = game.renderEntityMap.find(game.renderEntityId);
+  if (selfIt == game.renderEntityMap.end() ||
+      !game.renderRegistry.valid(selfIt->second) ||
+      !game.renderRegistry.all_of<shared::Position, shared::Camera>(
+          selfIt->second)) {
     return std::nullopt;
   }
-  const auto& p = game.registry.get<shared::Position>(selfIt->second);
-  const auto& cam = game.registry.get<shared::Camera>(selfIt->second);
+  const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
+  const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
@@ -66,7 +69,7 @@ static void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
 }
 
 static const shared::SceneInfo* currentScene(const ClientGame& game) {
-  auto sceneView = game.registry.view<shared::Scene>();
+  auto sceneView = game.renderRegistry.view<shared::Scene>();
   for (auto ent : sceneView) {
     auto& scene = sceneView.get<shared::Scene>(ent);
     auto* info = shared::findScene(scene.name);
@@ -90,7 +93,7 @@ static void updateDirectionalLight(const Shader& shader,
 
 static void updatePointLights(const Shader& shader, const ClientGame& game) {
   int plIdx = 0;
-  auto lightView = game.registry.view<shared::PointLight>();
+  auto lightView = game.renderRegistry.view<shared::PointLight>();
   for (auto ent : lightView) {
     if (plIdx >= 4) break;
     auto& pl = lightView.get<shared::PointLight>(ent);
@@ -126,13 +129,13 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
 
 static void renderEntities(const Shader& shader, ClientGame& game,
                            std::unordered_map<std::string, Model*>& models) {
-  auto view = game.registry
+  auto view = game.renderRegistry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
     auto& entity = view.get<shared::Entity>(ent);
-    if (entity.id == game.myEntityId) {
+    if (entity.id == game.renderEntityId) {
       continue;
     }
     Model* modelAsset = models[renderInfo.modelName];
@@ -163,6 +166,7 @@ bool Graphics::load(int width, int height) {
   }
 
   glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);  // vsync: cap to display refresh rate
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   if (glfwRawMouseMotionSupported())
@@ -214,6 +218,7 @@ bool Graphics::load(int width, int height) {
 }
 
 void Graphics::render(ClientGame& game) {
+  SIMPLE_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
 
