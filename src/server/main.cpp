@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
@@ -47,8 +48,9 @@ int main() {
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
-                                            InputKeys(0), 0.0f, 0.0f);
+    g.registry.emplace<shared::PlayerInput>(
+        entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
+        static_cast<InputKeys>(0), 0.0f, 0.0f);
 
     // Broadcast the new entity's full state to all clients
     auto buf =
@@ -64,7 +66,7 @@ int main() {
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
-    printf("%s disconnected.\n", (const char*)peer->data);
+    printf("%s disconnected.\n", static_cast<const char*>(peer->data));
     auto entity = g.peerEntityMap[peer];
 
     shared::DespawnPacket despawnPkt;
@@ -78,6 +80,7 @@ int main() {
   };
 
   registerServerHandlers(network);
+  loadLevel(game);
   // Create hardcoded light entity
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
