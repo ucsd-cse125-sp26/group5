@@ -42,14 +42,15 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     // Handle embedded textures (path starts with '*')
     if (auto embedded = scene->GetEmbeddedTexture(path.C_Str())) {
       if (embedded->mHeight == 0) {
-        pixels = stbi_load_from_memory((uint8_t*)embedded->pcData,
-                                       embedded->mWidth, &w, &h, &channels, 4);
+        pixels =
+            stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData),
+                                  embedded->mWidth, &w, &h, &channels, 4);
         pixel_order = GL_RGBA;
       } else {
         w = embedded->mWidth;
         h = embedded->mHeight;
         pixel_order = GL_BGRA;
-        pixels = (uint8_t*)embedded->pcData;
+        pixels = reinterpret_cast<uint8_t*>(embedded->pcData);
       }
     } else {
       // Otherwise load from disk
@@ -272,7 +273,9 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     float u = (f + 0.5f) / 6.0f;
     glm::vec2 uv(u, 0.5f);
     for (auto corner : faces[f].corners) {
-      vertices.push_back({corner, faces[f].normal, uv});
+      vertices.push_back({.position = corner,
+                          .normal = faces[f].normal,
+                          .texture_coordinates = uv});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
