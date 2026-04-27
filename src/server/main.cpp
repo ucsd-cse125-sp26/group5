@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
@@ -79,6 +80,7 @@ int main() {
   };
 
   registerServerHandlers(network);
+  loadLevel(game);
   // Create hardcoded light entity
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
