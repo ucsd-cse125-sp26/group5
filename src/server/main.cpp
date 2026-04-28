@@ -1,13 +1,13 @@
 #include <chrono>
-#include <cstdint>
 #include <iostream>
+#include <memory>
 #include <thread>
 
+#include "game_state.h"
 #include "server_game.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
-#include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
@@ -22,15 +22,49 @@ int main() {
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
   }
+  game.network = &network;
+
+  registerServerHandlers(network);
+
+  initWorldEntities(game);
+
+  // Start in the Overworld
+  game.gameStateManager.changeState(game,
+                                    std::make_unique<OverworldState>());
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
     printf("A new client connected from %x:%u.\n", peer->address.host,
            peer->address.port);
 
-    // Send full state of all existing entities to the new client
+    if (g.unused_player_slots.empty()) {
+        enet_peer_disconnect(peer, 0);
+        return;
+    }
+
+    peer->data = (void*)"Client information";
+    PlayerAvatars slots = g.unused_player_slots.back();
+    g.unused_player_slots.pop_back();
+    g.active_players[peer] = slots;
+
+    entt::entity activeEntity = entt::null;
+    StateType currentState = g.gameStateManager.currentState()->getStateType();
+
+    if (currentState == StateType::OVERWORLD) {
+        activeEntity = slots.overworld_avatar;
+    } else if (currentState == StateType::MAZE) {
+        activeEntity = slots.maze_avatar;
+    }
+
+    // Send full state of all existing entities for the current state to the new client
     std::vector<entt::entity> existing;
-    auto view = g.registry.view<shared::Entity>();
-    for (auto ent : view) existing.push_back(ent);
+    if (currentState == StateType::OVERWORLD) {
+        auto view = g.registry.view<shared::OverworldTag>();
+        for (auto ent : view) existing.push_back(ent);
+    } else if (currentState == StateType::MAZE) {
+        auto view = g.registry.view<shared::MazeTag>();
+        for (auto ent : view) existing.push_back(ent);
+    }
+
     if (!existing.empty()) {
       auto buf =
           serializeEntities(g.registry, g.componentRegistry,
@@ -38,63 +72,43 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-    // Create the new player entity
-    peer->data = (void*)"Client information";
-    auto [entity_id, entity] = new_entity(g);
-    g.peerEntityMap[peer] = entity;
-    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-                                         0.0f, 0.0f);
-    g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
-    g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
-    g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
-                                            InputKeys(0), 0.0f, 0.0f);
-
-    // Broadcast the new entity's full state to all clients
-    auto buf =
-        serializeEntities(g.registry, g.componentRegistry,
-                          shared::PacketType::SPAWN_ENTITY, {entity}, false);
-    net::broadcastRaw(network.getHost(), buf.data(), buf.size());
-
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = entity_id;
+    assignPkt.entityId = g.registry.get<shared::Entity>(activeEntity).id;
     net::sendPacket(peer, assignPkt);
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
+    auto it = g.active_players.find(peer);
+    if (it == g.active_players.end()) return;
+
     printf("%s disconnected.\n", (const char*)peer->data);
-    auto entity = g.peerEntityMap[peer];
+    PlayerAvatars slots = it->second;
 
-    shared::DespawnPacket despawnPkt;
-    despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
-    despawnPkt.entityId = g.registry.get<shared::Entity>(entity).id;
-    net::broadcastPacket(network.getHost(), despawnPkt);
+    auto resetSlotEntity = [&g](entt::entity entity) {
+      if (g.registry.all_of<shared::PlayerInput>(entity)) {
+        auto& input = g.registry.get<shared::PlayerInput>(entity);
+        input.keys = 0;
+        input.keys_prev = 0;
+        input.keys_newly_pressed = 0;
+        input.mouseDx = 0.0f;
+        input.mouseDy = 0.0f;
+      }
+      if (g.registry.all_of<shared::Velocity>(entity)) {
+        auto& velocity = g.registry.get<shared::Velocity>(entity);
+        velocity.dx = 0.0f;
+        velocity.dy = 0.0f;
+        velocity.dz = 0.0f;
+      }
+    };
+    resetSlotEntity(slots.overworld_avatar);
+    resetSlotEntity(slots.maze_avatar);
 
-    g.registry.destroy(entity);
-    g.peerEntityMap.erase(peer);
+    g.unused_player_slots.push_back(slots);
+    g.active_players.erase(it);
     peer->data = nullptr;
   };
-
-  registerServerHandlers(network);
-  // Create hardcoded light entity
-  auto [light_entity_id, light_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f);
-  // TODO: at some point the point light will be removed from this entity and it
-  // will just handle directional
-  game.registry.emplace<shared::PointLight>(
-      light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
-      0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-  game.registry.emplace<shared::Scene>(light_entity, "sunny");
-
-  // Create floor entity (large cube, top surface at z=0)
-  auto [floor_entity_id, floor_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f,
-                                          1.0f, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
@@ -108,29 +122,29 @@ int main() {
     accumulator += dt;
 
     while (accumulator >= fixedDt) {
-      input_tick(game.registry);
-      movement_system(game.registry, fixedDt);
-      render_model_change(game.registry, fixedDt);
-      hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
-      scene_cycle_system(game.registry);
+      game.gameStateManager.update(game, fixedDt);
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
-      // Broadcast delta state to all clients (dirtyOnly=false for now — full
-      // snapshot every tick)
       std::vector<entt::entity> allEnts;
-      auto view = game.registry.view<shared::Entity>();
-      for (auto ent : view) allEnts.push_back(ent);
-      auto buf =
-          serializeEntities(game.registry, game.componentRegistry,
-                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
-      net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      if (game.gameStateManager.currentState() && game.gameStateManager.currentState()->getStateType() == StateType::OVERWORLD) {
+          auto view = game.registry.view<shared::OverworldTag>();
+          for (auto ent : view) allEnts.push_back(ent);
+      } else if (game.gameStateManager.currentState() && game.gameStateManager.currentState()->getStateType() == StateType::MAZE) {
+          auto view = game.registry.view<shared::MazeTag>();
+          for (auto ent : view) allEnts.push_back(ent);
+      }
+
+      if (!allEnts.empty()) {
+        auto buf =
+            serializeEntities(game.registry, game.componentRegistry,
+                              shared::PacketType::UPDATE_ENTITY, allEnts, false);
+        net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      }
       SIMPLE_PROFILE_FRAME_END("Server");
       SIMPLE_PROFILE_FRAME_START();
     }
 
-    // Yield control to the OS briefly if we have plenty of time.
-    // This stops the server from spin-locking the CPU at 100%.
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
