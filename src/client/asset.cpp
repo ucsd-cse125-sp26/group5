@@ -12,26 +12,19 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "client/shaders.h"
-#include "shared/util.h"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "shared/util.h"
 
-static inline glm::vec3 vec3_cast(const aiVector3D& v) {
-  return {v.x, v.y, v.z};
-}
+static inline glm::vec3 vec3_cast(const aiVector3D& v) { return {v.x, v.y, v.z}; }
 static inline glm::vec2 vec2_cast(const aiVector3D& v) {
   return {v.x, v.y};
 }  // it's aiVector3D because assimp's texture coordinates use that
-static inline glm::quat quat_cast(const aiQuaternion& q) {
-  return {q.w, q.x, q.y, q.z};
-}
-static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) {
-  return glm::transpose(glm::make_mat4(&m.a1));
-}
+static inline glm::quat quat_cast(const aiQuaternion& q) { return {q.w, q.x, q.y, q.z}; }
+static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) { return glm::transpose(glm::make_mat4(&m.a1)); }
 
-MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
-                          const aiScene* scene, const std::string& base) {
+MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type, const aiScene* scene, const std::string& base) {
   if (mat->GetTextureCount(type) > 0) {
     aiString path;
     mat->GetTexture(type, 0, &path);
@@ -43,8 +36,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     if (auto embedded = scene->GetEmbeddedTexture(path.C_Str())) {
       if (embedded->mHeight == 0) {
         pixels =
-            stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData),
-                                  embedded->mWidth, &w, &h, &channels, 4);
+            stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData), embedded->mWidth, &w, &h, &channels, 4);
         pixel_order = GL_RGBA;
       } else {
         w = embedded->mWidth;
@@ -62,8 +54,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     GLuint id;
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, pixel_order,
-                 GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, pixel_order, GL_UNSIGNED_BYTE, pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
     if (pixel_order == GL_RGBA) {
       stbi_image_free(pixels);
@@ -88,15 +79,13 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     default:
       break;
   }
-  uint8_t pixel[4] = {
-      static_cast<uint8_t>(color.r * 255), static_cast<uint8_t>(color.g * 255),
-      static_cast<uint8_t>(color.b * 255), static_cast<uint8_t>(color.a * 255)};
+  uint8_t pixel[4] = {static_cast<uint8_t>(color.r * 255), static_cast<uint8_t>(color.g * 255),
+                      static_cast<uint8_t>(color.b * 255), static_cast<uint8_t>(color.a * 255)};
 
   GLuint id;
   glGenTextures(1, &id);
   glBindTexture(GL_TEXTURE_2D, id);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               pixel);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -109,10 +98,8 @@ Model* loadModel(const std::string& filename) {
   const std::string baseStr = exeDir().string();
   const std::string fullPath = (exeDir() / filename).string();
   Assimp::Importer importer;
-  const aiScene* scene =
-      importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
-  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
-      !scene->mRootNode) {
+  const aiScene* scene = importer.ReadFile(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs);
+  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
     std::cout << "ERROR::ASSIMP::" << importer.GetErrorString() << '\n';
     return nullptr;
   }
@@ -125,10 +112,8 @@ Model* loadModel(const std::string& filename) {
     Material result;
     result.ambient = loadMaterial(aimat, aiTextureType_AMBIENT, scene, baseStr);
     result.diffuse = loadMaterial(aimat, aiTextureType_DIFFUSE, scene, baseStr);
-    result.specular =
-        loadMaterial(aimat, aiTextureType_SPECULAR, scene, baseStr);
-    result.emissive =
-        loadMaterial(aimat, aiTextureType_EMISSIVE, scene, baseStr);
+    result.specular = loadMaterial(aimat, aiTextureType_SPECULAR, scene, baseStr);
+    result.emissive = loadMaterial(aimat, aiTextureType_EMISSIVE, scene, baseStr);
     aimat->Get(AI_MATKEY_SHININESS, result.shininess);
     model->materials.push_back(result);
   }
@@ -166,22 +151,17 @@ Model* loadModel(const std::string& filename) {
     glBindVertexArray(vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
-                 vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
-                 indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*)offsetof(Vertex, position));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*)offsetof(Vertex, normal));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void*)offsetof(Vertex, texture_coordinates));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texture_coordinates));
 
     glBindVertexArray(0);
 
@@ -217,8 +197,7 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   GLuint id;
   glGenTextures(1, &id);
   glBindTexture(GL_TEXTURE_2D, id);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               pixel);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   return id;
@@ -233,35 +212,17 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   // below; each face samples one texel of a 6x1 diffuse texture).
   const Face faces[6] = {
       {.normal = {0, 0, -1},
-       .corners = {{-0.5f, -0.5f, -0.5f},
-                   {0.5f, -0.5f, -0.5f},
-                   {0.5f, 0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f}}},
+       .corners = {{-0.5f, -0.5f, -0.5f}, {0.5f, -0.5f, -0.5f}, {0.5f, 0.5f, -0.5f}, {-0.5f, 0.5f, -0.5f}}},
       {.normal = {0, 0, 1},
-       .corners = {{-0.5f, -0.5f, 0.5f},
-                   {0.5f, -0.5f, 0.5f},
-                   {0.5f, 0.5f, 0.5f},
-                   {-0.5f, 0.5f, 0.5f}}},
+       .corners = {{-0.5f, -0.5f, 0.5f}, {0.5f, -0.5f, 0.5f}, {0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}}},
       {.normal = {-1, 0, 0},
-       .corners = {{-0.5f, -0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f},
-                   {-0.5f, 0.5f, 0.5f},
-                   {-0.5f, -0.5f, 0.5f}}},
+       .corners = {{-0.5f, -0.5f, -0.5f}, {-0.5f, 0.5f, -0.5f}, {-0.5f, 0.5f, 0.5f}, {-0.5f, -0.5f, 0.5f}}},
       {.normal = {1, 0, 0},
-       .corners = {{0.5f, -0.5f, -0.5f},
-                   {0.5f, 0.5f, -0.5f},
-                   {0.5f, 0.5f, 0.5f},
-                   {0.5f, -0.5f, 0.5f}}},
+       .corners = {{0.5f, -0.5f, -0.5f}, {0.5f, 0.5f, -0.5f}, {0.5f, 0.5f, 0.5f}, {0.5f, -0.5f, 0.5f}}},
       {.normal = {0, -1, 0},
-       .corners = {{-0.5f, -0.5f, -0.5f},
-                   {0.5f, -0.5f, -0.5f},
-                   {0.5f, -0.5f, 0.5f},
-                   {-0.5f, -0.5f, 0.5f}}},
+       .corners = {{-0.5f, -0.5f, -0.5f}, {0.5f, -0.5f, -0.5f}, {0.5f, -0.5f, 0.5f}, {-0.5f, -0.5f, 0.5f}}},
       {.normal = {0, 1, 0},
-       .corners = {{-0.5f, 0.5f, -0.5f},
-                   {0.5f, 0.5f, -0.5f},
-                   {0.5f, 0.5f, 0.5f},
-                   {-0.5f, 0.5f, 0.5f}}},
+       .corners = {{-0.5f, 0.5f, -0.5f}, {0.5f, 0.5f, -0.5f}, {0.5f, 0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}}},
   };
 
   std::vector<Vertex> vertices;
@@ -273,9 +234,7 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     float u = (f + 0.5f) / 6.0f;
     glm::vec2 uv(u, 0.5f);
     for (auto corner : faces[f].corners) {
-      vertices.push_back({.position = corner,
-                          .normal = faces[f].normal,
-                          .texture_coordinates = uv});
+      vertices.push_back({.position = corner, .normal = faces[f].normal, .texture_coordinates = uv});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -293,22 +252,17 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   glBindVertexArray(vao);
 
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
-               vertices.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
-               indices.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                        (void*)offsetof(Vertex, position));
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                        (void*)offsetof(Vertex, normal));
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
   glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                        (void*)offsetof(Vertex, texture_coordinates));
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, texture_coordinates));
 
   glBindVertexArray(0);
 
@@ -316,8 +270,7 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   GLuint diffuseTex;
   glGenTextures(1, &diffuseTex);
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 6, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               spec.palette);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 6, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, spec.palette);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -326,12 +279,10 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   Material material;
   material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
   material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
-  material.specular = {.constant = glm::vec3(1.0f),
-                       .texture = makeSolidTexture(255, 255, 255, 255)};
+  material.specular = {.constant = glm::vec3(1.0f), .texture = makeSolidTexture(255, 255, 255, 255)};
   material.emissive = {
       .constant = glm::vec3(1.0f),
-      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
-                                  spec.emissive[2], spec.emissive[3])};
+      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1], spec.emissive[2], spec.emissive[3])};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -373,8 +324,7 @@ void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
   glBindVertexArray(0);
 }
 
-void Draw(const Shader& shader, const Model& model,
-          const glm::mat4& transform) {
+void Draw(const Shader& shader, const Model& model, const glm::mat4& transform) {
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
@@ -387,8 +337,7 @@ void Draw(const Shader& shader, const Model& model,
 }
 
 static GLuint loadCubemap(const std::string& directory) {
-  const std::string suffixes[] = {"px.png", "nx.png", "py.png",
-                                  "ny.png", "pz.png", "nz.png"};
+  const std::string suffixes[] = {"px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png"};
   GLuint textureID;
   glGenTextures(1, &textureID);
   glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
@@ -396,17 +345,14 @@ static GLuint loadCubemap(const std::string& directory) {
   int width, height, nrChannels;
   for (unsigned int i = 0; i < 6; i++) {
     const std::string fullPath = (exeDir() / directory / suffixes[i]).string();
-    unsigned char* data =
-        stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
+    unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
     if (data) {
-      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, width,
-                   height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
       stbi_image_free(data);
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
-      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, 1, 1, 0,
-                   GL_RGBA, GL_UNSIGNED_BYTE, pink);
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
     }
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -447,8 +393,7 @@ Skybox loadSkybox(const std::string& directory) {
   glGenBuffers(1, &vbo);
   glBindVertexArray(vao);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
-               GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
   glBindVertexArray(0);

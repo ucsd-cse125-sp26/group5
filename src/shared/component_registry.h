@@ -14,11 +14,9 @@ namespace shared {
 
 using ComponentTypeId = uint16_t;
 
-using SerializeFn = std::function<bool(entt::registry& reg, entt::entity entity,
-                                       std::vector<uint8_t>& buffer)>;
+using SerializeFn = std::function<bool(entt::registry& reg, entt::entity entity, std::vector<uint8_t>& buffer)>;
 
-using DeserializeFn = std::function<size_t(
-    entt::registry& reg, entt::entity entity, const uint8_t* data, size_t len)>;
+using DeserializeFn = std::function<size_t(entt::registry& reg, entt::entity entity, const uint8_t* data, size_t len)>;
 
 struct ComponentMeta {
   SerializeFn serialize;
@@ -29,38 +27,30 @@ class ComponentRegistry {
  public:
   template <typename T>
   void registerComponent(ComponentTypeId id) {
-    meta_[id] = ComponentMeta{
-        [](entt::registry& r, entt::entity e,
-           std::vector<uint8_t>& buf) -> bool {
-          if (!r.all_of<T>(e)) return false;
-          const auto& comp = r.get<T>(e);
-          std::vector<std::byte> tmp;
-          zpp::bits::out out(tmp);
-          if (zpp::bits::failure(out(comp))) return false;
-          const auto* raw = reinterpret_cast<const uint8_t*>(tmp.data());
-          buf.insert(buf.end(), raw, raw + tmp.size());
-          return true;
-        },
-        [](entt::registry& r, entt::entity e, const uint8_t* data,
-           size_t len) -> size_t {
-          T comp;
-          auto span = std::span{reinterpret_cast<const std::byte*>(data), len};
-          zpp::bits::in in(span);
-          if (zpp::bits::failure(in(comp))) return 0;
-          r.emplace_or_replace<T>(e, comp);
-          return in.position();
-        }};
+    meta_[id] = ComponentMeta{[](entt::registry& r, entt::entity e, std::vector<uint8_t>& buf) -> bool {
+                                if (!r.all_of<T>(e)) return false;
+                                const auto& comp = r.get<T>(e);
+                                std::vector<std::byte> tmp;
+                                zpp::bits::out out(tmp);
+                                if (zpp::bits::failure(out(comp))) return false;
+                                const auto* raw = reinterpret_cast<const uint8_t*>(tmp.data());
+                                buf.insert(buf.end(), raw, raw + tmp.size());
+                                return true;
+                              },
+                              [](entt::registry& r, entt::entity e, const uint8_t* data, size_t len) -> size_t {
+                                T comp;
+                                auto span = std::span{reinterpret_cast<const std::byte*>(data), len};
+                                zpp::bits::in in(span);
+                                if (zpp::bits::failure(in(comp))) return 0;
+                                r.emplace_or_replace<T>(e, comp);
+                                return in.position();
+                              }};
     syncedIds_.push_back(id);
   }
 
-  [[nodiscard]] const std::unordered_map<ComponentTypeId, ComponentMeta>& meta()
-      const {
-    return meta_;
-  }
+  [[nodiscard]] const std::unordered_map<ComponentTypeId, ComponentMeta>& meta() const { return meta_; }
 
-  [[nodiscard]] const std::vector<ComponentTypeId>& syncedIds() const {
-    return syncedIds_;
-  }
+  [[nodiscard]] const std::vector<ComponentTypeId>& syncedIds() const { return syncedIds_; }
 
   [[nodiscard]] const ComponentMeta* find(ComponentTypeId id) const {
     auto it = meta_.find(id);

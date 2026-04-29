@@ -16,6 +16,5 @@ struct ClientGame {
 };
 
 void registerClientHandlers(ClientNetwork& network);
-void processInput(GLFWwindow* window, ClientNetwork& network,
-                  InputKeys& prevKeys);
+void processInput(GLFWwindow* window, ClientNetwork& network, InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
