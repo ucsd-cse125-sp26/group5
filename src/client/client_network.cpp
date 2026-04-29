@@ -4,8 +4,7 @@
 
 #include "shared/simple_profiler.h"
 
-bool ClientNetwork::connect(const char* host, uint16_t port,
-                            uint32_t timeoutMs) {
+bool ClientNetwork::connect(const char* host, uint16_t port, uint32_t timeoutMs) {
   if (enet_initialize() != 0) {
     fprintf(stderr, "An error occurred while initializing ENet.\n");
     return false;
@@ -94,8 +93,7 @@ void ClientNetwork::poll(ClientGame& game) {
   }
 }
 
-void ClientNetwork::drainInputQueue(
-    SpscQueue<shared::InputPacket, 256>& inputQueue) {
+void ClientNetwork::drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue) {
   shared::InputPacket pkt;
   while (inputQueue.tryPop(pkt)) {
     send(pkt);
