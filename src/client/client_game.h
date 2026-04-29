@@ -1,21 +1,38 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
+#include <mutex>
 
 #include "shared/component_registry.h"
+#include "shared/protocol.h"
+#include "spsc_queue.h"
 
 struct GLFWwindow;
 class ClientNetwork;
 
 struct ClientGame {
   shared::ComponentRegistry componentRegistry;
-  entt::registry registry;
-  std::map<uint32_t, entt::entity> entityMap;
-  uint32_t myEntityId = UINT32_MAX;
+
+  entt::registry renderRegistry;
+  std::map<uint32_t, entt::entity> renderEntityMap;
+  uint32_t renderEntityId = UINT32_MAX;
+
+  entt::registry networkRegistry;
+  std::map<uint32_t, entt::entity> networkEntityMap;
+  uint32_t networkEntityId = UINT32_MAX;
+
+  std::mutex snapshotMutex;
+  std::atomic<bool> snapshotDirty = false;
+  std::atomic<bool> running = true;
+
+  SpscQueue<shared::InputPacket, 256> inputQueue;
 };
 
+void syncToRender(ClientGame& game);
 void registerClientHandlers(ClientNetwork& network);
-void processInput(GLFWwindow* window, ClientNetwork& network,
+void processInput(GLFWwindow* window,
+                  SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
