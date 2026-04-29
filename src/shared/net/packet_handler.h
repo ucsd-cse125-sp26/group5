@@ -11,9 +11,12 @@ namespace net {
 template <typename TContext>
 class PacketDispatcher {
  public:
-  using Handler = std::function<void(TContext& ctx, ENetPeer* sender, const uint8_t* data, size_t length)>;
+  using Handler = std::function<void(TContext& ctx, ENetPeer* sender,
+                                     const uint8_t* data, size_t length)>;
 
-  void on(shared::PacketType type, Handler handler) { handlers_[type] = std::move(handler); }
+  void on(shared::PacketType type, Handler handler) {
+    handlers_[type] = std::move(handler);
+  }
 
   void dispatch(TContext& ctx, ENetPeer* sender, ENetPacket* packet) const {
     if (packet->dataLength == 0) return;

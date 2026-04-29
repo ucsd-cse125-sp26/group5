@@ -4,7 +4,8 @@
 
 #include "shared/simple_profiler.h"
 
-bool ClientNetwork::connect(const char* host, uint16_t port, uint32_t timeoutMs) {
+bool ClientNetwork::connect(const char* host, uint16_t port,
+                            uint32_t timeoutMs) {
   if (enet_initialize() != 0) {
     fprintf(stderr, "An error occurred while initializing ENet.\n");
     return false;
@@ -12,7 +13,8 @@ bool ClientNetwork::connect(const char* host, uint16_t port, uint32_t timeoutMs)
 
   client_ = enet_host_create(nullptr, 1, 2, 0, 0);
   if (client_ == nullptr) {
-    fprintf(stderr, "An error occurred while trying to create an ENet client host.\n");
+    fprintf(stderr,
+            "An error occurred while trying to create an ENet client host.\n");
     return false;
   }
 
@@ -27,7 +29,8 @@ bool ClientNetwork::connect(const char* host, uint16_t port, uint32_t timeoutMs)
   }
 
   ENetEvent event;
-  if (enet_host_service(client_, &event, timeoutMs) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
+  if (enet_host_service(client_, &event, timeoutMs) > 0 &&
+      event.type == ENET_EVENT_TYPE_CONNECT) {
     printf("Connection to %s:%u succeeded.\n", host, port);
     return true;
   }
@@ -93,7 +96,8 @@ void ClientNetwork::poll(ClientGame& game) {
   }
 }
 
-void ClientNetwork::drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue) {
+void ClientNetwork::drainInputQueue(
+    SpscQueue<shared::InputPacket, 256>& inputQueue) {
   shared::InputPacket pkt;
   while (inputQueue.tryPop(pkt)) {
     send(pkt);

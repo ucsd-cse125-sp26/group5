@@ -13,7 +13,9 @@ inline std::chrono::time_point<std::chrono::high_resolution_clock> frame_start;
 
 class ScopeTimer {
  public:
-  ScopeTimer(const char* name) : name_(name) { start_ = std::chrono::high_resolution_clock::now(); }
+  ScopeTimer(const char* name) : name_(name) {
+    start_ = std::chrono::high_resolution_clock::now();
+  }
   ~ScopeTimer() {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = end - start_;
@@ -25,7 +27,9 @@ class ScopeTimer {
   std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
 
-inline void start_frame() { frame_start = std::chrono::high_resolution_clock::now(); }
+inline void start_frame() {
+  frame_start = std::chrono::high_resolution_clock::now();
+}
 
 inline void end_frame(const char* context = "Frame") {
   auto end = std::chrono::high_resolution_clock::now();
@@ -40,17 +44,25 @@ inline void end_frame(const char* context = "Frame") {
 
   // Print stats every 60 frames
   if (frame_count % 60 == 0) {
-    std::cout << "\n=== [ " << context << " ] Profiling Stats (Average per Frame over last 60 Frames) ===\n";
+    std::cout
+        << "\n=== [ " << context
+        << " ] Profiling Stats (Average per Frame over last 60 Frames) ===\n";
     double average_frame_time = cumulative_frame_time / 60.0;
     std::cout << "Avg Frame Time: " << average_frame_time << " ms\n";
 
-    std::vector<std::pair<std::string, double>> stats(frame_stats.begin(), frame_stats.end());
-    std::ranges::sort(stats, [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::vector<std::pair<std::string, double>> stats(frame_stats.begin(),
+                                                      frame_stats.end());
+    std::ranges::sort(stats, [](const auto& a, const auto& b) {
+      return a.second > b.second;
+    });
 
     for (const auto& stat : stats) {
       double avg_stat_time = stat.second / 60.0;
-      double percent = average_frame_time > 0 ? (avg_stat_time / average_frame_time) * 100.0 : 0.0;
-      std::cout << " - " << stat.first << ": " << avg_stat_time << " ms (" << percent << "%)\n";
+      double percent = average_frame_time > 0
+                           ? (avg_stat_time / average_frame_time) * 100.0
+                           : 0.0;
+      std::cout << " - " << stat.first << ": " << avg_stat_time << " ms ("
+                << percent << "%)\n";
     }
     std::cout << "========================================================\n";
 
@@ -63,7 +75,8 @@ inline void end_frame(const char* context = "Frame") {
 }  // namespace shared::profiler
 
 #ifdef ENABLE_PROFILING
-#define SIMPLE_PROFILE_SCOPE(name) shared::profiler::ScopeTimer __timer_##__LINE__(name)
+#define SIMPLE_PROFILE_SCOPE(name) \
+  shared::profiler::ScopeTimer __timer_##__LINE__(name)
 #define SIMPLE_PROFILE_FRAME_START() shared::profiler::start_frame()
 #define SIMPLE_PROFILE_FRAME_END(context) shared::profiler::end_frame(context)
 #else

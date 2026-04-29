@@ -7,8 +7,9 @@
 namespace shared {
 
 struct CubeSpec {
-  uint8_t palette[6][4];  // Per-face RGBA (back, front, left, right, bottom, top)
-  uint8_t emissive[4];    // Emissive RGBA
+  uint8_t palette[6]
+                 [4];   // Per-face RGBA (back, front, left, right, bottom, top)
+  uint8_t emissive[4];  // Emissive RGBA
 };
 
 inline constexpr CubeSpec CUBE_RAINBOW = {
@@ -39,7 +40,13 @@ struct AssetInfo {
 };
 
 inline constexpr AssetInfo ASSETS[] = {
-    {.name = "cube", .filename = "", .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f, .cubeSpec = &CUBE_RAINBOW},
+    {.name = "cube",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_RAINBOW},
     {.name = "light_cube",
      .filename = "",
      .qw = 1.0f,

@@ -24,7 +24,13 @@ int main() {
 
   spawnStaticEntities(
       game, {
-                {.x = 5.0f, .y = 5.0f, .z = 0.0f, .modelName = "cube", .scale = 1.0f, .meshPath = "", .render = true},
+                {.x = 5.0f,
+                 .y = 5.0f,
+                 .z = 0.0f,
+                 .modelName = "cube",
+                 .scale = 1.0f,
+                 .meshPath = "",
+                 .render = true},
                 {.x = 10.0f,
                  .y = 0.0f,
                  .z = -1.0f,
@@ -49,14 +55,17 @@ int main() {
   }
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
-    printf("A new client connected from %x:%u.\n", peer->address.host, peer->address.port);
+    printf("A new client connected from %x:%u.\n", peer->address.host,
+           peer->address.port);
 
     // Send full state of all existing entities to the new client
     std::vector<entt::entity> existing;
     auto view = g.registry.view<shared::Entity>();
     for (auto ent : view) existing.push_back(ent);
     if (!existing.empty()) {
-      auto buf = serializeEntities(g.registry, g.componentRegistry, shared::PacketType::SPAWN_ENTITY, existing, false);
+      auto buf =
+          serializeEntities(g.registry, g.componentRegistry,
+                            shared::PacketType::SPAWN_ENTITY, existing, false);
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
@@ -64,17 +73,22 @@ int main() {
     peer->data = (void*)"Client information";
     auto [entity_id, entity] = new_entity(g);
     g.peerEntityMap[peer] = entity;
-    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 5.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 5.0f, 1.0f, 0.0f,
+                                         0.0f, 0.0f);
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
-                                            static_cast<InputKeys>(0), 0.0f, 0.0f);
+    g.registry.emplace<shared::PlayerInput>(
+        entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
+        static_cast<InputKeys>(0), 0.0f, 0.0f);
     JPH::BodyID bodyId = g.physics.createPlayerBody(0.0f, 0.0f, 5.0f);
-    g.registry.emplace<shared::PhysicsBody>(entity, bodyId.GetIndexAndSequenceNumber());
+    g.registry.emplace<shared::PhysicsBody>(entity,
+                                            bodyId.GetIndexAndSequenceNumber());
 
     // Broadcast the new entity's full state to all clients
-    auto buf = serializeEntities(g.registry, g.componentRegistry, shared::PacketType::SPAWN_ENTITY, {entity}, false);
+    auto buf =
+        serializeEntities(g.registry, g.componentRegistry,
+                          shared::PacketType::SPAWN_ENTITY, {entity}, false);
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
     // Tell the new client which entity is theirs
@@ -104,17 +118,20 @@ int main() {
   loadLevel(game);
   // Create hardcoded light entity
   auto [light_entity_id, light_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f);
   // TODO: at some point the point light will be removed from this entity and it
   // will just handle directional
-  game.registry.emplace<shared::PointLight>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
-                                            0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::PointLight>(
+      light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f,
+      0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
   game.registry.emplace<shared::Scene>(light_entity, "sunny");
 
   // Create floor entity (large cube, top surface at z=0)
   auto [floor_entity_id, floor_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(floor_entity, 0.0f, 0.0f, -50.5f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(floor_entity, "cube", 100.0f);
 
   auto previousTime = std::chrono::high_resolution_clock::now();
@@ -139,11 +156,13 @@ int main() {
       // printf("Jolt step ok\n");
 
       // Sync Jolt positions back into ECS
-      auto physicsView = game.registry.view<shared::Position, shared::PhysicsBody>();
+      auto physicsView =
+          game.registry.view<shared::Position, shared::PhysicsBody>();
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::RVec3 joltPos = game.physics.getBodyInterface().GetPosition(JPH::BodyID(pb.bodyId));
+        JPH::RVec3 joltPos =
+            game.physics.getBodyInterface().GetPosition(JPH::BodyID(pb.bodyId));
         pos.x = joltPos.GetX();
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();
@@ -158,7 +177,8 @@ int main() {
       auto view = game.registry.view<shared::Entity>();
       for (auto ent : view) allEnts.push_back(ent);
       auto buf =
-          serializeEntities(game.registry, game.componentRegistry, shared::PacketType::UPDATE_ENTITY, allEnts, false);
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
       net::broadcastRaw(network.getHost(), buf.data(), buf.size());
       SIMPLE_PROFILE_FRAME_END("Server");
       SIMPLE_PROFILE_FRAME_START();
