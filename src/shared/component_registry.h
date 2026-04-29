@@ -53,7 +53,7 @@ class ComponentRegistry {
           r.emplace_or_replace<T>(e, comp);
           return in.position();
         },
-        [](entt ::registry& src, entt::entity srcEnt, entt::registry& dst,
+        [](entt::registry& src, entt::entity srcEnt, entt::registry& dst,
            entt::entity dstEnt) {
           if (!src.all_of<T>(srcEnt)) return;
           auto& srcComp = src.get<T>(srcEnt);
