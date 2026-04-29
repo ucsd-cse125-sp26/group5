@@ -61,8 +61,7 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
 
 static void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
   shader.setMat4("view", camera.view);
-  shader.setVec3("viewPos", camera.position.x, camera.position.y,
-                 camera.position.z);
+  shader.setVec3("viewPos", camera.position.x, camera.position.y, camera.position.z);
 }
 
 static const shared::SceneInfo* currentScene(const ClientGame& game) {
@@ -75,17 +74,13 @@ static const shared::SceneInfo* currentScene(const ClientGame& game) {
   return nullptr;
 }
 
-static void updateDirectionalLight(const Shader& shader,
-                                   const ClientGame& game) {
+static void updateDirectionalLight(const Shader& shader, const ClientGame& game) {
   auto* info = currentScene(game);
   if (!info) return;
   shader.setVec3("dirLight.direction", info->dirX, info->dirY, info->dirZ);
-  shader.setVec3("dirLight.ambient", info->ambientR, info->ambientG,
-                 info->ambientB);
-  shader.setVec3("dirLight.diffuse", info->diffuseR, info->diffuseG,
-                 info->diffuseB);
-  shader.setVec3("dirLight.specular", info->specularR, info->specularG,
-                 info->specularB);
+  shader.setVec3("dirLight.ambient", info->ambientR, info->ambientG, info->ambientB);
+  shader.setVec3("dirLight.diffuse", info->diffuseR, info->diffuseG, info->diffuseB);
+  shader.setVec3("dirLight.specular", info->specularR, info->specularG, info->specularB);
 }
 
 static void updatePointLights(const Shader& shader, const ClientGame& game) {
@@ -101,14 +96,13 @@ static void updatePointLights(const Shader& shader, const ClientGame& game) {
     shader.setFloat(prefix + "quadratic", pl.quadratic);
     shader.setVec3(prefix + "ambient", pl.ambientR, pl.ambientG, pl.ambientB);
     shader.setVec3(prefix + "diffuse", pl.diffuseR, pl.diffuseG, pl.diffuseB);
-    shader.setVec3(prefix + "specular", pl.specularR, pl.specularG,
-                   pl.specularB);
+    shader.setVec3(prefix + "specular", pl.specularR, pl.specularG, pl.specularB);
     plIdx++;
   }
 }
 
-static void drawSkybox(const Shader& shader, const Skybox& skybox,
-                       const CameraState& camera, const glm::mat4& projection) {
+static void drawSkybox(const Shader& shader, const Skybox& skybox, const CameraState& camera,
+                       const glm::mat4& projection) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
@@ -124,10 +118,8 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
   glDepthFunc(GL_LESS);
 }
 
-static void renderEntities(const Shader& shader, ClientGame& game,
-                           std::unordered_map<std::string, Model*>& models) {
-  auto view = game.registry
-                  .view<shared::Entity, shared::Position, shared::RenderInfo>();
+static void renderEntities(const Shader& shader, ClientGame& game, std::unordered_map<std::string, Model*>& models) {
+  auto view = game.registry.view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
@@ -141,8 +133,7 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
     model = glm::scale(model, glm::vec3(renderInfo.scale));
-    model = model * glm::mat4_cast(rotation) *
-            glm::mat4_cast(modelAsset->orientation);
+    model = model * glm::mat4_cast(rotation) * glm::mat4_cast(modelAsset->orientation);
 
     Draw(shader, *modelAsset, model);
   }
@@ -166,23 +157,18 @@ bool Graphics::load(int width, int height) {
   glfwMakeContextCurrent(window);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  if (glfwRawMouseMotionSupported())
-    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  if (glfwRawMouseMotionSupported()) glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
   int version = gladLoadGL(glfwGetProcAddress);
-  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
-         GLAD_VERSION_MINOR(version));
+  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version), GLAD_VERSION_MINOR(version));
 
   shader.emplace("shaders/vertex.glsl", "shaders/fragment.glsl");
-  skyboxShader.emplace("shaders/vertex_skybox.glsl",
-                       "shaders/fragment_skybox.glsl");
+  skyboxShader.emplace("shaders/vertex_skybox.glsl", "shaders/fragment_skybox.glsl");
 
   for (const auto& asset : shared::ASSETS) {
-    Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
-                              : loadModel(std::string(asset.filename));
+    Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec) : loadModel(std::string(asset.filename));
     if (!m) {
-      fprintf(stderr, "Failed to load asset '%s' (%s)\n",
-              std::string(asset.name).c_str(),
+      fprintf(stderr, "Failed to load asset '%s' (%s)\n", std::string(asset.name).c_str(),
               std::string(asset.filename).c_str());
       continue;
     }
@@ -195,17 +181,15 @@ bool Graphics::load(int width, int height) {
     std::string dir = std::string(sc.skyboxDirectory);
     if (skyboxes.find(dir) == skyboxes.end()) {
       skyboxes[dir] = loadSkybox(dir);
-      printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
-             dir.c_str());
+      printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(), dir.c_str());
     }
   }
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  projection = glm::perspective(
-      glm::radians(45.0f),
-      static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
+  projection =
+      glm::perspective(glm::radians(45.0f), static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
 
   shader->use();
   shader->setMat4("projection", projection);

@@ -16,12 +16,9 @@
 
 int main() {
   volatile void* sinks[] = {
-      reinterpret_cast<void*>(&glfwInit),
-      reinterpret_cast<void*>(&glfwTerminate),
-      reinterpret_cast<void*>(&enet_initialize),
-      reinterpret_cast<void*>(&enet_deinitialize),
-      reinterpret_cast<void*>(&aiGetVersionMajor),
-      reinterpret_cast<void*>(&gladLoadGL),
+      reinterpret_cast<void*>(&glfwInit),          reinterpret_cast<void*>(&glfwTerminate),
+      reinterpret_cast<void*>(&enet_initialize),   reinterpret_cast<void*>(&enet_deinitialize),
+      reinterpret_cast<void*>(&aiGetVersionMajor), reinterpret_cast<void*>(&gladLoadGL),
       reinterpret_cast<void*>(&ImGui::GetVersion),
   };
   (void)sinks;

@@ -33,8 +33,7 @@ void movement_system(ServerGame& game, float dt) {
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
   auto& bodyInterface = game.physics.getBodyInterface();
 
-  auto view = game.registry.view<shared::Position, shared::Velocity,
-                                 shared::PlayerInput, shared::PhysicsBody>();
+  auto view = game.registry.view<shared::Position, shared::Velocity, shared::PlayerInput, shared::PhysicsBody>();
   for (auto entity : view) {
     auto& position = view.get<shared::Position>(entity);
     auto& velocity = view.get<shared::Velocity>(entity);
@@ -56,16 +55,14 @@ void movement_system(ServerGame& game, float dt) {
 
     if (game.registry.all_of<shared::Camera>(entity)) {
       auto& cam = game.registry.get<shared::Camera>(entity);
-      cam.pitch = std::clamp(cam.pitch - input.mouseDy * sensitivity,
-                             -pitchLimit, pitchLimit);
+      cam.pitch = std::clamp(cam.pitch - input.mouseDy * sensitivity, -pitchLimit, pitchLimit);
     }
 
     input.mouseDx = 0.0f;
     input.mouseDy = 0.0f;
 
-    float yaw = std::atan2(
-        2.0f * (position.qw * position.qz + position.qx * position.qy),
-        1.0f - 2.0f * (position.qy * position.qy + position.qz * position.qz));
+    float yaw = std::atan2(2.0f * (position.qw * position.qz + position.qx * position.qy),
+                           1.0f - 2.0f * (position.qy * position.qy + position.qz * position.qz));
     float cy = std::cos(yaw);
     float sy = std::sin(yaw);
     float fwdX = -sy, fwdY = cy;
@@ -89,8 +86,7 @@ void movement_system(ServerGame& game, float dt) {
     if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
 
     // Set velocity on Jolt body instead of manually moving position
-    bodyInterface.SetLinearVelocity(
-        bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    bodyInterface.SetLinearVelocity(bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
   }
 }
 
@@ -109,8 +105,7 @@ void render_model_change(entt::registry& registry, float dt) {
 }
 
 // Temporary - used to demonstrate server-controlled point light
-void hardcoded_spinning_light(entt::registry& registry, float dt,
-                              uint32_t light_entity_id) {
+void hardcoded_spinning_light(entt::registry& registry, float dt, uint32_t light_entity_id) {
   bool brighten = false;
   bool dim = false;
 
@@ -127,8 +122,7 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
   const float radius = 5.0f;
   const float height = 3.0f;
 
-  auto view =
-      registry.view<shared::Position, shared::PointLight, shared::Entity>();
+  auto view = registry.view<shared::Position, shared::PointLight, shared::Entity>();
   for (auto entity : view) {
     auto& eid = view.get<shared::Entity>(entity);
     if (eid.id != light_entity_id) continue;
@@ -189,8 +183,7 @@ void scene_cycle_system(entt::registry& registry) {
     auto& scene = sceneView.get<shared::Scene>(entity);
     for (std::size_t i = 0; i < shared::SCENE_COUNT; i++) {
       if (shared::SCENES[i].name == scene.name) {
-        scene.name =
-            std::string(shared::SCENES[(i + 1) % shared::SCENE_COUNT].name);
+        scene.name = std::string(shared::SCENES[(i + 1) % shared::SCENE_COUNT].name);
         return;
       }
     }
@@ -210,20 +203,19 @@ std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
 // ── Packet handlers ──────────────────────────────────────
 
 void registerServerHandlers(ServerNetwork& network) {
-  network.dispatcher().on(
-      shared::PacketType::INPUT,
-      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
-        shared::InputPacket pkt;
-        std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.peerEntityMap.find(sender);
-        if (it == game.peerEntityMap.end()) return;
-        auto ent = it->second;
+  network.dispatcher().on(shared::PacketType::INPUT,
+                          [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+                            shared::InputPacket pkt;
+                            std::memcpy(&pkt, data, sizeof(pkt));
+                            auto it = game.peerEntityMap.find(sender);
+                            if (it == game.peerEntityMap.end()) return;
+                            auto ent = it->second;
 
-        auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
-        playerInput.keys = pkt.keys;
-        playerInput.mouseDx += pkt.mouseDx;
-        playerInput.mouseDy += pkt.mouseDy;
-      });
+                            auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
+                            playerInput.keys = pkt.keys;
+                            playerInput.mouseDx += pkt.mouseDx;
+                            playerInput.mouseDy += pkt.mouseDy;
+                          });
 }
 
 // ── Entity serialization ─────────────────────────────────
@@ -241,11 +233,9 @@ void registerServerHandlers(ServerNetwork& network) {
 // │ ...more entities...                                     │
 // └─────────────────────────────────────────────────────────┘
 
-std::vector<uint8_t> serializeEntities(
-    entt::registry& registry,
-    const shared::ComponentRegistry& componentRegistry,
-    shared::PacketType packetType, const std::vector<entt::entity>& entities,
-    bool dirtyOnly) {
+std::vector<uint8_t> serializeEntities(entt::registry& registry, const shared::ComponentRegistry& componentRegistry,
+                                       shared::PacketType packetType, const std::vector<entt::entity>& entities,
+                                       bool dirtyOnly) {
   std::vector<uint8_t> buffer;
 
   size_t headerPos = buffer.size();
@@ -271,8 +261,7 @@ std::vector<uint8_t> serializeEntities(
       if (meta->serialize(registry, ent, compBuf)) {
         auto dataSize = static_cast<uint16_t>(compBuf.size());
         std::memcpy(&buffer[before], &cid, sizeof(uint16_t));
-        std::memcpy(&buffer[before + sizeof(uint16_t)], &dataSize,
-                    sizeof(uint16_t));
+        std::memcpy(&buffer[before + sizeof(uint16_t)], &dataSize, sizeof(uint16_t));
         buffer.insert(buffer.end(), compBuf.begin(), compBuf.end());
         compCount++;
       } else {
@@ -281,14 +270,12 @@ std::vector<uint8_t> serializeEntities(
     }
 
     std::memcpy(&buffer[entityHeaderPos], &entityId, sizeof(uint32_t));
-    std::memcpy(&buffer[entityHeaderPos + sizeof(uint32_t)], &compCount,
-                sizeof(uint16_t));
+    std::memcpy(&buffer[entityHeaderPos + sizeof(uint32_t)], &compCount, sizeof(uint16_t));
     entityCount++;
   }
 
   std::memcpy(&buffer[headerPos], &packetType, sizeof(shared::PacketType));
-  std::memcpy(&buffer[headerPos + sizeof(shared::PacketType)], &entityCount,
-              sizeof(uint16_t));
+  std::memcpy(&buffer[headerPos + sizeof(shared::PacketType)], &entityCount, sizeof(uint16_t));
 
   return buffer;
 }

@@ -14,8 +14,7 @@ bool ServerNetwork::init(uint16_t port, size_t maxClients) {
 
   host_ = enet_host_create(&address, maxClients, 2, 0, 0);
   if (host_ == nullptr) {
-    fprintf(stderr,
-            "An error occurred while trying to create an ENet server host.\n");
+    fprintf(stderr, "An error occurred while trying to create an ENet server host.\n");
     return false;
   }
 

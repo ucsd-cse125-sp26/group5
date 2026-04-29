@@ -41,10 +41,8 @@ int main() {
     // ESC releases the cursor; left-click re-captures it.
     if (glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    } else if (glfwGetMouseButton(graphics.window, GLFW_MOUSE_BUTTON_LEFT) ==
-                   GLFW_PRESS &&
-               glfwGetInputMode(graphics.window, GLFW_CURSOR) ==
-                   GLFW_CURSOR_NORMAL) {
+    } else if (glfwGetMouseButton(graphics.window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS &&
+               glfwGetInputMode(graphics.window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 

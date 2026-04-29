@@ -39,8 +39,7 @@ Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
   glGetShaderiv(vertexShaderId, GL_INFO_LOG_LENGTH, &InfoLogLength);
   if (InfoLogLength > 0) {
     std::vector<char> vertexErrorMessage(InfoLogLength + 1);
-    glGetShaderInfoLog(vertexShaderId, InfoLogLength, nullptr,
-                       &vertexErrorMessage[0]);
+    glGetShaderInfoLog(vertexShaderId, InfoLogLength, nullptr, &vertexErrorMessage[0]);
     printf("%s\n", &vertexErrorMessage[0]);
   }
 
@@ -53,8 +52,7 @@ Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
   glGetShaderiv(fragmentShaderId, GL_INFO_LOG_LENGTH, &InfoLogLength);
   if (InfoLogLength > 0) {
     std::vector<char> FragmentShaderErrorMessage(InfoLogLength + 1);
-    glGetShaderInfoLog(fragmentShaderId, InfoLogLength, nullptr,
-                       &FragmentShaderErrorMessage[0]);
+    glGetShaderInfoLog(fragmentShaderId, InfoLogLength, nullptr, &FragmentShaderErrorMessage[0]);
     printf("%s\n", &FragmentShaderErrorMessage[0]);
   }
 
@@ -83,8 +81,7 @@ Shader::~Shader() {
   if (m_id) glDeleteProgram(m_id);
 }
 
-Shader::Shader(Shader&& other) noexcept
-    : m_id(other.m_id), m_locationCache(std::move(other.m_locationCache)) {
+Shader::Shader(Shader&& other) noexcept : m_id(other.m_id), m_locationCache(std::move(other.m_locationCache)) {
   other.m_id = 0;
 }
 
@@ -107,20 +104,15 @@ GLint Shader::getLocation(const std::string& name) const {
   if (it != m_locationCache.end()) return it->second;
   GLint loc = glGetUniformLocation(m_id, name.c_str());
   if (loc == -1) {
-    fprintf(stderr, "Warning: uniform '%s' not found in shader %u\n",
-            name.c_str(), m_id);
+    fprintf(stderr, "Warning: uniform '%s' not found in shader %u\n", name.c_str(), m_id);
   }
   m_locationCache[name] = loc;
   return loc;
 }
 
-void Shader::setInt(const std::string& name, int value) const {
-  glUniform1i(getLocation(name), value);
-}
+void Shader::setInt(const std::string& name, int value) const { glUniform1i(getLocation(name), value); }
 
-void Shader::setFloat(const std::string& name, float value) const {
-  glUniform1f(getLocation(name), value);
-}
+void Shader::setFloat(const std::string& name, float value) const { glUniform1f(getLocation(name), value); }
 
 void Shader::setVec3(const std::string& name, float x, float y, float z) const {
   glUniform3f(getLocation(name), x, y, z);
