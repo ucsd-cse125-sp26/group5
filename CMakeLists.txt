@@ -10,7 +10,9 @@ endif()
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
-    src/shared/hello.cpp)
+    src/shared/hello.cpp
+    src/shared/util.cpp
+    )
 target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -81,7 +83,6 @@ target_sources(client PRIVATE
     src/client/client_game.cpp
     src/client/client_graphics.cpp
     src/client/shaders.cpp
-    src/client/util.cpp
     src/client/asset.cpp
 )
 target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt)
@@ -104,6 +105,7 @@ endif()
 add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
+    src/server/physics_engine.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)

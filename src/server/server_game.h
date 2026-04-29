@@ -1,144 +1,21 @@
 #pragma once
-// clang-format off
-#include <Jolt/Jolt.h> // NOLINT
-// clang-format on
-
-#include <Jolt/Core/Factory.h>
-#include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Collision/Shape/SphereShape.h>
-#include <Jolt/Physics/PhysicsSettings.h>
-#include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/RegisterTypes.h>
 #include <enet/enet.h>
-
-#include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
-#include <thread>
 #include <vector>
 
+#include "physics_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
 
 class ServerNetwork;
-
-// Jolt requires you to define object layers
-namespace Layers {
-static constexpr JPH::ObjectLayer NON_MOVING = 0;
-static constexpr JPH::ObjectLayer MOVING = 1;
-static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
-};  // namespace Layers
-
-// Tells Jolt which layers can collide with each other
-class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
- public:
-  [[nodiscard]] bool ShouldCollide(JPH::ObjectLayer a,
-                                   JPH::ObjectLayer b) const override {
-    switch (a) {
-      case Layers::NON_MOVING:
-        return b == Layers::MOVING;
-      case Layers::MOVING:
-        return true;
-      default:
-        return false;
-    }
-  }
-};
-
-// Broadphase layers (coarse collision detection)
-namespace BroadPhaseLayers {
-static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
-static constexpr JPH::BroadPhaseLayer MOVING(1);
-static constexpr JPH::uint NUM_LAYERS(2);
-};  // namespace BroadPhaseLayers
-
-class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
- public:
-  BPLayerInterfaceImpl() {
-    mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
-    mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
-  }
-  [[nodiscard]] JPH::uint GetNumBroadPhaseLayers() const override {
-    return BroadPhaseLayers::NUM_LAYERS;
-  }
-  [[nodiscard]] JPH::BroadPhaseLayer GetBroadPhaseLayer(
-      JPH::ObjectLayer layer) const override {
-    JPH_ASSERT(layer < Layers::NUM_LAYERS);
-    return mObjectToBroadPhase[layer];
-  }
-#if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
-  const char* GetBroadPhaseLayerName(
-      JPH::BroadPhaseLayer layer) const override {
-    switch ((JPH::BroadPhaseLayer::Type)layer) {
-      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::NON_MOVING:
-        return "NON_MOVING";
-      case (JPH::BroadPhaseLayer::Type)BroadPhaseLayers::MOVING:
-        return "MOVING";
-      default:
-        return "UNKNOWN";
-    }
-  }
-#endif
-
- private:
-  JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
-};
-
-class ObjectVsBroadPhaseLayerFilterImpl
-    : public JPH::ObjectVsBroadPhaseLayerFilter {
- public:
-  [[nodiscard]] bool ShouldCollide(
-      JPH::ObjectLayer layer, JPH::BroadPhaseLayer bpLayer) const override {
-    switch (layer) {
-      case Layers::NON_MOVING:
-        return bpLayer == BroadPhaseLayers::MOVING;
-      case Layers::MOVING:
-        return true;
-      default:
-        return false;
-    }
-  }
-};
 
 struct ServerGame {
   shared::ComponentRegistry componentRegistry;
   entt::registry registry;
   std::map<ENetPeer*, entt::entity> peerEntityMap;
   uint32_t nextEntityId = 0;
-
-  // Jolt physics
-  JPH::PhysicsSystem physicsSystem;
-  BPLayerInterfaceImpl broadPhaseLayerInterface;
-  ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhaseLayerFilter;
-  ObjectLayerPairFilterImpl objectLayerPairFilter;
-  // JPH::TempAllocatorImpl tempAllocator{10 * 1024 * 1024}; // 10MB
-  JPH::TempAllocatorImpl* tempAllocator = nullptr;
-  JPH::JobSystemThreadPool* jobSystem = nullptr;
-
-  ServerGame() {
-    JPH::RegisterDefaultAllocator();
-    JPH::Factory::sInstance = new JPH::Factory();
-    JPH::RegisterTypes();
-    tempAllocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
-    jobSystem = new JPH::JobSystemThreadPool(
-        JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
-        std::thread::hardware_concurrency() - 1);
-    physicsSystem.Init(1024, 0, 1024, 1024, broadPhaseLayerInterface,
-                       objectVsBroadPhaseLayerFilter, objectLayerPairFilter);
-    physicsSystem.SetGravity(JPH::Vec3(0.0f, 0.0f, -18.0f));
-  }
-
-  ~ServerGame() {
-    delete tempAllocator;
-    JPH::UnregisterTypes();
-    delete JPH::Factory::sInstance;
-    JPH::Factory::sInstance = nullptr;
-    delete jobSystem;
-  }
+  PhysicsEngine physics;
 };
 
 void input_tick(entt::registry& registry);
@@ -149,10 +26,6 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
 void scene_cycle_system(entt::registry& registry);
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
-JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z);
-JPH::BodyID createFloor(ServerGame& game);
-JPH::BodyID createMeshBody(ServerGame& game, const std::string& filename,
-                           float x, float y, float z, float scale = 1.0f);
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,

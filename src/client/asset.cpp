@@ -12,7 +12,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "client/shaders.h"
-#include "client/util.h"
+#include "shared/util.h"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"

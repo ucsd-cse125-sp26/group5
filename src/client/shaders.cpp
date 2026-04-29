@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "glm/gtc/type_ptr.hpp"
-#include "util.h"
+#include "shared/util.h"
 
 static std::string readFile(const std::filesystem::path& path) {
   std::ifstream f(path);

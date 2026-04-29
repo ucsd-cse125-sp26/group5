@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <iostream>
 #include <thread>
-
+#include "shared/util.h"
 #include "server_game.h"
 #include "server_network.h"
 #include "shared/components.h"
@@ -17,10 +17,10 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+  auto& bodyInterface = game.physics.getBodyInterface();
 
   auto [box_id, box_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(box_entity, 5.0f, 10.0f, 0.0f, 1.0f,
+  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(box_entity, "cube", 1.0f);
   JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
@@ -38,18 +38,12 @@ int main() {
   game.registry.emplace<shared::Position>(bear_entity, 10.0f, 0.0f, -1.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(bear_entity, "bear", 0.5f);
-  JPH::BodyID bearBodyId = createMeshBody(game, "assets/bear/bear_full.obj",
-                                          10.0f, 0.0f, -1.0f, 0.5f);
+  JPH::BodyID bearBodyId = game.physics.createMeshBody(
+    (exeDir() / "assets/bear/bear_full.obj").string(),
+    10.0f, 0.0f, -1.0f, 0.5f);
   game.registry.emplace<shared::PhysicsBody>(
       bear_entity, bearBodyId.GetIndexAndSequenceNumber());
-
-  auto [floor_id, floorEntity] = new_entity(game);
-  game.registry.emplace<shared::Position>(floorEntity, 0.0f, 0.0f, -1.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(floorEntity, "floor", 1.0f);
-  JPH::BodyID floorBodyId = createFloor(game);
-  game.registry.emplace<shared::PhysicsBody>(
-      floorEntity, floorBodyId.GetIndexAndSequenceNumber());
+  game.physics.createFloor();
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -74,15 +68,14 @@ int main() {
     peer->data = (void*)"Client information";
     auto [entity_id, entity] = new_entity(g);
     g.peerEntityMap[peer] = entity;
-    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-                                         0.0f, 0.0f);
+    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 5.0f, 1.0f, 0.0f, 0.0f, 0.0f);
     g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
     g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f);
     g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
     g.registry.emplace<shared::PlayerInput>(
         entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
         static_cast<InputKeys>(0), 0.0f, 0.0f);
-    JPH::BodyID bodyId = createPlayerBody(g, 0.0f, 0.0f, 5.0f);
+    JPH::BodyID bodyId = g.physics.createPlayerBody(0.0f, 0.0f, 5.0f);
     g.registry.emplace<shared::PhysicsBody>(entity,
                                             bodyId.GetIndexAndSequenceNumber());
 
@@ -108,6 +101,8 @@ int main() {
     despawnPkt.entityId = g.registry.get<shared::Entity>(entity).id;
     net::broadcastPacket(network.getHost(), despawnPkt);
 
+    auto& pb = g.registry.get<shared::PhysicsBody>(entity);
+    g.physics.destroyBody(pb.bodyId);  // clean up Jolt body first
     g.registry.destroy(entity);
     g.peerEntityMap.erase(peer);
     peer->data = nullptr;
@@ -150,7 +145,7 @@ int main() {
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
 
       // Step Jolt physics
-      game.physicsSystem.Update(fixedDt, 1, game.tempAllocator, game.jobSystem);
+      game.physics.step(fixedDt);
       // printf("Jolt step ok\n");
 
       // Sync Jolt positions back into ECS
@@ -159,7 +154,7 @@ int main() {
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::RVec3 joltPos = bodyInterface.GetPosition(JPH::BodyID(pb.bodyId));
+        JPH::RVec3 joltPos = game.physics.getBodyInterface().GetPosition(JPH::BodyID(pb.bodyId));
         pos.x = joltPos.GetX();
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();
