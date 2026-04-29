@@ -37,7 +37,7 @@ void input_tick(entt::registry& registry) {
 void movement_system(ServerGame& game, float dt) {
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+  auto& bodyInterface = game.physics.getBodyInterface();
 
   auto view = game.registry.view<shared::Position, shared::Velocity,
                                  shared::PlayerInput, shared::PhysicsBody>();
@@ -300,7 +300,7 @@ std::vector<uint8_t> serializeEntities(
 }
 
 JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+  auto& bodyInterface = game.physics.getBodyInterface();
 
   JPH::CapsuleShapeSettings capsuleSettings(0.5f, 0.5f);
   JPH::ShapeSettings::ShapeResult capsuleResult = capsuleSettings.Create();
@@ -323,7 +323,7 @@ JPH::BodyID createPlayerBody(ServerGame& game, float x, float y, float z) {
 }
 
 JPH::BodyID createFloor(ServerGame& game) {
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+  auto& bodyInterface = game.physics.getBodyInterface();
   JPH::BoxShapeSettings floorShapeSettings(JPH::Vec3(100.0f, 100.0f, 1.0f));
   floorShapeSettings.SetEmbedded();
   JPH::ShapeSettings::ShapeResult floorShapeResult =
@@ -339,7 +339,7 @@ JPH::BodyID createFloor(ServerGame& game) {
 
 JPH::BodyID createMeshBody(ServerGame& game, const std::string& filename,
                            float x, float y, float z, float scale) {
-  auto& bodyInterface = game.physicsSystem.GetBodyInterface();
+  auto& bodyInterface = game.physics.getBodyInterface();
 
   Assimp::Importer importer;
   const aiScene* scene = importer.ReadFile(
