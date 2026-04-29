@@ -12,6 +12,7 @@
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
+#include "shared/component_registry.h"
 
 int main() {
   std::cout << "Hello World Server";
