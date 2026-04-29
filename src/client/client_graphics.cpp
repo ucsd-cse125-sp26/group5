@@ -37,10 +37,8 @@ static void initPointLights(const Shader& shader) {
 
 std::optional<CameraState> computeCamera(const ClientGame& game) {
   auto selfIt = game.renderEntityMap.find(game.renderEntityId);
-  if (selfIt == game.renderEntityMap.end() ||
-      !game.renderRegistry.valid(selfIt->second) ||
-      !game.renderRegistry.all_of<shared::Position, shared::Camera>(
-          selfIt->second)) {
+  if (selfIt == game.renderEntityMap.end() || !game.renderRegistry.valid(selfIt->second) ||
+      !game.renderRegistry.all_of<shared::Position, shared::Camera>(selfIt->second)) {
     return std::nullopt;
   }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
@@ -121,10 +119,8 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox, const CameraS
   glDepthFunc(GL_LESS);
 }
 
-static void renderEntities(const Shader& shader, ClientGame& game,
-                           std::unordered_map<std::string, Model*>& models) {
-  auto view = game.renderRegistry
-                  .view<shared::Entity, shared::Position, shared::RenderInfo>();
+static void renderEntities(const Shader& shader, ClientGame& game, std::unordered_map<std::string, Model*>& models) {
+  auto view = game.renderRegistry.view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);

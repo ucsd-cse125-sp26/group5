@@ -12,8 +12,8 @@
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
-#include "shared/util.h"
 #include "shared/simple_profiler.h"
+#include "shared/util.h"
 
 int main() {
   std::cout << "Hello World Server";

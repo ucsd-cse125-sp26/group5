@@ -8,8 +8,7 @@ template <typename data_T, std::size_t size_T>
 class SpscQueue {
  public:
   static_assert(size_T >= 2, "Queue size must be at least 2");
-  static_assert(std::popcount(size_T) == 1,
-                "Size of the queue must be power of 2");
+  static_assert(std::popcount(size_T) == 1, "Size of the queue must be power of 2");
   bool tryPush(data_T element) {
     auto head = head_.load(std::memory_order_acquire);
     auto tail = tail_.load(std::memory_order_relaxed);
