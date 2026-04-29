@@ -50,6 +50,13 @@ struct Scene {
   std::string name;
 };
 
+// struct PhysicsBody {
+//   JPH::BodyID bodyId;
+// };
+struct PhysicsBody {
+  uint32_t bodyId;
+};
+
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
 
 enum class Outcome : uint8_t { UNDECIDED, WIN, LOSE };

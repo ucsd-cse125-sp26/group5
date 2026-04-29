@@ -12,10 +12,10 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "client/shaders.h"
-#include "client/util.h"
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "shared/util.h"
 
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
   return {v.x, v.y, v.z};
