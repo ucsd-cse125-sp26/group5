@@ -85,8 +85,9 @@ struct TimeComponent {
 };
 
 struct SectionController {
-  SectionSeasonMap type = SectionSeasonMap::WINTER;  // the season map of this section
-  uint32_t puzzleID = 0;                             // the puzzle linked to this section
+  SectionSeasonMap type =
+      SectionSeasonMap::WINTER;  // the season map of this section
+  uint32_t puzzleID = 0;         // the puzzle linked to this section
   bool unlocked = false;
   bool completed = false;
 };
@@ -109,7 +110,8 @@ struct SectionDoorComponent {
 };
 
 struct SwitchComponent {
-  uint32_t parent = 0;  // what entity this switch is linked to (door, puzzle, etc)
+  uint32_t parent =
+      0;  // what entity this switch is linked to (door, puzzle, etc)
   bool switchOn = false;
 };
 

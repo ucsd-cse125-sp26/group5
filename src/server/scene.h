@@ -13,4 +13,5 @@ struct StaticEntityDesc {
   float halfX = -1.0f, halfY = -1.0f, halfZ = -1.0f;
 };
 
-void spawnStaticEntities(ServerGame& game, const std::vector<StaticEntityDesc>& descs);
+void spawnStaticEntities(ServerGame& game,
+                         const std::vector<StaticEntityDesc>& descs);
