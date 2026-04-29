@@ -227,13 +227,13 @@ void registerServerHandlers(ServerNetwork& network) {
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
         if (it == game.active_players.end()) return;
-        
+
         entt::entity ent = entt::null;
         auto state = game.gameStateManager.currentState();
         if (state && state->getStateType() == StateType::OVERWORLD) {
-            ent = it->second.overworld_avatar;
+          ent = it->second.overworld_avatar;
         } else if (state && state->getStateType() == StateType::MAZE) {
-            ent = it->second.maze_avatar;
+          ent = it->second.maze_avatar;
         }
         if (ent == entt::null) return;
 

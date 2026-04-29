@@ -84,7 +84,7 @@ struct TimeComponent {
 
 struct SectionController {
   SectionSeasonMap type;  // the season map of this section
-  uint32_t puzzleID;         // the puzzle linked to this section
+  uint32_t puzzleID;      // the puzzle linked to this section
   bool unlocked;
   bool completed;
 };
@@ -104,7 +104,6 @@ struct SectionDoorComponent {
   // track the physical animation
   float currentZ = 0.0f;
   float targetOpenZ = -10.0f;  // where the door should end up
-  
 };
 
 struct SwitchComponent {
