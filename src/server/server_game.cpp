@@ -24,18 +24,18 @@ void input_tick(entt::registry& registry) {
   }
 }
 
-// ── Movement system ──────────────────────────────────────
-void movement_system(entt::registry& registry, float dt) {
+template <typename WorldTag>
+static void movement_system_for_world(entt::registry& registry, float dt) {
   SIMPLE_PROFILE_SCOPE("Movement System");
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
 
-  auto view =
-      registry.view<shared::Position, shared::Velocity, shared::PlayerInput>();
+  auto view = registry.view<shared::Position, shared::Velocity,
+                            shared::PlayerInput, WorldTag>();
   for (auto entity : view) {
-    auto& position = view.get<shared::Position>(entity);
-    auto& velocity = view.get<shared::Velocity>(entity);
-    auto& input = view.get<shared::PlayerInput>(entity);
+    auto& position = view.template get<shared::Position>(entity);
+    auto& velocity = view.template get<shared::Velocity>(entity);
+    auto& input = view.template get<shared::PlayerInput>(entity);
 
     // Apply mouse look: yaw from mouseDx, pitch from mouseDy
     if (input.mouseDx != 0.0f) {
@@ -87,6 +87,18 @@ void movement_system(entt::registry& registry, float dt) {
     position.y += velocity.dy * dt;
     position.z += velocity.dz * dt;
     position.z = fmax(position.z, 0);
+  }
+}
+
+// ── Movement system ──────────────────────────────────────
+void movement_system(entt::registry& registry, float dt, StateType stateType) {
+  switch (stateType) {
+    case StateType::OVERWORLD:
+      movement_system_for_world<shared::OverworldTag>(registry, dt);
+      break;
+    case StateType::MAZE:
+      movement_system_for_world<shared::MazeTag>(registry, dt);
+      break;
   }
 }
 
@@ -213,9 +225,17 @@ void registerServerHandlers(ServerNetwork& network) {
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.peerEntityMap.find(sender);
-        if (it == game.peerEntityMap.end()) return;
-        auto ent = it->second;
+        auto it = game.active_players.find(sender);
+        if (it == game.active_players.end()) return;
+
+        entt::entity ent = entt::null;
+        auto state = game.gameStateManager.currentState();
+        if (state && state->getStateType() == StateType::OVERWORLD) {
+          ent = it->second.overworld_avatar;
+        } else if (state && state->getStateType() == StateType::MAZE) {
+          ent = it->second.maze_avatar;
+        }
+        if (ent == entt::null) return;
 
         auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
         playerInput.keys = pkt.keys;

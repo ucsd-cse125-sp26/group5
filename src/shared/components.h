@@ -5,6 +5,11 @@
 #include "input.h"
 
 namespace shared {
+
+// tags
+struct OverworldTag {};
+struct MazeTag {};
+
 struct Position {
   float x, y, z;
   float qw, qx, qy, qz;
@@ -78,11 +83,10 @@ struct TimeComponent {
 };
 
 struct SectionController {
-  SectionSeasonMap type =
-      SectionSeasonMap::WINTER;  // the season map of this section
-  uint32_t puzzleID = 0;         // the puzzle linked to this section
-  bool unlocked = false;
-  bool completed = false;
+  SectionSeasonMap type;  // the season map of this section
+  uint32_t puzzleID;      // the puzzle linked to this section
+  bool unlocked;
+  bool completed;
 };
 
 enum class DoorState : uint8_t {
