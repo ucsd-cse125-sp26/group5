@@ -85,7 +85,10 @@ JPH::BodyID PhysicsEngine::createMeshBody(const std::string& filename,
   float halfX = (maxX - minX) / 2.0f * scale;
   float halfY = (maxZ - minZ) / 2.0f * scale;
   float halfZ = (maxY - minY) / 2.0f * scale;
-
+    printf("Mesh: %s\n", filename.c_str());
+    printf("halfX=%.3f halfY=%.3f halfZ=%.3f\n", halfX, halfY, halfZ);
+    printf("min: %.3f %.3f %.3f\n", minX, minY, minZ);
+    printf("max: %.3f %.3f %.3f\n", maxX, maxY, maxZ);
   JPH::BoxShapeSettings boxSettings(JPH::Vec3(halfX, halfY, halfZ));
   boxSettings.SetEmbedded();
   JPH::ShapeRefC shape = boxSettings.Create().Get();
