@@ -43,7 +43,7 @@ void loadLevel(ServerGame& game) {
       false,  // summer is 3rd to unlock
       false   // not completed yet
   );
-  auto [springSectionID, SpringSection] = new_entity(game);
+  auto [springSectionID, springSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       springSection, shared::SectionSeasonMap::SPRING, puzzleTengramID,
       false,  // spring is 4th to unlock
