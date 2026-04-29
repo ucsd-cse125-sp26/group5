@@ -31,3 +31,6 @@
 [submodule "lib/jolt"]
 	path = lib/jolt
 	url = https://github.com/jrouwe/JoltPhysics
+[submodule "lib/tracy"]
+	path = lib/tracy
+	url = https://github.com/wolfpld/tracy.git

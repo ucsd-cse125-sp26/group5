@@ -4,6 +4,11 @@ project(cse125-game)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+option(ENABLE_PROFILING "Enable Simple Profiler" OFF)
+if(ENABLE_PROFILING)
+    add_compile_definitions(ENABLE_PROFILING)
+endif()
+
 if(WIN32)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
@@ -107,6 +112,7 @@ add_library(server_lib STATIC
     src/server/server_game.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
+    src/server/server_level_loader.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)

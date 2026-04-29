@@ -5,6 +5,7 @@
 
 #include "scene.h"
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
@@ -12,6 +13,7 @@
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/util.h"
+#include "shared/simple_profiler.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -99,6 +101,7 @@ int main() {
   };
 
   registerServerHandlers(network);
+  loadLevel(game);
   // Create hardcoded light entity
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f, 0.0f, 0.0f);
@@ -148,6 +151,7 @@ int main() {
       scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
+      SIMPLE_PROFILE_SCOPE("Broadcast State");
       // Broadcast delta state to all clients (dirtyOnly=false for now — full
       // snapshot every tick)
       std::vector<entt::entity> allEnts;
@@ -156,7 +160,13 @@ int main() {
       auto buf =
           serializeEntities(game.registry, game.componentRegistry, shared::PacketType::UPDATE_ENTITY, allEnts, false);
       net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      SIMPLE_PROFILE_FRAME_END("Server");
+      SIMPLE_PROFILE_FRAME_START();
     }
+
+    // Yield control to the OS briefly if we have plenty of time.
+    // This stops the server from spin-locking the CPU at 100%.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
   network.shutdown();
