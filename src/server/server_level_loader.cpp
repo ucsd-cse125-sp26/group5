@@ -3,6 +3,7 @@
 #include "server_game.h"
 #include "shared/components.h"
 
+// loads in puzzles, doors, sections
 void loadLevel(ServerGame& game) {
   // Entity holding game progress
   auto [gameControllerID, gameController] = new_entity(game);
@@ -47,13 +48,33 @@ void loadLevel(ServerGame& game) {
 		false,  // spring is 4th to unlock
 		false  // not completed yet
   );
-  auto [sectionDoorID, sectionDoor] = new_entity(game);
+  auto [winterDoorID, winterDoor] = new_entity(game);
   // Temporary position values
-  game.registry.emplace<shared::Position>(sectionDoor, 100.0f, 100.0f, 100.0f,
+  game.registry.emplace<shared::Position>(winterDoor, 100.0f, 100.0f, 100.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::SectionDoorComponent>(
-      sectionDoor, shared::DoorState::CLOSED,
+      winterDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
       winterSectionID, 0.0f, -10.0f);
-	game.registry.emplace<shared::OverworldTag>(sectionDoor);
+	game.registry.emplace<shared::OverworldTag>(winterDoor);
+	
+	auto [fallDoorID, fallDoor] = new_entity(game);
+  // Temporary position values
+  game.registry.emplace<shared::Position>(fallDoor, 100.0f, 100.0f, 100.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::SectionDoorComponent>(
+      fallDoor, shared::DoorState::CLOSED,
+      static_cast<uint8_t>(4),  // required players to open
+      fallSectionID, 0.0f, -10.0f);
+	game.registry.emplace<shared::OverworldTag>(fallDoor);
+
+	auto [summerDoorID, summerDoor] = new_entity(game);
+  // Temporary position values
+  game.registry.emplace<shared::Position>(summerDoor, 100.0f, 100.0f, 100.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::SectionDoorComponent>(
+      summerDoor, shared::DoorState::CLOSED,
+      static_cast<uint8_t>(4),  // required players to open
+      summerSectionID, 0.0f, -10.0f);
+	game.registry.emplace<shared::OverworldTag>(summerDoor);
 }
