@@ -76,6 +76,14 @@ rsync -avz --progress -e 'ssh -p 222' assets/ jaroot@cse125.ucsd.edu:/var/www/ht
 
 The `-a` flag preserves file attributes and handles directories recursively. The `-z` flag compresses data during transfer. rsync only transfers files that have changed, so repeated syncs are fast.
 
+## Profiling with Tracy
+
+To diagnose performance and stuttering issues, you can compile the client and server with Profiling enabled using:
+
+```bash
+./build-profiling.sh
+```
+
 ## Important links 
 - [Group main document](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.ugr095ybe2nc) 
 - [Brainstorm whiteboard](https://excalidraw.com/#room=e75b50a0442682a79f02,f1qUrFmzmgYeGmBa12QS0A)
