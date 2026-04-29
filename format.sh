@@ -11,3 +11,4 @@ find src -name '*.cpp' | xargs clang-tidy --fix -p build \
   $EXTRA \
   --header-filter='.*' \
   --exclude-header-filter='(lib|build)/.*'
+find src -name '*.cpp' | xargs clang-tidy --fix -p build --header-filter='.*' --exclude-header-filter='(lib|build)/.*'

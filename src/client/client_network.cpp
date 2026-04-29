@@ -2,7 +2,10 @@
 
 #include <cstdio>
 
-bool ClientNetwork::connect(const char* host, uint16_t port, uint32_t timeoutMs) {
+#include "shared/simple_profiler.h"
+
+bool ClientNetwork::connect(const char* host, uint16_t port,
+                            uint32_t timeoutMs) {
   if (enet_initialize() != 0) {
     fprintf(stderr, "An error occurred while initializing ENet.\n");
     return false;
@@ -69,12 +72,14 @@ void ClientNetwork::shutdown() {
 }
 
 void ClientNetwork::poll(ClientGame& game) {
+  SIMPLE_PROFILE_SCOPE("Network Poll");
   ENetEvent event;
   while (enet_host_service(client_, &event, 0) > 0) {
     switch (event.type) {
       case ENET_EVENT_TYPE_RECEIVE:
         dispatcher_.dispatch(game, event.peer, event.packet);
         enet_packet_destroy(event.packet);
+        game.snapshotDirty.store(true, std::memory_order_release);
         break;
 
       case ENET_EVENT_TYPE_DISCONNECT:
@@ -86,5 +91,13 @@ void ClientNetwork::poll(ClientGame& game) {
       default:
         break;
     }
+  }
+}
+
+void ClientNetwork::drainInputQueue(
+    SpscQueue<shared::InputPacket, 256>& inputQueue) {
+  shared::InputPacket pkt;
+  while (inputQueue.tryPop(pkt)) {
+    send(pkt);
   }
 }
