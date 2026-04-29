@@ -71,8 +71,17 @@ Met for Rebecca to come up with a hollistic view of the project repo for better 
   <img src="{{ '/assets/week4/rebecca/h2.png' | relative_url }}" alt="Landscape">
   <img src="{{ '/assets/week4/rebecca/h3.png' | relative_url }}" alt="Landscape">
 </div>
+  - Experimenting with trees; Failing but we will get there...hopefully
+<img style="width: 70%" src="{{ '/assets/week4/rebecca/leaf6.png' | relative_url }}">
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px;">
+  <img style="width: 70%" src="{{ '/assets/week4/rebecca/leaf1.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf2.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf3.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf4.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf5.png' | relative_url }}" alt="leaf">
+</div>
 
-  - Experimenting with trees; Failing but we will get there. 
+
 **Sarah** 
 Came up with detailed design and color for character Gurf
 <img style="width: 70%" src="{{ '/assets/week4/sarah/colored_gurf.png' | relative_url }}" alt="Note">
