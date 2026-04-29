@@ -7,12 +7,12 @@
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
+#include "shared/component_registry.h"
 #include "shared/components.h"
 #include "shared/hello.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
-#include "shared/component_registry.h"
 
 int main() {
   std::cout << "Hello World Server";
