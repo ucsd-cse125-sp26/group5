@@ -42,6 +42,75 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
+## Week 4 Group report 
+## Admin 
+**Rebecca & Jacob**   
+Met for Rebecca to come up with a hollistic view of the project repo for better understanding of running tasks & whole project's development. 
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week4/rebecca/arch1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week4/rebecca/arch2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week4/rebecca/arch3.png' | relative_url }}" alt="Note">
+</div>
+
+## Modeling 
+**Rebecca**
+- Landscape: Basic landscape modeling completely patched up, connected and finished. Next step is to optimize dirty mesh so its easier for the rendering people. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week4/rebecca/l1.png' | relative_url }}" alt="Landscape">
+  <img src="{{ '/assets/week4/rebecca/l2.png' | relative_url }}" alt="Landscape">
+  <img src="{{ '/assets/week4/rebecca/l3.png' | relative_url }}" alt="Landscape">
+  <img src="{{ '/assets/week4/rebecca/l4.png' | relative_url }}" alt="Landscape">
+</div>
+<img src="{{ '/assets/week4/rebecca/l5.png' | relative_url }}" alt="Landscape">
+
+- Assets: 
+  - Fallen star basic model done. Texture etc will come later. 
+<img src="{{ '/assets/week4/rebecca/h4.png' | relative_url }}" alt="Landscape">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week4/rebecca/h1.png' | relative_url }}" alt="Landscape">
+  <img src="{{ '/assets/week4/rebecca/h2.png' | relative_url }}" alt="Landscape">
+  <img src="{{ '/assets/week4/rebecca/h3.png' | relative_url }}" alt="Landscape">
+</div>
+  - Experimenting with trees; Failing but we will get there...hopefully
+<img style="width: 70%" src="{{ '/assets/week4/rebecca/leaf6.png' | relative_url }}">
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px;">
+  <img style="width: 70%" src="{{ '/assets/week4/rebecca/leaf1.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf2.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf3.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf4.png' | relative_url }}" alt="leaf">
+  <img src="{{ '/assets/week4/rebecca/leaf5.png' | relative_url }}" alt="leaf">
+</div>
+
+
+**Sarah** 
+Came up with detailed design and color for character Gurf
+<img style="width: 70%" src="{{ '/assets/week4/sarah/colored_gurf.png' | relative_url }}" alt="Note">
+
+### Map / World Building
+**Jacob**
+- Issue: file format exported from Blender does not give desired data format to game engine.
+- Working on proper map generation pipeline to enable collaborative world building. 
+- Investigating a file conversion workflow to map Blender objects to in-game objects, since Blender's export format does not match the required file size constraints.
+- Goal is to split a single Blender model into separate meshes and create a clear mapping from Blender assets to game map entities, making it easy to place objects (e.g., trees on hills) in the correct positions.
+
+## Game State & Minigames
+**Tim**
+- Created the game state system; resolved a version mismatch that required reorganizing the file structure.
+- Standardized the minigame framework to make it easier for others to contribute and for the game logic team to implement individual minigames.
+- PR will be submitted after Philip's branch is merged.
+- Wants to see a real map as soon as possible.
+
+**Philip & Leon**
+- Implemented additional components for the game state controller, including door, puzzle, and timer logic.
+- Added a function to load entities on game start, separated from main.
+- Potential conflicts with Tim's work identified — will coordinate with Tim this week to resolve.
+
+## Physics 
+**Alain**
+- Refactoring server-side game code: decoupling physics logic into its own dedicated physics engine class.
+- Phyics tick have been patched to sync with the game and server tick.
+
+---
 ## Week 3 Group report
 The team continued development across graphics, networking, physics, and puzzle systems.
 
@@ -67,7 +136,7 @@ The team continued development across graphics, networking, physics, and puzzle 
 <img src="{{ '/assets/week3/rebecca/rebecca1.png' | relative_url }}" alt="text">
 **Sarah**
 - Came up with detailed design for character. 
-<img src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
+<img style="width: 60%" src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
   <img src="{{ '/assets/week3/sarah/sarah2.png' | relative_url }}" alt="text">
   <img src="{{ '/assets/week3/sarah/sarah3.png' | relative_url }}" alt="text">
@@ -140,7 +209,7 @@ Updated game name, mechanics, solidified story and background.
 - For character model: Completed a tutorial more advanced than current game scope to build skill
     - base model sketch
     - gurf sketch   
-<img src="{{ '/assets/week2/group-report/gurf_draft.png' | relative_url }}" alt="text">
+<img style="width:60%" src="{{ '/assets/week2/group-report/gurf_draft.png' | relative_url }}" alt="text">
 <!-- ![text](assets/week2/gurf_draft.png) -->
 
 ### Technical   
