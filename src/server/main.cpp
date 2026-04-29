@@ -10,6 +10,7 @@
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "scene.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -17,33 +18,13 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  auto& bodyInterface = game.physics.getBodyInterface();
-
-  auto [box_id, box_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(box_entity, 5.0f, 5.0f, 0.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(box_entity, "cube", 1.0f);
-  JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
-  boxShapeSettings.SetEmbedded();
-  JPH::ShapeRefC boxShape = boxShapeSettings.Create().Get();
-  JPH::BodyCreationSettings boxBodySettings(
-      boxShape, JPH::RVec3(5.0f, 5.0f, 0.0f), JPH::Quat::sIdentity(),
-      JPH::EMotionType::Static, Layers::NON_MOVING);
-  JPH::Body* boxBody = bodyInterface.CreateBody(boxBodySettings);
-  bodyInterface.AddBody(boxBody->GetID(), JPH::EActivation::DontActivate);
-  game.registry.emplace<shared::PhysicsBody>(
-      box_entity, boxBody->GetID().GetIndexAndSequenceNumber());
-
-  auto [bear_id, bear_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(bear_entity, 10.0f, 0.0f, -1.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(bear_entity, "bear", 0.5f);
-  JPH::BodyID bearBodyId = game.physics.createMeshBody(
-    (exeDir() / "assets/bear/bear_full.obj").string(),
-    10.0f, 0.0f, -1.0f, 0.5f);
-  game.registry.emplace<shared::PhysicsBody>(
-      bear_entity, bearBodyId.GetIndexAndSequenceNumber());
-  game.physics.createFloor();
+  
+  spawnStaticEntities(game, {
+      {5.0f,  5.0f,  0.0f, "cube", 1.0f, "", true},
+      {10.0f, 0.0f, -1.0f, "bear", 0.5f,
+       (exeDir() / "assets/bear/bear_full.obj").string(), true},
+      {0.0f,  0.0f,  -1.0f, "", 1.0f, "", false, 100.0f, 100.0f, 1.0f},
+  });
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -149,8 +130,7 @@ int main() {
       // printf("Jolt step ok\n");
 
       // Sync Jolt positions back into ECS
-      auto physicsView =
-          game.registry.view<shared::Position, shared::PhysicsBody>();
+      auto physicsView = game.registry.view<shared::Position, shared::PhysicsBody>();
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
