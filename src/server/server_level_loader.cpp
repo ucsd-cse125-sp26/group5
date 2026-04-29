@@ -10,34 +10,40 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::GameSection>(gameController);
   game.registry.emplace<shared::TimeComponent>(gameController);
 
-
-
-
   // Entity holding Puzzle attributes
-  auto [puzzleID, puzzle1] = new_entity(game);
-  game.registry.emplace<shared::PuzzleComponent>(puzzle1);
+  auto [puzzleMazeID, puzzleMaze] = new_entity(game);
+  game.registry.emplace<shared::PuzzleComponent>(puzzleMaze);
+
+	auto [puzzleTypingID, puzzleTyping] = new_entity(game);
+  game.registry.emplace<shared::PuzzleComponent>(puzzleTyping);
+
+	auto [puzzleDecryptID, puzzleDecrypt] = new_entity(game);
+  game.registry.emplace<shared::PuzzleComponent>(puzzleDecrypt);
+
+	auto [puzzleTengramID, puzzleTengram] = new_entity(game);
+  game.registry.emplace<shared::PuzzleComponent>(puzzleTengram);
 
 	auto [winterSectionID, winterSection] = new_entity(game);
 	game.registry.emplace<shared::SectionController>(
-		winterSection, shared::SectionSeasonMap::WINTER, puzzleID,
+		winterSection, shared::SectionSeasonMap::WINTER, puzzleMazeID,
 		true,  // winter is first to unlock
 		false  // not completed yet
   );
 	auto [fallSectionID, fallSection] = new_entity(game);
 	game.registry.emplace<shared::SectionController>(
-		fallSection, shared::SectionSeasonMap::FALL, puzzleID,
+		fallSection, shared::SectionSeasonMap::FALL, puzzleTypingID,
 		false,  // fall is second to unlock
 		false  // not completed yet
   );
 	auto [summerSectionID, summerSection] = new_entity(game);
 	game.registry.emplace<shared::SectionController>(
-		summerSection, shared::SectionSeasonMap::SUMMER, puzzleID,
+		summerSection, shared::SectionSeasonMap::SUMMER, puzzleDecryptID,
 		false,  // summer is 3rd to unlock
 		false  // not completed yet
   );
 	auto [springSectionID, SpringSection] = new_entity(game);
 	game.registry.emplace<shared::SectionController>(
-		summerSection, shared::SectionSeasonMap::SPRING, puzzleID,
+		summerSection, shared::SectionSeasonMap::SPRING, puzzleTengramID,
 		false,  // spring is 4th to unlock
 		false  // not completed yet
   );
