@@ -14,6 +14,27 @@ class ServerNetwork;
 struct PlayerAvatars {
   entt::entity overworld_avatar;
   entt::entity maze_avatar;
+
+  void resetControls(entt::registry& registry) const {
+    auto resetAvatar = [&registry](entt::entity avatar) {
+      if (registry.all_of<shared::PlayerInput>(avatar)) {
+        auto& input = registry.get<shared::PlayerInput>(avatar);
+        input.keys = 0;
+        input.keys_prev = 0;
+        input.keys_newly_pressed = 0;
+        input.mouseDx = 0.0f;
+        input.mouseDy = 0.0f;
+      }
+      if (registry.all_of<shared::Velocity>(avatar)) {
+        auto& velocity = registry.get<shared::Velocity>(avatar);
+        velocity.dx = 0.0f;
+        velocity.dy = 0.0f;
+        velocity.dz = 0.0f;
+      }
+    };
+    resetAvatar(overworld_avatar);
+    resetAvatar(maze_avatar);
+  }
 };
 
 struct ServerGame {

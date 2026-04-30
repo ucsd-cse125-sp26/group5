@@ -46,31 +46,18 @@ int main() {
     g.unused_player_slots.pop_back();
     g.active_players[peer] = slots;
 
-    entt::entity activeEntity = entt::null;
-    StateType currentState = g.gameStateManager.currentState()->getStateType();
+    auto* currentState = g.gameStateManager.currentState();
+    entt::entity activeEntity = currentState->getClientAvatar(slots);
+    std::vector<entt::entity> existing = currentState->getStateEntities(g);
 
-    if (currentState == StateType::OVERWORLD) {
-        activeEntity = slots.overworld_avatar;
-    } else if (currentState == StateType::MAZE) {
-        activeEntity = slots.maze_avatar;
-    }
-
-    // Send full state of all existing entities for the current state to the new client
-    std::vector<entt::entity> existing;
-    if (currentState == StateType::OVERWORLD) {
-        auto view = g.registry.view<shared::OverworldTag>();
-        for (auto ent : view) existing.push_back(ent);
-    } else if (currentState == StateType::MAZE) {
-        auto view = g.registry.view<shared::MazeTag>();
-        for (auto ent : view) existing.push_back(ent);
-    }
-
+    // Send full state of all existing entities
     if (!existing.empty()) {
       auto buf =
           serializeEntities(g.registry, g.componentRegistry,
                             shared::PacketType::SPAWN_ENTITY, existing, false);
       net::sendRaw(peer, buf.data(), buf.size());
     }
+
 
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
@@ -85,26 +72,7 @@ int main() {
 
     printf("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
-
-    auto resetSlotEntity = [&g](entt::entity entity) {
-      if (g.registry.all_of<shared::PlayerInput>(entity)) {
-        auto& input = g.registry.get<shared::PlayerInput>(entity);
-        input.keys = 0;
-        input.keys_prev = 0;
-        input.keys_newly_pressed = 0;
-        input.mouseDx = 0.0f;
-        input.mouseDy = 0.0f;
-      }
-      if (g.registry.all_of<shared::Velocity>(entity)) {
-        auto& velocity = g.registry.get<shared::Velocity>(entity);
-        velocity.dx = 0.0f;
-        velocity.dy = 0.0f;
-        velocity.dz = 0.0f;
-      }
-    };
-    resetSlotEntity(slots.overworld_avatar);
-    resetSlotEntity(slots.maze_avatar);
-
+    slots.resetControls(g.registry);
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
     peer->data = nullptr;
@@ -126,15 +94,7 @@ int main() {
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
-      std::vector<entt::entity> allEnts;
-      if (game.gameStateManager.currentState() && game.gameStateManager.currentState()->getStateType() == StateType::OVERWORLD) {
-          auto view = game.registry.view<shared::OverworldTag>();
-          for (auto ent : view) allEnts.push_back(ent);
-      } else if (game.gameStateManager.currentState() && game.gameStateManager.currentState()->getStateType() == StateType::MAZE) {
-          auto view = game.registry.view<shared::MazeTag>();
-          for (auto ent : view) allEnts.push_back(ent);
-      }
-
+      std::vector<entt::entity> allEnts = game.gameStateManager.currentState()->getStateEntities(game);
       if (!allEnts.empty()) {
         auto buf =
             serializeEntities(game.registry, game.componentRegistry,

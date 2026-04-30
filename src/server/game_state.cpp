@@ -161,33 +161,56 @@ void initWorldEntities(ServerGame& game) {
   }
 }
 
+
+// ── Delegating Helpers ───────────────────────────────────
+
+template <typename Tag, entt::entity PlayerAvatars::*AvatarField>
+static void enterStateHelper(ServerGame& game, const char* stateName) {
+    printf("[State] Entering %s\n", stateName);
+    std::vector<entt::entity> spawned;
+    auto view = game.registry.view<Tag>();
+    for (auto ent : view) spawned.push_back(ent);
+
+    for (auto& pair : game.active_players) {
+        shared::AssignPacket assignPkt;
+        assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
+        entt::entity target_avatar = pair.second.*AvatarField;
+        assignPkt.entityId = game.registry.get<shared::Entity>(target_avatar).id;
+        net::sendPacket(pair.first, assignPkt);
+    }
+    broadcastSpawn(game, spawned);
+}
+
+template <typename Tag>
+static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
+    std::vector<entt::entity> existing;
+    auto view = game.registry.view<Tag>();
+    for (auto ent : view) existing.push_back(ent);
+    return existing;
+}
+
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
-  printf("[State] Entering Overworld\n");
-
-  std::vector<entt::entity> spawned;
-  auto view = game.registry.view<shared::OverworldTag>();
-  for (auto ent : view) {
-    spawned.push_back(ent);
-  }
-
-  // Update client authority IDs
-  for (auto& pair : game.active_players) {
-    shared::AssignPacket assignPkt;
-    assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = game.registry.get<shared::Entity>(pair.second.overworld_avatar).id;
-    net::sendPacket(pair.first, assignPkt);
-  }
-
-  broadcastSpawn(game, spawned);
+    enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(game, "Overworld");
 }
 
 void OverworldState::onExit(ServerGame& game) {
-  printf("[State] Exiting Overworld\n");
-  clearTaggedPlayerControls<shared::OverworldTag>(game);
-  despawnTaggedEntities<shared::OverworldTag>(game);
+    printf("[State] Exiting Overworld\n");
+    clearTaggedPlayerControls<shared::OverworldTag>(game);
+    despawnTaggedEntities<shared::OverworldTag>(game);
 }
+
+entt::entity OverworldState::getClientAvatar(const PlayerAvatars& slots) const {
+    return slots.overworld_avatar;
+}
+
+std::vector<entt::entity> OverworldState::getStateEntities(ServerGame& game) const {
+    return getEntitiesHelper<shared::OverworldTag>(game);
+}
+
+
+
 
 void OverworldState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
@@ -213,30 +236,24 @@ void OverworldState::update(ServerGame& game, float dt) {
 // ── MazeState ────────────────────────────────────────────
 
 void MazeState::onEnter(ServerGame& game) {
-  printf("[State] Entering Maze\n");
-
-  std::vector<entt::entity> spawned;
-  auto view = game.registry.view<shared::MazeTag>();
-  for (auto ent : view) {
-    spawned.push_back(ent);
-  }
-
-  // Update client authority IDs
-  for (auto& pair : game.active_players) {
-    shared::AssignPacket assignPkt;
-    assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = game.registry.get<shared::Entity>(pair.second.maze_avatar).id;
-    net::sendPacket(pair.first, assignPkt);
-  }
-
-  broadcastSpawn(game, spawned);
+    enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
 }
 
 void MazeState::onExit(ServerGame& game) {
-  printf("[State] Exiting Maze\n");
-  clearTaggedPlayerControls<shared::MazeTag>(game);
-  despawnTaggedEntities<shared::MazeTag>(game);
+    printf("[State] Exiting Maze\n");
+    clearTaggedPlayerControls<shared::MazeTag>(game);
+    despawnTaggedEntities<shared::MazeTag>(game);
 }
+
+entt::entity MazeState::getClientAvatar(const PlayerAvatars& slots) const {
+    return slots.maze_avatar;
+}
+
+std::vector<entt::entity> MazeState::getStateEntities(ServerGame& game) const {
+    return getEntitiesHelper<shared::MazeTag>(game);
+}
+
+
 
 void MazeState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
