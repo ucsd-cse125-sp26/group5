@@ -17,6 +17,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/map_format.h"
 #include "shared/simple_profiler.h"
 
 // Skybox images use Y-up; the game uses Z-up.
@@ -80,6 +81,18 @@ static const shared::SceneInfo* currentScene(const ClientGame& game) {
 
 static void updateDirectionalLight(const Shader& shader,
                                    const ClientGame& game) {
+  // ECS DirectionalLight overrides the scene's default. First entity wins;
+  // subsequent ones are ignored (shader has only one dirLight slot).
+  auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
+  for (auto ent : dlView) {
+    const auto& dl = dlView.get<shared::DirectionalLight>(ent);
+    shader.setVec3("dirLight.direction", dl.dirX, dl.dirY, dl.dirZ);
+    shader.setVec3("dirLight.ambient", dl.ambientR, dl.ambientG, dl.ambientB);
+    shader.setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG, dl.diffuseB);
+    shader.setVec3("dirLight.specular", dl.specularR, dl.specularG,
+                   dl.specularB);
+    return;
+  }
   auto* info = currentScene(game);
   if (!info) return;
   shader.setVec3("dirLight.direction", info->dirX, info->dirY, info->dirZ);
@@ -138,12 +151,14 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     if (entity.id == game.renderEntityId) {
       continue;
     }
-    Model* modelAsset = models[renderInfo.modelName];
-    if (!modelAsset) continue;
+    auto it = models.find(renderInfo.modelName);
+    if (it == models.end() || !it->second) continue;
+    Model* modelAsset = it->second;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
-    model = glm::scale(model, glm::vec3(renderInfo.scale));
+    model = glm::scale(model,
+                       glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
     model = model * glm::mat4_cast(rotation) *
             glm::mat4_cast(modelAsset->orientation);
 
@@ -193,6 +208,14 @@ bool Graphics::load(int width, int height) {
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  // Register per-node sub-models from the active map. Server-side map_loader
+  // spawns entities whose RenderInfo.modelName uses these same keys.
+  auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
+  for (auto& [key, m] : mapModels) {
+    models[key] = m;
+    printf("Loaded map sub-model: %s\n", key.c_str());
   }
 
   for (const auto& sc : shared::SCENES) {

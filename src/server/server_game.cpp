@@ -15,6 +15,20 @@
 
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
+namespace {
+
+void onPhysicsBodyDestroyed(PhysicsEngine& physics, entt::registry& reg,
+                            entt::entity ent) {
+  physics.destroyBody(reg.get<shared::PhysicsBody>(ent).bodyId);
+}
+
+}  // namespace
+
+void initServerGame(ServerGame& game) {
+  game.registry.on_destroy<shared::PhysicsBody>()
+      .connect<&onPhysicsBodyDestroyed>(game.physics);
+}
+
 // ── Movement system ──────────────────────────────────────
 
 // Process input on tick
@@ -55,6 +69,12 @@ void movement_system(ServerGame& game, float dt) {
       position.qx = q.x;
       position.qy = q.y;
       position.qz = q.z;
+
+      // Push yaw to the Jolt body so an asymmetric collision shape (e.g. the
+      // bear box) tracks the visible facing. The body has rotation DOFs
+      // locked, so SetRotation is user-driven only.
+      JPH::Quat joltRot(q.x, q.y, q.z, q.w);
+      bodyInterface.SetRotation(bodyId, joltRot, JPH::EActivation::Activate);
     }
 
     if (game.registry.all_of<shared::Camera>(entity)) {
@@ -98,16 +118,43 @@ void movement_system(ServerGame& game, float dt) {
 }
 
 // Model modification system
-void render_model_change(entt::registry& registry, float dt) {
-  auto view = registry.view<shared::RenderInfo, shared::PlayerInput>();
+void render_model_change(ServerGame& game, float dt) {
+  auto& bodyInterface = game.physics.getBodyInterface();
+  auto view =
+      game.registry
+          .view<shared::RenderInfo, shared::PlayerInput, shared::PhysicsBody>();
   for (auto entity : view) {
     auto& renderInfo = view.get<shared::RenderInfo>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
+    auto& pb = view.get<shared::PhysicsBody>(entity);
+    bool shapeDirty = false;
     if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
       renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+      shapeDirty = true;
     }
-    if (input.keys & KEY_MODEL_BIGGER) renderInfo.scale *= 1.1;
-    if (input.keys & KEY_MODEL_SMALLER) renderInfo.scale /= 1.1;
+    if (input.keys & KEY_MODEL_BIGGER) {
+      renderInfo.sx *= 1.1f;
+      renderInfo.sy *= 1.1f;
+      renderInfo.sz *= 1.1f;
+      shapeDirty = true;
+    }
+    if (input.keys & KEY_MODEL_SMALLER) {
+      renderInfo.sx /= 1.1f;
+      renderInfo.sy /= 1.1f;
+      renderInfo.sz /= 1.1f;
+      shapeDirty = true;
+    }
+    if (shapeDirty) {
+      JPH::ShapeRefC newShape = game.physics.playerShapeForAsset(
+          renderInfo.modelName,
+          glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
+      // Don't recompute mass: a 14x11x18 bear box at default density is a
+      // ~2.7M kg body, which combined with the player's rotation-locked DOFs
+      // produces NaN/Inf during the next physics step. Player keeps the
+      // mass it was created with regardless of visual model.
+      bodyInterface.SetShape(JPH::BodyID(pb.bodyId), newShape,
+                             /*update mass*/ false, JPH::EActivation::Activate);
+    }
   }
 }
 

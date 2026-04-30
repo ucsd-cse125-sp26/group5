@@ -54,3 +54,10 @@ Model* makeCubeModel(const shared::CubeSpec& spec);
 Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
+
+// Loads a glTF/glb map and emits one Model per mesh-bearing node, keyed by
+// shared::MAP_MODEL_PREFIX + nodeName. Each Model has identity local mesh
+// transforms — the node's world transform is on the server-spawned entity's
+// Position + RenderInfo.scale, not baked into the geometry.
+std::vector<std::pair<std::string, Model*>> loadMapModels(
+    const std::string& filename);
