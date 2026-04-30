@@ -5,7 +5,21 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
-## Week 2
+## Week 4
+1. What were your concrete goals for the week?  
+I wanted to implement ECS for the overall game state and puzzle logic, so basically adding in components and creating the entities needed to keep progress and game attributes at game start.
+2. What goals were you able to accomplish?  
+I was able to implement components for things such as game state, puzzle state, doors for each section, game section, etc. I was also able to implement the function that loads in the necessary entities for keeping track of game progress at game start. 
+3. If the week went differently than you had planned, what were the reasons?  
+This week was roughly on track in terms of the work I able to get done. But I was a little busy from other classes as well as being a caretaker for my mom who is currently bedridden from a herniated disc. It hasn't impacted my ability to contribute to the team and do my class work but it is worth mentioning. 
+4. What are your specific goals for the next week?  
+I would like to move onto implementing logic for the specific puzzles, starting with the maze. Since Tim is now starting to work on game logic too, I'd like to collaborate more with him so that we can be on the same page and avoid our work conflicting with each other.
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I don't think I learned much this week, mainly this week was about using what I learned last week to implement some real logic and put it into practice. 
+6. What is your individual morale (which might be different from the overall group morale)?  
+I am now starting to get busy in ECE108 so my morale is impacted from having to juggle the workload in that class on top of the time I put into this class, but I hope I'll be able to manage this coming week. 
+
+## Week 3
 1. What were your concrete goals for the week?  
 I wanted to implement a base puzzle for all the puzzle games to be extended from. I didn't have many other goals besides that.
 2. What goals were you able to accomplish?  
