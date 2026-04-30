@@ -1,11 +1,11 @@
 #pragma once
 #include <enet/enet.h>
 
-#include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
 #include <vector>
 
+#include "physics_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
 #include "game_state.h"
@@ -45,10 +45,11 @@ struct ServerGame {
   uint32_t nextEntityId = 0;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
+  PhysicsEngine physics;
 };
 
 void input_tick(entt::registry& registry);
-void movement_system(entt::registry& registry, float dt, StateType stateType);
+void movement_system(ServerGame& game, float dt, StateType stateType);
 void render_model_change(entt::registry& registry, float dt);
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t lightEntity);

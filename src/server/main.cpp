@@ -4,13 +4,16 @@
 #include <thread>
 
 #include "game_state.h"
+#include "scene.h"
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
+#include "shared/util.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -18,6 +21,34 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+
+  spawnStaticEntities(
+      game, {
+                {.x = 5.0f,
+                 .y = 5.0f,
+                 .z = 0.0f,
+                 .modelName = "cube",
+                 .scale = 1.0f,
+                 .meshPath = "",
+                 .render = true},
+                {.x = 10.0f,
+                 .y = 0.0f,
+                 .z = -1.0f,
+                 .modelName = "bear",
+                 .scale = 0.5f,
+                 .meshPath = (exeDir() / "assets/bear/bear_full.obj").string(),
+                 .render = true},
+                {.x = 0.0f,
+                 .y = 0.0f,
+                 .z = -1.0f,
+                 .modelName = "floor",
+                 .scale = 1.0f,
+                 .meshPath = "",
+                 .render = false,
+                 .halfX = 100.0f,
+                 .halfY = 100.0f,
+                 .halfZ = 1.0f},
+            });
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -58,7 +89,6 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-
     // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
@@ -72,15 +102,35 @@ int main() {
 
     printf("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
+
+    shared::DespawnPacket despawnPkt;
+    despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
+
+    // Both slots
+    auto despawnAvatar = [&](entt::entity e) {
+      if (g.registry.valid(e)) {
+        despawnPkt.entityId = g.registry.get<shared::Entity>(e).id;
+        net::broadcastPacket(network.getHost(), despawnPkt);
+
+        if (g.registry.all_of<shared::PhysicsBody>(e)) {
+          auto& pb = g.registry.get<shared::PhysicsBody>(e);
+          g.physics.destroyBody(pb.bodyId);
+        }
+        g.registry.destroy(e);
+      }
+    };
+    despawnAvatar(slots.overworld_avatar);
+    despawnAvatar(slots.maze_avatar);
+
     slots.resetControls(g.registry);
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
     peer->data = nullptr;
   };
-
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
+
   while (true) {
     network.poll(game);
 
@@ -88,9 +138,22 @@ int main() {
     float dt = std::chrono::duration<float>(currentTime - previousTime).count();
     previousTime = currentTime;
     accumulator += dt;
-
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
+      
+      // Sync Jolt positions back into ECS
+      auto physicsView =
+          game.registry.view<shared::Position, shared::PhysicsBody>();
+      for (auto ent : physicsView) {
+        auto& pos = physicsView.get<shared::Position>(ent);
+        auto& pb = physicsView.get<shared::PhysicsBody>(ent);
+        JPH::RVec3 joltPos =
+            game.physics.getBodyInterface().GetPosition(JPH::BodyID(pb.bodyId));
+        pos.x = joltPos.GetX();
+        pos.y = joltPos.GetY();
+        pos.z = joltPos.GetZ();
+      }
+      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");

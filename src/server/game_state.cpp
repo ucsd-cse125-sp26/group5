@@ -225,7 +225,7 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
-  movement_system(game.registry, dt, StateType::OVERWORLD);
+  movement_system(game, dt, StateType::OVERWORLD);
   render_model_change(game.registry, dt);
   
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
@@ -269,7 +269,7 @@ void MazeState::update(ServerGame& game, float dt) {
     }
   }
 
-  movement_system(game.registry, dt, StateType::MAZE);
+  movement_system(game, dt, StateType::MAZE);
   render_model_change(game.registry, dt);
   
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
