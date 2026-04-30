@@ -92,6 +92,9 @@ Came up with detailed design and color for character Gurf
 - Working on proper map generation pipeline to enable collaborative world building. 
 - Investigating a file conversion workflow to map Blender objects to in-game objects, since Blender's export format does not match the required file size constraints.
 - Goal is to split a single Blender model into separate meshes and create a clear mapping from Blender assets to game map entities, making it easy to place objects (e.g., trees on hills) in the correct positions.
+<img style="width: 70%" src="{{ '/assets/week4/jacob/fullscreen.png' | relative_url }}" alt="Note">
+<img style="width: 70%" src="{{ '/assets/week4/jacob/map.png' | relative_url }}" alt="Note">
+<img style="width: 70%" src="{{ '/assets/week4/jacob/blender.png' | relative_url }}" alt="Note">
 
 ## Game State & Minigames
 **Tim**
