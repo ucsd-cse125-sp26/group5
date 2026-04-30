@@ -30,19 +30,21 @@ void input_tick(entt::registry& registry) {
 
 // ── Movement system ──────────────────────────────────────
 
-void movement_system(ServerGame& game, float dt) {
+template <typename WorldTag>
+static void movement_system_for_world(ServerGame& game, float dt) {
   SIMPLE_PROFILE_SCOPE("Movement System");
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
   auto& bodyInterface = game.physics.getBodyInterface();
 
-  auto view = game.registry.view<shared::Position, shared::Velocity,
-                                 shared::PlayerInput, shared::PhysicsBody>();
+  auto view =
+      game.registry.view<shared::Position, shared::Velocity,
+                         shared::PlayerInput, shared::PhysicsBody, WorldTag>();
   for (auto entity : view) {
-    auto& position = view.get<shared::Position>(entity);
-    auto& velocity = view.get<shared::Velocity>(entity);
-    auto& input = view.get<shared::PlayerInput>(entity);
-    auto& pb = view.get<shared::PhysicsBody>(entity);
+    auto& position = view.template get<shared::Position>(entity);
+    auto& velocity = view.template get<shared::Velocity>(entity);
+    auto& input = view.template get<shared::PlayerInput>(entity);
+    auto& pb = view.template get<shared::PhysicsBody>(entity);
     JPH::BodyID bodyId(pb.bodyId);
 
     // Apply mouse look
@@ -94,6 +96,18 @@ void movement_system(ServerGame& game, float dt) {
     // Set velocity on Jolt body instead of manually moving position
     bodyInterface.SetLinearVelocity(
         bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+  }
+}
+
+// ── Movement system ──────────────────────────────────────
+void movement_system(ServerGame& game, float dt, StateType stateType) {
+  switch (stateType) {
+    case StateType::OVERWORLD:
+      movement_system_for_world<shared::OverworldTag>(game, dt);
+      break;
+    case StateType::MAZE:
+      movement_system_for_world<shared::MazeTag>(game, dt);
+      break;
   }
 }
 
@@ -218,9 +232,17 @@ void registerServerHandlers(ServerNetwork& network) {
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.peerEntityMap.find(sender);
-        if (it == game.peerEntityMap.end()) return;
-        auto ent = it->second;
+        auto it = game.active_players.find(sender);
+        if (it == game.active_players.end()) return;
+
+        entt::entity ent = entt::null;
+        auto state = game.gameStateManager.currentState();
+        if (state && state->getStateType() == StateType::OVERWORLD) {
+          ent = it->second.overworld_avatar;
+        } else if (state && state->getStateType() == StateType::MAZE) {
+          ent = it->second.maze_avatar;
+        }
+        if (ent == entt::null) return;
 
         auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
         playerInput.keys = pkt.keys;

@@ -110,6 +110,7 @@ endif()
 add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
+    src/server/game_state.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp
