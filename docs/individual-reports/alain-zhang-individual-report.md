@@ -61,7 +61,7 @@ Uhhh uhhhh meow meow meow meow meow. Learned to always refactor since it made th
 #### Individual Morale
  
 [10000000/10] — [
-```text
+<pre style="white-space: pre; overflow-x: auto; font-family: monospace;">
 ⣷⣦⣤⣄⡀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣿⢿⣟⡿⣿⣻⢿⡿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀
 ⣿⣿⣿⣿⣿⣧⣯⣤⢃⠠⠀⠀⠀⠀⠀⠀⠀⠈⡔⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⣿⣻⣽⣿⣯⣿⣯⣷⣿⣻⣟⣿⢾⣽⣳⢯⡿⣽⣳⢿⣽⡿⣿⣿⣿⣿⣿⣿⣿
 ⣿⣿⣿⣿⣿⣿⣿⣿⣇⠢⠀⠀⠀⠀⠀⠀⡀⠁⣠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣻⢾⣿⣻⠿⣿⢻⠿⣿⣿⣿⣟⣿⣽⣾⣻⢾⡽⣯⣛⡷⣯⡟⣷⢿⣿⣿⣿⣿⣿⣿⣿
@@ -92,7 +92,7 @@ Uhhh uhhhh meow meow meow meow meow. Learned to always refactor since it made th
 ⣇⡻⣵⣻⣞⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⡀⠀⠀⠀⠀⠠⠀⢀⠁⠀⠁⠠⢈⠁
 ⢲⡹⢖⡻⣞⣳⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⢫⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⡀⠁⠠⠀⠐⠀⠀⠀⠀⠀⠄⠁⢈⠀⠬⠀
 ⢧⡙⣎⠳⣍⠓⣎⠛⣟⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣮⣷⣿⣿⣿⣿⣟⠋⢿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣂⠀⠁⠂⠀⠀⠀⠀⠀⠀⠈⠠⠀⠂⠠⠐⠀
-```
+</pre>
 ]
  
 ---
