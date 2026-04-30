@@ -111,6 +111,8 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::Position>(ent, d.x, d.y, d.z, 1.0f, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", d.scale);
     game.registry.emplace<shared::OverworldTag>(ent);
+    JPH::BodyID bodyId = game.physics.createPlayerBody(d.x, d.y, d.z);
+    game.registry.emplace<shared::PhysicsBody>(ent, bodyId.GetIndexAndSequenceNumber());
   }
 
   // --- Maze Map ---
@@ -134,28 +136,36 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::Position>(ent, b.x, b.y, b.z, 1.0f, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "bear", b.scale);
     game.registry.emplace<shared::MazeTag>(ent);
+    JPH::BodyID bodyId = game.physics.createPlayerBody(b.x, b.y, b.z);
+    game.registry.emplace<shared::PhysicsBody>(ent, bodyId.GetIndexAndSequenceNumber());
   }
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
+    float startX = i * 10.0f; // Hardcode spread out to prevent overlap
     PlayerAvatars slots;
-    auto [oeid, oent] = new_entity(game);
-    game.registry.emplace<shared::Position>(oent, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::Velocity>(oent, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(oent, "cube", 1.0f);
-    game.registry.emplace<shared::Camera>(oent, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(oent, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
-    game.registry.emplace<shared::OverworldTag>(oent);
-    slots.overworld_avatar = oent;
+    
+    auto [overworldEntityId, overworldEntity] = new_entity(game);
+    game.registry.emplace<shared::Position>(overworldEntity, startX, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Velocity>(overworldEntity, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(overworldEntity, "cube", 1.0f);
+    game.registry.emplace<shared::Camera>(overworldEntity, 0.0f, 1.0f);
+    game.registry.emplace<shared::PlayerInput>(overworldEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
+    game.registry.emplace<shared::OverworldTag>(overworldEntity);
+    JPH::BodyID overworldBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
+    game.registry.emplace<shared::PhysicsBody>(overworldEntity, overworldBodyId.GetIndexAndSequenceNumber());
+    slots.overworld_avatar = overworldEntity;
 
-    auto [meid, ment] = new_entity(game);
-    game.registry.emplace<shared::Position>(ment, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::Velocity>(ment, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ment, "bear", 0.5f);
-    game.registry.emplace<shared::Camera>(ment, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(ment, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
-    game.registry.emplace<shared::MazeTag>(ment);
-    slots.maze_avatar = ment;
+    auto [mazeEntityId, mazeEntity] = new_entity(game);
+    game.registry.emplace<shared::Position>(mazeEntity, startX, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Velocity>(mazeEntity, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(mazeEntity, "bear", 0.5f);
+    game.registry.emplace<shared::Camera>(mazeEntity, 0.0f, 1.0f);
+    game.registry.emplace<shared::PlayerInput>(mazeEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
+    game.registry.emplace<shared::MazeTag>(mazeEntity);
+    JPH::BodyID mazeBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
+    game.registry.emplace<shared::PhysicsBody>(mazeEntity, mazeBodyId.GetIndexAndSequenceNumber());
+    slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
   }

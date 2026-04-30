@@ -72,5 +72,3 @@ class GameStateManager {
   std::unique_ptr<IGameState> currentState_;
   std::unique_ptr<IGameState> pendingState_;
 };
-
-std::vector<entt::entity> getEntitiesForCurrentState(const ServerGame& game);

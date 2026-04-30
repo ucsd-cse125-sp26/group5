@@ -103,24 +103,26 @@ int main() {
     printf("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
 
-    shared::DespawnPacket despawnPkt;
-    despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
+    // if we wanted to immediately despawn the player's avatar on disconnect, we could do it here.
+    
+    // shared::DespawnPacket despawnPkt;
+    // despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
 
-    // Both slots
-    auto despawnAvatar = [&](entt::entity e) {
-      if (g.registry.valid(e)) {
-        despawnPkt.entityId = g.registry.get<shared::Entity>(e).id;
-        net::broadcastPacket(network.getHost(), despawnPkt);
+    // // Both slots
+    // auto despawnAvatar = [&](entt::entity e) {
+    //   if (g.registry.valid(e)) {
+    //     despawnPkt.entityId = g.registry.get<shared::Entity>(e).id;
+    //     net::broadcastPacket(network.getHost(), despawnPkt);
 
-        if (g.registry.all_of<shared::PhysicsBody>(e)) {
-          auto& pb = g.registry.get<shared::PhysicsBody>(e);
-          g.physics.destroyBody(pb.bodyId);
-        }
-        g.registry.destroy(e);
-      }
-    };
-    despawnAvatar(slots.overworld_avatar);
-    despawnAvatar(slots.maze_avatar);
+    //     if (g.registry.all_of<shared::PhysicsBody>(e)) {
+    //       auto& pb = g.registry.get<shared::PhysicsBody>(e);
+    //       g.physics.destroyBody(pb.bodyId);
+    //     }
+    //     g.registry.destroy(e);
+    //   }
+    // };
+    // despawnAvatar(slots.overworld_avatar);
+    // despawnAvatar(slots.maze_avatar);
 
     slots.resetControls(g.registry);
     g.unused_player_slots.push_back(slots);
@@ -141,6 +143,9 @@ int main() {
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
       
+      // Step Jolt physics
+      game.physics.step(fixedDt);
+
       // Sync Jolt positions back into ECS
       auto physicsView =
           game.registry.view<shared::Position, shared::PhysicsBody>();
