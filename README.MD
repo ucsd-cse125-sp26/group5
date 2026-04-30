@@ -78,7 +78,7 @@ The `-a` flag preserves file attributes and handles directories recursively. The
 
 ## Profiling
 
-To diagnose performance and stuttering issues, you can compile the client and server with Tracy Profiling enabled using:
+To diagnose performance and stuttering issues, you can compile the client and server with Profiling enabled using:
 
 ```bash
 ./build-profiling.sh
