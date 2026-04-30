@@ -5,6 +5,67 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+
+## Week 4
+### Goals
+- [x] Create concept art for other MVPs
+  - [x] Goose
+  - [x] Mouse
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf - WIP
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+- [ ] Continue tutorial for rigging lesson
+
+### Achieved
+
+- Goose concept art
+  - Goose design references
+  <img src="{{ '/assets/week4/sarah/goose-refs.png' | relative_url }}" alt="Goose whiteboard references">
+  - First draft of Goose A (mvp) and Goose B (ideal)
+  <img src="{{ '/assets/week4/sarah/goose.jpg' | relative_url }}" alt="Goose design draft">
+  - Goose A version 2 - bigger head like other models, bigger eyes more to the sides of head, semi-realistic beak
+  <img src="{{ '/assets/week4/sarah/goose-a2.jpg' | relative_url }}" alt="Goose design A version 2 draft">
+  - Goose B cleaned up - more realistic design, drew inspiration from *Untitled Goose Game*
+  <img src="{{ '/assets/week4/sarah/goose-b.jpg' | relative_url }}" alt="Goose design B cleaned up">
+- Mouse concept art
+  - Mouse design references
+  <img src="{{ '/assets/week4/sarah/mouse-refs.png' | relative_url }}" alt="Mouse whiteboard references">
+  - Considering balance between realism and cuteness (real mice look cute too! hard to stylize though)
+  <img src="{{ '/assets/week4/sarah/mouse.jpg' | relative_url }}" alt="Mouse design">
+- Gurf concept art / ref sheet
+  - Gurf design references - I made Gurf while making teaching materials in EDS 124BR and he is #MySon
+  <img src="{{ '/assets/week4/sarah/gurf-refs.png' | relative_url }}" alt="Gurf whiteboard references">
+  - Colored concept art - considering maw shape, Rebecca prefers the top but I'm kinda liking the bottom; might change with modeling
+  <img src="{{ '/assets/week4/sarah/colored-gurf.png' | relative_url }}" alt="Gurf colored concept art">
+
+  
+### Progress Evaluation
+
+Designed in little pockets of time I had. Got sick so I can't really be mad at myself for not getting as much as I wanted done. Not too bad progress given that and courseload.
+
+### Upcoming Goals
+
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+- [ ] Continue tutorial for rigging lesson
+
+### Lessons Learned
+
+- I really just have to use whatever pockets of time I have to develop things
+- Taking the time to rest lets me get back on my feet faster than if I tried to work through my sickness
+- I need to remember to have fun
+
+### Individual Morale
+
+Being sick sucked. CSE 123 continues to be a heavy stressor, especially with midterm season being up on us. I still feel discouraged that I'm not making as much things in the time that I have as other teammates, but I think I just gotta buckle up and do it.
+
 ## Week 3
 ### Goals
 - [ ] Continue tutorial for rigging lesson
@@ -21,14 +82,14 @@ permalink: /project-spec/sarah-balatbat-individual-report/
     <img src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="Corgi model concept art">
     <img src="{{ '/assets/week3/sarah/corgi-rebecca.jpg' | relative_url }}" alt="Corgi model concept art iteration">
   - Created front and profile view references for modeling
-    <img src="{{ '/assets/week3/sarah/sarah4.jpg' | relative_url }}" alt="Corgi model reference sheet">
+    <img src="{{ '/assets/week3/sarah/sarah4.png' | relative_url }}" alt="Corgi model reference sheet">
 - Base model
   - Created base model front and profile ref sheet
-    <img src="{{ '/assets/week3/sarah/sarah3.jpg' | relative_url }}" alt="Base model reference sheet">
+    <img src="{{ '/assets/week3/sarah/sarah3.png' | relative_url }}" alt="Base model reference sheet">
   - Started base model on Blender
-    <img src="{{ '/assets/week3/sarah/sarah5.jpg' | relative_url }}" alt="Base model">
-    <img src="{{ '/assets/week3/sarah/sarah6.jpg' | relative_url }}" alt="Base model front view">
-    <img src="{{ '/assets/week3/sarah/sarah7.jpg' | relative_url }}" alt="Base model side view">
+    <img src="{{ '/assets/week3/sarah/sarah5.png' | relative_url }}" alt="Base model">
+    <img src="{{ '/assets/week3/sarah/sarah6.png' | relative_url }}" alt="Base model front view">
+    <img src="{{ '/assets/week3/sarah/sarah7.png' | relative_url }}" alt="Base model side view">
 - Other character design ideas - "Would-Be-Nice" category
   - Fox
   - Moose
