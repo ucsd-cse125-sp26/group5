@@ -8,10 +8,97 @@ permalink: /project-spec/alain-zhang-individual-report/
 
 ## Weekly Notes
 
+### Week 4
+ 
+#### Goals
+ 
+- [x] Refactor physics code into a dedicated `PhysicsEngine` class
+- [x] Fix all blocking PR review comments on the Jolt physics PR
+- [x] Resolve merge conflicts with `main`
+- [ ] Implement physics debug mode
+#### Achieved
+ 
+- Refactored Jolt physics into a dedicated `PhysicsEngine` class
+  - Moved all Jolt initialization, layer interfaces, broadphase setup, allocators, and job system out of `ServerGame` into a new `PhysicsEngine` class in `physics_engine.h` / `physics_engine.cpp`
+  - `ServerGame` now composes `PhysicsEngine` as a single member (`physics`)
+  - Moved `createPlayerBody`, `createFloor`, and `createMeshBody` from free functions in `server_game.cpp` into methods on `PhysicsEngine`, removing all Jolt calls from `server_game.cpp`
+  - Exposed public API: `physics.step(dt)`, `physics.getBodyInterface()`, `physics.destroyBody(bodyId)`
+  - Removed Jolt includes from `shared/components.h` so the client build no longer depends on Jolt at all; `PhysicsBody` component stores a plain `uint32_t bodyId`
+- Fixed all blocking PR review comments
+  - Fixed box entity ECS position inconsistency with its Jolt body position
+  - Added Jolt body cleanup (`destroyBody`) in `onDisconnect` before ECS entity is destroyed
+  - Moved `physicsSystem.Update` out of `main.cpp` into `PhysicsEngine::step`
+  - Fixed player spawn `Position` z coordinate to match `createPlayerBody` spawn height
+  - Removed floor `RenderInfo` from server; floor physics body still created but graphics team handles floor rendering client-side; floor entity kept in ECS with only `Position` and `PhysicsBody` for consistency
+  - Used `exeDir()` for asset paths instead of relative paths; moved `util.h` / `util.cpp` from `src/client/` into `src/shared/` so both client and server can use `exeDir()`
+- Introduced batch static entity spawning via `scene.h` / `scene.cpp`
+  - Created `StaticEntityDesc` struct with fields for position, model name, scale, optional mesh path, render flag, and half-extents
+  - `spawnStaticEntities` handles wiring each entity into both ECS and Jolt, conditionally adding `RenderInfo` based on the render flag
+  - Replaced individual box and bear creation code in `main.cpp` with a single `spawnStaticEntities` call
+- Fixed bounding box axis swap for mesh bodies
+  - `createMeshBody` now correctly swaps Y/Z half-extents to account for Assimp's Y-up convention versus the engine's Z-up convention
+  - Physics box dimensions now match the visual mesh orientation
+- Resolved merge conflicts with `main` across `client_game.cpp`, `client_game.h`, `server_game.cpp`, `component_registry.h`, and `main.cpp`
+  - Kept `main` branch changes for client network/render registry split and `ComponentMeta` clone function
+  - Kept `jolt_physics` branch changes for physics body creation and movement system signature
+- Fixed duplicate `kHeldKeyScaleFactor` definition that was introduced during a merge
+- Removed duplicate `clang-tidy` invocation in `format.sh` that was running without the macOS sysroot flag, causing false "file not found" errors for standard headers for macOs builds
+
+#### Progress Evaluation
+ 
+The bulk of this week was spent cleaning up the Jolt physics PR to get it ready to merge. The refactor into `PhysicsEngine` went smoothly and makes the codebase significantly cleaner. Addressing my teammates comments was straightforward once the class structure was in place, since most of them were about decoupling Jolt from the rest of the code, which the refactor handled naturally. Merge conflicts took some care since `main` had diverged significantly with the client rendering refactor.
+ 
+#### Upcoming Goals
+ 
+- [ ] Complete physics debug mode
+- [ ] Investigate `CharacterVirtual` as a replacement for the raw capsule body to fix wall-sliding behavior
+- [ ] Look into baking bounding boxes for mesh assets instead of loading OBJ files at runtime (need to consult Jacob)
+
+#### Lessons Learned
+
+Uhhh uhhhh meow meow meow meow meow. Learned to always refactor since it made the fixes much cleaner since it made it easier to address reviewer comments, e.g. the `PhysicsEngine` class created clear boundaries that made each reviewer comment easy to address. Also learned more about Assimp's coordinate system conventions and how Y-up vs Z-up affects bounding box axis ordering. Merge conflict resolution requires understanding both sides of the conflict well enough to know which changes to keep, not just which file is "newer."
+ 
+#### Individual Morale
+ 
+[10000000/10] — [
+```text
+⣯⢾⣿⣿⣿⣿⣯⢽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣻⢿⡿⣿⢿⣻⣟⣿⢯⣻⠽⣭⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢿⡽⣯⢿⡽⣻⡽⢯⣟⣯⠿⣽⣻⢯⣟⡿⣽⣻⡟⣿⣻⣟⣿⣻⣟⣿⣻⣟⡿⣿⣻
+⢎⡽⣿⣿⣿⣿⣏⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣯⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟⡾⣽⣳⢻⡗⣿⣛⡾⣞⣻⣳⢯⣟⡾⣽⣳⢯⣟⣷⣻⣞⣷⣻⣞⣷⣻⣞⣿⣳⣿
+⠻⢾⣿⣿⣿⣿⣯⢾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡽⣶⢏⡿⣝⣳⢯⢷⣫⢷⣫⢷⡾⣽⣳⢯⣟⡾⣧⢷⣻⣞⣷⣻⣞⡷⣯⡷⣿⣽
+⣝⣺⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢻⣭⢛⡜⣣⢏⡳⢫⡟⡿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢯⢯⣽⢳⣯⣛⣾⢳⣭⣟⠾⣽⡽⢯⣷⢻⣞⡷⣯⣟⣷⣻⢷⣻
+⠬⣹⣿⣿⣿⣿⡏⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⡳⣭⠳⣌⠣⢎⡑⢎⡱⢣⡝⡳⣝⢾⣻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢯⣷⣾⣿⣶⣿⣾⣿⣾⣾⣿⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟
+⠳⢾⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠿⢟⠛⠛⠛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢏⡳⢌⠓⡈⠒⠀⠈⠀⠁⠣⣘⠱⣎⢳⣻⢿⣿⣿⣿⣿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⣟⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣡⢻⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⣴⣤⣈⣰⣀⢀⠠⢀⣾⡇⠀⡉⣟⠫⡁⣀⣿⣎⢧⠓⡌⢂⠀⠀⠀⠀⠀⠀⠀⢀⠣⢜⢣⣻⣟⣿⣇⡈⠙⠺⠾⠽⠾⣿⡿⠿⠿⢿⣿⣿⣿⣿⣿⣷⣛⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯
+⠣⢻⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⢿⣶⣇⣉⡉⠉⠋⠓⢦⣏⠙⢶⣶⣾⣷⣿⣿⣿⡺⣌⠳⡈⢆⠀⠀⠀⠀⠀⠀⠠⡀⠞⣬⢣⢿⣞⣿⣿⣿⢶⣤⣀⣀⠤⢼⠃⡀⢀⠀⠀⠉⠙⠛⢿⡷⣿⢾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟
+⢶⣹⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢏⡐⠀⠈⠁⠉⠑⠲⢤⣀⣾⣆⣾⣿⣿⣿⣿⣿⣿⡳⣍⢣⠱⠈⠀⠀⠀⠀⠀⠀⠀⡘⠰⢈⣋⠿⣿⣾⣿⣿⣽⡾⣽⣇⠀⣾⣽⠉⠂⠙⠩⠛⠛⠻⢿⣷⣫⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟
+⢠⢹⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⡇⢴⢀⡒⢌⣦⣠⠀⣰⣿⠯⣿⣿⣿⣿⣿⣿⣿⣷⣷⣾⣶⣷⣦⣀⠀⠠⠀⠀⢄⣤⣶⣶⠿⠛⢛⣿⣳⣿⣿⣿⣿⣽⣿⢬⣿⡇⠀⣤⣀⡔⠂⠀⠀⠀⢹⣿⣿⠿⡿⢿⠿⡿⢿⠿⣟⠿⣿⣻⠿⣿⣻⢿⡿⣿⢿⡿⣟⡿⣽
+⢋⢿⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡻⠅⠀⠁⠈⣿⣙⢃⣤⡟⠡⣾⣿⣿⣿⣿⣿⣿⣿⣿⣦⣭⣌⣭⣙⡷⣾⣄⣀⣸⣿⣫⡵⢶⣶⢾⣶⡾⣽⣿⣿⣿⣿⢞⣻⡿⢻⡅⠀⠸⠻⣦⠤⠂⠀⠀⡹⣿⡷⣫⢝⣣⢯⣙⢧⡻⣜⡻⢶⣭⣛⠶⣏⡷⣛⣮⢟⡽⣯⣽⣳
+⢦⣾⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡃⠆⠀⠀⠀⣹⣟⠩⢁⢢⣽⣿⣿⣿⣿⣿⣿⣿⣿⣟⣻⠗⡽⠛⢚⣻⠛⣭⠀⢳⣌⠋⠿⢟⣢⣈⣥⢾⣽⣟⣿⣯⣿⣻⠷⣿⣍⠻⣶⣤⣀⡇⠀⠀⠀⠀⠹⣿⣿⡱⢞⢦⠳⡭⢶⣙⢮⣝⡳⢮⣝⡻⡼⣽⣹⢮⡟⣽⡞⣷⢯
+⣑⣺⣿⣿⣿⣿⡇⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣷⣍⠢⢀⠀⠰⣩⠇⢠⣡⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣌⠛⠙⠚⠉⢠⠞⡯⠁⢨⠑⠳⠄⠀⠀⠀⠀⠠⣛⣿⣾⣯⣟⣮⠿⣝⣷⡁⠀⠛⢿⡁⠀⠀⠀⠀⠐⣿⣿⡸⣍⢎⡳⣙⢮⡹⢖⡮⣝⡳⣎⢷⣛⡶⣏⣷⢻⣳⠿⣭⢿
+⡍⡹⡹⢏⠿⣹⢇⡿⣿⠻⣟⢿⣻⢿⣿⡿⢯⠳⣌⡳⡍⠆⢌⣱⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⠣⢄⠠⣲⢏⠺⠁⠀⠀⠩⠎⢡⣏⠱⣤⡀⠲⣭⣿⣿⢻⣿⣯⡿⣽⣞⣧⠀⠀⢸⡁⠀⠀⠀⠀⢈⡿⣟⡴⣩⢎⡵⣩⠶⡹⣭⠶⣭⢳⡝⣮⢷⣹⢞⡵⣯⢏⡿⣽⢯
+⣥⣣⣧⣼⣴⣭⣞⣵⣫⣶⣹⢚⣻⣮⠿⡇⣌⠲⢭⢧⣵⣤⣬⣿⣟⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣆⡜⢤⢻⣌⡐⡀⠀⠀⠀⣀⣬⠏⢠⢉⢷⣦⣿⣿⣿⣸⣿⣿⣷⣯⢽⣻⣆⡀⣎⠃⠀⠀⠀⠀⡜⡳⣿⢥⢫⡜⡥⣏⠶⣣⢏⡶⣹⢎⡷⣹⢎⡿⣼⡳⡽⣞⢷⣏⣾
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⠋⣏⠙⣿⣟⡇⡒⠤⢃⢎⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣱⣮⡿⣿⢿⠶⠶⠿⠽⠞⣛⣾⣿⡷⣿⣿⣿⣻⣿⣿⣿⣿⣾⣯⢷⣻⢿⣶⡁⠀⠀⠀⠀⢒⠱⡻⣯⢲⣙⠶⡭⣞⠵⣫⢞⡵⣫⢞⡧⣟⢾⣱⡟⣽⣞⢯⣞⡷
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣣⠼⢦⠘⣷⢌⡒⢩⣼⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⢿⡿⣿⡶⠭⡭⢬⠄⠘⢟⣽⡟⢉⢿⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣫⣟⣿⣦⡤⢠⠐⠈⠀⠡⠙⣻⣿⣿⢷⣎⢿⡱⣏⢾⣱⢯⣞⡽⣞⢧⣟⣳⣞⡿⢾⡽
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣤⣜⢛⣷⣟⣱⡷⠿⠟⣏⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡼⣌⢏⠑⣶⢶⣶⡿⢋⡸⣠⢏⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡌⠀⠀⠀⢀⣼⣿⣿⣿⣻⣮⣳⠽⣎⡷⣫⢾⡵⢯⣛⡾⢧⣟⡾⢯⣟
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣿⣎⢉⡟⠶⡦⣾⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣎⠣⠤⠧⠧⠤⢚⣴⠟⣮⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣤⣶⣿⡿⣟⣿⣿⣿⣿⣯⣟⡽⣺⣝⣧⡟⣯⣻⢽⣛⡾⣽⣻⣞
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟⢿⣦⣴⣦⣼⠟⡡⣭⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣻⣟⣽⣿⣿⣿⣾⣹⣗⠾⣞⣽⣳⢯⣟⡽⣽⣳⣳⢯
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣔⣤⣲⣀⣦⣷⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣻⡽⣞⣧⣟⣾⣽⣳⢷⣫⣟
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣟⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⢷⣯
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢿⠯⢽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⣟⣿⣽⣻⣾⣻⢾
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣞⣺⣿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢣⠧⢍⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⢆⢻⣯⢻⣿⣿⣿⣿⣿⣿⢿⣳⡿⣍⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⠯⢿⣷⣏⣟⣿⣿⣿⣿⣿⡿⣑⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣯⣿⢻⣿⣿⣿⣿⢿⢿⣫⣻⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡛⠽⣿⡿⣿⣻⢟⣿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣾⣯⣧⣯⣽⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 
+```
+]
+ 
+---
+
 ### Week 3
 
 #### Goals
-
+i
 - [x] Add a floor body to the physics simulation (#16)
 - [ ] Implement physics debug mode
 - [ ] Work on collision detection
