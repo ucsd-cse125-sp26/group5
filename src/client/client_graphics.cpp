@@ -139,6 +139,7 @@ static void renderEntities(const Shader& shader, ClientGame& game,
       continue;
     }
     Model* modelAsset = models[renderInfo.modelName];
+    if (!modelAsset) continue;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));

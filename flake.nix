@@ -39,7 +39,6 @@
           ninja
           clang-tools
           pkg-config
-          sccache
 
           # GLFW deps (Wayland)
           wayland
