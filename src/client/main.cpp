@@ -4,26 +4,24 @@
 #include <entt/entt.hpp>
 // clang-format on
 
+#include <cassert>
 #include <iostream>
-#include <string>
-#include <unordered_map>
+#include <thread>
 
-#include "asset.h"
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
-#include "glm/gtc/type_ptr.hpp"
-#include "shaders.h"
-#include "shared/assets.h"
-#include "shared/components.h"
 #include "shared/hello.h"
+#include "shared/simple_profiler.h"
 
+void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  // test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -32,95 +30,55 @@ int main() {
 
   registerClientHandlers(network);
 
-  if (!glfwInit()) return -1;
-
-  glfwWindowHint(GLFW_SAMPLES, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
-  GLFWwindow* window =
-      glfwCreateWindow(640, 480, "Hello World", nullptr, nullptr);
-  if (!window) {
-    glfwTerminate();
-    return -1;
+  Graphics graphics;
+  if (!graphics.load(960, 600)) {
+    return EXIT_FAILURE;
   }
-
-  glfwMakeContextCurrent(window);
-
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  if (glfwRawMouseMotionSupported())
-    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-
-  int version = gladLoadGL(glfwGetProcAddress);
-  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
-         GLAD_VERSION_MINOR(version));
-
-  // Load shaders
-  GLuint shaderProgram =
-      loadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
-
-  std::unordered_map<std::string, Model*> models;
-  for (const auto& asset : shared::ASSETS) {
-    Model* m = asset.filename.empty() ? makeCubeModel()
-                                      : loadModel(std::string(asset.filename));
-    if (!m) {
-      fprintf(stderr, "Failed to load asset '%s' (%s)\n",
-              std::string(asset.name).c_str(),
-              std::string(asset.filename).c_str());
-      continue;
-    }
-    models[std::string(asset.name)] = m;
-    printf("Loaded asset: %s\n", std::string(asset.name).c_str());
-  }
-
-  glEnable(GL_DEPTH_TEST);
-  glEnable(GL_MULTISAMPLE);
 
   InputKeys prevKeys = 0;
-  glUseProgram(shaderProgram);
 
-  initPointLights(shaderProgram);
-  GLuint i = 0;
+  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
+  while (!glfwWindowShouldClose(graphics.window)) {
+    SIMPLE_PROFILE_FRAME_START();
 
-  glm::mat4 projection;
-  projection =
-      glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-  glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1,
-                     GL_FALSE, glm::value_ptr(projection));
-
-  while (!glfwWindowShouldClose(window)) {
-    i += 1;
-    network.poll(game);
-    // printEntityPositions(game);
-    if (!setupCameraMatrix(shaderProgram, game)) {
-      continue;
+    if (game.snapshotDirty.load(std::memory_order_acquire)) {
+      std::scoped_lock lock(game.snapshotMutex);
+      syncToRender(game);
+      game.snapshotDirty.store(false, std::memory_order_release);
     }
 
-    updateDirectionalLight(shaderProgram, game);
-    updatePointLights(shaderProgram, game);
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    renderEntities(shaderProgram, game, models);
-    glfwSwapBuffers(window);
+    graphics.render(game);
+    graphics.swap();
     glfwPollEvents();
 
     // ESC releases the cursor; left-click re-captures it.
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    } else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) ==
+    if (glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+      glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    } else if (glfwGetMouseButton(graphics.window, GLFW_MOUSE_BUTTON_LEFT) ==
                    GLFW_PRESS &&
-               glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+               glfwGetInputMode(graphics.window, GLFW_CURSOR) ==
+                   GLFW_CURSOR_NORMAL) {
+      glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(window, network, prevKeys);
+    processInput(graphics.window, game.inputQueue, prevKeys);
+    SIMPLE_PROFILE_FRAME_END("Client");
   }
 
+  game.running.store(false, std::memory_order_release);
+  networkThread.join();
+  return 0;
+}
+
+void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
+  while (game.running.load(std::memory_order_acquire)) {
+    {
+      std::scoped_lock lock(game.snapshotMutex);
+      network.poll(game);
+    }
+    network.drainInputQueue(game.inputQueue);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
   network.disconnect();
   network.shutdown();
-  glfwTerminate();
-  return 0;
 }

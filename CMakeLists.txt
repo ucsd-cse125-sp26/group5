@@ -4,13 +4,20 @@ project(cse125-game)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+option(ENABLE_PROFILING "Enable Simple Profiler" OFF)
+if(ENABLE_PROFILING)
+    add_compile_definitions(ENABLE_PROFILING)
+endif()
+
 if(WIN32)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 # set(CMAKE_CXX_CLANG_TIDY clang-tidy)
 
 add_library(shared
-    src/shared/hello.cpp)
+    src/shared/hello.cpp
+    src/shared/util.cpp
+    )
 target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
@@ -21,8 +28,6 @@ add_subdirectory(lib/glm)
 
 add_subdirectory(lib/enet)
 target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
-
-target_include_directories(enet PUBLIC lib/enet/include)
 
 if(WIN32)
     target_link_libraries(enet ws2_32 winmm)
@@ -51,6 +56,16 @@ endif()
 SET(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 SET(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory(lib/assimp)
+set(PHYSICS_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt)
+add_subdirectory(lib/jolt/Build)
+if(MSVC)
+  set_target_properties(Jolt PROPERTIES
+    MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
+  )
+endif()
+if(NOT MSVC)
+  target_compile_options(Jolt PRIVATE -Wno-array-bounds)
+endif()
 
 add_library(imgui
     lib/imgui/imgui.cpp
@@ -73,10 +88,9 @@ target_sources(client PRIVATE
     src/client/client_game.cpp
     src/client/client_graphics.cpp
     src/client/shaders.cpp
-    src/client/util.cpp
     src/client/asset.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image)
+target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -96,9 +110,13 @@ endif()
 add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
+    src/server/physics_engine.cpp
+    src/server/scene.cpp
+    src/server/server_level_loader.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm)
+target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)
+target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/jolt/Build/..)
 
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
