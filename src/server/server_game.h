@@ -5,10 +5,10 @@
 #include <map>
 #include <vector>
 
+#include "game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
-#include "game_state.h"
 class ServerNetwork;
 
 struct PlayerAvatars {

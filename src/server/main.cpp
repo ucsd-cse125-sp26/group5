@@ -60,16 +60,15 @@ int main() {
   initWorldEntities(game);
 
   // Start in the Overworld
-  game.gameStateManager.changeState(game,
-                                    std::make_unique<OverworldState>());
+  game.gameStateManager.changeState(game, std::make_unique<OverworldState>());
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
     printf("A new client connected from %x:%u.\n", peer->address.host,
            peer->address.port);
 
     if (g.unused_player_slots.empty()) {
-        enet_peer_disconnect(peer, 0);
-        return;
+      enet_peer_disconnect(peer, 0);
+      return;
     }
 
     peer->data = (void*)"Client information";
@@ -103,8 +102,9 @@ int main() {
     printf("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
 
-    // if we wanted to immediately despawn the player's avatar on disconnect, we could do it here.
-    
+    // if we wanted to immediately despawn the player's avatar on disconnect, we
+    // could do it here.
+
     // shared::DespawnPacket despawnPkt;
     // despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
 
@@ -142,7 +142,7 @@ int main() {
     accumulator += dt;
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
-      
+
       // Step Jolt physics
       game.physics.step(fixedDt);
 
@@ -162,11 +162,12 @@ int main() {
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
-      std::vector<entt::entity> allEnts = game.gameStateManager.currentState()->getStateEntities(game);
+      std::vector<entt::entity> allEnts =
+          game.gameStateManager.currentState()->getStateEntities(game);
       if (!allEnts.empty()) {
-        auto buf =
-            serializeEntities(game.registry, game.componentRegistry,
-                              shared::PacketType::UPDATE_ENTITY, allEnts, false);
+        auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                     shared::PacketType::UPDATE_ENTITY, allEnts,
+                                     false);
         net::broadcastRaw(network.getHost(), buf.data(), buf.size());
       }
       SIMPLE_PROFILE_FRAME_END("Server");

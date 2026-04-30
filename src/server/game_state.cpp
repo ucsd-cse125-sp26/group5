@@ -93,140 +93,170 @@ void initWorldEntities(ServerGame& game) {
   // --- Overworld Map ---
   {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
-    game.registry.emplace<shared::PointLight>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+    game.registry.emplace<shared::PointLight>(
+        ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
+        0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
     game.registry.emplace<shared::Scene>(ent, "sunny");
     game.registry.emplace<shared::OverworldTag>(ent);
   }
   {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
     game.registry.emplace<shared::OverworldTag>(ent);
   }
-  struct Decor { float x, y, z, scale; };
-  for (auto& d : (Decor[]){{5,5,0.5,1}, {-5,3,0.5,1.5}, {3,-7,0.5,0.8}, {-8,-4,0.5,2}}) {
+  struct Decor {
+    float x, y, z, scale;
+  };
+  for (auto& d : (Decor[]){{.x = 5, .y = 5, .z = 0.5, .scale = 1},
+                           {.x = -5, .y = 3, .z = 0.5, .scale = 1.5},
+                           {.x = 3, .y = -7, .z = 0.5, .scale = 0.8},
+                           {.x = -8, .y = -4, .z = 0.5, .scale = 2}}) {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, d.x, d.y, d.z, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, d.x, d.y, d.z, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", d.scale);
     game.registry.emplace<shared::OverworldTag>(ent);
     JPH::BodyID bodyId = game.physics.createPlayerBody(d.x, d.y, d.z);
-    game.registry.emplace<shared::PhysicsBody>(ent, bodyId.GetIndexAndSequenceNumber());
+    game.registry.emplace<shared::PhysicsBody>(
+        ent, bodyId.GetIndexAndSequenceNumber());
   }
 
   // --- Maze Map ---
   {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
-    game.registry.emplace<shared::PointLight>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+    game.registry.emplace<shared::PointLight>(
+        ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
+        0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
     game.registry.emplace<shared::Scene>(ent, "night");
     game.registry.emplace<shared::MazeTag>(ent);
   }
   {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
     game.registry.emplace<shared::MazeTag>(ent);
   }
-  struct BearPos { float x, y, z, scale; };
-  for (auto& b : (BearPos[]){{3,0,0,0.1}, {-3,0,0,0.1}, {0,5,0,0.2}, {0,-5,0,0.2}, {6,6,0,0.15}, {-6,-6,0,0.15}}) {
+  struct BearPos {
+    float x, y, z, scale;
+  };
+  for (auto& b : (BearPos[]){{.x = 3, .y = 0, .z = 0, .scale = 0.1},
+                             {.x = -3, .y = 0, .z = 0, .scale = 0.1},
+                             {.x = 0, .y = 5, .z = 0, .scale = 0.2},
+                             {.x = 0, .y = -5, .z = 0, .scale = 0.2},
+                             {.x = 6, .y = 6, .z = 0, .scale = 0.15},
+                             {.x = -6, .y = -6, .z = 0, .scale = 0.15}}) {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, b.x, b.y, b.z, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, b.x, b.y, b.z, 1.0f, 0.0f,
+                                            0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "bear", b.scale);
     game.registry.emplace<shared::MazeTag>(ent);
     JPH::BodyID bodyId = game.physics.createPlayerBody(b.x, b.y, b.z);
-    game.registry.emplace<shared::PhysicsBody>(ent, bodyId.GetIndexAndSequenceNumber());
+    game.registry.emplace<shared::PhysicsBody>(
+        ent, bodyId.GetIndexAndSequenceNumber());
   }
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
-    float startX = i * 10.0f; // Hardcode spread out to prevent overlap
+    float startX = i * 10.0f;  // Hardcode spread out to prevent overlap
     PlayerAvatars slots;
-    
+
     auto [overworldEntityId, overworldEntity] = new_entity(game);
-    game.registry.emplace<shared::Position>(overworldEntity, startX, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(overworldEntity, startX, 0.0f, 0.0f,
+                                            1.0f, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::Velocity>(overworldEntity, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(overworldEntity, "cube", 1.0f);
     game.registry.emplace<shared::Camera>(overworldEntity, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(overworldEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
+    game.registry.emplace<shared::PlayerInput>(
+        overworldEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
     game.registry.emplace<shared::OverworldTag>(overworldEntity);
-    JPH::BodyID overworldBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
-    game.registry.emplace<shared::PhysicsBody>(overworldEntity, overworldBodyId.GetIndexAndSequenceNumber());
+    JPH::BodyID overworldBodyId =
+        game.physics.createPlayerBody(startX, 0.0f, 0.0f);
+    game.registry.emplace<shared::PhysicsBody>(
+        overworldEntity, overworldBodyId.GetIndexAndSequenceNumber());
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
-    game.registry.emplace<shared::Position>(mazeEntity, startX, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(mazeEntity, startX, 0.0f, 0.0f,
+                                            1.0f, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::Velocity>(mazeEntity, 0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(mazeEntity, "bear", 0.5f);
     game.registry.emplace<shared::Camera>(mazeEntity, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(mazeEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
+    game.registry.emplace<shared::PlayerInput>(
+        mazeEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
     game.registry.emplace<shared::MazeTag>(mazeEntity);
     JPH::BodyID mazeBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
-    game.registry.emplace<shared::PhysicsBody>(mazeEntity, mazeBodyId.GetIndexAndSequenceNumber());
+    game.registry.emplace<shared::PhysicsBody>(
+        mazeEntity, mazeBodyId.GetIndexAndSequenceNumber());
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
   }
 }
 
-
 // ── Delegating Helpers ───────────────────────────────────
 
-template <typename Tag, entt::entity PlayerAvatars::*AvatarField>
+template <typename Tag, entt::entity PlayerAvatars::* AvatarField>
 static void enterStateHelper(ServerGame& game, const char* stateName) {
-    printf("[State] Entering %s\n", stateName);
-    std::vector<entt::entity> spawned;
-    auto view = game.registry.view<Tag>();
-    for (auto ent : view) spawned.push_back(ent);
+  printf("[State] Entering %s\n", stateName);
+  std::vector<entt::entity> spawned;
+  auto view = game.registry.view<Tag>();
+  for (auto ent : view) spawned.push_back(ent);
 
-    for (auto& pair : game.active_players) {
-        shared::AssignPacket assignPkt;
-        assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-        entt::entity target_avatar = pair.second.*AvatarField;
-        assignPkt.entityId = game.registry.get<shared::Entity>(target_avatar).id;
-        net::sendPacket(pair.first, assignPkt);
-    }
-    broadcastSpawn(game, spawned);
+  for (auto& pair : game.active_players) {
+    shared::AssignPacket assignPkt;
+    assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
+    entt::entity target_avatar = pair.second.*AvatarField;
+    assignPkt.entityId = game.registry.get<shared::Entity>(target_avatar).id;
+    net::sendPacket(pair.first, assignPkt);
+  }
+  broadcastSpawn(game, spawned);
 }
 
 template <typename Tag>
 static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
-    std::vector<entt::entity> existing;
-    auto view = game.registry.view<Tag>();
-    for (auto ent : view) existing.push_back(ent);
-    return existing;
+  std::vector<entt::entity> existing;
+  auto view = game.registry.view<Tag>();
+  for (auto ent : view) existing.push_back(ent);
+  return existing;
 }
 
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
-    enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(game, "Overworld");
+  enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
+      game, "Overworld");
 }
 
 void OverworldState::onExit(ServerGame& game) {
-    printf("[State] Exiting Overworld\n");
-    clearTaggedPlayerControls<shared::OverworldTag>(game);
-    despawnTaggedEntities<shared::OverworldTag>(game);
+  printf("[State] Exiting Overworld\n");
+  clearTaggedPlayerControls<shared::OverworldTag>(game);
+  despawnTaggedEntities<shared::OverworldTag>(game);
 }
 
 entt::entity OverworldState::getClientAvatar(const PlayerAvatars& slots) const {
-    return slots.overworld_avatar;
+  return slots.overworld_avatar;
 }
 
-std::vector<entt::entity> OverworldState::getStateEntities(ServerGame& game) const {
-    return getEntitiesHelper<shared::OverworldTag>(game);
+std::vector<entt::entity> OverworldState::getStateEntities(
+    ServerGame& game) const {
+  return getEntitiesHelper<shared::OverworldTag>(game);
 }
-
-
-
 
 void OverworldState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
 
   // Press 1 → enter maze
-  auto inputView = game.registry.view<shared::PlayerInput, shared::OverworldTag>();
+  auto inputView =
+      game.registry.view<shared::PlayerInput, shared::OverworldTag>();
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
@@ -237,33 +267,32 @@ void OverworldState::update(ServerGame& game, float dt) {
 
   movement_system(game, dt, StateType::OVERWORLD);
   render_model_change(game.registry, dt);
-  
+
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-  if (lightId != kInvalidEntityId) hardcoded_spinning_light(game.registry, dt, lightId);
+  if (lightId != kInvalidEntityId)
+    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry);
 }
 
 // ── MazeState ────────────────────────────────────────────
 
 void MazeState::onEnter(ServerGame& game) {
-    enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
+  enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
 }
 
 void MazeState::onExit(ServerGame& game) {
-    printf("[State] Exiting Maze\n");
-    clearTaggedPlayerControls<shared::MazeTag>(game);
-    despawnTaggedEntities<shared::MazeTag>(game);
+  printf("[State] Exiting Maze\n");
+  clearTaggedPlayerControls<shared::MazeTag>(game);
+  despawnTaggedEntities<shared::MazeTag>(game);
 }
 
 entt::entity MazeState::getClientAvatar(const PlayerAvatars& slots) const {
-    return slots.maze_avatar;
+  return slots.maze_avatar;
 }
 
 std::vector<entt::entity> MazeState::getStateEntities(ServerGame& game) const {
-    return getEntitiesHelper<shared::MazeTag>(game);
+  return getEntitiesHelper<shared::MazeTag>(game);
 }
-
-
 
 void MazeState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
@@ -281,8 +310,9 @@ void MazeState::update(ServerGame& game, float dt) {
 
   movement_system(game, dt, StateType::MAZE);
   render_model_change(game.registry, dt);
-  
+
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
-  if (lightId != kInvalidEntityId) hardcoded_spinning_light(game.registry, dt, lightId);
+  if (lightId != kInvalidEntityId)
+    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry);
 }

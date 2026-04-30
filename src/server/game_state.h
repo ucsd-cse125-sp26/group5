@@ -5,11 +5,7 @@ static constexpr uint32_t kInvalidEntityId = UINT32_MAX;
 struct ServerGame;
 struct PlayerAvatars;
 
-
-enum class StateType {
-  OVERWORLD,
-  MAZE
-};
+enum class StateType { OVERWORLD, MAZE };
 
 // ── Game states ───────────────────────────────────────────
 
@@ -21,7 +17,8 @@ class IGameState {
   virtual void update(ServerGame& game, float dt) = 0;
   virtual StateType getStateType() const = 0;
   virtual entt::entity getClientAvatar(const PlayerAvatars& slots) const = 0;
-  virtual std::vector<entt::entity> getStateEntities(ServerGame& game) const = 0;
+  virtual std::vector<entt::entity> getStateEntities(
+      ServerGame& game) const = 0;
 };
 
 class OverworldState : public IGameState {

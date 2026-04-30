@@ -37,8 +37,9 @@ static void movement_system_for_world(ServerGame& game, float dt) {
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
   auto& bodyInterface = game.physics.getBodyInterface();
 
-  auto view = game.registry.view<shared::Position, shared::Velocity,
-                                 shared::PlayerInput, shared::PhysicsBody, WorldTag>();
+  auto view =
+      game.registry.view<shared::Position, shared::Velocity,
+                         shared::PlayerInput, shared::PhysicsBody, WorldTag>();
   for (auto entity : view) {
     auto& position = view.template get<shared::Position>(entity);
     auto& velocity = view.template get<shared::Velocity>(entity);
@@ -233,13 +234,13 @@ void registerServerHandlers(ServerNetwork& network) {
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
         if (it == game.active_players.end()) return;
-        
+
         entt::entity ent = entt::null;
         auto state = game.gameStateManager.currentState();
         if (state && state->getStateType() == StateType::OVERWORLD) {
-            ent = it->second.overworld_avatar;
+          ent = it->second.overworld_avatar;
         } else if (state && state->getStateType() == StateType::MAZE) {
-            ent = it->second.maze_avatar;
+          ent = it->second.maze_avatar;
         }
         if (ent == entt::null) return;
 
