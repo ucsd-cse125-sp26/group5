@@ -6,6 +6,23 @@ permalink: /project-spec/jiaying-chen-individual-report/
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
+## Week 4 
+1. What were your concrete goals for the week?
+This week, I wanted to: 
+    - Work on and finish the landscape, hopefully I can start coloring 
+    - Start making assets like the fallens star, trees, etc
+2. What goals were you able to accomplish?
+    - Finished working on the entire landscape, but have not started coloring yet; Finished making base model for fallen star, but was failing at making the tree leaves that I thought would be super easy. well see what happens next. 
+3. If the week went differently than you had planned, what were the reasons? 
+    - This week went kinda according to my plan still. 
+4. What are your specific goals for the next week?
+    - Start working more and more on assets, work with Jacob to understand what is the file format they specifically need 
+5. What did you learn this week, if anything (and did you expect to learn it)?
+    - As always, things that look simple might not be simple. 
+6. What is your individual morale (which might be different from the overall group morale)?
+    - I think it's pretty good; not much to comment on but I think I'm making acceptable progress.
+
+
 ## Week 3 
 1. What where your concrete goals for the week? 
 - Create a basic sketch of what the game should actaully look like, with colors and assets created. 
@@ -19,6 +36,14 @@ I was able to finish the sketch! This sketch contains:
     3. Assets each part of the map ✅
 
 However, I started doing landscape and realize it's actually more time consuming to get things to look good than I thought. So I will be spending more time on that. 
+
+<img src="{{ '/assets/week3/rebecca/color1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/color2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model3.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model4.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week3/rebecca/model5.png' | relative_url }}" alt="thing">
 
 3. If the week went differently than you had planned, what were the reasons? 
 Underestimation of how time consuming the landscaping task is; I also think I should redo parts of it because I just don't like how it looks currrently. Also joined a hackathon that took the life out of me this weekend. 

@@ -4,6 +4,7 @@
 #include "client_game.h"
 #include "shared/net/packet_handler.h"
 #include "shared/net/packet_utils.h"
+#include "spsc_queue.h"
 
 class ClientNetwork {
  public:
@@ -19,6 +20,8 @@ class ClientNetwork {
   void send(const T& packet, bool reliable = true, uint8_t channel = 0) {
     if (peer_) net::sendPacket(peer_, packet, reliable, channel);
   }
+
+  void drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue);
 
  private:
   ENetHost* client_ = nullptr;
