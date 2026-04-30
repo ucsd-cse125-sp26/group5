@@ -112,10 +112,11 @@ void initWorldEntities(ServerGame& game) {
   struct Decor {
     float x, y, z, scale;
   };
-  for (auto& d : (Decor[]){{.x = 5, .y = 5, .z = 0.5, .scale = 1},
-                           {.x = -5, .y = 3, .z = 0.5, .scale = 1.5},
-                           {.x = 3, .y = -7, .z = 0.5, .scale = 0.8},
-                           {.x = -8, .y = -4, .z = 0.5, .scale = 2}}) {
+  Decor decors[] = {{.x = 5, .y = 5, .z = 0.5, .scale = 1},
+                    {.x = -5, .y = 3, .z = 0.5, .scale = 1.5},
+                    {.x = 3, .y = -7, .z = 0.5, .scale = 0.8},
+                    {.x = -8, .y = -4, .z = 0.5, .scale = 2}};
+  for (auto& d : decors) {
     auto [eid, ent] = new_entity(game);
     game.registry.emplace<shared::Position>(ent, d.x, d.y, d.z, 1.0f, 0.0f,
                                             0.0f, 0.0f);
@@ -148,12 +149,13 @@ void initWorldEntities(ServerGame& game) {
   struct BearPos {
     float x, y, z, scale;
   };
-  for (auto& b : (BearPos[]){{.x = 3, .y = 0, .z = 0, .scale = 0.1},
-                             {.x = -3, .y = 0, .z = 0, .scale = 0.1},
-                             {.x = 0, .y = 5, .z = 0, .scale = 0.2},
-                             {.x = 0, .y = -5, .z = 0, .scale = 0.2},
-                             {.x = 6, .y = 6, .z = 0, .scale = 0.15},
-                             {.x = -6, .y = -6, .z = 0, .scale = 0.15}}) {
+  BearPos bears[] = {{.x = 3, .y = 0, .z = 0, .scale = 0.1},
+                     {.x = -3, .y = 0, .z = 0, .scale = 0.1},
+                     {.x = 0, .y = 5, .z = 0, .scale = 0.2},
+                     {.x = 0, .y = -5, .z = 0, .scale = 0.2},
+                     {.x = 6, .y = 6, .z = 0, .scale = 0.15},
+                     {.x = -6, .y = -6, .z = 0, .scale = 0.15}};
+  for (auto& b : bears) {
     auto [eid, ent] = new_entity(game);
     game.registry.emplace<shared::Position>(ent, b.x, b.y, b.z, 1.0f, 0.0f,
                                             0.0f, 0.0f);
