@@ -174,7 +174,6 @@ static void renderEntities(const Shader& shader, ClientGame& game,
 bool Graphics::load(int width, int height) {
   if (!glfwInit()) return false;
 
-  glfwWindowHint(GLFW_SAMPLES, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -210,7 +209,10 @@ bool Graphics::load(int width, int height) {
   shader.emplace("shaders/vertex.glsl", "shaders/fragment.glsl");
   skyboxShader.emplace("shaders/vertex_skybox.glsl",
                        "shaders/fragment_skybox.glsl");
-  debugOverlay.emplace("shaders/present.glsl", "shaders/debug_overlay.glsl");
+  presentShader.emplace("shaders/vertex_present.glsl",
+                        "shaders/fragment_present.glsl");
+  debugOverlay.emplace("shaders/vertex_present.glsl",
+                       "shaders/fragment_debug_overlay.glsl");
 
   // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
   // shader via gl_VertexID).
@@ -248,7 +250,6 @@ bool Graphics::load(int width, int height) {
   }
 
   glEnable(GL_DEPTH_TEST);
-  glEnable(GL_MULTISAMPLE);
 
   resizeBuffers(fbWidth, fbHeight);
   initShaderUniforms();
@@ -268,6 +269,34 @@ void Graphics::resizeBuffers(int width, int height) {
     shader->use();
     shader->setMat4("projection", projection);
   }
+
+  // (Re)create the offscreen scene framebuffer at the new size. Phase 5
+  // upgrades sceneColor's internal format to RGBA16F for HDR.
+  if (!sceneFBO) glGenFramebuffers(1, &sceneFBO);
+  if (!sceneColor) glGenTextures(1, &sceneColor);
+  if (!sceneDepth) glGenRenderbuffers(1, &sceneDepth);
+
+  glBindTexture(GL_TEXTURE_2D, sceneColor);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, sceneDepth);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
+                        fbHeight);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         sceneColor, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, sceneDepth);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "sceneFBO incomplete\n");
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Graphics::initShaderUniforms() {
@@ -287,7 +316,10 @@ void Graphics::reloadShaders() {
       {shader, "shaders/vertex.glsl", "shaders/fragment.glsl"},
       {skyboxShader, "shaders/vertex_skybox.glsl",
        "shaders/fragment_skybox.glsl"},
-      {debugOverlay, "shaders/present.glsl", "shaders/debug_overlay.glsl"},
+      {presentShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_present.glsl"},
+      {debugOverlay, "shaders/vertex_present.glsl",
+       "shaders/fragment_debug_overlay.glsl"},
   };
   for (auto& r : reloads) {
     Shader candidate(r.vert, r.frag);
@@ -363,6 +395,10 @@ void Graphics::render(ClientGame& game) {
   auto camera = computeCamera(game);
   if (!camera) return;
 
+  // Scene pass: render forward + skybox into the offscreen FBO.
+  glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glEnable(GL_DEPTH_TEST);
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -381,6 +417,23 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
+  // Present pass: blit sceneColor to the default framebuffer via fullscreen
+  // triangle. Phases 4-6 will insert tonemap / FXAA / bloom composite stages
+  // between the scene pass and the present.
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_DEPTH_TEST);
+  glClear(GL_COLOR_BUFFER_BIT);
+  if (presentShader && presentShader->valid()) {
+    presentShader->use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneColor);
+    presentShader->setInt("src", 0);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+  }
+
   drawDebugOverlay();
 }
 
@@ -389,11 +442,24 @@ void Graphics::swap() { glfwSwapBuffers(window); }
 Graphics::~Graphics() {
   shader.reset();
   skyboxShader.reset();
+  presentShader.reset();
   debugOverlay.reset();
 
   if (fullscreenVAO) {
     glDeleteVertexArrays(1, &fullscreenVAO);
     fullscreenVAO = 0;
+  }
+  if (sceneFBO) {
+    glDeleteFramebuffers(1, &sceneFBO);
+    sceneFBO = 0;
+  }
+  if (sceneColor) {
+    glDeleteTextures(1, &sceneColor);
+    sceneColor = 0;
+  }
+  if (sceneDepth) {
+    glDeleteRenderbuffers(1, &sceneDepth);
+    sceneDepth = 0;
   }
 
   for (auto& [name, model] : models) {

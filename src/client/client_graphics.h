@@ -33,10 +33,19 @@ struct Graphics {
   GLFWwindow* window = nullptr;
   std::optional<Shader> shader;
   std::optional<Shader> skyboxShader;
+  std::optional<Shader> presentShader;
   std::optional<Shader> debugOverlay;
   std::unordered_map<std::string, Model*> models;
   std::unordered_map<std::string, Skybox> skyboxes;
   glm::mat4 projection{1.0f};
+
+  // Offscreen scene target. The forward + skybox pass writes here; the
+  // present pass samples sceneColor and blits it to the default framebuffer.
+  // Recreated by resizeBuffers when the framebuffer size changes. Phase 5
+  // upgrades sceneColor to RGBA16F for HDR.
+  GLuint sceneFBO = 0;
+  GLuint sceneColor = 0;
+  GLuint sceneDepth = 0;
 
   // Framebuffer dimensions in pixels (HiDPI-aware).
   int fbWidth = 0;
