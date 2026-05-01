@@ -36,6 +36,11 @@ static void initPointLights(const Shader& shader) {
   }
 }
 
+static void framebufferSizeCallback(GLFWwindow* w, int width, int height) {
+  auto* g = static_cast<Graphics*>(glfwGetWindowUserPointer(w));
+  if (g) g->resizeBuffers(width, height);
+}
+
 std::optional<CameraState> computeCamera(const ClientGame& game) {
   auto selfIt = game.renderEntityMap.find(game.renderEntityId);
   if (selfIt == game.renderEntityMap.end() ||
@@ -188,6 +193,16 @@ bool Graphics::load(int width, int height) {
   if (glfwRawMouseMotionSupported())
     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
+  // Stash this Graphics instance on the window so the framebuffer-size
+  // callback can route resize events back into resizeBuffers.
+  glfwSetWindowUserPointer(window, this);
+  glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+
+  // Capture windowed geometry for fullscreen restore.
+  glfwGetWindowPos(window, &windowedX, &windowedY);
+  glfwGetWindowSize(window, &windowedW, &windowedH);
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
   int version = gladLoadGL(glfwGetProcAddress);
   printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
@@ -195,6 +210,11 @@ bool Graphics::load(int width, int height) {
   shader.emplace("shaders/vertex.glsl", "shaders/fragment.glsl");
   skyboxShader.emplace("shaders/vertex_skybox.glsl",
                        "shaders/fragment_skybox.glsl");
+  debugOverlay.emplace("shaders/present.glsl", "shaders/debug_overlay.glsl");
+
+  // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
+  // shader via gl_VertexID).
+  glGenVertexArrays(1, &fullscreenVAO);
 
   for (const auto& asset : shared::ASSETS) {
     Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
@@ -230,15 +250,112 @@ bool Graphics::load(int width, int height) {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
+  resizeBuffers(fbWidth, fbHeight);
+  initShaderUniforms();
+
+  return true;
+}
+
+void Graphics::resizeBuffers(int width, int height) {
+  if (width <= 0 || height <= 0) return;
+  fbWidth = width;
+  fbHeight = height;
+  glViewport(0, 0, fbWidth, fbHeight);
   projection = glm::perspective(
       glm::radians(45.0f),
-      static_cast<float>(width) / static_cast<float>(height), 0.1f, 100.0f);
+      static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 100.0f);
+  if (shader && shader->valid()) {
+    shader->use();
+    shader->setMat4("projection", projection);
+  }
+}
 
+void Graphics::initShaderUniforms() {
+  if (!shader || !shader->valid()) return;
   shader->use();
   shader->setMat4("projection", projection);
   initPointLights(*shader);
+}
 
-  return true;
+void Graphics::reloadShaders() {
+  struct Reload {
+    std::optional<Shader>& slot;
+    const char* vert;
+    const char* frag;
+  };
+  Reload reloads[] = {
+      {shader, "shaders/vertex.glsl", "shaders/fragment.glsl"},
+      {skyboxShader, "shaders/vertex_skybox.glsl",
+       "shaders/fragment_skybox.glsl"},
+      {debugOverlay, "shaders/present.glsl", "shaders/debug_overlay.glsl"},
+  };
+  for (auto& r : reloads) {
+    Shader candidate(r.vert, r.frag);
+    if (candidate.valid()) {
+      r.slot.emplace(std::move(candidate));
+      printf("Reloaded: %s + %s\n", r.vert, r.frag);
+    } else {
+      fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
+              r.frag);
+    }
+  }
+  initShaderUniforms();
+}
+
+void Graphics::toggleFullscreen() {
+  if (!window) return;
+  if (fullscreen) {
+    glfwSetWindowMonitor(window, nullptr, windowedX, windowedY, windowedW,
+                         windowedH, 0);
+    fullscreen = false;
+  } else {
+    glfwGetWindowPos(window, &windowedX, &windowedY);
+    glfwGetWindowSize(window, &windowedW, &windowedH);
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+    if (!monitor) return;
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (!mode) return;
+    glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height,
+                         mode->refreshRate);
+    fullscreen = true;
+  }
+}
+
+void Graphics::cycleDebugChannel() {
+  int next = (static_cast<int>(debugChannel) + 1) %
+             static_cast<int>(DebugChannel::Count);
+  debugChannel = static_cast<DebugChannel>(next);
+  const char* name = "?";
+  switch (debugChannel) {
+    case DebugChannel::Off:
+      name = "Off";
+      break;
+    case DebugChannel::Count:
+      break;
+  }
+  printf("Debug overlay: %s\n", name);
+}
+
+void Graphics::processDebugKeys() {
+  if (!window) return;
+  bool f2 = glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS;
+  bool f5 = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
+  bool f11 = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+  if (f2 && !keyF2Prev) cycleDebugChannel();
+  if (f5 && !keyF5Prev) reloadShaders();
+  if (f11 && !keyF11Prev) toggleFullscreen();
+  keyF2Prev = f2;
+  keyF5Prev = f5;
+  keyF11Prev = f11;
+}
+
+void Graphics::drawDebugOverlay() {
+  // Phase 0: only DebugChannel::Off exists, so nothing to display. Later
+  // phases bind their intermediate textures and configure the corner draw.
+  if (debugChannel == DebugChannel::Off) return;
+  // Reserved: bind the channel's texture, set viewport to a corner rect,
+  // disable depth, glBindVertexArray(fullscreenVAO),
+  // glDrawArrays(GL_TRIANGLES, 0, 3), restore viewport.
 }
 
 void Graphics::render(ClientGame& game) {
@@ -263,6 +380,8 @@ void Graphics::render(ClientGame& game) {
       drawSkybox(*skyboxShader, it->second, *camera, projection);
     }
   }
+
+  drawDebugOverlay();
 }
 
 void Graphics::swap() { glfwSwapBuffers(window); }
@@ -270,6 +389,12 @@ void Graphics::swap() { glfwSwapBuffers(window); }
 Graphics::~Graphics() {
   shader.reset();
   skyboxShader.reset();
+  debugOverlay.reset();
+
+  if (fullscreenVAO) {
+    glDeleteVertexArrays(1, &fullscreenVAO);
+    fullscreenVAO = 0;
+  }
 
   for (auto& [name, model] : models) {
     delete model;

@@ -20,6 +20,7 @@ class Shader {
 
   void use() const;
   GLuint id() const;
+  bool valid() const { return m_id != 0; }
 
   void setInt(const std::string& name, int value) const;
   void setFloat(const std::string& name, float value) const;
