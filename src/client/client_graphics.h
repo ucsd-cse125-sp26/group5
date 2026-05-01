@@ -149,6 +149,13 @@ struct Graphics {
   void render(ClientGame& game);
   void swap();
   ~Graphics();
+  // Owns ~30 raw GLuint handles deleted in the dtor. An accidental copy
+  // (capture-by-value, vector<Graphics>, etc.) would double-free at shutdown.
+  Graphics() = default;
+  Graphics(const Graphics&) = delete;
+  Graphics& operator=(const Graphics&) = delete;
+  Graphics(Graphics&&) = delete;
+  Graphics& operator=(Graphics&&) = delete;
 
   // Phase 0 infrastructure.
   void resizeBuffers(int width, int height);

@@ -15,5 +15,8 @@ void main() {
   hdr += bloom * bloomStrength;
   // Exposure tonemap. Phase 5 default exposure=1.0; tweak for day/night.
   vec3 mapped = vec3(1.0) - exp(-hdr * exposure);
+  // sRGB encode: the LDR target is RGBA8 with no GL_FRAMEBUFFER_SRGB, so
+  // apply gamma here. ~2.2 is the de-facto display gamma.
+  mapped = pow(mapped, vec3(1.0 / 2.2));
   FragColor = vec4(mapped, 1.0);
 }

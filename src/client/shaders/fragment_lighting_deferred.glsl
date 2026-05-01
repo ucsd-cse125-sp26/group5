@@ -59,7 +59,9 @@ float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
   vec3 proj = fragPosLightSpace.xyz / fragPosLightSpace.w;
   proj = proj * 0.5 + 0.5;
   if (proj.z > 1.0) return 0.0;
-  float bias = 0.0005;
+  // Slope-scaled bias: surfaces near-perpendicular to the light direction
+  // need less bias (small dot is large angle), grazing surfaces need more.
+  float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
   float currentDepth = proj.z;
   vec2 texelSize = 1.0 / vec2(textureSize(dirShadowMap, 0));
   float shadow = 0.0;
@@ -73,11 +75,16 @@ float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
   return shadow / 9.0;
 }
 
-float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos) {
+float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,
+                         vec3 normal) {
   if (shadowIdx < 0) return 0.0;
   vec3 frag2light = worldPos - lightPos;
   float currentDepth = length(frag2light);
   if (currentDepth >= pointFarPlane) return 0.0;
+  // Back-facing fragments are self-shadowed by geometry; skip the 20-tap
+  // cubemap PCF entirely and report fully shadowed.
+  vec3 lightDir = -frag2light / max(currentDepth, 1e-4);
+  if (dot(normal, lightDir) <= 0.0) return 1.0;
   float viewDistance = length(viewPos - worldPos);
   float diskRadius = (1.0 + viewDistance / pointFarPlane) / 25.0;
   float bias = 0.05;
@@ -127,9 +134,13 @@ void main() {
     PointLight L = pointLights[i];
     vec3 toLight = L.position - worldPos;
     float dist = length(toLight);
-    vec3 lightDir = toLight / max(dist, 1e-4);
     float attenuation = 1.0 /
         (L.constant + L.linear * dist + L.quadratic * dist * dist);
+    // Skip the rest of the loop body once the light's contribution drops
+    // below ~1/255 (one LDR step). Saves the shadow PCF and Blinn-Phong work
+    // on far-away lights that wouldn't visibly change the pixel anyway.
+    if (attenuation < 0.004) continue;
+    vec3 lightDir = toLight / max(dist, 1e-4);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 halfway = normalize(lightDir + viewDir);
     float spec = pow(max(dot(norm, halfway), 0.0), shininess);
@@ -139,16 +150,19 @@ void main() {
     ambient *= attenuation;
     diffuse *= attenuation;
     specular *= attenuation;
-    float shadow = PointShadowFactor(L.shadowIdx, worldPos, L.position);
+    float shadow = PointShadowFactor(L.shadowIdx, worldPos, L.position, norm);
     result += ambient + (1.0 - shadow) * (diffuse + specular);
   }
 
   result += emissive;
   FragColor = vec4(result, 1.0);
 
-  // Bright-pass extraction for bloom. Only contributes when the perceived
-  // luminance of this pixel exceeds the threshold (default 1.0 in HDR).
+  // Bright-pass extraction for bloom. Soft knee: smoothstep over a small
+  // band around the threshold so a pixel at exactly threshold doesn't snap
+  // from "no contribution" to "full contribution".
   float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
-  BrightColor = brightness > bloomThreshold ? vec4(result, 1.0)
-                                             : vec4(0.0, 0.0, 0.0, 1.0);
+  float knee = max(bloomThreshold * 0.1, 0.05);
+  float weight = smoothstep(bloomThreshold - knee, bloomThreshold + knee,
+                             brightness);
+  BrightColor = vec4(result * weight, 1.0);
 }

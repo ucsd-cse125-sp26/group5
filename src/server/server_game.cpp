@@ -123,6 +123,12 @@ void render_model_change(ServerGame& game, float dt) {
   auto view =
       game.registry
           .view<shared::RenderInfo, shared::PlayerInput, shared::PhysicsBody>();
+  // Held-key resize is uncapped: at 60 Hz it crosses sub-FLT_MIN within
+  // seconds. A near-zero scale builds a degenerate Jolt shape and crashes
+  // the contact resolver; an unbounded scale ruins broadphase. Clamp to a
+  // range that's still visible/playable.
+  constexpr float kMinPlayerScale = 0.05f;
+  constexpr float kMaxPlayerScale = 20.0f;
   for (auto entity : view) {
     auto& renderInfo = view.get<shared::RenderInfo>(entity);
     auto& input = view.get<shared::PlayerInput>(entity);
@@ -133,15 +139,15 @@ void render_model_change(ServerGame& game, float dt) {
       shapeDirty = true;
     }
     if (input.keys & KEY_MODEL_BIGGER) {
-      renderInfo.sx *= 1.1f;
-      renderInfo.sy *= 1.1f;
-      renderInfo.sz *= 1.1f;
+      renderInfo.sx = std::min(renderInfo.sx * 1.1f, kMaxPlayerScale);
+      renderInfo.sy = std::min(renderInfo.sy * 1.1f, kMaxPlayerScale);
+      renderInfo.sz = std::min(renderInfo.sz * 1.1f, kMaxPlayerScale);
       shapeDirty = true;
     }
     if (input.keys & KEY_MODEL_SMALLER) {
-      renderInfo.sx /= 1.1f;
-      renderInfo.sy /= 1.1f;
-      renderInfo.sz /= 1.1f;
+      renderInfo.sx = std::max(renderInfo.sx / 1.1f, kMinPlayerScale);
+      renderInfo.sy = std::max(renderInfo.sy / 1.1f, kMinPlayerScale);
+      renderInfo.sz = std::max(renderInfo.sz / 1.1f, kMinPlayerScale);
       shapeDirty = true;
     }
     if (shapeDirty) {
@@ -152,8 +158,11 @@ void render_model_change(ServerGame& game, float dt) {
       // ~2.7M kg body, which combined with the player's rotation-locked DOFs
       // produces NaN/Inf during the next physics step. Player keeps the
       // mass it was created with regardless of visual model.
-      bodyInterface.SetShape(JPH::BodyID(pb.bodyId), newShape,
-                             /*update mass*/ false, JPH::EActivation::Activate);
+      if (newShape) {
+        bodyInterface.SetShape(JPH::BodyID(pb.bodyId), newShape,
+                               /*update mass*/ false,
+                               JPH::EActivation::Activate);
+      }
     }
   }
 }

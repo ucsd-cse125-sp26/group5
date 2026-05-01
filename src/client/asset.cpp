@@ -149,11 +149,17 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       ownedByStb = pixels != nullptr;
     }
 
+    // DIFFUSE and EMISSIVE are perceptual color (authored in sRGB tools);
+    // upload as GL_SRGB8_ALPHA8 so the GPU decodes to linear on sample.
+    // SPECULAR/AMBIENT are typically masks or scene-linear; keep as RGBA8.
+    const bool perceptual =
+        type == aiTextureType_DIFFUSE || type == aiTextureType_EMISSIVE;
+    const GLint internal = perceptual ? GL_SRGB8_ALPHA8 : GL_RGBA8;
     GLuint id;
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
     if (pixels) {
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, pixelOrder,
+      glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, pixelOrder,
                    GL_UNSIGNED_BYTE, pixels);
       glGenerateMipmap(GL_TEXTURE_2D);
     } else {
@@ -162,7 +168,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
                    "(type=%d); using magenta fallback\n",
                    path.C_Str(), static_cast<int>(type));
       uint8_t magenta[4] = {255, 0, 255, 255};
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA,
+      glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA,
                    GL_UNSIGNED_BYTE, magenta);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -192,10 +198,16 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       static_cast<uint8_t>(color.r * 255), static_cast<uint8_t>(color.g * 255),
       static_cast<uint8_t>(color.b * 255), static_cast<uint8_t>(color.a * 255)};
 
+  // Constant fallbacks for diffuse/emissive: same sRGB convention as the
+  // texture path so a model with one diffuse texture and one diffuse
+  // constant doesn't render with two different gamma assumptions.
+  const bool perceptual =
+      type == aiTextureType_DIFFUSE || type == aiTextureType_EMISSIVE;
+  const GLint internal = perceptual ? GL_SRGB8_ALPHA8 : GL_RGBA8;
   GLuint id;
   glGenTextures(1, &id);
   glBindTexture(GL_TEXTURE_2D, id);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+  glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pixel);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -307,11 +319,12 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   }
 
   // 6x1 diffuse palette, one texel per face (matches `faces` order above).
+  // Palette colors are picked visually, so they're sRGB.
   GLuint diffuseTex;
   glGenTextures(1, &diffuseTex);
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 6, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-               spec.palette);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, 6, 1, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, spec.palette);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -385,14 +398,14 @@ static GLuint loadCubemap(const std::string& directory) {
     unsigned char* data =
         stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 4);
     if (data) {
-      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, width,
-                   height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8,
+                   width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
       stbi_image_free(data);
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
-      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, 1, 1, 0,
-                   GL_RGBA, GL_UNSIGNED_BYTE, pink);
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, 1,
+                   1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
     }
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

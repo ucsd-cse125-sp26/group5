@@ -27,12 +27,11 @@
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-// Resolution of the directional shadow map. 8192² ≈ 192 MB at 24-bit depth.
-static constexpr int kDirShadowMapSize = 8192;
+// Resolution of the directional shadow map. 2048² ≈ 12 MB at 24-bit depth.
+static constexpr int kDirShadowMapSize = 2048;
 
-// Point-light cubemap array. 4 lights × 6 faces × 4096² depth ≈ 1.1 GB.
-// If GL_OUT_OF_MEMORY shows up at startup, dial this back.
-static constexpr int kPointShadowSize = 4096;
+// Point-light cubemap array. 4 lights × 6 faces × 1024² depth ≈ 24 MB.
+static constexpr int kPointShadowSize = 1024;
 static constexpr int kMaxPointLights = 4;
 static constexpr int kPointShadowLayers = kMaxPointLights * 6;
 // Linear-distance encoding range for point-light shadow depth.
@@ -99,6 +98,22 @@ static void uploadPointLights(const Shader& shader,
 static void framebufferSizeCallback(GLFWwindow* w, int width, int height) {
   auto* g = static_cast<Graphics*>(glfwGetWindowUserPointer(w));
   if (g) g->resizeBuffers(width, height);
+}
+
+static void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
+                                       GLuint /*id*/, GLenum severity,
+                                       GLsizei /*length*/, const GLchar* msg,
+                                       const void* /*userParam*/) {
+  // Filter out the noisy NOTIFICATION-level messages (buffer-detail spam from
+  // some drivers); everything else gets surfaced.
+  if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
+  const char* sev =
+      severity == GL_DEBUG_SEVERITY_HIGH      ? "HIGH"
+      : severity == GL_DEBUG_SEVERITY_MEDIUM  ? "MED"
+      : severity == GL_DEBUG_SEVERITY_LOW     ? "LOW"
+                                              : "?";
+  fprintf(stderr, "[GL %s%s] %s\n", sev,
+          type == GL_DEBUG_TYPE_ERROR ? " ERROR" : "", msg);
 }
 
 // Returns the active directional light direction (ECS override beats scene
@@ -173,17 +188,38 @@ static void computePointShadowMatrices(const LightUpload* lights, int count,
 // Builds a light-space matrix that wraps an ortho frustum around the camera.
 // The frustum follows the camera so distant objects get shadows too without
 // burning the whole shadow map on the world origin.
+//
+// Texel-snapping: lightPos slides continuously with the camera, which makes
+// the projected shadow texels drift across world surfaces and produces a
+// visible "swimming" shimmer on static geometry. We quantize lightPos to
+// whole-texel increments along the light's tangent plane so each texel
+// always covers the same world-space patch frame-over-frame.
 static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
                                                const glm::vec3& lightDir) {
   glm::vec3 dir = glm::normalize(lightDir);
-  // Place the virtual sun far enough behind the camera that the entire
-  // frustum stays in front of it. 30 units works for the current scene scale.
-  glm::vec3 lightPos = cameraPos - dir * 30.0f;
   glm::vec3 up = glm::abs(dir.z) > 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f)
                                         : glm::vec3(0.0f, 0.0f, 1.0f);
-  glm::mat4 view = glm::lookAt(lightPos, cameraPos, up);
-  // ±20 covers the visible play area; near=1, far=80 reaches across.
-  glm::mat4 proj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 1.0f, 80.0f);
+  // Build the light's tangent plane (right, lightUp) so we can snap the
+  // camera's projection onto it.
+  glm::vec3 right = glm::normalize(glm::cross(dir, up));
+  glm::vec3 lightUp = glm::cross(right, dir);
+  // Ortho frustum half-extent. ±20 covers the visible play area.
+  constexpr float kHalfExtent = 20.0f;
+  // World-space size of one shadow-map texel along the tangent plane.
+  const float texelWorld = (2.0f * kHalfExtent) / kDirShadowMapSize;
+  float u = glm::dot(cameraPos, right);
+  float v = glm::dot(cameraPos, lightUp);
+  u = std::floor(u / texelWorld) * texelWorld;
+  v = std::floor(v / texelWorld) * texelWorld;
+  // Reconstruct a snapped camera anchor in the light's tangent plane,
+  // then push it back along -dir to place the virtual sun.
+  glm::vec3 snapped =
+      right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
+  glm::vec3 lightPos = snapped - dir * 30.0f;
+  glm::mat4 view = glm::lookAt(lightPos, snapped, up);
+  glm::mat4 proj =
+      glm::ortho(-kHalfExtent, kHalfExtent, -kHalfExtent, kHalfExtent,
+                 1.0f, 80.0f);
   return proj * view;
 }
 
@@ -316,6 +352,10 @@ bool Graphics::load(int width, int height) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  // Debug context — KHR_debug is core in 4.3 but widely available as an
+  // extension on 4.1 (which we target for macOS support). We install the
+  // callback below only if the loader picked up the function pointer.
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 
   window = glfwCreateWindow(width, height, "Hello World", nullptr, nullptr);
   if (!window) {
@@ -344,6 +384,16 @@ bool Graphics::load(int width, int height) {
   printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
 
+  // KHR_debug is core in GL 4.3 and broadly available as an extension on
+  // 4.1 — install the callback if glad loaded a function pointer.
+  if (glDebugMessageCallback) {
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(glDebugCallback, nullptr);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
+                          GL_TRUE);
+  }
+
   gbufferShader.emplace("shaders/vertex_gbuffer.glsl",
                         "shaders/fragment_gbuffer.glsl");
   lightingShader.emplace("shaders/vertex_present.glsl",
@@ -367,6 +417,23 @@ bool Graphics::load(int width, int height) {
                             "shaders/geometry_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
+
+  // Shader::Shader silently fails (m_id=0) on missing/uncompilable source so
+  // that F5 hot-reload can keep running with the previous program. At
+  // startup we don't have a previous program, so a silent failure produces
+  // a black window with one stderr line. Fail fast instead.
+  const std::optional<Shader>* required[] = {
+      &gbufferShader,    &lightingShader,    &skyboxShader,
+      &presentShader,    &blurShader,        &tonemapShader,
+      &ssaoShader,       &ssaoBlurShader,    &shadowDirShader,
+      &shadowPointShader, &debugOverlay,
+  };
+  for (const auto* s : required) {
+    if (!*s || !(*s)->valid()) {
+      fprintf(stderr, "Graphics::load: required shader failed to compile\n");
+      return false;
+    }
+  }
 
   // Allocate the directional shadow map once; size is independent of window
   // size so resizeBuffers leaves it alone.
@@ -626,6 +693,10 @@ void Graphics::resizeBuffers(int width, int height) {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
       fprintf(stderr, "ssao FBO incomplete\n");
     }
+    // Clear to 1.0 ("no occlusion") so the first frame's lighting pass — or
+    // any frame that runs before the SSAO pass — reads sensible values.
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
   };
   allocSsao(ssaoFBO, ssaoColor);
   allocSsao(ssaoBlurFBO, ssaoBlurColor);

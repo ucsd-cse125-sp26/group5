@@ -180,9 +180,23 @@ JPH::BodyID PhysicsEngine::createBoxBody(const shared::ParsedModel& parsed,
   return createBoxBody(ext.halfExtents * scale, pos, rot, ext.center * scale);
 }
 
+// Reject scales Jolt can't safely consume. Anything below ~1e-3 builds a
+// near-degenerate shape; non-finite or non-positive components are crash
+// material in the contact resolver. Caller treats {} as "not built".
+static bool isUsableScale(const glm::vec3& s) {
+  constexpr float kMinScale = 1e-3f;
+  return std::isfinite(s.x) && std::isfinite(s.y) && std::isfinite(s.z) &&
+         s.x > kMinScale && s.y > kMinScale && s.z > kMinScale;
+}
+
 JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
     const std::string& modelName, const glm::vec3& scale,
     const glm::vec3& centerOffsetMask) {
+  if (!isUsableScale(scale)) {
+    printf("boxShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+           scale.x, scale.y, scale.z, modelName.c_str());
+    return nullptr;
+  }
   // Cache key is just modelName since asset orientation is baked in.
   BoxExtents ext;
   if (auto it = assetBoxCache_.find(modelName); it != assetBoxCache_.end()) {
@@ -239,6 +253,11 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
 
 JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
                                                 const glm::vec3& scale) {
+  if (!isUsableScale(scale)) {
+    printf("meshShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+           scale.x, scale.y, scale.z, modelName.c_str());
+    return nullptr;
+  }
   JPH::ShapeRefC unscaled;
   if (auto it = assetMeshCache_.find(modelName); it != assetMeshCache_.end()) {
     unscaled = it->second;
