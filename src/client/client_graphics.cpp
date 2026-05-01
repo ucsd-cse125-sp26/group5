@@ -37,15 +37,60 @@ static constexpr int kPointShadowLayers = kMaxPointLights * 6;
 static constexpr float kPointShadowNear = 0.1f;
 static constexpr float kPointShadowFar = 50.0f;
 
-static void initPointLights(const Shader& shader) {
-  for (int pl = 0; pl < 4; pl++) {
-    std::string prefix = "pointLights[" + std::to_string(pl) + "].";
-    shader.setFloat(prefix + "constant", 1.0f);
-    shader.setFloat(prefix + "linear", 0.0f);
-    shader.setFloat(prefix + "quadratic", 0.0f);
-    shader.setVec3(prefix + "ambient", 0.0f, 0.0f, 0.0f);
-    shader.setVec3(prefix + "diffuse", 0.0f, 0.0f, 0.0f);
-    shader.setVec3(prefix + "specular", 0.0f, 0.0f, 0.0f);
+// CPU-side mirror of one PointLight uniform struct.
+struct LightUpload {
+  glm::vec3 position;
+  float constant;
+  float linear;
+  float quadratic;
+  glm::vec3 ambient;
+  glm::vec3 diffuse;
+  glm::vec3 specular;
+  int shadowIdx;  // -1 = non-shadow-casting
+};
+
+static constexpr int kMaxLightingShaderLights = 32;
+
+// Iterates the ECS PointLight view, copies up to kMaxLightingShaderLights
+// into out, and assigns the first kMaxPointLights with castsShadow=true to
+// shadow slots 0..(kMaxPointLights-1). Returns the active light count.
+static int collectPointLights(const ClientGame& game,
+                               LightUpload out[kMaxLightingShaderLights]) {
+  int count = 0;
+  int shadowSlot = 0;
+  auto view = game.renderRegistry.view<shared::PointLight>();
+  for (auto ent : view) {
+    if (count >= kMaxLightingShaderLights) break;
+    const auto& pl = view.get<shared::PointLight>(ent);
+    LightUpload& l = out[count++];
+    l.position = glm::vec3(pl.px, pl.py, pl.pz);
+    l.constant = pl.constant;
+    l.linear = pl.linear;
+    l.quadratic = pl.quadratic;
+    l.ambient = glm::vec3(pl.ambientR, pl.ambientG, pl.ambientB);
+    l.diffuse = glm::vec3(pl.diffuseR, pl.diffuseG, pl.diffuseB);
+    l.specular = glm::vec3(pl.specularR, pl.specularG, pl.specularB);
+    l.shadowIdx =
+        (pl.castsShadow && shadowSlot < kMaxPointLights) ? shadowSlot++ : -1;
+  }
+  return count;
+}
+
+// Pushes the collected lights into the deferred lighting shader's uniform
+// arrays.
+static void uploadPointLights(const Shader& shader,
+                               const LightUpload* lights, int count) {
+  shader.setInt("numPointLights", count);
+  for (int i = 0; i < count; ++i) {
+    std::string base = "pointLights[" + std::to_string(i) + "].";
+    shader.setVec3(base + "position", lights[i].position);
+    shader.setFloat(base + "constant", lights[i].constant);
+    shader.setFloat(base + "linear", lights[i].linear);
+    shader.setFloat(base + "quadratic", lights[i].quadratic);
+    shader.setVec3(base + "ambient", lights[i].ambient);
+    shader.setVec3(base + "diffuse", lights[i].diffuse);
+    shader.setVec3(base + "specular", lights[i].specular);
+    shader.setInt(base + "shadowIdx", lights[i].shadowIdx);
   }
 }
 
@@ -80,7 +125,11 @@ static glm::vec3 directionalLightDir(const ClientGame& game) {
 // remains, meaning "not in shadow" when sampled). Also writes the per-light
 // world-space positions into outPositions, padded with origins for
 // inactive slots.
-static void computePointShadowMatrices(const ClientGame& game,
+//
+// Reads shadow-slot assignments from the LightUpload array so that the
+// lighting shader and the shadow shader agree on which cubemap layer each
+// shadow-casting light owns.
+static void computePointShadowMatrices(const LightUpload* lights, int count,
                                        glm::mat4 outMatrices[kPointShadowLayers],
                                        glm::vec3 outPositions[kMaxPointLights]) {
   // Cube-face directions/ups. Same convention learnopengl uses; the cube
@@ -107,18 +156,15 @@ static void computePointShadowMatrices(const ClientGame& game,
   glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
                                     kPointShadowNear, kPointShadowFar);
 
-  int idx = 0;
-  auto view = game.renderRegistry.view<shared::PointLight>();
-  for (auto ent : view) {
-    if (idx >= kMaxPointLights) break;
-    const auto& pl = view.get<shared::PointLight>(ent);
-    glm::vec3 p(pl.px, pl.py, pl.pz);
-    outPositions[idx] = p;
+  for (int i = 0; i < count; ++i) {
+    int slot = lights[i].shadowIdx;
+    if (slot < 0 || slot >= kMaxPointLights) continue;
+    const glm::vec3& p = lights[i].position;
+    outPositions[slot] = p;
     for (int f = 0; f < 6; ++f) {
-      outMatrices[idx * 6 + f] =
+      outMatrices[slot * 6 + f] =
           proj * glm::lookAt(p, p + faces[f].dir, faces[f].up);
     }
-    ++idx;
   }
 }
 
@@ -205,25 +251,6 @@ static void updateDirectionalLight(const Shader& shader,
                  info->diffuseB);
   shader.setVec3("dirLight.specular", info->specularR, info->specularG,
                  info->specularB);
-}
-
-static void updatePointLights(const Shader& shader, const ClientGame& game) {
-  int plIdx = 0;
-  auto lightView = game.renderRegistry.view<shared::PointLight>();
-  for (auto ent : lightView) {
-    if (plIdx >= 4) break;
-    auto& pl = lightView.get<shared::PointLight>(ent);
-    std::string prefix = "pointLights[" + std::to_string(plIdx) + "].";
-    shader.setVec3(prefix + "position", pl.px, pl.py, pl.pz);
-    shader.setFloat(prefix + "constant", pl.constant);
-    shader.setFloat(prefix + "linear", pl.linear);
-    shader.setFloat(prefix + "quadratic", pl.quadratic);
-    shader.setVec3(prefix + "ambient", pl.ambientR, pl.ambientG, pl.ambientB);
-    shader.setVec3(prefix + "diffuse", pl.diffuseR, pl.diffuseG, pl.diffuseB);
-    shader.setVec3(prefix + "specular", pl.specularR, pl.specularG,
-                   pl.specularB);
-    plIdx++;
-  }
 }
 
 static void drawSkybox(const Shader& shader, const Skybox& skybox,
@@ -315,11 +342,18 @@ bool Graphics::load(int width, int height) {
   printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
 
-  shader.emplace("shaders/vertex.glsl", "shaders/fragment.glsl");
+  gbufferShader.emplace("shaders/vertex_gbuffer.glsl",
+                        "shaders/fragment_gbuffer.glsl");
+  lightingShader.emplace("shaders/vertex_present.glsl",
+                         "shaders/fragment_lighting_deferred.glsl");
   skyboxShader.emplace("shaders/vertex_skybox.glsl",
                        "shaders/fragment_skybox.glsl");
   presentShader.emplace("shaders/vertex_present.glsl",
-                        "shaders/fragment_present.glsl");
+                        "shaders/fragment_fxaa.glsl");
+  blurShader.emplace("shaders/vertex_present.glsl",
+                     "shaders/fragment_blur.glsl");
+  tonemapShader.emplace("shaders/vertex_present.glsl",
+                        "shaders/fragment_tonemap.glsl");
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
@@ -430,45 +464,137 @@ void Graphics::resizeBuffers(int width, int height) {
   projection = glm::perspective(
       glm::radians(45.0f),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 100.0f);
-  if (shader && shader->valid()) {
-    shader->use();
-    shader->setMat4("projection", projection);
+  if (gbufferShader && gbufferShader->valid()) {
+    gbufferShader->use();
+    gbufferShader->setMat4("projection", projection);
   }
 
-  // (Re)create the offscreen scene framebuffer at the new size. Phase 5
-  // upgrades sceneColor's internal format to RGBA16F for HDR.
-  if (!sceneFBO) glGenFramebuffers(1, &sceneFBO);
-  if (!sceneColor) glGenTextures(1, &sceneColor);
-  if (!sceneDepth) glGenRenderbuffers(1, &sceneDepth);
+  // G-buffer attachments. Position and normal are RGBA16F so we don't lose
+  // precision on world-space coords; albedo+spec and emissive are RGBA8.
+  if (!gBufferFBO) glGenFramebuffers(1, &gBufferFBO);
+  if (!gPosition) glGenTextures(1, &gPosition);
+  if (!gNormal) glGenTextures(1, &gNormal);
+  if (!gAlbedo) glGenTextures(1, &gAlbedo);
+  if (!gSpecular) glGenTextures(1, &gSpecular);
+  if (!gEmissive) glGenTextures(1, &gEmissive);
+  if (!gBufferDepth) glGenRenderbuffers(1, &gBufferDepth);
 
-  glBindTexture(GL_TEXTURE_2D, sceneColor);
+  auto allocColor = [&](GLuint tex, GLint internalFmt, GLenum fmt,
+                         GLenum type) {
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, fbWidth, fbHeight, 0, fmt,
+                 type, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  };
+  allocColor(gPosition, GL_RGBA16F, GL_RGBA, GL_FLOAT);
+  allocColor(gNormal, GL_RGBA16F, GL_RGBA, GL_FLOAT);
+  allocColor(gAlbedo, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+  allocColor(gSpecular, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+  allocColor(gEmissive, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, gBufferDepth);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
+                        fbHeight);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         gPosition, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
+                         gNormal, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D,
+                         gAlbedo, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D,
+                         gSpecular, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D,
+                         gEmissive, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, gBufferDepth);
+  GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+                          GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
+                          GL_COLOR_ATTACHMENT4};
+  glDrawBuffers(5, drawBuffers);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "gBufferFBO incomplete\n");
+  }
+
+  // Lit FBO: deferred lighting writes via MRT (litColor + brightColor);
+  // skybox forward-renders to litColor afterward (drawBuffers swapped).
+  // Both color attachments are RGBA16F so highlights can exceed 1.0.
+  if (!litFBO) glGenFramebuffers(1, &litFBO);
+  if (!litColor) glGenTextures(1, &litColor);
+  if (!brightColor) glGenTextures(1, &brightColor);
+  if (!litDepth) glGenRenderbuffers(1, &litDepth);
+
+  auto allocHDR = [&](GLuint tex) {
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, fbWidth, fbHeight, 0, GL_RGBA,
+                 GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  };
+  allocHDR(litColor);
+  allocHDR(brightColor);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, litDepth);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
+                        fbHeight);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         litColor, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
+                         brightColor, 0);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, litDepth);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "litFBO incomplete\n");
+  }
+
+  // Bloom ping-pong FBOs.
+  for (int i = 0; i < 2; ++i) {
+    if (!pingFBO[i]) glGenFramebuffers(1, &pingFBO[i]);
+    if (!pingColor[i]) glGenTextures(1, &pingColor[i]);
+    allocHDR(pingColor[i]);
+    glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           pingColor[i], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      fprintf(stderr, "pingFBO[%d] incomplete\n", i);
+    }
+  }
+
+  // LDR target after tonemap; FXAA reads this.
+  if (!ldrFBO) glGenFramebuffers(1, &ldrFBO);
+  if (!ldrColor) glGenTextures(1, &ldrColor);
+  glBindTexture(GL_TEXTURE_2D, ldrColor);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, nullptr);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-  glBindRenderbuffer(GL_RENDERBUFFER, sceneDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
-                        fbHeight);
-
-  glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+  glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                         sceneColor, 0);
-  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                            GL_RENDERBUFFER, sceneDepth);
+                         ldrColor, 0);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    fprintf(stderr, "sceneFBO incomplete\n");
+    fprintf(stderr, "ldrFBO incomplete\n");
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Graphics::initShaderUniforms() {
-  if (!shader || !shader->valid()) return;
-  shader->use();
-  shader->setMat4("projection", projection);
-  initPointLights(*shader);
+  // Geometry pass needs the projection matrix; it never changes per frame.
+  // The deferred lighting shader's uniforms (lights, shadow maps, viewPos)
+  // are all populated per frame in render(), so nothing to do here for it.
+  if (gbufferShader && gbufferShader->valid()) {
+    gbufferShader->use();
+    gbufferShader->setMat4("projection", projection);
+  }
 }
 
 void Graphics::reloadShaders() {
@@ -478,11 +604,18 @@ void Graphics::reloadShaders() {
     const char* frag;
   };
   Reload reloads[] = {
-      {shader, "shaders/vertex.glsl", "shaders/fragment.glsl"},
+      {gbufferShader, "shaders/vertex_gbuffer.glsl",
+       "shaders/fragment_gbuffer.glsl"},
+      {lightingShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_lighting_deferred.glsl"},
       {skyboxShader, "shaders/vertex_skybox.glsl",
        "shaders/fragment_skybox.glsl"},
       {presentShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_present.glsl"},
+       "shaders/fragment_fxaa.glsl"},
+      {blurShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_blur.glsl"},
+      {tonemapShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_tonemap.glsl"},
       {shadowDirShader, "shaders/vertex_shadow_dir.glsl",
        "shaders/fragment_shadow_dir.glsl"},
       {debugOverlay, "shaders/vertex_present.glsl",
@@ -603,8 +736,13 @@ void Graphics::render(ClientGame& game) {
   auto camera = computeCamera(game);
   if (!camera) return;
 
-  // Shadow pass: render scene depth from the directional light's POV into
-  // dirShadowMap. The main scene pass below samples the result.
+  // Per-frame light collection. Done up front so the shadow passes and the
+  // lighting pass agree on shadow-slot assignments.
+  LightUpload lights[kMaxLightingShaderLights];
+  int numLights = collectPointLights(game, lights);
+
+  // Directional shadow pass. Light-space matrix tracks the camera so shadows
+  // stay sharp around the player.
   lightSpaceMatrix = computeDirectionalLightMatrix(
       camera->position, directionalLightDir(game));
   if (shadowDirShader && shadowDirShader->valid()) {
@@ -613,10 +751,6 @@ void Graphics::render(ClientGame& game) {
     glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
-    // Hardware slope-scaled depth bias. Avoids the peter-panning we'd get
-    // from front-face culling on the floor / non-watertight geometry while
-    // still keeping shadow acne off flat surfaces. Tune the slope factor up
-    // if acne returns; tune down if shadows detach from their casters.
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowDirShader->use();
@@ -625,11 +759,19 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // Point-light shadow pass: 24 cubemap-array layers populated in a single
-  // draw call via geometry-shader instancing.
+  // Point-light shadow pass: 24 cubemap-array layers populated in one draw
+  // via geometry-shader instancing. Inactive shadow slots (and lights with
+  // castsShadow=false) get kill matrices so their layers stay cleared.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
-  computePointShadowMatrices(game, pointMats, pointPositions);
+  // Initialize to kill matrices for all 24 layers.
+  {
+    glm::mat4 kill(0.0f);
+    kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+    for (int i = 0; i < kPointShadowLayers; ++i) pointMats[i] = kill;
+    for (int i = 0; i < kMaxPointLights; ++i) pointPositions[i] = glm::vec3(0);
+  }
+  computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
   if (shadowPointShader && shadowPointShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
@@ -649,51 +791,186 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // Scene pass: render forward + skybox into the offscreen FBO.
-  glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
-  glViewport(0, 0, fbWidth, fbHeight);
-  glEnable(GL_DEPTH_TEST);
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  // Geometry pass: write the g-buffer.
+  {
+    SIMPLE_PROFILE_SCOPE("GBuffer");
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    // Clear color = (0,0,0,0); the .a=0 sentinel in gPosition tells the
+    // lighting shader "this pixel was never written; skip it" so the skybox
+    // can take over.
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    gbufferShader->use();
+    gbufferShader->setMat4("view", camera->view);
+    renderEntities(*gbufferShader, game, models);
+  }
 
-  shader->use();
-  setupCameraMatrix(*shader, *camera);
-  shader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
-  glActiveTexture(GL_TEXTURE4);
-  glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-  shader->setInt("dirShadowMap", 4);
-  glActiveTexture(GL_TEXTURE5);
-  glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
-  shader->setInt("pointShadowMaps", 5);
-  shader->setFloat("pointFarPlane", kPointShadowFar);
-  updateDirectionalLight(*shader, game);
-  updatePointLights(*shader, game);
-  renderEntities(*shader, game, models);
-
-  auto* sceneInfo = currentScene(game);
-  if (sceneInfo) {
-    std::string skyboxDir = std::string(sceneInfo->skyboxDirectory);
-    auto it = skyboxes.find(skyboxDir);
-    if (it != skyboxes.end()) {
-      drawSkybox(*skyboxShader, it->second, *camera, projection);
+  // Lighting pass: full-screen triangle reads the g-buffer + shadow maps and
+  // writes (litColor, brightColor) via MRT into litFBO. Sky pixels
+  // (gPosition.a == 0) are discarded so the skybox can take over.
+  {
+    SIMPLE_PROFILE_SCOPE("Lighting");
+    glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
+    GLenum litDrawBufs[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, litDrawBufs);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (lightingShader && lightingShader->valid()) {
+      lightingShader->use();
+      lightingShader->setFloat("bloomThreshold", bloomThreshold);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gPosition);
+      lightingShader->setInt("gPosition", 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, gNormal);
+      lightingShader->setInt("gNormal", 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, gAlbedo);
+      lightingShader->setInt("gAlbedo", 2);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, gSpecular);
+      lightingShader->setInt("gSpecular", 3);
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, gEmissive);
+      lightingShader->setInt("gEmissive", 4);
+      glActiveTexture(GL_TEXTURE5);
+      glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+      lightingShader->setInt("dirShadowMap", 5);
+      glActiveTexture(GL_TEXTURE6);
+      glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
+      lightingShader->setInt("pointShadowMaps", 6);
+      lightingShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+      lightingShader->setFloat("pointFarPlane", kPointShadowFar);
+      lightingShader->setVec3("viewPos", camera->position);
+      // Directional light: ECS override beats scene default.
+      bool dirSet = false;
+      auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
+      for (auto ent : dlView) {
+        const auto& dl = dlView.get<shared::DirectionalLight>(ent);
+        lightingShader->setVec3("dirLight.direction", dl.dirX, dl.dirY,
+                                 dl.dirZ);
+        lightingShader->setVec3("dirLight.ambient", dl.ambientR, dl.ambientG,
+                                 dl.ambientB);
+        lightingShader->setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG,
+                                 dl.diffuseB);
+        lightingShader->setVec3("dirLight.specular", dl.specularR,
+                                 dl.specularG, dl.specularB);
+        dirSet = true;
+        break;
+      }
+      if (!dirSet) {
+        if (auto* info = currentScene(game)) {
+          lightingShader->setVec3("dirLight.direction", info->dirX, info->dirY,
+                                   info->dirZ);
+          lightingShader->setVec3("dirLight.ambient", info->ambientR,
+                                   info->ambientG, info->ambientB);
+          lightingShader->setVec3("dirLight.diffuse", info->diffuseR,
+                                   info->diffuseG, info->diffuseB);
+          lightingShader->setVec3("dirLight.specular", info->specularR,
+                                   info->specularG, info->specularB);
+        }
+      }
+      uploadPointLights(*lightingShader, lights, numLights);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
     }
   }
 
-  // Present pass: blit sceneColor to the default framebuffer via fullscreen
-  // triangle. Phases 4-6 will insert tonemap / FXAA / bloom composite stages
-  // between the scene pass and the present.
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glViewport(0, 0, fbWidth, fbHeight);
-  glDisable(GL_DEPTH_TEST);
-  glClear(GL_COLOR_BUFFER_BIT);
-  if (presentShader && presentShader->valid()) {
-    presentShader->use();
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, sceneColor);
-    presentShader->setInt("src", 0);
-    glBindVertexArray(fullscreenVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
+  // Skybox: blit g-buffer depth into litFBO so the skybox depth-tests
+  // correctly, then draw forward — but only into litColor, not brightColor
+  // (skybox shouldn't bloom).
+  {
+    SIMPLE_PROFILE_SCOPE("Skybox");
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, litFBO);
+    glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight,
+                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
+    GLenum skyDrawBufs[] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, skyDrawBufs);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glEnable(GL_DEPTH_TEST);
+    auto* sceneInfo = currentScene(game);
+    if (sceneInfo) {
+      std::string skyboxDir = std::string(sceneInfo->skyboxDirectory);
+      auto it = skyboxes.find(skyboxDir);
+      if (it != skyboxes.end()) {
+        drawSkybox(*skyboxShader, it->second, *camera, projection);
+      }
+    }
+  }
+
+  // Bloom blur: ping-pong separable Gaussian, seeded from brightColor.
+  GLuint finalBloomColor = brightColor;
+  if (blurShader && blurShader->valid() && bloomBlurIterations > 0) {
+    SIMPLE_PROFILE_SCOPE("Bloom");
+    glDisable(GL_DEPTH_TEST);
+    glViewport(0, 0, fbWidth, fbHeight);
+    blurShader->use();
+    bool horizontal = true;
+    bool firstIter = true;
+    for (int i = 0; i < bloomBlurIterations; ++i) {
+      int dst = horizontal ? 0 : 1;
+      glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[dst]);
+      blurShader->setInt("horizontal", horizontal ? 1 : 0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, firstIter ? brightColor
+                                              : pingColor[1 - dst]);
+      blurShader->setInt("src", 0);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+      finalBloomColor = pingColor[dst];
+      horizontal = !horizontal;
+      firstIter = false;
+    }
+  }
+
+  // Tonemap: combine HDR lit + bloom, exposure-tonemap, write LDR.
+  {
+    SIMPLE_PROFILE_SCOPE("Tonemap");
+    glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (tonemapShader && tonemapShader->valid()) {
+      tonemapShader->use();
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, litColor);
+      tonemapShader->setInt("hdrColor", 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, finalBloomColor);
+      tonemapShader->setInt("bloomColor", 1);
+      tonemapShader->setFloat("exposure", exposure);
+      tonemapShader->setFloat("bloomStrength", bloomStrength);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+    }
+  }
+
+  // FXAA present: samples LDR, writes to default framebuffer.
+  {
+    SIMPLE_PROFILE_SCOPE("Present");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (presentShader && presentShader->valid()) {
+      presentShader->use();
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, ldrColor);
+      presentShader->setInt("src", 0);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+    }
   }
 
   drawDebugOverlay();
@@ -702,9 +979,12 @@ void Graphics::render(ClientGame& game) {
 void Graphics::swap() { glfwSwapBuffers(window); }
 
 Graphics::~Graphics() {
-  shader.reset();
+  gbufferShader.reset();
+  lightingShader.reset();
   skyboxShader.reset();
   presentShader.reset();
+  blurShader.reset();
+  tonemapShader.reset();
   shadowDirShader.reset();
   shadowPointShader.reset();
   debugOverlay.reset();
@@ -713,17 +993,67 @@ Graphics::~Graphics() {
     glDeleteVertexArrays(1, &fullscreenVAO);
     fullscreenVAO = 0;
   }
-  if (sceneFBO) {
-    glDeleteFramebuffers(1, &sceneFBO);
-    sceneFBO = 0;
+  if (gBufferFBO) {
+    glDeleteFramebuffers(1, &gBufferFBO);
+    gBufferFBO = 0;
   }
-  if (sceneColor) {
-    glDeleteTextures(1, &sceneColor);
-    sceneColor = 0;
+  if (gPosition) {
+    glDeleteTextures(1, &gPosition);
+    gPosition = 0;
   }
-  if (sceneDepth) {
-    glDeleteRenderbuffers(1, &sceneDepth);
-    sceneDepth = 0;
+  if (gNormal) {
+    glDeleteTextures(1, &gNormal);
+    gNormal = 0;
+  }
+  if (gAlbedo) {
+    glDeleteTextures(1, &gAlbedo);
+    gAlbedo = 0;
+  }
+  if (gSpecular) {
+    glDeleteTextures(1, &gSpecular);
+    gSpecular = 0;
+  }
+  if (gEmissive) {
+    glDeleteTextures(1, &gEmissive);
+    gEmissive = 0;
+  }
+  if (gBufferDepth) {
+    glDeleteRenderbuffers(1, &gBufferDepth);
+    gBufferDepth = 0;
+  }
+  if (litFBO) {
+    glDeleteFramebuffers(1, &litFBO);
+    litFBO = 0;
+  }
+  if (litColor) {
+    glDeleteTextures(1, &litColor);
+    litColor = 0;
+  }
+  if (brightColor) {
+    glDeleteTextures(1, &brightColor);
+    brightColor = 0;
+  }
+  if (litDepth) {
+    glDeleteRenderbuffers(1, &litDepth);
+    litDepth = 0;
+  }
+  for (int i = 0; i < 2; ++i) {
+    if (pingFBO[i]) {
+      glDeleteFramebuffers(1, &pingFBO[i]);
+      pingFBO[i] = 0;
+    }
+    if (pingColor[i]) {
+      glDeleteTextures(1, &pingColor[i]);
+      pingColor[i] = 0;
+    }
+  }
+  if (ldrFBO) {
+    glDeleteFramebuffers(1, &ldrFBO);
+    ldrFBO = 0;
+  }
+  if (ldrColor) {
+    glDeleteTextures(1, &ldrColor);
+    ldrColor = 0;
   }
   if (dirShadowFBO) {
     glDeleteFramebuffers(1, &dirShadowFBO);

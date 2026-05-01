@@ -34,21 +34,60 @@ enum class DebugChannel {
 
 struct Graphics {
   GLFWwindow* window = nullptr;
-  std::optional<Shader> shader;
+  // Geometry pass: writes the g-buffer.
+  std::optional<Shader> gbufferShader;
+  // Deferred lighting pass: reads g-buffer + shadow maps, writes lit color.
+  std::optional<Shader> lightingShader;
   std::optional<Shader> skyboxShader;
+  // Final present pass — currently FXAA. Phase 5 inserts a tonemap pass
+  // before this.
   std::optional<Shader> presentShader;
   std::optional<Shader> debugOverlay;
   std::unordered_map<std::string, Model*> models;
   std::unordered_map<std::string, Skybox> skyboxes;
   glm::mat4 projection{1.0f};
 
-  // Offscreen scene target. The forward + skybox pass writes here; the
-  // present pass samples sceneColor and blits it to the default framebuffer.
-  // Recreated by resizeBuffers when the framebuffer size changes. Phase 5
-  // upgrades sceneColor to RGBA16F for HDR.
-  GLuint sceneFBO = 0;
-  GLuint sceneColor = 0;
-  GLuint sceneDepth = 0;
+  // G-buffer. Reallocated on resize.
+  //   gPosition  RGBA16F   (.rgb world-space pos, .a sky sentinel)
+  //   gNormal    RGBA16F   (.rgb world-space normal, .a shininess)
+  //   gAlbedo    RGBA8     (.rgb diffuse/albedo, .a unused)
+  //   gSpecular  RGBA8     (.rgb specular tint, .a unused — could be
+  //                          roughness in a future PBR variant)
+  //   gEmissive  RGBA8     (.rgb emissive, .a unused)
+  GLuint gBufferFBO = 0;
+  GLuint gPosition = 0;
+  GLuint gNormal = 0;
+  GLuint gAlbedo = 0;
+  GLuint gSpecular = 0;
+  GLuint gEmissive = 0;
+  GLuint gBufferDepth = 0;
+
+  // Lit FBO: deferred lighting pass writes via MRT (litColor + brightColor),
+  // skybox forward pass adds to litColor only. Both color attachments are
+  // RGBA16F for HDR.
+  GLuint litFBO = 0;
+  GLuint litColor = 0;
+  GLuint brightColor = 0;
+  GLuint litDepth = 0;  // RB; gBuffer depth gets blitted in for skybox
+
+  // Bloom blur ping-pong (RGBA16F). Seeded from brightColor; final pass
+  // result is read by the tonemap step.
+  GLuint pingFBO[2] = {0, 0};
+  GLuint pingColor[2] = {0, 0};
+
+  // Tone-mapped LDR output (RGBA8). FXAA samples this on the way to the
+  // default framebuffer.
+  GLuint ldrFBO = 0;
+  GLuint ldrColor = 0;
+
+  std::optional<Shader> blurShader;
+  std::optional<Shader> tonemapShader;
+
+  // Tunables (CPU-side defaults).
+  float exposure = 1.0f;
+  float bloomThreshold = 1.0f;
+  float bloomStrength = 1.0f;
+  int bloomBlurIterations = 10;  // 5 H/V pairs
 
   // Directional shadow map. Allocated once at SHADOW_MAP_SIZE × itself,
   // independent of window size — never recreated by resizeBuffers.
