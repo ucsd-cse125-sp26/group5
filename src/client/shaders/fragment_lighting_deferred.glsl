@@ -14,6 +14,7 @@ uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
 uniform sampler2D gSpecular;
 uniform sampler2D gEmissive;
+uniform sampler2D ssao;
 uniform sampler2D dirShadowMap;
 uniform samplerCubeArray pointShadowMaps;
 
@@ -102,6 +103,8 @@ void main() {
   vec3 albedo = texture(gAlbedo, vUV).rgb;
   vec3 specularTint = texture(gSpecular, vUV).rgb;
   vec3 emissive = texture(gEmissive, vUV).rgb;
+  // Screen-space ambient occlusion factor; only modulates ambient terms.
+  float ssaoFactor = texture(ssao, vUV).r;
   vec3 viewDir = normalize(viewPos - worldPos);
 
   vec3 result = vec3(0.0);
@@ -112,7 +115,7 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 halfway = normalize(lightDir + viewDir);
     float spec = pow(max(dot(norm, halfway), 0.0), shininess);
-    vec3 ambient = dirLight.ambient * albedo;
+    vec3 ambient = dirLight.ambient * albedo * ssaoFactor;
     vec3 diffuse = dirLight.diffuse * diff * albedo;
     vec3 specular = dirLight.specular * spec * specularTint;
     float shadow = DirShadowFactor(worldPos, norm, lightDir);
@@ -130,7 +133,7 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 halfway = normalize(lightDir + viewDir);
     float spec = pow(max(dot(norm, halfway), 0.0), shininess);
-    vec3 ambient = L.ambient * albedo;
+    vec3 ambient = L.ambient * albedo * ssaoFactor;
     vec3 diffuse = L.diffuse * diff * albedo;
     vec3 specular = L.specular * spec * specularTint;
     ambient *= attenuation;

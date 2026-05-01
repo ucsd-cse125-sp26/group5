@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "asset.h"
 #include "client/client_game.h"
@@ -82,6 +83,23 @@ struct Graphics {
 
   std::optional<Shader> blurShader;
   std::optional<Shader> tonemapShader;
+  std::optional<Shader> ssaoShader;
+  std::optional<Shader> ssaoBlurShader;
+
+  // SSAO. Single-channel GL_RED textures sized to the framebuffer.
+  GLuint ssaoFBO = 0;
+  GLuint ssaoColor = 0;
+  GLuint ssaoBlurFBO = 0;
+  GLuint ssaoBlurColor = 0;
+  // 4×4 GL_REPEAT noise texture of tangent-space rotation vectors.
+  GLuint ssaoNoiseTex = 0;
+  // 64-sample hemisphere kernel (vec3 each), generated once at load.
+  std::vector<glm::vec3> ssaoKernel;
+
+  // SSAO tunables.
+  int ssaoKernelSize = 64;
+  float ssaoRadius = 0.5f;
+  float ssaoBias = 0.025f;
 
   // Tunables (CPU-side defaults).
   float exposure = 1.0f;

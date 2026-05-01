@@ -7,7 +7,9 @@
 
 #include <cmath>
 #include <iostream>
+#include <random>
 #include <string>
+#include <vector>
 
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -25,12 +27,12 @@
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-// Resolution of the directional shadow map. 2048² gives crisp shadows at
-// modest VRAM cost; bump if the scene grows larger.
-static constexpr int kDirShadowMapSize = 2048;
+// Resolution of the directional shadow map. 8192² ≈ 192 MB at 24-bit depth.
+static constexpr int kDirShadowMapSize = 8192;
 
-// Point-light cubemap array. 4 lights × 6 faces × 1024² depth ≈ 24 MB.
-static constexpr int kPointShadowSize = 1024;
+// Point-light cubemap array. 4 lights × 6 faces × 4096² depth ≈ 1.1 GB.
+// If GL_OUT_OF_MEMORY shows up at startup, dial this back.
+static constexpr int kPointShadowSize = 4096;
 static constexpr int kMaxPointLights = 4;
 static constexpr int kPointShadowLayers = kMaxPointLights * 6;
 // Linear-distance encoding range for point-light shadow depth.
@@ -354,6 +356,10 @@ bool Graphics::load(int width, int height) {
                      "shaders/fragment_blur.glsl");
   tonemapShader.emplace("shaders/vertex_present.glsl",
                         "shaders/fragment_tonemap.glsl");
+  ssaoShader.emplace("shaders/vertex_present.glsl",
+                     "shaders/fragment_ssao.glsl");
+  ssaoBlurShader.emplace("shaders/vertex_present.glsl",
+                          "shaders/fragment_ssao_blur.glsl");
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
@@ -416,6 +422,41 @@ bool Graphics::load(int width, int height) {
   // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
   // shader via gl_VertexID).
   glGenVertexArrays(1, &fullscreenVAO);
+
+  // SSAO hemisphere kernel: 64 random vectors in the +z hemisphere, biased
+  // towards the origin so closer samples carry more weight. Uploaded once
+  // as a uniform array; the SSAO shader rotates each sample into view-space.
+  {
+    std::default_random_engine gen(0xc4b1u);
+    std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
+    auto lerp = [](float a, float b, float t) { return a + t * (b - a); };
+    ssaoKernel.clear();
+    ssaoKernel.reserve(64);
+    for (int i = 0; i < 64; ++i) {
+      glm::vec3 sample(rand01(gen) * 2.0f - 1.0f,
+                       rand01(gen) * 2.0f - 1.0f, rand01(gen));
+      sample = glm::normalize(sample);
+      sample *= rand01(gen);
+      float scale = static_cast<float>(i) / 64.0f;
+      sample *= lerp(0.1f, 1.0f, scale * scale);
+      ssaoKernel.push_back(sample);
+    }
+    // 4×4 noise texture of tangent-space rotation vectors (z=0 so we rotate
+    // around the surface normal). GL_REPEAT tiles it across the screen.
+    std::vector<glm::vec3> noise(16);
+    for (int i = 0; i < 16; ++i) {
+      noise[i] = glm::vec3(rand01(gen) * 2.0f - 1.0f,
+                            rand01(gen) * 2.0f - 1.0f, 0.0f);
+    }
+    glGenTextures(1, &ssaoNoiseTex);
+    glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT,
+                 noise.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  }
 
   for (const auto& asset : shared::ASSETS) {
     Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
@@ -568,6 +609,27 @@ void Graphics::resizeBuffers(int width, int height) {
     }
   }
 
+  // SSAO + blur targets. Single-channel, framebuffer-sized.
+  auto allocSsao = [&](GLuint& fbo, GLuint& tex) {
+    if (!fbo) glGenFramebuffers(1, &fbo);
+    if (!tex) glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, fbWidth, fbHeight, 0, GL_RED,
+                 GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, tex, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      fprintf(stderr, "ssao FBO incomplete\n");
+    }
+  };
+  allocSsao(ssaoFBO, ssaoColor);
+  allocSsao(ssaoBlurFBO, ssaoBlurColor);
+
   // LDR target after tonemap; FXAA reads this.
   if (!ldrFBO) glGenFramebuffers(1, &ldrFBO);
   if (!ldrColor) glGenTextures(1, &ldrColor);
@@ -616,6 +678,10 @@ void Graphics::reloadShaders() {
        "shaders/fragment_blur.glsl"},
       {tonemapShader, "shaders/vertex_present.glsl",
        "shaders/fragment_tonemap.glsl"},
+      {ssaoShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_ssao.glsl"},
+      {ssaoBlurShader, "shaders/vertex_present.glsl",
+       "shaders/fragment_ssao_blur.glsl"},
       {shadowDirShader, "shaders/vertex_shadow_dir.glsl",
        "shaders/fragment_shadow_dir.glsl"},
       {debugOverlay, "shaders/vertex_present.glsl",
@@ -808,6 +874,55 @@ void Graphics::render(ClientGame& game) {
     renderEntities(*gbufferShader, game, models);
   }
 
+  // SSAO pass: read view-space position/normal from g-buffer, compute
+  // per-pixel occlusion factor, write to ssaoColor.
+  if (ssaoShader && ssaoShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("SSAO");
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ssaoShader->use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    ssaoShader->setInt("gPosition", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    ssaoShader->setInt("gNormal", 1);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
+    ssaoShader->setInt("texNoise", 2);
+    ssaoShader->setMat4("view", camera->view);
+    ssaoShader->setMat4("projection", projection);
+    ssaoShader->setVec3Array(
+        "samples", static_cast<int>(ssaoKernel.size()),
+        glm::value_ptr(ssaoKernel[0]));
+    ssaoShader->setInt("kernelSize", ssaoKernelSize);
+    ssaoShader->setFloat("radius", ssaoRadius);
+    ssaoShader->setFloat("bias", ssaoBias);
+    ssaoShader->setVec2("noiseScale", static_cast<float>(fbWidth) / 4.0f,
+                          static_cast<float>(fbHeight) / 4.0f);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+  }
+
+  // SSAO blur: 4×4 box blur to wash out the per-pixel rotation noise.
+  if (ssaoBlurShader && ssaoBlurShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("SSAOBlur");
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ssaoBlurShader->use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, ssaoColor);
+    ssaoBlurShader->setInt("src", 0);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+  }
+
   // Lighting pass: full-screen triangle reads the g-buffer + shadow maps and
   // writes (litColor, brightColor) via MRT into litFBO. Sky pixels
   // (gPosition.a == 0) are discarded so the skybox can take over.
@@ -839,11 +954,14 @@ void Graphics::render(ClientGame& game) {
       glBindTexture(GL_TEXTURE_2D, gEmissive);
       lightingShader->setInt("gEmissive", 4);
       glActiveTexture(GL_TEXTURE5);
-      glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-      lightingShader->setInt("dirShadowMap", 5);
+      glBindTexture(GL_TEXTURE_2D, ssaoBlurColor);
+      lightingShader->setInt("ssao", 5);
       glActiveTexture(GL_TEXTURE6);
+      glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+      lightingShader->setInt("dirShadowMap", 6);
+      glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
-      lightingShader->setInt("pointShadowMaps", 6);
+      lightingShader->setInt("pointShadowMaps", 7);
       lightingShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
       lightingShader->setFloat("pointFarPlane", kPointShadowFar);
       lightingShader->setVec3("viewPos", camera->position);
@@ -985,6 +1103,8 @@ Graphics::~Graphics() {
   presentShader.reset();
   blurShader.reset();
   tonemapShader.reset();
+  ssaoShader.reset();
+  ssaoBlurShader.reset();
   shadowDirShader.reset();
   shadowPointShader.reset();
   debugOverlay.reset();
@@ -1054,6 +1174,26 @@ Graphics::~Graphics() {
   if (ldrColor) {
     glDeleteTextures(1, &ldrColor);
     ldrColor = 0;
+  }
+  if (ssaoFBO) {
+    glDeleteFramebuffers(1, &ssaoFBO);
+    ssaoFBO = 0;
+  }
+  if (ssaoColor) {
+    glDeleteTextures(1, &ssaoColor);
+    ssaoColor = 0;
+  }
+  if (ssaoBlurFBO) {
+    glDeleteFramebuffers(1, &ssaoBlurFBO);
+    ssaoBlurFBO = 0;
+  }
+  if (ssaoBlurColor) {
+    glDeleteTextures(1, &ssaoBlurColor);
+    ssaoBlurColor = 0;
+  }
+  if (ssaoNoiseTex) {
+    glDeleteTextures(1, &ssaoNoiseTex);
+    ssaoNoiseTex = 0;
   }
   if (dirShadowFBO) {
     glDeleteFramebuffers(1, &dirShadowFBO);
