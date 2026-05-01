@@ -12,6 +12,9 @@
 class Shader {
  public:
   Shader(const std::string& vertexPath, const std::string& fragmentPath);
+  // Variant with a geometry shader (used by point-light shadow cubemap pass).
+  Shader(const std::string& vertexPath, const std::string& fragmentPath,
+         const std::string& geometryPath);
   ~Shader();
   Shader(Shader&& other) noexcept;
   Shader& operator=(Shader&& other) noexcept;
@@ -28,6 +31,8 @@ class Shader {
   void setVec3(const std::string& name, const glm::vec3& v) const;
   void setMat3(const std::string& name, const glm::mat3& m) const;
   void setMat4(const std::string& name, const glm::mat4& m) const;
+  void setMat4Array(const std::string& name, int count, const float* data) const;
+  void setVec3Array(const std::string& name, int count, const float* data) const;
 
  private:
   GLuint m_id = 0;

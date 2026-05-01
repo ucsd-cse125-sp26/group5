@@ -35,31 +35,38 @@ static bool compileStage(GLuint shaderId, const char* source, const char* tag) {
   return result == GL_TRUE;
 }
 
-Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
+// Shared link path for both ctors. Compiles all provided stages, links, logs
+// errors, and assigns m_id only on success. Empty path strings skip a stage.
+static GLuint linkProgram(const std::string& vertPath,
+                          const std::string& fragPath,
+                          const std::string& geomPath) {
   auto base = exeDir();
-  std::string vertexShaderText, fragmentShaderText;
-  if (!readFile(base / vertexPath, vertexShaderText) ||
-      !readFile(base / fragmentPath, fragmentShaderText)) {
-    return;
-  }
+  std::string vertSrc, fragSrc, geomSrc;
+  if (!readFile(base / vertPath, vertSrc)) return 0;
+  if (!readFile(base / fragPath, fragSrc)) return 0;
+  if (!geomPath.empty() && !readFile(base / geomPath, geomSrc)) return 0;
 
-  GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-  GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
+  GLuint vsId = glCreateShader(GL_VERTEX_SHADER);
+  GLuint fsId = glCreateShader(GL_FRAGMENT_SHADER);
+  GLuint gsId =
+      geomPath.empty() ? 0 : glCreateShader(GL_GEOMETRY_SHADER);
 
-  bool vsOk = compileStage(vertexShaderId, vertexShaderText.c_str(),
-                           vertexPath.c_str());
-  bool fsOk = compileStage(fragmentShaderId, fragmentShaderText.c_str(),
-                           fragmentPath.c_str());
+  bool ok = compileStage(vsId, vertSrc.c_str(), vertPath.c_str()) &
+            compileStage(fsId, fragSrc.c_str(), fragPath.c_str());
+  if (gsId)
+    ok = ok & compileStage(gsId, geomSrc.c_str(), geomPath.c_str());
 
-  if (!vsOk || !fsOk) {
-    glDeleteShader(vertexShaderId);
-    glDeleteShader(fragmentShaderId);
-    return;
+  if (!ok) {
+    glDeleteShader(vsId);
+    glDeleteShader(fsId);
+    if (gsId) glDeleteShader(gsId);
+    return 0;
   }
 
   GLuint program = glCreateProgram();
-  glAttachShader(program, vertexShaderId);
-  glAttachShader(program, fragmentShaderId);
+  glAttachShader(program, vsId);
+  glAttachShader(program, fsId);
+  if (gsId) glAttachShader(program, gsId);
   glLinkProgram(program);
 
   GLint linkStatus = GL_FALSE;
@@ -69,20 +76,32 @@ Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
   if (logLen > 0) {
     std::vector<char> msg(logLen + 1);
     glGetProgramInfoLog(program, logLen, nullptr, msg.data());
-    fprintf(stderr, "[link %s + %s] %s\n", vertexPath.c_str(),
-            fragmentPath.c_str(), msg.data());
+    fprintf(stderr, "[link %s + %s%s%s] %s\n", vertPath.c_str(),
+            fragPath.c_str(), geomPath.empty() ? "" : " + ",
+            geomPath.c_str(), msg.data());
   }
 
-  glDetachShader(program, vertexShaderId);
-  glDetachShader(program, fragmentShaderId);
-  glDeleteShader(vertexShaderId);
-  glDeleteShader(fragmentShaderId);
+  glDetachShader(program, vsId);
+  glDetachShader(program, fsId);
+  if (gsId) glDetachShader(program, gsId);
+  glDeleteShader(vsId);
+  glDeleteShader(fsId);
+  if (gsId) glDeleteShader(gsId);
 
   if (linkStatus != GL_TRUE) {
     glDeleteProgram(program);
-    return;
+    return 0;
   }
-  m_id = program;
+  return program;
+}
+
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
+  m_id = linkProgram(vertexPath, fragmentPath, "");
+}
+
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath,
+               const std::string& geometryPath) {
+  m_id = linkProgram(vertexPath, fragmentPath, geometryPath);
 }
 
 Shader::~Shader() {
@@ -111,11 +130,11 @@ GLuint Shader::id() const { return m_id; }
 GLint Shader::getLocation(const std::string& name) const {
   auto it = m_locationCache.find(name);
   if (it != m_locationCache.end()) return it->second;
+  // glGetUniformLocation returns -1 for uniforms the linker stripped because
+  // they were never read. Silently caching that is the standard behavior;
+  // setting a uniform on -1 is a no-op. Avoids stderr spam when the same
+  // mesh data is rendered with a stripped-down shader (e.g. depth-only).
   GLint loc = glGetUniformLocation(m_id, name.c_str());
-  if (loc == -1) {
-    fprintf(stderr, "Warning: uniform '%s' not found in shader %u\n",
-            name.c_str(), m_id);
-  }
   m_locationCache[name] = loc;
   return loc;
 }
@@ -142,4 +161,14 @@ void Shader::setMat3(const std::string& name, const glm::mat3& m) const {
 
 void Shader::setMat4(const std::string& name, const glm::mat4& m) const {
   glUniformMatrix4fv(getLocation(name), 1, GL_FALSE, glm::value_ptr(m));
+}
+
+void Shader::setMat4Array(const std::string& name, int count,
+                          const float* data) const {
+  glUniformMatrix4fv(getLocation(name), count, GL_FALSE, data);
+}
+
+void Shader::setVec3Array(const std::string& name, int count,
+                          const float* data) const {
+  glUniform3fv(getLocation(name), count, data);
 }

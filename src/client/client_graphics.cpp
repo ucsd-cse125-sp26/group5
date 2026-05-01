@@ -15,6 +15,7 @@
 #include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/map_format.h"
@@ -23,6 +24,18 @@
 // Skybox images use Y-up; the game uses Z-up.
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
+
+// Resolution of the directional shadow map. 2048² gives crisp shadows at
+// modest VRAM cost; bump if the scene grows larger.
+static constexpr int kDirShadowMapSize = 2048;
+
+// Point-light cubemap array. 4 lights × 6 faces × 1024² depth ≈ 24 MB.
+static constexpr int kPointShadowSize = 1024;
+static constexpr int kMaxPointLights = 4;
+static constexpr int kPointShadowLayers = kMaxPointLights * 6;
+// Linear-distance encoding range for point-light shadow depth.
+static constexpr float kPointShadowNear = 0.1f;
+static constexpr float kPointShadowFar = 50.0f;
 
 static void initPointLights(const Shader& shader) {
   for (int pl = 0; pl < 4; pl++) {
@@ -39,6 +52,91 @@ static void initPointLights(const Shader& shader) {
 static void framebufferSizeCallback(GLFWwindow* w, int width, int height) {
   auto* g = static_cast<Graphics*>(glfwGetWindowUserPointer(w));
   if (g) g->resizeBuffers(width, height);
+}
+
+// Returns the active directional light direction (ECS override beats scene
+// default). If no directional light is configured, returns a sensible
+// fallback so the shadow pass still runs without crashing.
+static glm::vec3 directionalLightDir(const ClientGame& game) {
+  auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
+  for (auto ent : dlView) {
+    const auto& dl = dlView.get<shared::DirectionalLight>(ent);
+    return glm::vec3(dl.dirX, dl.dirY, dl.dirZ);
+  }
+  auto sceneView = game.renderRegistry.view<shared::Scene>();
+  for (auto ent : sceneView) {
+    auto& scene = sceneView.get<shared::Scene>(ent);
+    if (auto* info = shared::findScene(scene.name)) {
+      return glm::vec3(info->dirX, info->dirY, info->dirZ);
+    }
+  }
+  return glm::vec3(0.3f, 1.0f, -0.4f);
+}
+
+// Builds 24 light-space matrices for the point-light cubemap-array shadow
+// pass. Active light slots get real per-face matrices; inactive slots get a
+// "kill" matrix that produces clip-space z > 1, so emitted geometry is
+// clipped and never writes to those layers (their cleared depth=1.0
+// remains, meaning "not in shadow" when sampled). Also writes the per-light
+// world-space positions into outPositions, padded with origins for
+// inactive slots.
+static void computePointShadowMatrices(const ClientGame& game,
+                                       glm::mat4 outMatrices[kPointShadowLayers],
+                                       glm::vec3 outPositions[kMaxPointLights]) {
+  // Cube-face directions/ups. Same convention learnopengl uses; the cube
+  // map is its own coordinate system, independent of the world's up axis.
+  static const struct {
+    glm::vec3 dir;
+    glm::vec3 up;
+  } faces[6] = {
+      {{1, 0, 0}, {0, -1, 0}},   // +X
+      {{-1, 0, 0}, {0, -1, 0}},  // -X
+      {{0, 1, 0}, {0, 0, 1}},    // +Y
+      {{0, -1, 0}, {0, 0, -1}},  // -Y
+      {{0, 0, 1}, {0, -1, 0}},   // +Z
+      {{0, 0, -1}, {0, -1, 0}},  // -Z
+  };
+
+  // Kill matrix: any input → clip space (0, 0, 2, 1) → NDC z = 2 → clipped.
+  glm::mat4 kill(0.0f);
+  kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
+  for (int i = 0; i < kPointShadowLayers; ++i) outMatrices[i] = kill;
+  for (int i = 0; i < kMaxPointLights; ++i)
+    outPositions[i] = glm::vec3(0.0f);
+
+  glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
+                                    kPointShadowNear, kPointShadowFar);
+
+  int idx = 0;
+  auto view = game.renderRegistry.view<shared::PointLight>();
+  for (auto ent : view) {
+    if (idx >= kMaxPointLights) break;
+    const auto& pl = view.get<shared::PointLight>(ent);
+    glm::vec3 p(pl.px, pl.py, pl.pz);
+    outPositions[idx] = p;
+    for (int f = 0; f < 6; ++f) {
+      outMatrices[idx * 6 + f] =
+          proj * glm::lookAt(p, p + faces[f].dir, faces[f].up);
+    }
+    ++idx;
+  }
+}
+
+// Builds a light-space matrix that wraps an ortho frustum around the camera.
+// The frustum follows the camera so distant objects get shadows too without
+// burning the whole shadow map on the world origin.
+static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
+                                               const glm::vec3& lightDir) {
+  glm::vec3 dir = glm::normalize(lightDir);
+  // Place the virtual sun far enough behind the camera that the entire
+  // frustum stays in front of it. 30 units works for the current scene scale.
+  glm::vec3 lightPos = cameraPos - dir * 30.0f;
+  glm::vec3 up = glm::abs(dir.z) > 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f)
+                                        : glm::vec3(0.0f, 0.0f, 1.0f);
+  glm::mat4 view = glm::lookAt(lightPos, cameraPos, up);
+  // ±20 covers the visible play area; near=1, far=80 reaches across.
+  glm::mat4 proj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 1.0f, 80.0f);
+  return proj * view;
 }
 
 std::optional<CameraState> computeCamera(const ClientGame& game) {
@@ -146,15 +244,26 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
 }
 
 static void renderEntities(const Shader& shader, ClientGame& game,
-                           std::unordered_map<std::string, Model*>& models) {
+                           std::unordered_map<std::string, Model*>& models,
+                           bool forShadowPass = false) {
   auto view = game.renderRegistry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
     auto& entity = view.get<shared::Entity>(ent);
-    if (entity.id == game.renderEntityId) {
-      continue;
+    if (forShadowPass) {
+      // Light-marker meshes (the visible cube on a point/dir light) sit at
+      // the light's origin; rendering them into the shadow map makes the
+      // light shadow itself. Skip any entity whose render mesh represents
+      // a light source.
+      if (game.renderRegistry.any_of<shared::PointLight,
+                                      shared::DirectionalLight>(ent))
+        continue;
+    } else {
+      // Main pass: skip the camera entity (we'd see our own model
+      // first-person otherwise).
+      if (entity.id == game.renderEntityId) continue;
     }
     auto it = models.find(renderInfo.modelName);
     if (it == models.end() || !it->second) continue;
@@ -211,8 +320,64 @@ bool Graphics::load(int width, int height) {
                        "shaders/fragment_skybox.glsl");
   presentShader.emplace("shaders/vertex_present.glsl",
                         "shaders/fragment_present.glsl");
+  shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
+                          "shaders/fragment_shadow_dir.glsl");
+  shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
+                            "shaders/fragment_shadow_point.glsl",
+                            "shaders/geometry_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
+
+  // Allocate the directional shadow map once; size is independent of window
+  // size so resizeBuffers leaves it alone.
+  glGenFramebuffers(1, &dirShadowFBO);
+  glGenTextures(1, &dirShadowMap);
+  glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kDirShadowMapSize,
+               kDirShadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+  // Outside the frustum returns depth=1.0 so DirShadowFactor reports unlit.
+  float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, white);
+  glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
+                         dirShadowMap, 0);
+  glDrawBuffer(GL_NONE);
+  glReadBuffer(GL_NONE);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "dirShadowFBO incomplete\n");
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Point-light cubemap array shadow target. One depth attachment, 24
+  // layer-faces (4 cubes × 6 faces). The whole array is bound to the FBO
+  // via glFramebufferTexture so the GS can pick layers via gl_Layer.
+  glGenFramebuffers(1, &pointShadowFBO);
+  glGenTextures(1, &pointShadowMaps);
+  glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
+  glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT24,
+               kPointShadowSize, kPointShadowSize, kPointShadowLayers, 0,
+               GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S,
+                  GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T,
+                  GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R,
+                  GL_CLAMP_TO_EDGE);
+  glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
+  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps,
+                       0);
+  glDrawBuffer(GL_NONE);
+  glReadBuffer(GL_NONE);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "pointShadowFBO incomplete\n");
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
   // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
   // shader via gl_VertexID).
@@ -318,6 +483,8 @@ void Graphics::reloadShaders() {
        "shaders/fragment_skybox.glsl"},
       {presentShader, "shaders/vertex_present.glsl",
        "shaders/fragment_present.glsl"},
+      {shadowDirShader, "shaders/vertex_shadow_dir.glsl",
+       "shaders/fragment_shadow_dir.glsl"},
       {debugOverlay, "shaders/vertex_present.glsl",
        "shaders/fragment_debug_overlay.glsl"},
   };
@@ -329,6 +496,19 @@ void Graphics::reloadShaders() {
     } else {
       fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
               r.frag);
+    }
+  }
+  // Geometry-stage reload (point shadow only).
+  {
+    Shader candidate("shaders/vertex_shadow_point.glsl",
+                     "shaders/fragment_shadow_point.glsl",
+                     "shaders/geometry_shadow_point.glsl");
+    if (candidate.valid()) {
+      shadowPointShader.emplace(std::move(candidate));
+      printf("Reloaded: vertex_shadow_point + geometry_shadow_point + ...\n");
+    } else {
+      fprintf(stderr,
+              "Reload failed, keeping previous: vertex_shadow_point + ...\n");
     }
   }
   initShaderUniforms();
@@ -362,6 +542,9 @@ void Graphics::cycleDebugChannel() {
     case DebugChannel::Off:
       name = "Off";
       break;
+    case DebugChannel::DirShadowMap:
+      name = "DirShadowMap";
+      break;
     case DebugChannel::Count:
       break;
   }
@@ -382,18 +565,89 @@ void Graphics::processDebugKeys() {
 }
 
 void Graphics::drawDebugOverlay() {
-  // Phase 0: only DebugChannel::Off exists, so nothing to display. Later
-  // phases bind their intermediate textures and configure the corner draw.
   if (debugChannel == DebugChannel::Off) return;
-  // Reserved: bind the channel's texture, set viewport to a corner rect,
-  // disable depth, glBindVertexArray(fullscreenVAO),
-  // glDrawArrays(GL_TRIANGLES, 0, 3), restore viewport.
+  if (!debugOverlay || !debugOverlay->valid() || !fullscreenVAO) return;
+
+  GLuint texToShow = 0;
+  switch (debugChannel) {
+    case DebugChannel::DirShadowMap:
+      texToShow = dirShadowMap;
+      break;
+    case DebugChannel::Off:
+    case DebugChannel::Count:
+      return;
+  }
+  if (!texToShow) return;
+
+  // Top-right quarter-screen tile.
+  int cornerW = fbWidth / 4;
+  int cornerH = fbHeight / 4;
+  if (cornerW <= 0 || cornerH <= 0) return;
+  int cornerX = fbWidth - cornerW;
+  int cornerY = fbHeight - cornerH;
+
+  glDisable(GL_DEPTH_TEST);
+  glViewport(cornerX, cornerY, cornerW, cornerH);
+  debugOverlay->use();
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, texToShow);
+  debugOverlay->setInt("src", 0);
+  glBindVertexArray(fullscreenVAO);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindVertexArray(0);
+  glViewport(0, 0, fbWidth, fbHeight);
 }
 
 void Graphics::render(ClientGame& game) {
   SIMPLE_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
+
+  // Shadow pass: render scene depth from the directional light's POV into
+  // dirShadowMap. The main scene pass below samples the result.
+  lightSpaceMatrix = computeDirectionalLightMatrix(
+      camera->position, directionalLightDir(game));
+  if (shadowDirShader && shadowDirShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("ShadowDir");
+    glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
+    glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    // Hardware slope-scaled depth bias. Avoids the peter-panning we'd get
+    // from front-face culling on the floor / non-watertight geometry while
+    // still keeping shadow acne off flat surfaces. Tune the slope factor up
+    // if acne returns; tune down if shadows detach from their casters.
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.0f, 4.0f);
+    shadowDirShader->use();
+    shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    renderEntities(*shadowDirShader, game, models, /*forShadowPass=*/true);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+  }
+
+  // Point-light shadow pass: 24 cubemap-array layers populated in a single
+  // draw call via geometry-shader instancing.
+  glm::mat4 pointMats[kPointShadowLayers];
+  glm::vec3 pointPositions[kMaxPointLights];
+  computePointShadowMatrices(game, pointMats, pointPositions);
+  if (shadowPointShader && shadowPointShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("ShadowPoint");
+    glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
+    glViewport(0, 0, kPointShadowSize, kPointShadowSize);
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(2.0f, 4.0f);
+    shadowPointShader->use();
+    shadowPointShader->setMat4Array(
+        "shadowMatrices", kPointShadowLayers,
+        glm::value_ptr(pointMats[0]));
+    shadowPointShader->setVec3Array("lightPositions", kMaxPointLights,
+                                     glm::value_ptr(pointPositions[0]));
+    shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
+    renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+  }
 
   // Scene pass: render forward + skybox into the offscreen FBO.
   glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
@@ -404,6 +658,14 @@ void Graphics::render(ClientGame& game) {
 
   shader->use();
   setupCameraMatrix(*shader, *camera);
+  shader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+  glActiveTexture(GL_TEXTURE4);
+  glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+  shader->setInt("dirShadowMap", 4);
+  glActiveTexture(GL_TEXTURE5);
+  glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
+  shader->setInt("pointShadowMaps", 5);
+  shader->setFloat("pointFarPlane", kPointShadowFar);
   updateDirectionalLight(*shader, game);
   updatePointLights(*shader, game);
   renderEntities(*shader, game, models);
@@ -443,6 +705,8 @@ Graphics::~Graphics() {
   shader.reset();
   skyboxShader.reset();
   presentShader.reset();
+  shadowDirShader.reset();
+  shadowPointShader.reset();
   debugOverlay.reset();
 
   if (fullscreenVAO) {
@@ -460,6 +724,22 @@ Graphics::~Graphics() {
   if (sceneDepth) {
     glDeleteRenderbuffers(1, &sceneDepth);
     sceneDepth = 0;
+  }
+  if (dirShadowFBO) {
+    glDeleteFramebuffers(1, &dirShadowFBO);
+    dirShadowFBO = 0;
+  }
+  if (dirShadowMap) {
+    glDeleteTextures(1, &dirShadowMap);
+    dirShadowMap = 0;
+  }
+  if (pointShadowFBO) {
+    glDeleteFramebuffers(1, &pointShadowFBO);
+    pointShadowFBO = 0;
+  }
+  if (pointShadowMaps) {
+    glDeleteTextures(1, &pointShadowMaps);
+    pointShadowMaps = 0;
   }
 
   for (auto& [name, model] : models) {

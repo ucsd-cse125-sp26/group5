@@ -44,6 +44,10 @@ struct PointLight {
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
+  // Phase 3 plumbs this through but ignores its value — every active light
+  // currently casts shadows. Phase 4 (deferred) starts respecting it so
+  // many cheap point lights can be added without paying for a cubemap each.
+  bool castsShadow = true;
 };
 
 struct DirectionalLight {

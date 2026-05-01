@@ -26,6 +26,9 @@ std::optional<CameraState> computeCamera(const ClientGame& game);
 // shadow maps, SSAO, bloom intermediates, etc.).
 enum class DebugChannel {
   Off,
+  DirShadowMap,
+  // PointShadow channels need a samplerCubeArray overlay variant — punt
+  // until we add one.
   Count,
 };
 
@@ -46,6 +49,20 @@ struct Graphics {
   GLuint sceneFBO = 0;
   GLuint sceneColor = 0;
   GLuint sceneDepth = 0;
+
+  // Directional shadow map. Allocated once at SHADOW_MAP_SIZE × itself,
+  // independent of window size — never recreated by resizeBuffers.
+  GLuint dirShadowFBO = 0;
+  GLuint dirShadowMap = 0;
+  glm::mat4 lightSpaceMatrix{1.0f};
+  std::optional<Shader> shadowDirShader;
+
+  // Point-light cubemap array shadow map: 4 cubemaps × 6 faces = 24 layers.
+  // Single FBO; the shadow pass uses a geometry shader with 24 invocations
+  // to populate every layer-face in one draw call.
+  GLuint pointShadowFBO = 0;
+  GLuint pointShadowMaps = 0;
+  std::optional<Shader> shadowPointShader;
 
   // Framebuffer dimensions in pixels (HiDPI-aware).
   int fbWidth = 0;
