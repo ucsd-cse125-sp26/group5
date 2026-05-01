@@ -76,6 +76,38 @@ rsync -avz --progress -e 'ssh -p 222' assets/ jaroot@cse125.ucsd.edu:/var/www/ht
 
 The `-a` flag preserves file attributes and handles directories recursively. The `-z` flag compresses data during transfer. rsync only transfers files that have changed, so repeated syncs are fast.
 
+## Maps
+
+`.blend` map sources live on the CSE 125 server (not in git) and are edited
+under a check-out / check-in lock.
+
+### Common commands
+
+```bash
+scripts/mapsync.py list
+scripts/mapsync.py sync default                                  # read-only
+scripts/mapsync.py checkout default -m "redo arena lighting"
+# ...edit maps/Untitled.blend...
+scripts/mapsync.py checkin default
+scripts/blend2glb.sh default
+scripts/mapsync.py status
+
+# First time only:
+cp assets/Untitled.blend maps/Untitled.blend
+scripts/mapsync.py new Untitled -m "import existing"
+```
+
+### Recovery
+
+- `scripts/mapsync.py abandon <name>` — release a lock you hold without
+  uploading anything.
+- `scripts/mapsync.py abandon <name> --break` — forcibly clear a lock left
+  behind by someone else's crashed client. `list` shows the holder so you
+  can ask first.
+- `scripts/mapsync.py checkin <name> --force` — proceed despite a lock
+  holder mismatch or epoch mismatch (will overwrite the server's copy).
+  Try not to use.
+
 ## Profiling with Tracy
 
 To diagnose performance and stuttering issues, you can compile the client and server with Profiling enabled using:

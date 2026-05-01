@@ -107,6 +107,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     )
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets)
+    add_custom_command(TARGET client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets
+            $<TARGET_FILE_DIR:client>/maps/assets
+    )
+endif()
+
 # this is for testing purposes
 add_library(server_lib STATIC
     src/server/server_network.cpp
@@ -131,6 +139,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${CMAKE_CURRENT_SOURCE_DIR}/assets
             $<TARGET_FILE_DIR:server>/assets
+    )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets)
+    add_custom_command(TARGET server POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets
+            $<TARGET_FILE_DIR:server>/maps/assets
     )
 endif()
 

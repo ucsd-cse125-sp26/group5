@@ -8,7 +8,7 @@ namespace shared {
 // disk; the server's RenderInfo entries reference sub-models the client also
 // registers under MAP_MODEL_PREFIX + nodeName. Hardcoded for v1; expected to
 // move into a protocol message later.
-inline constexpr const char* DEFAULT_MAP_PATH = "assets/Untitled.glb";
+inline constexpr const char* DEFAULT_MAP_PATH = "maps/assets/Untitled.glb";
 
 // Prefix for sub-model keys derived from a map's node names. A map node named
 // "Cube" becomes the model key "map:Cube" in Graphics::models.
