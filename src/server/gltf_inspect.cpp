@@ -1,6 +1,8 @@
-// Standalone inspector — prints scene/node/material/light summary for any
-// assimp-readable file. Diagnostic aid for the map loader.
+// Standalone inspector — prints scene/node/material/light/camera summary for
+// any assimp-readable file, including a full dump of scene + node metadata
+// and every aiMaterialProperty. Diagnostic aid for the map loader.
 
+#include <assimp/camera.h>
 #include <assimp/light.h>
 #include <assimp/material.h>
 #include <assimp/postprocess.h>
@@ -9,6 +11,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -175,12 +178,168 @@ void printLight(const aiLight* light, unsigned i,
     std::printf("  worldDir=(%g,%g,%g)\n", worldDir.x, worldDir.y, worldDir.z);
   }
 
-  // glTF's `range` is dropped from aiLight and stashed on the node instead.
+  // glTF stashes per-light extras (e.g. `range`) on the matching node's
+  // metadata. Dump the full block — printNode already shows it once during the
+  // tree walk, but reprinting here keeps light diagnostics self-contained.
   const aiNode* node = parsed.scene()->mRootNode->FindNode(light->mName);
-  if (node && node->mMetaData) {
-    double range;
-    if (node->mMetaData->Get("PBR_LightRange", range)) {
-      std::printf("  range=%g (from node metadata)\n", range);
+  if (node && node->mMetaData && node->mMetaData->mNumProperties > 0) {
+    std::printf("  node metadata:\n");
+    printMetadata(node->mMetaData, 2);
+  }
+}
+
+void printCamera(const aiCamera* cam, unsigned i,
+                 const shared::ParsedModel& parsed) {
+  std::printf(
+      "camera[%u] \"%s\" hfov=%g rad aspect=%g near=%g far=%g\n", i,
+      cam->mName.C_Str(), cam->mHorizontalFOV, cam->mAspect, cam->mClipPlaneNear,
+      cam->mClipPlaneFar);
+  std::printf("  localPos=(%g,%g,%g) localLook=(%g,%g,%g) localUp=(%g,%g,%g)\n",
+              cam->mPosition.x, cam->mPosition.y, cam->mPosition.z,
+              cam->mLookAt.x, cam->mLookAt.y, cam->mLookAt.z, cam->mUp.x,
+              cam->mUp.y, cam->mUp.z);
+
+  const aiMatrix4x4* world = parsed.worldTransform(cam->mName.C_Str());
+  if (world) {
+    aiVector3D t, s;
+    aiQuaternion r;
+    world->Decompose(s, r, t);
+    std::printf("  worldPos=(%g,%g,%g)\n", t.x, t.y, t.z);
+  }
+
+  const aiNode* node = parsed.scene()->mRootNode->FindNode(cam->mName);
+  if (node && node->mMetaData && node->mMetaData->mNumProperties > 0) {
+    std::printf("  node metadata:\n");
+    printMetadata(node->mMetaData, 2);
+  }
+}
+
+const char* propertyTypeName(aiPropertyTypeInfo t) {
+  switch (t) {
+    case aiPTI_Float:
+      return "float";
+    case aiPTI_Double:
+      return "double";
+    case aiPTI_String:
+      return "string";
+    case aiPTI_Integer:
+      return "int";
+    case aiPTI_Buffer:
+      return "buffer";
+    default:
+      return "?";
+  }
+}
+
+const char* textureTypeName(unsigned semantic) {
+  switch (semantic) {
+    case aiTextureType_NONE:
+      return "";
+    case aiTextureType_DIFFUSE:
+      return "DIFFUSE";
+    case aiTextureType_SPECULAR:
+      return "SPECULAR";
+    case aiTextureType_AMBIENT:
+      return "AMBIENT";
+    case aiTextureType_EMISSIVE:
+      return "EMISSIVE";
+    case aiTextureType_HEIGHT:
+      return "HEIGHT";
+    case aiTextureType_NORMALS:
+      return "NORMALS";
+    case aiTextureType_SHININESS:
+      return "SHININESS";
+    case aiTextureType_OPACITY:
+      return "OPACITY";
+    case aiTextureType_DISPLACEMENT:
+      return "DISPLACEMENT";
+    case aiTextureType_LIGHTMAP:
+      return "LIGHTMAP";
+    case aiTextureType_REFLECTION:
+      return "REFLECTION";
+    case aiTextureType_BASE_COLOR:
+      return "BASE_COLOR";
+    case aiTextureType_NORMAL_CAMERA:
+      return "NORMAL_CAMERA";
+    case aiTextureType_EMISSION_COLOR:
+      return "EMISSION_COLOR";
+    case aiTextureType_METALNESS:
+      return "METALNESS";
+    case aiTextureType_DIFFUSE_ROUGHNESS:
+      return "DIFFUSE_ROUGHNESS";
+    case aiTextureType_AMBIENT_OCCLUSION:
+      return "AMBIENT_OCCLUSION";
+    case aiTextureType_SHEEN:
+      return "SHEEN";
+    case aiTextureType_CLEARCOAT:
+      return "CLEARCOAT";
+    case aiTextureType_TRANSMISSION:
+      return "TRANSMISSION";
+    case aiTextureType_UNKNOWN:
+      return "UNKNOWN";
+    default:
+      return "?";
+  }
+}
+
+void printMaterialProperties(const aiMaterial* mat) {
+  for (unsigned p = 0; p < mat->mNumProperties; ++p) {
+    const aiMaterialProperty* prop = mat->mProperties[p];
+    const char* tex = textureTypeName(prop->mSemantic);
+    if (*tex) {
+      std::printf("  prop \"%s\" [%s/%u] (%s,len=%u): ", prop->mKey.C_Str(), tex,
+                  prop->mIndex, propertyTypeName(prop->mType),
+                  prop->mDataLength);
+    } else {
+      std::printf("  prop \"%s\" (%s,len=%u): ", prop->mKey.C_Str(),
+                  propertyTypeName(prop->mType), prop->mDataLength);
+    }
+    switch (prop->mType) {
+      case aiPTI_Float: {
+        unsigned n = prop->mDataLength / sizeof(float);
+        const float* f = reinterpret_cast<const float*>(prop->mData);
+        std::printf("[");
+        for (unsigned k = 0; k < n; ++k)
+          std::printf("%s%g", k ? ", " : "", f[k]);
+        std::printf("]\n");
+        break;
+      }
+      case aiPTI_Double: {
+        unsigned n = prop->mDataLength / sizeof(double);
+        const double* d = reinterpret_cast<const double*>(prop->mData);
+        std::printf("[");
+        for (unsigned k = 0; k < n; ++k)
+          std::printf("%s%g", k ? ", " : "", d[k]);
+        std::printf("]\n");
+        break;
+      }
+      case aiPTI_Integer: {
+        unsigned n = prop->mDataLength / sizeof(int32_t);
+        const int32_t* v = reinterpret_cast<const int32_t*>(prop->mData);
+        std::printf("[");
+        for (unsigned k = 0; k < n; ++k)
+          std::printf("%s%d", k ? ", " : "", v[k]);
+        std::printf("]\n");
+        break;
+      }
+      case aiPTI_String: {
+        // assimp stores strings as a 4-byte length prefix followed by chars.
+        if (prop->mDataLength >= sizeof(uint32_t) && prop->mData) {
+          uint32_t len;
+          std::memcpy(&len, prop->mData, sizeof(len));
+          std::printf("\"%.*s\"\n", static_cast<int>(len),
+                      prop->mData + sizeof(uint32_t));
+        } else {
+          std::printf("(empty)\n");
+        }
+        break;
+      }
+      case aiPTI_Buffer:
+        std::printf("(%u bytes)\n", prop->mDataLength);
+        break;
+      default:
+        std::printf("(unknown)\n");
+        break;
     }
   }
 }
@@ -221,6 +380,8 @@ void printMaterial(const aiMaterial* mat, unsigned i) {
     mat->GetTexture(t, 0, &path);
     std::printf("  tex %s x%u: \"%s\"\n", label, n, path.C_Str());
   }
+
+  printMaterialProperties(mat);
 }
 
 }  // namespace
@@ -266,6 +427,13 @@ int main(int argc, char** argv) {
     std::printf("\nlights:\n");
     for (unsigned i = 0; i < scene->mNumLights; ++i) {
       printLight(scene->mLights[i], i, parsed);
+    }
+  }
+
+  if (scene->mNumCameras > 0) {
+    std::printf("\ncameras:\n");
+    for (unsigned i = 0; i < scene->mNumCameras; ++i) {
+      printCamera(scene->mCameras[i], i, parsed);
     }
   }
 

@@ -37,6 +37,7 @@ bpy.ops.export_scene.gltf(
     export_format='GLB',
     export_yup=False,
     export_lights=True,
+    export_extras=True,
 )
 "
 
