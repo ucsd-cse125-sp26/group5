@@ -10,7 +10,8 @@
 namespace shared {
 
 // Maximum number of shadow-casting point lights. The cubemap-array shadow
-// target reserves 6 layers per light, so kPointShadowLayers = kMaxPointLights * 6.
+// target reserves 6 layers per light, so kPointShadowLayers = kMaxPointLights
+// * 6.
 inline constexpr int kMaxPointLights = 4;
 
 // Maximum total point lights consumed by the deferred lighting shader.

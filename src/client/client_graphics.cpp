@@ -61,11 +61,11 @@ static constexpr int kDirShadowMapSize = 2048;
 // Point-light cubemap array. K_MAX_POINT_LIGHTS × 6 faces × 1024² ≈ 24 MB.
 static constexpr int kPointShadowSize = 1024;
 // Counts/ranges live in shared/shader_constants.h so C++ and GLSL stay in sync.
+using shared::kMaxLightingShaderLights;
 using shared::kMaxPointLights;
+using shared::kPointShadowFar;
 using shared::kPointShadowLayers;
 using shared::kPointShadowNear;
-using shared::kPointShadowFar;
-using shared::kMaxLightingShaderLights;
 
 // CPU-side mirror of one PointLight uniform struct.
 struct LightUpload {
@@ -83,7 +83,7 @@ struct LightUpload {
 // into out, and assigns the first kMaxPointLights with castsShadow=true to
 // shadow slots 0..(kMaxPointLights-1). Returns the active light count.
 static int collectPointLights(const ClientGame& game,
-                               LightUpload out[kMaxLightingShaderLights]) {
+                              LightUpload out[kMaxLightingShaderLights]) {
   int count = 0;
   int shadowSlot = 0;
   auto view = game.renderRegistry.view<shared::PointLight>();
@@ -106,8 +106,8 @@ static int collectPointLights(const ClientGame& game,
 
 // Pushes the collected lights into the deferred lighting shader's uniform
 // arrays.
-static void uploadPointLights(const Shader& shader,
-                               const LightUpload* lights, int count) {
+static void uploadPointLights(const Shader& shader, const LightUpload* lights,
+                              int count) {
   shader.setInt("numPointLights", count);
   for (int i = 0; i < count; ++i) {
     std::string base = "pointLights[" + std::to_string(i) + "].";
@@ -134,11 +134,10 @@ static void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
   // Filter out the noisy NOTIFICATION-level messages (buffer-detail spam from
   // some drivers); everything else gets surfaced.
   if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
-  const char* sev =
-      severity == GL_DEBUG_SEVERITY_HIGH      ? "HIGH"
-      : severity == GL_DEBUG_SEVERITY_MEDIUM  ? "MED"
-      : severity == GL_DEBUG_SEVERITY_LOW     ? "LOW"
-                                              : "?";
+  const char* sev = severity == GL_DEBUG_SEVERITY_HIGH     ? "HIGH"
+                    : severity == GL_DEBUG_SEVERITY_MEDIUM ? "MED"
+                    : severity == GL_DEBUG_SEVERITY_LOW    ? "LOW"
+                                                           : "?";
   fprintf(stderr, "[GL %s%s] %s\n", sev,
           type == GL_DEBUG_TYPE_ERROR ? " ERROR" : "", msg);
 }
@@ -150,16 +149,16 @@ static glm::vec3 directionalLightDir(const ClientGame& game) {
   auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
   for (auto ent : dlView) {
     const auto& dl = dlView.get<shared::DirectionalLight>(ent);
-    return glm::vec3(dl.dirX, dl.dirY, dl.dirZ);
+    return {dl.dirX, dl.dirY, dl.dirZ};
   }
   auto sceneView = game.renderRegistry.view<shared::Scene>();
   for (auto ent : sceneView) {
     auto& scene = sceneView.get<shared::Scene>(ent);
     if (auto* info = shared::findScene(scene.name)) {
-      return glm::vec3(info->dirX, info->dirY, info->dirZ);
+      return {info->dirX, info->dirY, info->dirZ};
     }
   }
-  return glm::vec3(0.3f, 1.0f, -0.4f);
+  return {0.3f, 1.0f, -0.4f};
 }
 
 // Builds 24 light-space matrices for the point-light cubemap-array shadow
@@ -173,32 +172,32 @@ static glm::vec3 directionalLightDir(const ClientGame& game) {
 // Reads shadow-slot assignments from the LightUpload array so that the
 // lighting shader and the shadow shader agree on which cubemap layer each
 // shadow-casting light owns.
-static void computePointShadowMatrices(const LightUpload* lights, int count,
-                                       glm::mat4 outMatrices[kPointShadowLayers],
-                                       glm::vec3 outPositions[kMaxPointLights]) {
+static void computePointShadowMatrices(
+    const LightUpload* lights, int count,
+    glm::mat4 outMatrices[kPointShadowLayers],
+    glm::vec3 outPositions[kMaxPointLights]) {
   // Cube-face directions/ups. Same convention learnopengl uses; the cube
   // map is its own coordinate system, independent of the world's up axis.
   static const struct {
     glm::vec3 dir;
     glm::vec3 up;
   } faces[6] = {
-      {{1, 0, 0}, {0, -1, 0}},   // +X
-      {{-1, 0, 0}, {0, -1, 0}},  // -X
-      {{0, 1, 0}, {0, 0, 1}},    // +Y
-      {{0, -1, 0}, {0, 0, -1}},  // -Y
-      {{0, 0, 1}, {0, -1, 0}},   // +Z
-      {{0, 0, -1}, {0, -1, 0}},  // -Z
+      {.dir = {1, 0, 0}, .up = {0, -1, 0}},   // +X
+      {.dir = {-1, 0, 0}, .up = {0, -1, 0}},  // -X
+      {.dir = {0, 1, 0}, .up = {0, 0, 1}},    // +Y
+      {.dir = {0, -1, 0}, .up = {0, 0, -1}},  // -Y
+      {.dir = {0, 0, 1}, .up = {0, -1, 0}},   // +Z
+      {.dir = {0, 0, -1}, .up = {0, -1, 0}},  // -Z
   };
 
   // Kill matrix: any input → clip space (0, 0, 2, 1) → NDC z = 2 → clipped.
   glm::mat4 kill(0.0f);
   kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
   for (int i = 0; i < kPointShadowLayers; ++i) outMatrices[i] = kill;
-  for (int i = 0; i < kMaxPointLights; ++i)
-    outPositions[i] = glm::vec3(0.0f);
+  for (int i = 0; i < kMaxPointLights; ++i) outPositions[i] = glm::vec3(0.0f);
 
-  glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
-                                    kPointShadowNear, kPointShadowFar);
+  glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, kPointShadowNear,
+                                    kPointShadowFar);
 
   for (int i = 0; i < count; ++i) {
     int slot = lights[i].shadowIdx;
@@ -240,13 +239,11 @@ static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
   v = std::floor(v / texelWorld) * texelWorld;
   // Reconstruct a snapped camera anchor in the light's tangent plane,
   // then push it back along -dir to place the virtual sun.
-  glm::vec3 snapped =
-      right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
+  glm::vec3 snapped = right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
   glm::vec3 lightPos = snapped - dir * 30.0f;
   glm::mat4 view = glm::lookAt(lightPos, snapped, up);
-  glm::mat4 proj =
-      glm::ortho(-kHalfExtent, kHalfExtent, -kHalfExtent, kHalfExtent,
-                 1.0f, 80.0f);
+  glm::mat4 proj = glm::ortho(-kHalfExtent, kHalfExtent, -kHalfExtent,
+                              kHalfExtent, 1.0f, 80.0f);
   return proj * view;
 }
 
@@ -349,8 +346,8 @@ static void renderEntities(const Shader& shader, ClientGame& game,
       // the light's origin; rendering them into the shadow map makes the
       // light shadow itself. Skip any entity whose render mesh represents
       // a light source.
-      if (game.renderRegistry.any_of<shared::PointLight,
-                                      shared::DirectionalLight>(ent))
+      if (game.renderRegistry
+              .any_of<shared::PointLight, shared::DirectionalLight>(ent))
         continue;
     } else {
       // Main pass: skip the camera entity (we'd see our own model
@@ -436,7 +433,7 @@ bool Graphics::load(int width, int height) {
   ssaoShader.emplace("shaders/vertex_present.glsl",
                      "shaders/fragment_ssao.glsl");
   ssaoBlurShader.emplace("shaders/vertex_present.glsl",
-                          "shaders/fragment_ssao_blur.glsl");
+                         "shaders/fragment_ssao_blur.glsl");
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
@@ -450,10 +447,9 @@ bool Graphics::load(int width, int height) {
   // startup we don't have a previous program, so a silent failure produces
   // a black window with one stderr line. Fail fast instead.
   const std::optional<Shader>* required[] = {
-      &gbufferShader,    &lightingShader,    &skyboxShader,
-      &presentShader,    &blurShader,        &tonemapShader,
-      &ssaoShader,       &ssaoBlurShader,    &shadowDirShader,
-      &shadowPointShader, &debugOverlay,
+      &gbufferShader,   &lightingShader,    &skyboxShader, &presentShader,
+      &blurShader,      &tonemapShader,     &ssaoShader,   &ssaoBlurShader,
+      &shadowDirShader, &shadowPointShader, &debugOverlay,
   };
   for (const auto* s : required) {
     if (!*s || !(*s)->valid()) {
@@ -515,8 +511,7 @@ bool Graphics::load(int width, int height) {
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
                   GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
-  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps,
-                       0);
+  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -551,8 +546,8 @@ bool Graphics::load(int width, int height) {
     ssaoKernel.clear();
     ssaoKernel.reserve(64);
     for (int i = 0; i < 64; ++i) {
-      glm::vec3 sample(rand01(gen) * 2.0f - 1.0f,
-                       rand01(gen) * 2.0f - 1.0f, rand01(gen));
+      glm::vec3 sample(rand01(gen) * 2.0f - 1.0f, rand01(gen) * 2.0f - 1.0f,
+                       rand01(gen));
       sample = glm::normalize(sample);
       sample *= rand01(gen);
       float scale = static_cast<float>(i) / 64.0f;
@@ -563,8 +558,8 @@ bool Graphics::load(int width, int height) {
     // around the surface normal). GL_REPEAT tiles it across the screen.
     std::vector<glm::vec3> noise(16);
     for (int i = 0; i < 16; ++i) {
-      noise[i] = glm::vec3(rand01(gen) * 2.0f - 1.0f,
-                            rand01(gen) * 2.0f - 1.0f, 0.0f);
+      noise[i] =
+          glm::vec3(rand01(gen) * 2.0f - 1.0f, rand01(gen) * 2.0f - 1.0f, 0.0f);
     }
     glGenTextures(1, &ssaoNoiseTex);
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
@@ -637,10 +632,10 @@ void Graphics::resizeBuffers(int width, int height) {
   if (!gBufferDepth) glGenRenderbuffers(1, &gBufferDepth);
 
   auto allocColor = [&](GLuint tex, GLint internalFmt, GLenum fmt,
-                         GLenum type) {
+                        GLenum type) {
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, fbWidth, fbHeight, 0, fmt,
-                 type, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, fbWidth, fbHeight, 0, fmt, type,
+                 nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -737,8 +732,8 @@ void Graphics::resizeBuffers(int width, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                           GL_TEXTURE_2D, tex, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           tex, 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
       fprintf(stderr, "ssao FBO incomplete\n");
     }
@@ -787,34 +782,54 @@ void Graphics::reloadShaders() {
     const char* geom;  // empty string when no geometry stage
   };
   Reload reloads[] = {
-      {gbufferShader, "shaders/vertex_gbuffer.glsl",
-       "shaders/fragment_gbuffer.glsl", ""},
-      {lightingShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_lighting_deferred.glsl", ""},
-      {skyboxShader, "shaders/vertex_skybox.glsl",
-       "shaders/fragment_skybox.glsl", ""},
-      {presentShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_fxaa.glsl", ""},
-      {blurShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_blur.glsl", ""},
-      {tonemapShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_tonemap.glsl", ""},
-      {ssaoShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_ssao.glsl", ""},
-      {ssaoBlurShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_ssao_blur.glsl", ""},
-      {shadowDirShader, "shaders/vertex_shadow_dir.glsl",
-       "shaders/fragment_shadow_dir.glsl", ""},
-      {shadowPointShader, "shaders/vertex_shadow_point.glsl",
-       "shaders/fragment_shadow_point.glsl",
-       "shaders/geometry_shadow_point.glsl"},
-      {debugOverlay, "shaders/vertex_present.glsl",
-       "shaders/fragment_debug_overlay.glsl", ""},
+      {.slot = gbufferShader,
+       .vert = "shaders/vertex_gbuffer.glsl",
+       .frag = "shaders/fragment_gbuffer.glsl",
+       .geom = ""},
+      {.slot = lightingShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_lighting_deferred.glsl",
+       .geom = ""},
+      {.slot = skyboxShader,
+       .vert = "shaders/vertex_skybox.glsl",
+       .frag = "shaders/fragment_skybox.glsl",
+       .geom = ""},
+      {.slot = presentShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_fxaa.glsl",
+       .geom = ""},
+      {.slot = blurShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_blur.glsl",
+       .geom = ""},
+      {.slot = tonemapShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_tonemap.glsl",
+       .geom = ""},
+      {.slot = ssaoShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_ssao.glsl",
+       .geom = ""},
+      {.slot = ssaoBlurShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_ssao_blur.glsl",
+       .geom = ""},
+      {.slot = shadowDirShader,
+       .vert = "shaders/vertex_shadow_dir.glsl",
+       .frag = "shaders/fragment_shadow_dir.glsl",
+       .geom = ""},
+      {.slot = shadowPointShader,
+       .vert = "shaders/vertex_shadow_point.glsl",
+       .frag = "shaders/fragment_shadow_point.glsl",
+       .geom = "shaders/geometry_shadow_point.glsl"},
+      {.slot = debugOverlay,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_debug_overlay.glsl",
+       .geom = ""},
   };
   for (auto& r : reloads) {
-    Shader candidate = (r.geom && *r.geom)
-                           ? Shader(r.vert, r.frag, r.geom)
-                           : Shader(r.vert, r.frag);
+    Shader candidate = (r.geom && *r.geom) ? Shader(r.vert, r.frag, r.geom)
+                                           : Shader(r.vert, r.frag);
     if (candidate.valid()) {
       r.slot.emplace(std::move(candidate));
       printf("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
@@ -934,8 +949,8 @@ void Graphics::render(ClientGame& game) {
 
   // Directional shadow pass. Light-space matrix tracks the camera so shadows
   // stay sharp around the player.
-  lightSpaceMatrix = computeDirectionalLightMatrix(
-      camera->position, directionalLightDir(game));
+  lightSpaceMatrix = computeDirectionalLightMatrix(camera->position,
+                                                   directionalLightDir(game));
 
   // Upload the per-frame camera UBO. Every shader with a CameraBlock will
   // pick up these values without needing per-program setMat4 calls.
@@ -974,8 +989,8 @@ void Graphics::render(ClientGame& game) {
   {
     glm::mat4 kill(0.0f);
     kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-    for (int i = 0; i < kPointShadowLayers; ++i) pointMats[i] = kill;
-    for (int i = 0; i < kMaxPointLights; ++i) pointPositions[i] = glm::vec3(0);
+    for (auto& pointMat : pointMats) pointMat = kill;
+    for (auto& pointPosition : pointPositions) pointPosition = glm::vec3(0);
   }
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
   if (shadowPointShader && shadowPointShader->valid()) {
@@ -987,11 +1002,10 @@ void Graphics::render(ClientGame& game) {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowPointShader->use();
-    shadowPointShader->setMat4Array(
-        "shadowMatrices", kPointShadowLayers,
-        glm::value_ptr(pointMats[0]));
+    shadowPointShader->setMat4Array("shadowMatrices", kPointShadowLayers,
+                                    glm::value_ptr(pointMats[0]));
     shadowPointShader->setVec3Array("lightPositions", kMaxPointLights,
-                                     glm::value_ptr(pointPositions[0]));
+                                    glm::value_ptr(pointPositions[0]));
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
     renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1033,14 +1047,13 @@ void Graphics::render(ClientGame& game) {
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
     ssaoShader->setInt("texNoise", 2);
     // view/projection from the camera UBO.
-    ssaoShader->setVec3Array(
-        "samples", static_cast<int>(ssaoKernel.size()),
-        glm::value_ptr(ssaoKernel[0]));
+    ssaoShader->setVec3Array("samples", static_cast<int>(ssaoKernel.size()),
+                             glm::value_ptr(ssaoKernel[0]));
     ssaoShader->setInt("kernelSize", ssaoKernelSize);
     ssaoShader->setFloat("radius", ssaoRadius);
     ssaoShader->setFloat("bias", ssaoBias);
     ssaoShader->setVec2("noiseScale", static_cast<float>(fbWidth) / 4.0f,
-                          static_cast<float>(fbHeight) / 4.0f);
+                        static_cast<float>(fbHeight) / 4.0f);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
@@ -1108,26 +1121,26 @@ void Graphics::render(ClientGame& game) {
       for (auto ent : dlView) {
         const auto& dl = dlView.get<shared::DirectionalLight>(ent);
         lightingShader->setVec3("dirLight.direction", dl.dirX, dl.dirY,
-                                 dl.dirZ);
+                                dl.dirZ);
         lightingShader->setVec3("dirLight.ambient", dl.ambientR, dl.ambientG,
-                                 dl.ambientB);
+                                dl.ambientB);
         lightingShader->setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG,
-                                 dl.diffuseB);
-        lightingShader->setVec3("dirLight.specular", dl.specularR,
-                                 dl.specularG, dl.specularB);
+                                dl.diffuseB);
+        lightingShader->setVec3("dirLight.specular", dl.specularR, dl.specularG,
+                                dl.specularB);
         dirSet = true;
         break;
       }
       if (!dirSet) {
         if (auto* info = currentScene(game)) {
           lightingShader->setVec3("dirLight.direction", info->dirX, info->dirY,
-                                   info->dirZ);
+                                  info->dirZ);
           lightingShader->setVec3("dirLight.ambient", info->ambientR,
-                                   info->ambientG, info->ambientB);
+                                  info->ambientG, info->ambientB);
           lightingShader->setVec3("dirLight.diffuse", info->diffuseR,
-                                   info->diffuseG, info->diffuseB);
+                                  info->diffuseG, info->diffuseB);
           lightingShader->setVec3("dirLight.specular", info->specularR,
-                                   info->specularG, info->specularB);
+                                  info->specularG, info->specularB);
         }
       }
       uploadPointLights(*lightingShader, lights, numLights);
@@ -1175,8 +1188,8 @@ void Graphics::render(ClientGame& game) {
       glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[dst]);
       blurShader->setInt("horizontal", horizontal ? 1 : 0);
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, firstIter ? brightColor
-                                              : pingColor[1 - dst]);
+      glBindTexture(GL_TEXTURE_2D,
+                    firstIter ? brightColor : pingColor[1 - dst]);
       blurShader->setInt("src", 0);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);

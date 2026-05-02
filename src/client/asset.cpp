@@ -404,8 +404,8 @@ static GLuint loadCubemap(const std::string& directory) {
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
-      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, 1,
-                   1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
+      glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, 1, 1,
+                   0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
     }
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

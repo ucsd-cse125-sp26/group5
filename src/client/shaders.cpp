@@ -78,13 +78,11 @@ static GLuint linkProgram(const std::string& vertPath,
 
   GLuint vsId = glCreateShader(GL_VERTEX_SHADER);
   GLuint fsId = glCreateShader(GL_FRAGMENT_SHADER);
-  GLuint gsId =
-      geomPath.empty() ? 0 : glCreateShader(GL_GEOMETRY_SHADER);
+  GLuint gsId = geomPath.empty() ? 0 : glCreateShader(GL_GEOMETRY_SHADER);
 
   bool ok = compileStage(vsId, vertSrc.c_str(), vertPath.c_str()) &
             compileStage(fsId, fragSrc.c_str(), fragPath.c_str());
-  if (gsId)
-    ok = ok & compileStage(gsId, geomSrc.c_str(), geomPath.c_str());
+  if (gsId) ok = ok & compileStage(gsId, geomSrc.c_str(), geomPath.c_str());
 
   if (!ok) {
     glDeleteShader(vsId);
@@ -107,8 +105,8 @@ static GLuint linkProgram(const std::string& vertPath,
     std::vector<char> msg(logLen + 1);
     glGetProgramInfoLog(program, logLen, nullptr, msg.data());
     fprintf(stderr, "[link %s + %s%s%s] %s\n", vertPath.c_str(),
-            fragPath.c_str(), geomPath.empty() ? "" : " + ",
-            geomPath.c_str(), msg.data());
+            fragPath.c_str(), geomPath.empty() ? "" : " + ", geomPath.c_str(),
+            msg.data());
   }
 
   glDetachShader(program, vsId);
