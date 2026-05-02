@@ -6,9 +6,11 @@
 
 #include "server_game.h"
 #include "server_network.h"
+#include "scene.h"
 #include "shared/components.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/util.h"
 
 // ── GameStateManager ─────────────────────────────────────
 
@@ -87,6 +89,32 @@ static void clearTaggedPlayerControls(ServerGame& game) {
   }
 }
 
+template <typename Tag>
+static void addPhysicsBodies(ServerGame& game) {
+  auto view = game.registry.view<Tag, shared::PhysicsBody>();
+  auto& bodyInterface = game.physics.getBodyInterface();
+  for (auto ent : view) {
+    auto& phys = view.template get<shared::PhysicsBody>(ent);
+    JPH::BodyID bodyId(phys.bodyId);
+    if (!bodyInterface.IsAdded(bodyId)) {
+      bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+    }
+  }
+}
+
+template <typename Tag>
+static void removePhysicsBodies(ServerGame& game) {
+  auto view = game.registry.view<Tag, shared::PhysicsBody>();
+  auto& bodyInterface = game.physics.getBodyInterface();
+  for (auto ent : view) {
+    auto& phys = view.template get<shared::PhysicsBody>(ent);
+    JPH::BodyID bodyId(phys.bodyId);
+    if (bodyInterface.IsAdded(bodyId)) {
+      bodyInterface.RemoveBody(bodyId);
+    }
+  }
+}
+
 // ── Initialization ───────────────────────────────────────
 
 void initWorldEntities(ServerGame& game) {
@@ -108,23 +136,62 @@ void initWorldEntities(ServerGame& game) {
                                             0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
     game.registry.emplace<shared::OverworldTag>(ent);
-  }
-  struct Decor {
-    float x, y, z, scale;
-  };
-  Decor decors[] = {{.x = 5, .y = 5, .z = 0.5, .scale = 1},
-                    {.x = -5, .y = 3, .z = 0.5, .scale = 1.5},
-                    {.x = 3, .y = -7, .z = 0.5, .scale = 0.8},
-                    {.x = -8, .y = -4, .z = 0.5, .scale = 2}};
-  for (auto& d : decors) {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, d.x, d.y, d.z, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "cube", d.scale);
-    game.registry.emplace<shared::OverworldTag>(ent);
-    JPH::BodyID bodyId = game.physics.createPlayerBody(d.x, d.y, d.z);
-    game.registry.emplace<shared::PhysicsBody>(
-        ent, bodyId.GetIndexAndSequenceNumber());
+
+    spawnStaticEntitiesForWorld<shared::OverworldTag>(
+        game, {
+                  {.x = 5.0f,
+                   .y = 5.0f,
+                   .z = 0.0f,
+                   .modelName = "cube",
+                   .scale = 1.0f,
+                   .meshPath = "",
+                   .render = true},
+                  {.x = 10.0f,
+                   .y = 0.0f,
+                   .z = -1.0f,
+                   .modelName = "bear",
+                   .scale = 0.5f,
+                   .meshPath = (exeDir() / "assets/bear/bear_full.obj").string(),
+                   .render = true},
+                  {.x = 0.0f,
+                   .y = 0.0f,
+                   .z = -1.0f,
+                   .modelName = "floor",
+                   .scale = 1.0f,
+                   .meshPath = "",
+                   .render = false,
+                   .halfX = 100.0f,
+                   .halfY = 100.0f,
+                   .halfZ = 1.0f},
+                  {.x = 5.0f,
+                   .y = 5.0f,
+                   .z = 0.5f,
+                   .modelName = "cube",
+                   .scale = 1.0f,
+                   .meshPath = "",
+                   .render = true},
+                  {.x = -5.0f,
+                   .y = 3.0f,
+                   .z = 0.5f,
+                   .modelName = "cube",
+                   .scale = 1.5f,
+                   .meshPath = "",
+                   .render = true},
+                  {.x = 3.0f,
+                   .y = -7.0f,
+                   .z = 0.5f,
+                   .modelName = "cube",
+                   .scale = 0.8f,
+                   .meshPath = "",
+                   .render = true},
+                  {.x = -8.0f,
+                   .y = -4.0f,
+                   .z = 0.5f,
+                   .modelName = "cube",
+                   .scale = 2.0f,
+                   .meshPath = "",
+                   .render = true},
+              });
   }
 
   // --- Maze Map ---
@@ -145,25 +212,64 @@ void initWorldEntities(ServerGame& game) {
                                             0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
     game.registry.emplace<shared::MazeTag>(ent);
-  }
-  struct BearPos {
-    float x, y, z, scale;
-  };
-  BearPos bears[] = {{.x = 3, .y = 0, .z = 0, .scale = 0.1},
-                     {.x = -3, .y = 0, .z = 0, .scale = 0.1},
-                     {.x = 0, .y = 5, .z = 0, .scale = 0.2},
-                     {.x = 0, .y = -5, .z = 0, .scale = 0.2},
-                     {.x = 6, .y = 6, .z = 0, .scale = 0.15},
-                     {.x = -6, .y = -6, .z = 0, .scale = 0.15}};
-  for (auto& b : bears) {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, b.x, b.y, b.z, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "bear", b.scale);
-    game.registry.emplace<shared::MazeTag>(ent);
-    JPH::BodyID bodyId = game.physics.createPlayerBody(b.x, b.y, b.z);
-    game.registry.emplace<shared::PhysicsBody>(
-        ent, bodyId.GetIndexAndSequenceNumber());
+
+    const std::string bearMesh =
+        (exeDir() / "assets/bear/bear_full.obj").string();
+    spawnStaticEntitiesForWorld<shared::MazeTag>(
+        game, {
+                  {.x = 0.0f,
+                   .y = 0.0f,
+                   .z = -1.0f,
+                   .modelName = "floor",
+                   .scale = 1.0f,
+                   .meshPath = "",
+                   .render = false,
+                   .halfX = 100.0f,
+                   .halfY = 100.0f,
+                   .halfZ = 1.0f},
+                  {.x = 3.0f,
+                   .y = 0.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.1f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = -3.0f,
+                   .y = 0.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.1f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 0.0f,
+                   .y = 5.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.2f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 0.0f,
+                   .y = -5.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.2f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 6.0f,
+                   .y = 6.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.15f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = -6.0f,
+                   .y = -6.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.15f,
+                   .meshPath = bearMesh,
+                   .render = true},
+              });
   }
 
   // --- Pool slots ---
@@ -202,6 +308,11 @@ void initWorldEntities(ServerGame& game) {
 
     game.unused_player_slots.push_back(slots);
   }
+
+  // Remove all state-owned physics bodies after creation. State enter will add
+  // back only the active world's bodies.
+  removePhysicsBodies<shared::MazeTag>(game);
+  removePhysicsBodies<shared::OverworldTag>(game);
 }
 
 // ── Delegating Helpers ───────────────────────────────────
@@ -234,12 +345,14 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
+  addPhysicsBodies<shared::OverworldTag>(game);
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
 }
 
 void OverworldState::onExit(ServerGame& game) {
   printf("[State] Exiting Overworld\n");
+  removePhysicsBodies<shared::OverworldTag>(game);
   clearTaggedPlayerControls<shared::OverworldTag>(game);
   despawnTaggedEntities<shared::OverworldTag>(game);
 }
@@ -279,11 +392,13 @@ void OverworldState::update(ServerGame& game, float dt) {
 // ── MazeState ────────────────────────────────────────────
 
 void MazeState::onEnter(ServerGame& game) {
+  addPhysicsBodies<shared::MazeTag>(game);
   enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
 }
 
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
+  removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
   despawnTaggedEntities<shared::MazeTag>(game);
 }
