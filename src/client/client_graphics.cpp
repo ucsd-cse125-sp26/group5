@@ -955,19 +955,14 @@ void Graphics::render(ClientGame& game) {
     glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
+    // Polygon offset alone — front-face culling stacks with this and causes
+    // peter-panning on non-watertight geometry (floor/walls are single-sided).
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
-    // Cull front faces during shadow render: back-faces of solid geometry
-    // are written instead. Halves draw cost and shoves Peter-Panning to
-    // the inside of objects where it's harder to notice.
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
     shadowDirShader->use();
     shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
     renderEntities(*shadowDirShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
-    glCullFace(GL_BACK);
-    glDisable(GL_CULL_FACE);
   }
 
   // Point-light shadow pass: 24 cubemap-array layers populated in one draw
@@ -991,8 +986,6 @@ void Graphics::render(ClientGame& game) {
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
     shadowPointShader->use();
     shadowPointShader->setMat4Array(
         "shadowMatrices", kPointShadowLayers,
@@ -1002,8 +995,6 @@ void Graphics::render(ClientGame& game) {
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
     renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
-    glCullFace(GL_BACK);
-    glDisable(GL_CULL_FACE);
   }
 
   // Geometry pass: write the g-buffer.
