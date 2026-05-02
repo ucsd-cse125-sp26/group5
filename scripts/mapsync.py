@@ -133,6 +133,25 @@ def rsync_down(state: dict, remote: str, local: Path) -> None:
         die(f"rsync download failed (exit {proc.returncode})")
 
 
+def backup_local(local: Path) -> Path | None:
+    if not local.exists():
+        return None
+    backup = local.with_name(local.name + ".backup")
+    local.replace(backup)
+    return backup
+
+
+# Read-only flips the write bits so Blender's "Save" refuses, nudging
+# the editor toward `checkout` before making changes they'd lose.
+def set_readonly(local: Path, readonly: bool) -> None:
+    if not local.exists():
+        return
+    mode = local.stat().st_mode
+    new_mode = (mode & ~0o222) if readonly else (mode | 0o200)
+    if new_mode != mode:
+        local.chmod(new_mode)
+
+
 def now_iso() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -288,6 +307,7 @@ def cmd_new(args: argparse.Namespace, state: dict) -> int:
     """).strip()
     ssh_run(state, finalize)
 
+    set_readonly(local, readonly=True)
     print(f"created map {name!r} at epoch 1")
     print("note: 'new' does not check the map out — use 'checkout' to start editing")
     return 0
@@ -407,7 +427,9 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
         if update_proc.returncode != 0:
             sys.stderr.write(update_proc.stderr.decode("utf-8", errors="replace"))
             die(f"metadata update failed (exit {update_proc.returncode})")
+        backup = backup_local(local_blend)
         rsync_down(state, remote_path(state, name, "current.blend"), local_blend)
+        set_readonly(local_blend, readonly=False)
     except BaseException:
         try:
             ssh_run(state, release, check=False)
@@ -426,6 +448,8 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
         f"checked out {name!r} at epoch {epoch} → "
         f"{local_blend.relative_to(REPO_ROOT)}"
     )
+    if backup is not None:
+        print(f"  prior local file moved to {backup.relative_to(REPO_ROOT)}")
     return 0
 
 
@@ -620,6 +644,7 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
 
     state.get("checkouts", {}).pop(name, None)
     save_state(state)
+    set_readonly(local_blend, readonly=True)
     print(f"checked in {name!r}: epoch {remote_epoch} → {new_epoch}")
     return 0
 
@@ -705,6 +730,7 @@ def cmd_abandon(args: argparse.Namespace, state: dict) -> int:
         die("abandon failed")
     state.get("checkouts", {}).pop(name, None)
     save_state(state)
+    set_readonly(LOCAL_MAPS_DIR / f"{name}.blend", readonly=True)
     if out == "NOLOCK":
         print(f"no lock to release for {name!r} (cleared local record)")
     else:
@@ -750,11 +776,15 @@ def cmd_sync(args: argparse.Namespace, state: dict) -> int:
         die(f"probe failed (exit {proc.returncode})")
     epoch = proc.stdout.decode("utf-8", errors="replace").strip() or "?"
 
+    backup = backup_local(local_blend)
     rsync_down(state, remote_path(state, name, "current.blend"), local_blend)
+    set_readonly(local_blend, readonly=True)
     print(
         f"synced {name!r} at epoch {epoch} → "
         f"{local_blend.relative_to(REPO_ROOT)} (read-only, no lock)"
     )
+    if backup is not None:
+        print(f"  prior local file moved to {backup.relative_to(REPO_ROOT)}")
     return 0
 
 
