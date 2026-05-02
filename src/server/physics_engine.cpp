@@ -64,9 +64,47 @@ bool accumulateMeshAABB(const aiNode& node, const aiScene& scene, Xform xform,
   return any;
 }
 
+// Drops degenerate and non-finite triangles in place. Jolt's narrow-phase
+// (CollideConvexVsTriangles → EPA) crashes when an unnormalized triangle
+// normal underflows to zero, and Jolt's own sanitizer doesn't always catch
+// slivers — see JoltPhysics issue #1352. Returns the number of triangles
+// dropped.
+//
+// Threshold rationale: |edge1 × edge2|² < 1e-10 corresponds to a triangle
+// area below ~5 µm × 5 µm — far smaller than anything that could matter
+// for collision in a meter-scale game, and ~100× looser than Jolt's
+// internal IsNearZero default to give floating-point math headroom.
+size_t pruneDegenerateTriangles(JPH::TriangleList& tris) {
+  constexpr float kMinCrossSq = 1e-10f;
+  auto finite3 = [](const JPH::Float3& v) {
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+  };
+  size_t kept = 0;
+  for (size_t i = 0; i < tris.size(); ++i) {
+    const auto& t = tris[i];
+    if (!finite3(t.mV[0]) || !finite3(t.mV[1]) || !finite3(t.mV[2])) continue;
+    glm::vec3 a(t.mV[0].x, t.mV[0].y, t.mV[0].z);
+    glm::vec3 b(t.mV[1].x, t.mV[1].y, t.mV[1].z);
+    glm::vec3 c(t.mV[2].x, t.mV[2].y, t.mV[2].z);
+    glm::vec3 cross = glm::cross(b - a, c - a);
+    if (glm::dot(cross, cross) < kMinCrossSq) continue;
+    if (kept != i) tris[kept] = t;
+    ++kept;
+  }
+  size_t dropped = tris.size() - kept;
+  tris.resize(kept);
+  return dropped;
+}
+
 // Wraps `tris` in a Jolt MeshShape, logging build failures with `tag`.
 // Returns nullptr on empty input or build error.
 JPH::ShapeRefC buildMeshShape(JPH::TriangleList&& tris, const char* tag) {
+  if (tris.empty()) return nullptr;
+  size_t dropped = pruneDegenerateTriangles(tris);
+  if (dropped > 0) {
+    printf("MeshShape: pruned %zu degenerate triangle(s) from %s\n", dropped,
+           tag);
+  }
   if (tris.empty()) return nullptr;
   JPH::MeshShapeSettings settings(tris);
   settings.SetEmbedded();
