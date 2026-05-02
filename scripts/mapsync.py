@@ -13,6 +13,7 @@ import socket
 import subprocess
 import sys
 import textwrap
+import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -130,13 +131,17 @@ def now_iso() -> str:
     return _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def lock_metadata(state: dict, description: str, epoch: int) -> dict:
+def lock_metadata(state: dict, description: str, epoch: int,
+                  lock_uuid: str) -> dict:
     return {
         "user": state["server_user"],
         "host": socket.gethostname(),
         "description": description,
         "epoch_at_checkout": epoch,
         "timestamp": now_iso(),
+        # Per-lock identity: every checkin/abandon verifies this matches
+        # so a stolen-and-released lock can't quietly land my work.
+        "lock_uuid": lock_uuid,
     }
 
 
@@ -284,21 +289,30 @@ REMOTE_CHECKOUT_SCRIPT = r"""
 set -u
 ROOT=__ROOT__
 NAME=__NAME__
+META=__META__
 DIR="$ROOT/$NAME"
 if [ ! -d "$DIR" ]; then
   echo "NOMAP" >&2
   exit 3
 fi
 EPOCH="$(cat "$DIR/epoch" 2>/dev/null || echo '?')"
-if ! mkdir "$DIR/LOCK" 2>/dev/null; then
+# Atomic acquire: build a staging dir with metadata already inside, then
+# rename it into place. mv -T fails if the target exists — that's our
+# mutex. No window where LOCK exists without metadata, no separate scp.
+STAGING="$DIR/.LOCK.staging.$$"
+trap 'rm -rf "$STAGING"' EXIT
+mkdir "$STAGING" || { echo "STAGE_FAIL" >&2; exit 6; }
+printf '%s' "$META" > "$STAGING/metadata"
+chmod 2770 "$STAGING"
+if ! mv -T "$STAGING" "$DIR/LOCK" 2>/dev/null; then
   echo "LOCKED $EPOCH"
   if [ -f "$DIR/LOCK/metadata" ]; then
     cat "$DIR/LOCK/metadata"
   fi
   exit 4
 fi
+trap - EXIT
 echo "ACQUIRED $EPOCH"
-chmod 2770 "$DIR/LOCK"
 """
 
 
@@ -316,10 +330,20 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
     LOCAL_MAPS_DIR.mkdir(exist_ok=True)
     local_blend = LOCAL_MAPS_DIR / f"{name}.blend"
 
+    # We don't know the epoch yet, so build metadata with a placeholder and
+    # patch it after the server tells us which epoch we're acquiring against.
+    # The server-side script is told the metadata text up front so it lands
+    # atomically with the LOCK directory rename — no orphan-without-metadata
+    # window if the client crashes after acquire.
+    lock_uuid = str(uuid.uuid4())
+    meta_pending = lock_metadata(state, args.message, -1, lock_uuid)
+    meta_json = json.dumps(meta_pending, sort_keys=True)
+
     script = render_script(
         REMOTE_CHECKOUT_SCRIPT,
         root=shlex.quote(state["server_root"]),
         name=shlex.quote(name),
+        meta=shlex.quote(meta_json),
     )
     proc = ssh_run(state, script, check=False)
     out = proc.stdout.decode("utf-8", errors="replace").strip()
@@ -345,37 +369,36 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
         die(f"unexpected server response: {out!r}")
     epoch = int(out.split(" ", 1)[1])
 
-    meta = lock_metadata(state, args.message, epoch)
-
-    import tempfile
+    # Patch the metadata with the now-known epoch (the placeholder we sent
+    # had epoch=-1) and overwrite the remote file atomically.
+    final_meta = lock_metadata(state, args.message, epoch, lock_uuid)
+    final_meta_json = json.dumps(final_meta, sort_keys=True)
+    update_meta = textwrap.dedent(rf"""
+        set -eu
+        DIR={shlex.quote(remote_path(state, name))}
+        TMP="$DIR/LOCK/.metadata.tmp"
+        printf '%s' {shlex.quote(final_meta_json)} > "$TMP"
+        mv -f "$TMP" "$DIR/LOCK/metadata"
+        chmod -R g+rwsX "$DIR/LOCK"
+    """).strip()
 
     try:
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".json", delete=False, encoding="utf-8"
-        ) as fh:
-            # Compact JSON — `list` parses metadata as one tab-separated field.
-            json.dump(meta, fh, sort_keys=True)
-            fh.write("\n")
-            meta_local = Path(fh.name)
-        try:
-            scp_up(
-                state, meta_local, remote_path(state, name, "LOCK", "metadata")
-            )
-        finally:
-            meta_local.unlink(missing_ok=True)
-
-        chmod = textwrap.dedent(rf"""
-            set -eu
-            DIR={shlex.quote(remote_path(state, name))}
-            chmod -R g+rwsX "$DIR"
-            chmod 2770 "$DIR" "$DIR/LOCK"
-        """).strip()
-        ssh_run(state, chmod)
-
+        ssh_run(state, update_meta)
         scp_down(state, remote_path(state, name, "current.blend"), local_blend)
     except Exception:
+        # Best-effort release on failure. abandon-by-uuid so we don't blow
+        # away someone else's lock if they raced in.
         release = textwrap.dedent(rf"""
-            rm -rf {shlex.quote(remote_path(state, name, "LOCK"))}
+            set -u
+            DIR={shlex.quote(remote_path(state, name))}
+            UUID={shlex.quote(lock_uuid)}
+            HOLDER_UUID=""
+            if [ -f "$DIR/LOCK/metadata" ]; then
+              HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
+            fi
+            if [ "$HOLDER_UUID" = "$UUID" ]; then
+              rm -rf "$DIR/LOCK"
+            fi
         """).strip()
         ssh_run(state, release, check=False)
         raise
@@ -383,7 +406,8 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
     state.setdefault("checkouts", {})[name] = {
         "epoch_at_checkout": epoch,
         "description": args.message,
-        "checked_out_at": meta["timestamp"],
+        "checked_out_at": final_meta["timestamp"],
+        "lock_uuid": lock_uuid,
     }
     save_state(state)
     print(
@@ -471,6 +495,22 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
             "pass --force to override (will steal the lock)"
         )
 
+    # Per-lock UUID verification: if a lock was stolen-and-released-and-
+    # re-acquired between our checkout and now, the user/holder names might
+    # still match by coincidence but the UUIDs won't. Without --force, refuse
+    # so we don't quietly land work into someone else's lock.
+    expected_uuid = local_record.get("lock_uuid") if local_record else None
+    remote_uuid = remote_meta.get("lock_uuid")
+    if expected_uuid and remote_uuid and remote_uuid != expected_uuid \
+            and not args.force:
+        die(
+            f"lock identity mismatch on {name!r}: this isn't the lock you "
+            f"acquired (expected uuid={expected_uuid}, "
+            f"server has uuid={remote_uuid}). "
+            "Someone released and re-acquired this lock. "
+            "pass --force to overwrite anyway."
+        )
+
     if local_record is not None:
         if local_record["epoch_at_checkout"] != remote_epoch:
             if not args.force:
@@ -493,12 +533,26 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
 
     new_epoch = remote_epoch + 1
     archive_name = f"{remote_epoch:04d}.blend"
+    # Re-verify ownership on the server before doing anything destructive.
+    # Without --force, if the lock has changed identity we abort cleanly
+    # (incoming file is left in place for inspection).
+    expect_arg = expected_uuid or ""
     finalize = textwrap.dedent(rf"""
         set -eu
         DIR={shlex.quote(remote_path(state, name))}
         INCOMING={shlex.quote(incoming_name)}
         ARCHIVE={shlex.quote(archive_name)}
         NEW_EPOCH={shlex.quote(str(new_epoch))}
+        EXPECT_UUID={shlex.quote(expect_arg)}
+        FORCE={shlex.quote("1" if args.force else "0")}
+        if [ -d "$DIR/LOCK" ] && [ -f "$DIR/LOCK/metadata" ] \
+                && [ -n "$EXPECT_UUID" ] && [ "$FORCE" != "1" ]; then
+          HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
+          if [ -n "$HOLDER_UUID" ] && [ "$HOLDER_UUID" != "$EXPECT_UUID" ]; then
+            echo "STOLEN $HOLDER_UUID" >&2
+            exit 7
+          fi
+        fi
         if [ -f "$DIR/current.blend" ]; then
           mv "$DIR/current.blend" "$DIR/history/$ARCHIVE"
         fi
@@ -508,7 +562,15 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
         chmod -R g+rwsX "$DIR"
         chmod 2770 "$DIR" "$DIR/history"
     """).strip()
-    ssh_run(state, finalize)
+    fproc = ssh_run(state, finalize, check=False)
+    if fproc.returncode == 7:
+        die(
+            f"refusing to checkin: lock on {name!r} was stolen between "
+            "probe and finalize. Local incoming file remains on server."
+        )
+    if fproc.returncode != 0:
+        sys.stderr.write(fproc.stderr.decode("utf-8", errors="replace"))
+        die(f"finalize failed (exit {fproc.returncode})")
 
     state.get("checkouts", {}).pop(name, None)
     save_state(state)
@@ -521,32 +583,71 @@ set -u
 ROOT=__ROOT__
 NAME=__NAME__
 EXPECT_USER=__USER__
+EXPECT_UUID=__UUID__
 ALLOW_BREAK=__BRK__
 DIR="$ROOT/$NAME"
 if [ ! -d "$DIR/LOCK" ]; then
   echo "NOLOCK"
   exit 0
 fi
-HOLDER=""
-if [ -f "$DIR/LOCK/metadata" ]; then
-  HOLDER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("user",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
+# Atomic claim: rename LOCK to a unique victim name. After this point a
+# new mkdir LOCK by another client would succeed, so anything we do
+# operates on the dir we just claimed — no race with re-acquire.
+VICTIM="$DIR/.LOCK.victim.$$"
+if ! mv -T "$DIR/LOCK" "$VICTIM" 2>/dev/null; then
+  # Lost the race: someone else removed it first.
+  echo "NOLOCK"
+  exit 0
 fi
-if [ -n "$HOLDER" ] && [ "$HOLDER" != "$EXPECT_USER" ] && [ "$ALLOW_BREAK" != "1" ]; then
+HOLDER=""
+HOLDER_UUID=""
+if [ -f "$VICTIM/metadata" ]; then
+  HOLDER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("user",""))' "$VICTIM/metadata" 2>/dev/null || true)"
+  HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$VICTIM/metadata" 2>/dev/null || true)"
+fi
+if [ "$ALLOW_BREAK" = "1" ]; then
+  rm -rf "$VICTIM"
+  echo "RELEASED"
+  exit 0
+fi
+# UUID match is the strongest identity check; fall back to user name when
+# the lock was acquired by an older client without UUID support.
+OWNED=0
+if [ -n "$EXPECT_UUID" ] && [ "$HOLDER_UUID" = "$EXPECT_UUID" ]; then
+  OWNED=1
+elif [ -z "$HOLDER_UUID" ] && [ -n "$HOLDER" ] \
+        && [ "$HOLDER" = "$EXPECT_USER" ]; then
+  OWNED=1
+fi
+if [ "$OWNED" = "1" ]; then
+  rm -rf "$VICTIM"
+  echo "RELEASED"
+  exit 0
+fi
+# Not ours: try to atomically restore the lock so the rightful holder
+# isn't disrupted. If a third client already raced in and recreated LOCK,
+# discard our victim.
+if mv -T "$VICTIM" "$DIR/LOCK" 2>/dev/null; then
   echo "OTHER $HOLDER"
   exit 5
 fi
-rm -rf "$DIR/LOCK"
-echo "RELEASED"
+rm -rf "$VICTIM"
+echo "OTHER $HOLDER"
+exit 5
 """
 
 
 def cmd_abandon(args: argparse.Namespace, state: dict) -> int:
     name = validate_map_name(args.name)
+    expected_uuid = (
+        state.get("checkouts", {}).get(name, {}).get("lock_uuid", "")
+    )
     script = render_script(
         REMOTE_ABANDON_SCRIPT,
         root=shlex.quote(state["server_root"]),
         name=shlex.quote(name),
         user=shlex.quote(state["server_user"]),
+        uuid=shlex.quote(expected_uuid),
         brk=shlex.quote("1" if args.break_ else "0"),
     )
     proc = ssh_run(state, script, check=False)

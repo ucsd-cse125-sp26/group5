@@ -21,22 +21,51 @@
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/map_format.h"
+#include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 
 // Skybox images use Y-up; the game uses Z-up.
 // cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
+// std140 layout of the per-frame camera uniform block. Mirrored verbatim by
+// CameraBlock in fragment_lighting_deferred.glsl, vertex_gbuffer.glsl, and
+// fragment_ssao.glsl. Skybox keeps its own "view" uniform because it uses
+// a custom rotation-only view matrix.
+struct alignas(16) CameraUBOData {
+  glm::mat4 view;              // offset 0
+  glm::mat4 projection;        // offset 64
+  glm::mat4 lightSpaceMatrix;  // offset 128
+  glm::vec3 viewPos;           // offset 192
+  float pointFarPlane;         // offset 204
+};
+static_assert(sizeof(CameraUBOData) == 208,
+              "CameraUBOData must match std140 layout for binding=0");
+
+// Binding point for the camera UBO. Shader load wires CameraBlock here
+// (via glUniformBlockBinding) for every program that declares the block.
+static constexpr GLuint kCameraUBOBinding = 0;
+
+// Tells `prog` to source its CameraBlock (if it has one) from
+// kCameraUBOBinding. No-op for shaders that don't declare the block.
+static void bindCameraBlock(GLuint prog) {
+  GLuint blockIdx = glGetUniformBlockIndex(prog, "CameraBlock");
+  if (blockIdx != GL_INVALID_INDEX) {
+    glUniformBlockBinding(prog, blockIdx, kCameraUBOBinding);
+  }
+}
+
 // Resolution of the directional shadow map. 2048² ≈ 12 MB at 24-bit depth.
 static constexpr int kDirShadowMapSize = 2048;
 
-// Point-light cubemap array. 4 lights × 6 faces × 1024² depth ≈ 24 MB.
+// Point-light cubemap array. K_MAX_POINT_LIGHTS × 6 faces × 1024² ≈ 24 MB.
 static constexpr int kPointShadowSize = 1024;
-static constexpr int kMaxPointLights = 4;
-static constexpr int kPointShadowLayers = kMaxPointLights * 6;
-// Linear-distance encoding range for point-light shadow depth.
-static constexpr float kPointShadowNear = 0.1f;
-static constexpr float kPointShadowFar = 50.0f;
+// Counts/ranges live in shared/shader_constants.h so C++ and GLSL stay in sync.
+using shared::kMaxPointLights;
+using shared::kPointShadowLayers;
+using shared::kPointShadowNear;
+using shared::kPointShadowFar;
+using shared::kMaxLightingShaderLights;
 
 // CPU-side mirror of one PointLight uniform struct.
 struct LightUpload {
@@ -49,8 +78,6 @@ struct LightUpload {
   glm::vec3 specular;
   int shadowIdx;  // -1 = non-shadow-casting
 };
-
-static constexpr int kMaxLightingShaderLights = 32;
 
 // Iterates the ECS PointLight view, copies up to kMaxLightingShaderLights
 // into out, and assigns the first kMaxPointLights with castsShadow=true to
@@ -442,11 +469,17 @@ bool Graphics::load(int width, int height) {
   glBindTexture(GL_TEXTURE_2D, dirShadowMap);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kDirShadowMapSize,
                kDirShadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  // GL_LINEAR with TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE gives 2×2
+  // hardware PCF per tap — each manual disc/grid sample blends 4 stored
+  // depth comparisons for free.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-  // Outside the frustum returns depth=1.0 so DirShadowFactor reports unlit.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+                  GL_COMPARE_REF_TO_TEXTURE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+  // Outside the frustum returns "lit" (visibility=1.0).
   float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, white);
   glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
@@ -476,6 +509,11 @@ bool Graphics::load(int width, int height) {
                   GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R,
                   GL_CLAMP_TO_EDGE);
+  // Hardware PCF on cubemap-array depth.
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_MODE,
+                  GL_COMPARE_REF_TO_TEXTURE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
+                  GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
   glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps,
                        0);
@@ -489,6 +527,19 @@ bool Graphics::load(int width, int height) {
   // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
   // shader via gl_VertexID).
   glGenVertexArrays(1, &fullscreenVAO);
+
+  // Per-frame camera UBO. Allocated once with persistent storage; written
+  // each frame in render() via glBufferSubData and consumed by every shader
+  // that declares CameraBlock.
+  glGenBuffers(1, &cameraUBO);
+  glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
+  glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraUBOData), nullptr,
+               GL_DYNAMIC_DRAW);
+  glBindBufferBase(GL_UNIFORM_BUFFER, kCameraUBOBinding, cameraUBO);
+  // Wire CameraBlock → binding point 0 for every program that declares it.
+  for (auto* s : {&*gbufferShader, &*lightingShader, &*ssaoShader}) {
+    bindCameraBlock(s->id());
+  }
 
   // SSAO hemisphere kernel: 64 random vectors in the +z hemisphere, biased
   // towards the origin so closer samples carry more weight. Uploaded once
@@ -572,10 +623,8 @@ void Graphics::resizeBuffers(int width, int height) {
   projection = glm::perspective(
       glm::radians(45.0f),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 100.0f);
-  if (gbufferShader && gbufferShader->valid()) {
-    gbufferShader->use();
-    gbufferShader->setMat4("projection", projection);
-  }
+  // Projection is uploaded each frame via the camera UBO; resize doesn't
+  // need to push it into individual shaders anymore.
 
   // G-buffer attachments. Position and normal are RGBA16F so we don't lose
   // precision on world-space coords; albedo+spec and emissive are RGBA8.
@@ -721,12 +770,12 @@ void Graphics::resizeBuffers(int width, int height) {
 }
 
 void Graphics::initShaderUniforms() {
-  // Geometry pass needs the projection matrix; it never changes per frame.
-  // The deferred lighting shader's uniforms (lights, shadow maps, viewPos)
-  // are all populated per frame in render(), so nothing to do here for it.
-  if (gbufferShader && gbufferShader->valid()) {
-    gbufferShader->use();
-    gbufferShader->setMat4("projection", projection);
+  // Camera state (view/projection/viewPos/lightSpaceMatrix/pointFarPlane)
+  // lives in the camera UBO and is uploaded once per frame in render().
+  // Re-bind each program's CameraBlock to binding=0 (idempotent; needed
+  // after a hot-reload that produces a fresh program object).
+  for (auto* s : {&gbufferShader, &lightingShader, &ssaoShader}) {
+    if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
 
@@ -735,50 +784,44 @@ void Graphics::reloadShaders() {
     std::optional<Shader>& slot;
     const char* vert;
     const char* frag;
+    const char* geom;  // empty string when no geometry stage
   };
   Reload reloads[] = {
       {gbufferShader, "shaders/vertex_gbuffer.glsl",
-       "shaders/fragment_gbuffer.glsl"},
+       "shaders/fragment_gbuffer.glsl", ""},
       {lightingShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_lighting_deferred.glsl"},
+       "shaders/fragment_lighting_deferred.glsl", ""},
       {skyboxShader, "shaders/vertex_skybox.glsl",
-       "shaders/fragment_skybox.glsl"},
+       "shaders/fragment_skybox.glsl", ""},
       {presentShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_fxaa.glsl"},
+       "shaders/fragment_fxaa.glsl", ""},
       {blurShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_blur.glsl"},
+       "shaders/fragment_blur.glsl", ""},
       {tonemapShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_tonemap.glsl"},
+       "shaders/fragment_tonemap.glsl", ""},
       {ssaoShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_ssao.glsl"},
+       "shaders/fragment_ssao.glsl", ""},
       {ssaoBlurShader, "shaders/vertex_present.glsl",
-       "shaders/fragment_ssao_blur.glsl"},
+       "shaders/fragment_ssao_blur.glsl", ""},
       {shadowDirShader, "shaders/vertex_shadow_dir.glsl",
-       "shaders/fragment_shadow_dir.glsl"},
+       "shaders/fragment_shadow_dir.glsl", ""},
+      {shadowPointShader, "shaders/vertex_shadow_point.glsl",
+       "shaders/fragment_shadow_point.glsl",
+       "shaders/geometry_shadow_point.glsl"},
       {debugOverlay, "shaders/vertex_present.glsl",
-       "shaders/fragment_debug_overlay.glsl"},
+       "shaders/fragment_debug_overlay.glsl", ""},
   };
   for (auto& r : reloads) {
-    Shader candidate(r.vert, r.frag);
+    Shader candidate = (r.geom && *r.geom)
+                           ? Shader(r.vert, r.frag, r.geom)
+                           : Shader(r.vert, r.frag);
     if (candidate.valid()) {
       r.slot.emplace(std::move(candidate));
-      printf("Reloaded: %s + %s\n", r.vert, r.frag);
+      printf("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
+             (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
     } else {
       fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
               r.frag);
-    }
-  }
-  // Geometry-stage reload (point shadow only).
-  {
-    Shader candidate("shaders/vertex_shadow_point.glsl",
-                     "shaders/fragment_shadow_point.glsl",
-                     "shaders/geometry_shadow_point.glsl");
-    if (candidate.valid()) {
-      shadowPointShader.emplace(std::move(candidate));
-      printf("Reloaded: vertex_shadow_point + geometry_shadow_point + ...\n");
-    } else {
-      fprintf(stderr,
-              "Reload failed, keeping previous: vertex_shadow_point + ...\n");
     }
   }
   initShaderUniforms();
@@ -861,10 +904,21 @@ void Graphics::drawDebugOverlay() {
   debugOverlay->use();
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texToShow);
+  // Shadow textures are kept in COMPARE_REF_TO_TEXTURE for hardware PCF,
+  // but the debug overlay samples via plain sampler2D — temporarily disable
+  // compare so we get raw depth values, then restore.
+  bool isDirShadow = (debugChannel == DebugChannel::DirShadowMap);
+  if (isDirShadow) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+  }
   debugOverlay->setInt("src", 0);
   glBindVertexArray(fullscreenVAO);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindVertexArray(0);
+  if (isDirShadow) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+                    GL_COMPARE_REF_TO_TEXTURE);
+  }
   glViewport(0, 0, fbWidth, fbHeight);
 }
 
@@ -882,6 +936,19 @@ void Graphics::render(ClientGame& game) {
   // stay sharp around the player.
   lightSpaceMatrix = computeDirectionalLightMatrix(
       camera->position, directionalLightDir(game));
+
+  // Upload the per-frame camera UBO. Every shader with a CameraBlock will
+  // pick up these values without needing per-program setMat4 calls.
+  {
+    CameraUBOData ubo{};
+    ubo.view = camera->view;
+    ubo.projection = projection;
+    ubo.lightSpaceMatrix = lightSpaceMatrix;
+    ubo.viewPos = camera->position;
+    ubo.pointFarPlane = kPointShadowFar;
+    glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ubo), &ubo);
+  }
   if (shadowDirShader && shadowDirShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowDir");
     glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
@@ -890,10 +957,17 @@ void Graphics::render(ClientGame& game) {
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
+    // Cull front faces during shadow render: back-faces of solid geometry
+    // are written instead. Halves draw cost and shoves Peter-Panning to
+    // the inside of objects where it's harder to notice.
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
     shadowDirShader->use();
     shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
     renderEntities(*shadowDirShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
+    glCullFace(GL_BACK);
+    glDisable(GL_CULL_FACE);
   }
 
   // Point-light shadow pass: 24 cubemap-array layers populated in one draw
@@ -917,6 +991,8 @@ void Graphics::render(ClientGame& game) {
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
     shadowPointShader->use();
     shadowPointShader->setMat4Array(
         "shadowMatrices", kPointShadowLayers,
@@ -926,6 +1002,8 @@ void Graphics::render(ClientGame& game) {
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
     renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
+    glCullFace(GL_BACK);
+    glDisable(GL_CULL_FACE);
   }
 
   // Geometry pass: write the g-buffer.
@@ -941,7 +1019,7 @@ void Graphics::render(ClientGame& game) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gbufferShader->use();
-    gbufferShader->setMat4("view", camera->view);
+    // view/projection sourced from the camera UBO bound at index 0.
     renderEntities(*gbufferShader, game, models);
   }
 
@@ -963,8 +1041,7 @@ void Graphics::render(ClientGame& game) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
     ssaoShader->setInt("texNoise", 2);
-    ssaoShader->setMat4("view", camera->view);
-    ssaoShader->setMat4("projection", projection);
+    // view/projection from the camera UBO.
     ssaoShader->setVec3Array(
         "samples", static_cast<int>(ssaoKernel.size()),
         glm::value_ptr(ssaoKernel[0]));
@@ -1033,9 +1110,7 @@ void Graphics::render(ClientGame& game) {
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
       lightingShader->setInt("pointShadowMaps", 7);
-      lightingShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
-      lightingShader->setFloat("pointFarPlane", kPointShadowFar);
-      lightingShader->setVec3("viewPos", camera->position);
+      // lightSpaceMatrix, pointFarPlane, viewPos all come from the camera UBO.
       // Directional light: ECS override beats scene default.
       bool dirSet = false;
       auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
@@ -1168,127 +1243,10 @@ void Graphics::render(ClientGame& game) {
 void Graphics::swap() { glfwSwapBuffers(window); }
 
 Graphics::~Graphics() {
-  gbufferShader.reset();
-  lightingShader.reset();
-  skyboxShader.reset();
-  presentShader.reset();
-  blurShader.reset();
-  tonemapShader.reset();
-  ssaoShader.reset();
-  ssaoBlurShader.reset();
-  shadowDirShader.reset();
-  shadowPointShader.reset();
-  debugOverlay.reset();
-
-  if (fullscreenVAO) {
-    glDeleteVertexArrays(1, &fullscreenVAO);
-    fullscreenVAO = 0;
-  }
-  if (gBufferFBO) {
-    glDeleteFramebuffers(1, &gBufferFBO);
-    gBufferFBO = 0;
-  }
-  if (gPosition) {
-    glDeleteTextures(1, &gPosition);
-    gPosition = 0;
-  }
-  if (gNormal) {
-    glDeleteTextures(1, &gNormal);
-    gNormal = 0;
-  }
-  if (gAlbedo) {
-    glDeleteTextures(1, &gAlbedo);
-    gAlbedo = 0;
-  }
-  if (gSpecular) {
-    glDeleteTextures(1, &gSpecular);
-    gSpecular = 0;
-  }
-  if (gEmissive) {
-    glDeleteTextures(1, &gEmissive);
-    gEmissive = 0;
-  }
-  if (gBufferDepth) {
-    glDeleteRenderbuffers(1, &gBufferDepth);
-    gBufferDepth = 0;
-  }
-  if (litFBO) {
-    glDeleteFramebuffers(1, &litFBO);
-    litFBO = 0;
-  }
-  if (litColor) {
-    glDeleteTextures(1, &litColor);
-    litColor = 0;
-  }
-  if (brightColor) {
-    glDeleteTextures(1, &brightColor);
-    brightColor = 0;
-  }
-  if (litDepth) {
-    glDeleteRenderbuffers(1, &litDepth);
-    litDepth = 0;
-  }
-  for (int i = 0; i < 2; ++i) {
-    if (pingFBO[i]) {
-      glDeleteFramebuffers(1, &pingFBO[i]);
-      pingFBO[i] = 0;
-    }
-    if (pingColor[i]) {
-      glDeleteTextures(1, &pingColor[i]);
-      pingColor[i] = 0;
-    }
-  }
-  if (ldrFBO) {
-    glDeleteFramebuffers(1, &ldrFBO);
-    ldrFBO = 0;
-  }
-  if (ldrColor) {
-    glDeleteTextures(1, &ldrColor);
-    ldrColor = 0;
-  }
-  if (ssaoFBO) {
-    glDeleteFramebuffers(1, &ssaoFBO);
-    ssaoFBO = 0;
-  }
-  if (ssaoColor) {
-    glDeleteTextures(1, &ssaoColor);
-    ssaoColor = 0;
-  }
-  if (ssaoBlurFBO) {
-    glDeleteFramebuffers(1, &ssaoBlurFBO);
-    ssaoBlurFBO = 0;
-  }
-  if (ssaoBlurColor) {
-    glDeleteTextures(1, &ssaoBlurColor);
-    ssaoBlurColor = 0;
-  }
-  if (ssaoNoiseTex) {
-    glDeleteTextures(1, &ssaoNoiseTex);
-    ssaoNoiseTex = 0;
-  }
-  if (dirShadowFBO) {
-    glDeleteFramebuffers(1, &dirShadowFBO);
-    dirShadowFBO = 0;
-  }
-  if (dirShadowMap) {
-    glDeleteTextures(1, &dirShadowMap);
-    dirShadowMap = 0;
-  }
-  if (pointShadowFBO) {
-    glDeleteFramebuffers(1, &pointShadowFBO);
-    pointShadowFBO = 0;
-  }
-  if (pointShadowMaps) {
-    glDeleteTextures(1, &pointShadowMaps);
-    pointShadowMaps = 0;
-  }
-
-  for (auto& [name, model] : models) {
-    delete model;
-  }
-  models.clear();
-  skyboxes.clear();
-
+  // Process exit reclaims every GL handle we allocated; we don't recycle
+  // the renderer at runtime, so per-handle glDelete* would just be dead
+  // code. Tear down GLFW (window + library) so things shut down cleanly
+  // before atexit, which is enough.
   if (window) {
     glfwDestroyWindow(window);
     window = nullptr;

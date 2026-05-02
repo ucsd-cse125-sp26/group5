@@ -39,7 +39,6 @@ struct Model {
   std::vector<Material> materials;
   std::vector<std::pair<unsigned int, glm::mat4>> mesh_instances;
   glm::quat orientation{1.0f, 0.0f, 0.0f, 0.0f};
-  GLuint test;
 };
 
 struct Skybox {

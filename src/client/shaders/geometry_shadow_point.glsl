@@ -5,10 +5,10 @@
 // light-space matrix. Matrices for inactive light slots are zeroed so
 // emitted triangles get clipped (z > 1 after divide), leaving the layer's
 // cleared depth=1.0 untouched.
-layout(triangles, invocations = 24) in;
+layout(triangles, invocations = K_POINT_SHADOW_LAYERS) in;
 layout(triangle_strip, max_vertices = 3) out;
 
-uniform mat4 shadowMatrices[24];
+uniform mat4 shadowMatrices[K_POINT_SHADOW_LAYERS];
 
 out vec4 fragWorldPos;
 flat out int lightIdx;

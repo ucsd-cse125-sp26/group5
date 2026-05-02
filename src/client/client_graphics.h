@@ -145,17 +145,15 @@ struct Graphics {
   // by the debug overlay (and, from phase 2 onward, the present pass).
   GLuint fullscreenVAO = 0;
 
+  // Per-frame camera state shared across shaders via a uniform block bound
+  // at binding point 0. See shaders/_camera_block.glsl for the GLSL
+  // declaration; CameraUBOData (in client_graphics.cpp) is the std140 mirror.
+  GLuint cameraUBO = 0;
+
   bool load(int width, int height);
   void render(ClientGame& game);
   void swap();
   ~Graphics();
-  // Owns ~30 raw GLuint handles deleted in the dtor. An accidental copy
-  // (capture-by-value, vector<Graphics>, etc.) would double-free at shutdown.
-  Graphics() = default;
-  Graphics(const Graphics&) = delete;
-  Graphics& operator=(const Graphics&) = delete;
-  Graphics(Graphics&&) = delete;
-  Graphics& operator=(Graphics&&) = delete;
 
   // Phase 0 infrastructure.
   void resizeBuffers(int width, int height);

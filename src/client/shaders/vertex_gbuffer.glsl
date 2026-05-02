@@ -7,14 +7,20 @@ out vec3 worldPos;
 out vec3 worldNormal;
 out vec2 vTexCoords;
 
-uniform mat4 projection;
-uniform mat4 view;
+layout(std140) uniform CameraBlock {
+  mat4 view;
+  mat4 projection;
+  mat4 lightSpaceMatrix;
+  vec3 viewPos;
+  float pointFarPlane;
+} camera;
+
 uniform mat4 model;
 uniform mat3 normalMatrix;
 
 void main() {
   vec4 world = model * vec4(position, 1.0);
-  gl_Position = projection * view * world;
+  gl_Position = camera.projection * camera.view * world;
   worldPos = world.xyz;
   worldNormal = normalMatrix * normal;
   vTexCoords = texCoords;

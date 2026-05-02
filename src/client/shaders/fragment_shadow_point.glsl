@@ -2,7 +2,7 @@
 in vec4 fragWorldPos;
 flat in int lightIdx;
 
-uniform vec3 lightPositions[4];
+uniform vec3 lightPositions[K_MAX_POINT_LIGHTS];
 uniform float pointFarPlane;
 
 void main() {

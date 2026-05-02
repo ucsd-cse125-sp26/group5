@@ -10,8 +10,13 @@ uniform sampler2D gPosition;  // RGBA16F, .a = sky sentinel
 uniform sampler2D gNormal;    // RGBA16F, .a = shininess (ignored here)
 uniform sampler2D texNoise;   // 4x4 RGB16F, GL_REPEAT
 
-uniform mat4 view;
-uniform mat4 projection;
+layout(std140) uniform CameraBlock {
+  mat4 view;
+  mat4 projection;
+  mat4 lightSpaceMatrix;
+  vec3 viewPos;
+  float pointFarPlane;
+} camera;
 
 // Hemisphere kernel + tile-noise scale.
 uniform vec3 samples[64];
@@ -27,9 +32,9 @@ void main() {
     FragColor = 1.0;
     return;
   }
-  vec3 fragPos = (view * vec4(worldSample.rgb, 1.0)).xyz;
+  vec3 fragPos = (camera.view * vec4(worldSample.rgb, 1.0)).xyz;
   vec3 worldNormal = texture(gNormal, vUV).rgb;
-  vec3 normal = normalize(mat3(view) * worldNormal);
+  vec3 normal = normalize(mat3(camera.view) * worldNormal);
 
   // Random per-pixel rotation vector tiled across the screen.
   vec3 randomVec = texture(texNoise, vUV * noiseScale).rgb;
@@ -44,13 +49,16 @@ void main() {
     samplePos = fragPos + samplePos * radius;
 
     // Project sample to clip space, perspective divide, [0,1] for sampling.
-    vec4 offset = projection * vec4(samplePos, 1.0);
+    vec4 offset = camera.projection * vec4(samplePos, 1.0);
     offset.xyz /= offset.w;
     offset.xyz = offset.xyz * 0.5 + 0.5;
 
     // Look up the actual geometry's view-space z at that screen position.
     vec4 worldHit = texture(gPosition, offset.xy);
-    float sampleDepth = (view * vec4(worldHit.rgb, 1.0)).z;
+    // Skip sky pixels (gPosition.a==0): without this, worldHit.rgb is (0,0,0)
+    // and the resulting view-space z can spuriously occlude foreground.
+    if (worldHit.a == 0.0) continue;
+    float sampleDepth = (camera.view * vec4(worldHit.rgb, 1.0)).z;
 
     // Range-check so distant geometry doesn't darken the fragment.
     float rangeCheck = smoothstep(0.0, 1.0,

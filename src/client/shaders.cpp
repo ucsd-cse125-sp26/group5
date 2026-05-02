@@ -6,7 +6,34 @@
 #include <vector>
 
 #include "glm/gtc/type_ptr.hpp"
+#include "shared/shader_constants.h"
 #include "shared/util.h"
+
+// Builds the GLSL `#define` block injected into every shader after its
+// `#version` directive. Single source of truth: edit shader_constants.h and
+// add a matching line below.
+static std::string buildShaderConstantsBlock() {
+  std::ostringstream s;
+  s << "#define K_MAX_POINT_LIGHTS " << shared::kMaxPointLights << "\n";
+  s << "#define K_MAX_LIGHTING_SHADER_LIGHTS "
+    << shared::kMaxLightingShaderLights << "\n";
+  s << "#define K_POINT_SHADOW_LAYERS " << shared::kPointShadowLayers << "\n";
+  s << "#define K_POINT_SHADOW_NEAR " << shared::kPointShadowNear << "\n";
+  s << "#define K_POINT_SHADOW_FAR " << shared::kPointShadowFar << "\n";
+  return s.str();
+}
+
+// Inserts the shared-constants block immediately after the source's
+// `#version ...` line so GLSL preprocessor sees the macros before any code.
+// If the source has no `#version` line we return it unchanged (the compiler
+// will error out anyway).
+static std::string injectConstants(const std::string& source) {
+  static const std::string block = buildShaderConstantsBlock();
+  size_t versionEnd = source.find('\n');
+  if (versionEnd == std::string::npos) return source;
+  return source.substr(0, versionEnd + 1) + block +
+         source.substr(versionEnd + 1);
+}
 
 static bool readFile(const std::filesystem::path& path, std::string& out) {
   std::ifstream f(path);
@@ -45,6 +72,9 @@ static GLuint linkProgram(const std::string& vertPath,
   if (!readFile(base / vertPath, vertSrc)) return 0;
   if (!readFile(base / fragPath, fragSrc)) return 0;
   if (!geomPath.empty() && !readFile(base / geomPath, geomSrc)) return 0;
+  vertSrc = injectConstants(vertSrc);
+  fragSrc = injectConstants(fragSrc);
+  if (!geomSrc.empty()) geomSrc = injectConstants(geomSrc);
 
   GLuint vsId = glCreateShader(GL_VERTEX_SHADER);
   GLuint fsId = glCreateShader(GL_FRAGMENT_SHADER);
