@@ -12,6 +12,8 @@
 class Shader {
  public:
   Shader(const std::string& vertexPath, const std::string& fragmentPath);
+  Shader(const std::string& vertexPath, const std::string& fragmentPath,
+         const std::string& geometryPath);
   ~Shader();
   Shader(Shader&& other) noexcept;
   Shader& operator=(Shader&& other) noexcept;
@@ -20,13 +22,19 @@ class Shader {
 
   void use() const;
   GLuint id() const;
+  bool valid() const { return m_id != 0; }
 
   void setInt(const std::string& name, int value) const;
   void setFloat(const std::string& name, float value) const;
+  void setVec2(const std::string& name, float x, float y) const;
   void setVec3(const std::string& name, float x, float y, float z) const;
   void setVec3(const std::string& name, const glm::vec3& v) const;
   void setMat3(const std::string& name, const glm::mat3& m) const;
   void setMat4(const std::string& name, const glm::mat4& m) const;
+  void setMat4Array(const std::string& name, int count,
+                    const float* data) const;
+  void setVec3Array(const std::string& name, int count,
+                    const float* data) const;
 
  private:
   GLuint m_id = 0;
