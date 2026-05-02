@@ -17,6 +17,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/map_format.h"
 #include "shared/simple_profiler.h"
 
 // Skybox images use Y-up; the game uses Z-up.
@@ -143,7 +144,8 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
-    model = glm::scale(model, glm::vec3(renderInfo.scale));
+    model = glm::scale(model,
+                       glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
     model = model * glm::mat4_cast(rotation) *
             glm::mat4_cast(modelAsset->orientation);
 
@@ -193,6 +195,12 @@ bool Graphics::load(int width, int height) {
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
+  for (auto& [key, m] : mapModels) {
+    models[key] = m;
+    printf("Loaded map sub-model: %s\n", key.c_str());
   }
 
   for (const auto& sc : shared::SCENES) {

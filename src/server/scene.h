@@ -1,16 +1,23 @@
 #pragma once
+
+#include <glm/ext/quaternion_float.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <string>
 #include <vector>
 
-#include "server_game.h"
+class ServerGame;
+
+enum class CollisionShape {
+  Box,   // post-orientation AABB; cheap, works for procedural assets
+  Mesh,  // triangle mesh; mesh-backed assets only
+};
 
 struct StaticEntityDesc {
-  float x, y, z;
-  std::string modelName;
-  float scale;
-  std::string meshPath;
-  bool render = true;  // default true, set false for physics-only
-  float halfX = -1.0f, halfY = -1.0f, halfZ = -1.0f;
+  glm::vec3 position{0.0f};
+  glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+  std::string modelName;  // "" → no visual entity
+  glm::vec3 scale{1.0f, 1.0f, 1.0f};
+  CollisionShape collision = CollisionShape::Box;
 };
 
 void spawnStaticEntities(ServerGame& game,
