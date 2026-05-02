@@ -27,7 +27,7 @@ DEFAULT_REMOTE_ROOT = "/var/www/html/cse125/2026/cse125g5/maps"
 MAP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$")
 
 
-def die(msg: str, code: int = 1) -> "None":
+def die(msg: str, code: int = 1) -> None:
     print(f"mapsync: {msg}", file=sys.stderr)
     sys.exit(code)
 
@@ -88,8 +88,11 @@ def ssh_base_args(state: dict) -> list[str]:
     return ["ssh", "-p", str(state["server_port"]), ssh_target(state)]
 
 
-def scp_base_args(state: dict) -> list[str]:
-    return ["scp", "-q", "-P", str(state["server_port"])]
+def rsync_base_args(state: dict) -> list[str]:
+    # rsync default behavior writes to a hidden temp file in the destination
+    # dir and atomic-renames on success, so a partial transfer never replaces
+    # the existing file.
+    return ["rsync", "-q", "-e", f"ssh -p {state['server_port']}"]
 
 
 def remote_path(state: dict, *parts: str) -> str:
@@ -117,14 +120,20 @@ def ssh_run(
     return proc
 
 
-def scp_up(state: dict, local: Path, remote: str) -> None:
-    args = [*scp_base_args(state), str(local), f"{ssh_target(state)}:{remote}"]
-    subprocess.run(args, check=True)
+def rsync_up(state: dict, local: Path, remote: str) -> None:
+    args = [*rsync_base_args(state), str(local), f"{ssh_target(state)}:{remote}"]
+    proc = subprocess.run(args, capture_output=True)
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr.decode("utf-8", errors="replace"))
+        die(f"rsync upload failed (exit {proc.returncode})")
 
 
-def scp_down(state: dict, remote: str, local: Path) -> None:
-    args = [*scp_base_args(state), f"{ssh_target(state)}:{remote}", str(local)]
-    subprocess.run(args, check=True)
+def rsync_down(state: dict, remote: str, local: Path) -> None:
+    args = [*rsync_base_args(state), f"{ssh_target(state)}:{remote}", str(local)]
+    proc = subprocess.run(args, capture_output=True)
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr.decode("utf-8", errors="replace"))
+        die(f"rsync download failed (exit {proc.returncode})")
 
 
 def now_iso() -> str:
@@ -139,8 +148,6 @@ def lock_metadata(state: dict, description: str, epoch: int,
         "description": description,
         "epoch_at_checkout": epoch,
         "timestamp": now_iso(),
-        # Per-lock identity: every checkin/abandon verifies this matches
-        # so a stolen-and-released lock can't quietly land my work.
         "lock_uuid": lock_uuid,
     }
 
@@ -231,17 +238,22 @@ TS=__TS__
 mkdir -p "$ROOT"
 chmod 2770 "$ROOT" 2>/dev/null || true
 DIR="$ROOT/$NAME"
-if [ -e "$DIR" ]; then
-  echo "EXISTS" >&2
-  exit 2
+# Atomic existence check via mkdir; the [ -e ] + mkdir pattern races and
+# loses on concurrent 'new' for the same name.
+if ! mkdir "$DIR" 2>/dev/null; then
+  if [ -e "$DIR" ]; then
+    echo "EXISTS" >&2
+    exit 2
+  fi
+  echo "MKDIR_FAIL" >&2
+  exit 11
 fi
-mkdir "$DIR"
 mkdir "$DIR/history"
 echo 0 > "$DIR/epoch"
 GROUP="$(stat -c %g "$ROOT" 2>/dev/null || stat -f %g "$ROOT")"
 chgrp -R "$GROUP" "$DIR" 2>/dev/null || true
-chmod -R g+rwsX "$DIR"
-chmod 2770 "$DIR"
+chmod -R g+rwsX "$DIR" 2>/dev/null || true
+chmod 2770 "$DIR" 2>/dev/null || true
 echo "READY $TS"
 """
 
@@ -268,7 +280,7 @@ def cmd_new(args: argparse.Namespace, state: dict) -> int:
         die(f"remote setup failed (exit {proc.returncode})")
 
     incoming = remote_path(state, name, ".incoming.blend")
-    scp_up(state, local, incoming)
+    rsync_up(state, local, incoming)
 
     finalize = textwrap.dedent(rf"""
         set -eu
@@ -298,7 +310,7 @@ fi
 EPOCH="$(cat "$DIR/epoch" 2>/dev/null || echo '?')"
 # Atomic acquire: build a staging dir with metadata already inside, then
 # rename it into place. mv -T fails if the target exists — that's our
-# mutex. No window where LOCK exists without metadata, no separate scp.
+# mutex. No window where LOCK exists without metadata, no separate upload.
 STAGING="$DIR/.LOCK.staging.$$"
 trap 'rm -rf "$STAGING"' EXIT
 mkdir "$STAGING" || { echo "STAGE_FAIL" >&2; exit 6; }
@@ -330,11 +342,8 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
     LOCAL_MAPS_DIR.mkdir(exist_ok=True)
     local_blend = LOCAL_MAPS_DIR / f"{name}.blend"
 
-    # We don't know the epoch yet, so build metadata with a placeholder and
-    # patch it after the server tells us which epoch we're acquiring against.
-    # The server-side script is told the metadata text up front so it lands
-    # atomically with the LOCK directory rename — no orphan-without-metadata
-    # window if the client crashes after acquire.
+    # Metadata lands atomically with the LOCK rename; epoch is patched in
+    # afterward since the server picks it.
     lock_uuid = str(uuid.uuid4())
     meta_pending = lock_metadata(state, args.message, -1, lock_uuid)
     meta_json = json.dumps(meta_pending, sort_keys=True)
@@ -367,40 +376,49 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
 
     if not out.startswith("ACQUIRED "):
         die(f"unexpected server response: {out!r}")
-    epoch = int(out.split(" ", 1)[1])
 
-    # Patch the metadata with the now-known epoch (the placeholder we sent
-    # had epoch=-1) and overwrite the remote file atomically.
-    final_meta = lock_metadata(state, args.message, epoch, lock_uuid)
-    final_meta_json = json.dumps(final_meta, sort_keys=True)
-    update_meta = textwrap.dedent(rf"""
-        set -eu
+    # Lock is now held on the server. Every code path from here must release
+    # it on failure — including SystemExit from die() and KeyboardInterrupt,
+    # which is why the catch is BaseException, not Exception.
+    release = textwrap.dedent(rf"""
+        set -u
         DIR={shlex.quote(remote_path(state, name))}
-        TMP="$DIR/LOCK/.metadata.tmp"
-        printf '%s' {shlex.quote(final_meta_json)} > "$TMP"
-        mv -f "$TMP" "$DIR/LOCK/metadata"
-        chmod -R g+rwsX "$DIR/LOCK"
+        UUID={shlex.quote(lock_uuid)}
+        HOLDER_UUID=""
+        if [ -f "$DIR/LOCK/metadata" ]; then
+          HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
+        fi
+        if [ "$HOLDER_UUID" = "$UUID" ]; then
+          rm -rf "$DIR/LOCK"
+        fi
     """).strip()
 
     try:
-        ssh_run(state, update_meta)
-        scp_down(state, remote_path(state, name, "current.blend"), local_blend)
-    except Exception:
-        # Best-effort release on failure. abandon-by-uuid so we don't blow
-        # away someone else's lock if they raced in.
-        release = textwrap.dedent(rf"""
-            set -u
+        try:
+            epoch = int(out.split(" ", 1)[1])
+        except ValueError:
+            die(f"server returned non-integer epoch: {out!r}")
+
+        final_meta = lock_metadata(state, args.message, epoch, lock_uuid)
+        final_meta_json = json.dumps(final_meta, sort_keys=True)
+        update_meta = textwrap.dedent(rf"""
+            set -eu
             DIR={shlex.quote(remote_path(state, name))}
-            UUID={shlex.quote(lock_uuid)}
-            HOLDER_UUID=""
-            if [ -f "$DIR/LOCK/metadata" ]; then
-              HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
-            fi
-            if [ "$HOLDER_UUID" = "$UUID" ]; then
-              rm -rf "$DIR/LOCK"
-            fi
+            TMP="$DIR/LOCK/.metadata.tmp"
+            printf '%s' {shlex.quote(final_meta_json)} > "$TMP"
+            mv -f "$TMP" "$DIR/LOCK/metadata"
+            chmod -R g+rwsX "$DIR/LOCK" 2>/dev/null || true
         """).strip()
-        ssh_run(state, release, check=False)
+        update_proc = ssh_run(state, update_meta, check=False)
+        if update_proc.returncode != 0:
+            sys.stderr.write(update_proc.stderr.decode("utf-8", errors="replace"))
+            die(f"metadata update failed (exit {update_proc.returncode})")
+        rsync_down(state, remote_path(state, name, "current.blend"), local_blend)
+    except BaseException:
+        try:
+            ssh_run(state, release, check=False)
+        except BaseException:
+            pass
         raise
 
     state.setdefault("checkouts", {})[name] = {
@@ -495,10 +513,7 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
             "pass --force to override (will steal the lock)"
         )
 
-    # Per-lock UUID verification: if a lock was stolen-and-released-and-
-    # re-acquired between our checkout and now, the user/holder names might
-    # still match by coincidence but the UUIDs won't. Without --force, refuse
-    # so we don't quietly land work into someone else's lock.
+    # UUID catches stolen-released-reacquired cycles where holder name still matches.
     expected_uuid = local_record.get("lock_uuid") if local_record else None
     remote_uuid = remote_meta.get("lock_uuid")
     if expected_uuid and remote_uuid and remote_uuid != expected_uuid \
@@ -529,13 +544,10 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
 
     incoming_name = f".incoming.{os.getpid()}.blend"
     incoming = remote_path(state, name, incoming_name)
-    scp_up(state, local_blend, incoming)
+    rsync_up(state, local_blend, incoming)
 
     new_epoch = remote_epoch + 1
     archive_name = f"{remote_epoch:04d}.blend"
-    # Re-verify ownership on the server before doing anything destructive.
-    # Without --force, if the lock has changed identity we abort cleanly
-    # (incoming file is left in place for inspection).
     expect_arg = expected_uuid or ""
     finalize = textwrap.dedent(rf"""
         set -eu
@@ -543,30 +555,75 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
         INCOMING={shlex.quote(incoming_name)}
         ARCHIVE={shlex.quote(archive_name)}
         NEW_EPOCH={shlex.quote(str(new_epoch))}
+        EXPECTED_EPOCH={shlex.quote(str(remote_epoch))}
         EXPECT_UUID={shlex.quote(expect_arg)}
         FORCE={shlex.quote("1" if args.force else "0")}
-        if [ -d "$DIR/LOCK" ] && [ -f "$DIR/LOCK/metadata" ] \
-                && [ -n "$EXPECT_UUID" ] && [ "$FORCE" != "1" ]; then
+
+        # Refuse if epoch advanced since probe; otherwise we'd archive over
+        # someone else's history slot and reset the epoch counter backward.
+        CURRENT_EPOCH="$(cat "$DIR/epoch" 2>/dev/null || echo '?')"
+        if [ "$FORCE" != "1" ] && [ "$CURRENT_EPOCH" != "$EXPECTED_EPOCH" ]; then
+          echo "EPOCH_DRIFT $CURRENT_EPOCH" >&2
+          exit 8
+        fi
+
+        # Fail-closed lock identity check: with EXPECT_UUID we require LOCK
+        # to exist with matching UUID, else abort. Empty/unreadable UUID is
+        # treated as mismatch — never silently fall through.
+        if [ "$FORCE" != "1" ] && [ -n "$EXPECT_UUID" ]; then
+          if [ ! -d "$DIR/LOCK" ]; then
+            echo "LOCK_GONE" >&2
+            exit 9
+          fi
+          if [ ! -f "$DIR/LOCK/metadata" ]; then
+            echo "NO_META" >&2
+            exit 10
+          fi
           HOLDER_UUID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("lock_uuid",""))' "$DIR/LOCK/metadata" 2>/dev/null || true)"
-          if [ -n "$HOLDER_UUID" ] && [ "$HOLDER_UUID" != "$EXPECT_UUID" ]; then
+          if [ -z "$HOLDER_UUID" ] || [ "$HOLDER_UUID" != "$EXPECT_UUID" ]; then
             echo "STOLEN $HOLDER_UUID" >&2
             exit 7
           fi
         fi
+
+        # Atomicity: keep current.blend valid throughout. Hard-link the
+        # outgoing version into history (cheap, same fs) before the rename
+        # that overwrites current. If we're killed between any two ops,
+        # there is no window where current.blend is missing.
         if [ -f "$DIR/current.blend" ]; then
-          mv "$DIR/current.blend" "$DIR/history/$ARCHIVE"
+          ln -f "$DIR/current.blend" "$DIR/history/.$ARCHIVE.new" 2>/dev/null \
+            || cp "$DIR/current.blend" "$DIR/history/.$ARCHIVE.new"
+          mv -f "$DIR/history/.$ARCHIVE.new" "$DIR/history/$ARCHIVE"
         fi
-        mv "$DIR/$INCOMING" "$DIR/current.blend"
-        echo "$NEW_EPOCH" > "$DIR/epoch"
+        # Stage epoch first so the swap-then-finalize window is one rename.
+        printf '%s\n' "$NEW_EPOCH" > "$DIR/.epoch.tmp"
+        mv -f "$DIR/$INCOMING" "$DIR/current.blend"
+        mv -f "$DIR/.epoch.tmp" "$DIR/epoch"
         rm -rf "$DIR/LOCK"
-        chmod -R g+rwsX "$DIR"
-        chmod 2770 "$DIR" "$DIR/history"
+        chmod -R g+rwsX "$DIR" 2>/dev/null || true
+        chmod 2770 "$DIR" "$DIR/history" 2>/dev/null || true
     """).strip()
     fproc = ssh_run(state, finalize, check=False)
     if fproc.returncode == 7:
         die(
             f"refusing to checkin: lock on {name!r} was stolen between "
-            "probe and finalize. Local incoming file remains on server."
+            "probe and finalize. Incoming upload remains on server."
+        )
+    if fproc.returncode == 8:
+        actual = fproc.stderr.decode("utf-8", errors="replace").strip()
+        die(
+            f"refusing to checkin: epoch advanced from {remote_epoch} during "
+            f"upload ({actual}). Sync and retry, or pass --force to overwrite."
+        )
+    if fproc.returncode == 9:
+        die(
+            f"refusing to checkin: lock on {name!r} disappeared between probe "
+            "and finalize (someone abandoned or broke it). Pass --force to upload anyway."
+        )
+    if fproc.returncode == 10:
+        die(
+            f"refusing to checkin: lock metadata on {name!r} is missing. "
+            "Pass --force to upload anyway."
         )
     if fproc.returncode != 0:
         sys.stderr.write(fproc.stderr.decode("utf-8", errors="replace"))
@@ -708,7 +765,7 @@ def cmd_sync(args: argparse.Namespace, state: dict) -> int:
         die(f"probe failed (exit {proc.returncode})")
     epoch = proc.stdout.decode("utf-8", errors="replace").strip() or "?"
 
-    scp_down(state, remote_path(state, name, "current.blend"), local_blend)
+    rsync_down(state, remote_path(state, name, "current.blend"), local_blend)
     print(
         f"synced {name!r} at epoch {epoch} → "
         f"{local_blend.relative_to(REPO_ROOT)} (read-only, no lock)"
