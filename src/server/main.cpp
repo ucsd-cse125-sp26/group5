@@ -4,16 +4,13 @@
 #include <thread>
 
 #include "game_state.h"
-#include "scene.h"
 #include "server_game.h"
-#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
-#include "shared/util.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -22,33 +19,6 @@ int main() {
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
 
-  spawnStaticEntities(
-      game, {
-                {.x = 5.0f,
-                 .y = 5.0f,
-                 .z = 0.0f,
-                 .modelName = "cube",
-                 .scale = 1.0f,
-                 .meshPath = "",
-                 .render = true},
-                {.x = 10.0f,
-                 .y = 0.0f,
-                 .z = -1.0f,
-                 .modelName = "bear",
-                 .scale = 0.5f,
-                 .meshPath = (exeDir() / "assets/bear/bear_full.obj").string(),
-                 .render = true},
-                {.x = 0.0f,
-                 .y = 0.0f,
-                 .z = -1.0f,
-                 .modelName = "floor",
-                 .scale = 1.0f,
-                 .meshPath = "",
-                 .render = false,
-                 .halfX = 100.0f,
-                 .halfY = 100.0f,
-                 .halfZ = 1.0f},
-            });
   ServerNetwork network;
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
@@ -149,11 +119,14 @@ int main() {
       // Sync Jolt positions back into ECS
       auto physicsView =
           game.registry.view<shared::Position, shared::PhysicsBody>();
+      auto& bodyInterface = game.physics.getBodyInterface();
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::RVec3 joltPos =
-            game.physics.getBodyInterface().GetPosition(JPH::BodyID(pb.bodyId));
+        JPH::BodyID bodyId(pb.bodyId);
+        if (!bodyInterface.IsAdded(bodyId)) continue;
+
+        JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyId);
         pos.x = joltPos.GetX();
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();

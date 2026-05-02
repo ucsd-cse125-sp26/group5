@@ -46,6 +46,7 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     auto& input = view.template get<shared::PlayerInput>(entity);
     auto& pb = view.template get<shared::PhysicsBody>(entity);
     JPH::BodyID bodyId(pb.bodyId);
+    if (!bodyInterface.IsAdded(bodyId)) continue;
 
     // Apply mouse look
     if (input.mouseDx != 0.0f) {
