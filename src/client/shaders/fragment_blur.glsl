@@ -1,7 +1,5 @@
 #version 410 core
-// Separable Gaussian blur, one axis per draw. Ping-pong between two FBOs to
-// build the full 2D blur. Weights are the canonical 5-tap kernel from
-// learnopengl.
+// Separable 5-tap Gaussian (learnopengl weights). Ping-pong H/V draws.
 in vec2 vUV;
 out vec4 FragColor;
 

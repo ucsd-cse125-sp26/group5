@@ -12,7 +12,6 @@
 class Shader {
  public:
   Shader(const std::string& vertexPath, const std::string& fragmentPath);
-  // Variant with a geometry shader (used by point-light shadow cubemap pass).
   Shader(const std::string& vertexPath, const std::string& fragmentPath,
          const std::string& geometryPath);
   ~Shader();

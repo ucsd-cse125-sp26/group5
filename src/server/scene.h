@@ -8,19 +8,10 @@
 class ServerGame;
 
 enum class CollisionShape {
-  // AABB-box derived from the asset's post-orientation bounds. Cheap.
-  Box,
-  // Triangle-mesh body using the asset's actual geometry. Accurate but only
-  // available for mesh-backed assets (procedural cubes can't use this).
-  Mesh,
+  Box,   // post-orientation AABB; cheap, works for procedural assets
+  Mesh,  // triangle mesh; mesh-backed assets only
 };
 
-// Declarative description of a static entity (e.g. floor, ad-hoc props).
-// One desc → one ECS entity with Position + (optional) RenderInfo +
-// (optional) PhysicsBody. Render and physics share the same `modelName` and
-// `scale` so a single source of truth drives both. Asset orientation
-// (shared::ASSETS[].q*) is applied to the physics shape so collision lines
-// up with the visible mesh.
 struct StaticEntityDesc {
   glm::vec3 position{0.0f};
   glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};

@@ -26,11 +26,9 @@ void decompose(const aiMatrix4x4& m, glm::vec3& pos, glm::quat& rot,
   scale = {s.x, s.y, s.z};
 }
 
-// glTF-via-assimp pre-multiplies color by intensity into mColorDiffuse, which
-// for Blender point lights produces values in the thousands (lumens). Without
-// units the Phong shader just blows out, so for v1 we normalize each color to
-// its max channel — relative tints are preserved, brightness is clamped to
-// unit. Future work: pipe glTF range/intensity into proper attenuation.
+// glTF-via-assimp pre-multiplies intensity into mColorDiffuse (lumens for
+// Blender point lights), which blows out the Phong shader. Normalize to
+// preserve relative tint until proper range/intensity attenuation lands.
 aiColor3D normalizeLightColor(const aiColor3D& c) {
   float m = std::max({c.r, c.g, c.b});
   if (m <= 1.0f || m == 0.0f) return c;
@@ -90,8 +88,7 @@ bool loadMap(ServerGame& game, const std::string& path) {
     aiColor3D color = normalizeLightColor(light->mColorDiffuse);
 
     if (light->mType == aiLightSource_POINT) {
-      // If the glTF artist specified a `range` cutoff, derive attenuation to
-      // match. assimp stores it on the node's metadata, not on aiLight.
+      // glTF `range` lives on node metadata, not aiLight.
       shared::PointLightAttenuation att = shared::kDefaultPointLightAttenuation;
       const aiNode* lightNode =
           scene->mRootNode->FindNode(aiString(light->mName));
@@ -111,8 +108,7 @@ bool loadMap(ServerGame& game, const std::string& path) {
           color.b, color.r, color.g, color.b);
       ++pointLights;
     } else if (light->mType == aiLightSource_DIRECTIONAL) {
-      // glTF directional light points along the node's local -Z. Rotate that
-      // by the world rotation to get a world-space direction.
+      // glTF directional light points along node-local -Z.
       glm::vec3 worldDir = rot * glm::vec3(0.0f, 0.0f, -1.0f);
       auto [id, entity] = new_entity(game);
       game.registry.emplace<shared::DirectionalLight>(

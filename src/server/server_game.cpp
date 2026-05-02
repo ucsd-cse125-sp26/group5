@@ -29,8 +29,6 @@ void initServerGame(ServerGame& game) {
       .connect<&onPhysicsBodyDestroyed>(game.physics);
 }
 
-// ── Movement system ──────────────────────────────────────
-
 // Process input on tick
 void input_tick(entt::registry& registry) {
   SIMPLE_PROFILE_SCOPE("Input Tick");
@@ -41,8 +39,6 @@ void input_tick(entt::registry& registry) {
     playerInput.keys_prev = playerInput.keys;
   }
 }
-
-// ── Movement system ──────────────────────────────────────
 
 void movement_system(ServerGame& game, float dt) {
   SIMPLE_PROFILE_SCOPE("Movement System");
@@ -59,7 +55,6 @@ void movement_system(ServerGame& game, float dt) {
     auto& pb = view.get<shared::PhysicsBody>(entity);
     JPH::BodyID bodyId(pb.bodyId);
 
-    // Apply mouse look
     if (input.mouseDx != 0.0f) {
       float yawDelta = -input.mouseDx * sensitivity;
       glm::quat q(position.qw, position.qx, position.qy, position.qz);
@@ -70,9 +65,7 @@ void movement_system(ServerGame& game, float dt) {
       position.qy = q.y;
       position.qz = q.z;
 
-      // Push yaw to the Jolt body so an asymmetric collision shape (e.g. the
-      // bear box) tracks the visible facing. The body has rotation DOFs
-      // locked, so SetRotation is user-driven only.
+      // Push yaw so asymmetric shapes (bear box) track the facing.
       JPH::Quat joltRot(q.x, q.y, q.z, q.w);
       bodyInterface.SetRotation(bodyId, joltRot, JPH::EActivation::Activate);
     }
@@ -104,29 +97,24 @@ void movement_system(ServerGame& game, float dt) {
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 
-    // Get current vertical velocity from Jolt to preserve gravity
+    // Preserve gravity-driven Z velocity.
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    // Jump
     if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
 
-    // Set velocity on Jolt body instead of manually moving position
     bodyInterface.SetLinearVelocity(
         bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
   }
 }
 
-// Model modification system
 void render_model_change(ServerGame& game, float dt) {
   auto& bodyInterface = game.physics.getBodyInterface();
   auto view =
       game.registry
           .view<shared::RenderInfo, shared::PlayerInput, shared::PhysicsBody>();
-  // Held-key resize is uncapped: at 60 Hz it crosses sub-FLT_MIN within
-  // seconds. A near-zero scale builds a degenerate Jolt shape and crashes
-  // the contact resolver; an unbounded scale ruins broadphase. Clamp to a
-  // range that's still visible/playable.
+  // Held-key resize is uncapped; clamp before it crashes the Jolt narrow-
+  // phase (sub-FLT_MIN scale → degenerate shape) or wrecks broadphase.
   constexpr float kMinPlayerScale = 0.05f;
   constexpr float kMaxPlayerScale = 20.0f;
   for (auto entity : view) {
@@ -154,10 +142,9 @@ void render_model_change(ServerGame& game, float dt) {
       JPH::ShapeRefC newShape = game.physics.playerShapeForAsset(
           renderInfo.modelName,
           glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
-      // Don't recompute mass: a 14x11x18 bear box at default density is a
-      // ~2.7M kg body, which combined with the player's rotation-locked DOFs
-      // produces NaN/Inf during the next physics step. Player keeps the
-      // mass it was created with regardless of visual model.
+      // Don't recompute mass: a 14x11x18 bear box at default density is
+      // ~2.7M kg, which combined with locked rotation DOFs produces
+      // NaN/Inf in the next physics step.
       if (newShape) {
         bodyInterface.SetShape(JPH::BodyID(pb.bodyId), newShape,
                                /*update mass*/ false,
@@ -167,7 +154,7 @@ void render_model_change(ServerGame& game, float dt) {
   }
 }
 
-// Temporary - used to demonstrate server-controlled point light
+// Demo: server-controlled point light orbiting the origin.
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t light_entity_id) {
   bool brighten = false;
@@ -181,7 +168,7 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
   }
 
   static float angle = 0.0f;
-  angle += dt * 1.0f;  // 1 radian/sec
+  angle += dt;  // rad/sec
 
   const float radius = 5.0f;
   const float height = 3.0f;
@@ -199,7 +186,6 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     pos.y = radius * std::sin(angle);
     pos.z = height;
 
-    // Orient the cube to face the origin
     glm::vec3 p(pos.x, pos.y, pos.z);
     glm::vec3 dir = glm::normalize(-p);
     glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -257,7 +243,6 @@ void scene_cycle_system(entt::registry& registry) {
   }
 }
 
-// Entity creation helper
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
   auto entity = g.registry.create();
   auto id = g.nextEntityId;
@@ -265,8 +250,6 @@ std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
   g.nextEntityId++;
   return {id, entity};
 }
-
-// ── Packet handlers ──────────────────────────────────────
 
 void registerServerHandlers(ServerNetwork& network) {
   network.dispatcher().on(

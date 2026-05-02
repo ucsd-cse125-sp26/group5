@@ -3,15 +3,9 @@ in vec3 worldPos;
 in vec3 worldNormal;
 in vec2 vTexCoords;
 
-// MRT outputs:
-//   gPosition.rgb = world-space position; .a = 1 to flag "real geometry"
-//                   so the lighting pass can discard sky pixels.
-//   gNormal.rgb   = world-space normal (renormalized).
-//   gNormal.a     = material shininess.
-//   gAlbedo.rgb   = sampled diffuse / albedo. .a unused.
-//   gSpecular.rgb = sampled specular tint (full RGB so colored highlights
-//                   from e.g. metals work). .a unused.
-//   gEmissive.rgb = sampled emissive (added unattenuated in lighting).
+// gPosition: .rgb world pos, .a=1 sentinel ("real geometry, not sky").
+// gNormal:   .rgb world normal, .a shininess.
+// gAlbedo/gSpecular/gEmissive: .rgb sampled material; .a unused.
 layout(location = 0) out vec4 gPosition;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec4 gAlbedo;

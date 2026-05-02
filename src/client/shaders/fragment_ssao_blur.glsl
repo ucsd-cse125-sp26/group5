@@ -1,6 +1,5 @@
 #version 410 core
-// 4x4 box blur over the SSAO buffer. Matches the noise-tile size, so the
-// per-pixel rotation noise gets smoothed out completely.
+// 4x4 box blur sized to the noise tile so rotation noise washes out.
 in vec2 vUV;
 out float FragColor;
 

@@ -24,30 +24,22 @@
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 
-// Skybox images use Y-up; the game uses Z-up.
-// cubemap->game: X->X, Y->Z, Z->-Y  (column-major)
+// Skybox images are Y-up; the game is Z-up.
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-// std140 layout of the per-frame camera uniform block. Mirrored verbatim by
-// CameraBlock in fragment_lighting_deferred.glsl, vertex_gbuffer.glsl, and
-// fragment_ssao.glsl. Skybox keeps its own "view" uniform because it uses
-// a custom rotation-only view matrix.
+// std140 layout — must match CameraBlock in the deferred-lighting,
+// vertex_gbuffer, and ssao shaders.
 struct alignas(16) CameraUBOData {
-  glm::mat4 view;              // offset 0
-  glm::mat4 projection;        // offset 64
-  glm::mat4 lightSpaceMatrix;  // offset 128
-  glm::vec3 viewPos;           // offset 192
-  float pointFarPlane;         // offset 204
+  glm::mat4 view;
+  glm::mat4 projection;
+  glm::mat4 lightSpaceMatrix;
+  glm::vec3 viewPos;
+  float pointFarPlane;
 };
-static_assert(sizeof(CameraUBOData) == 208,
-              "CameraUBOData must match std140 layout for binding=0");
+static_assert(sizeof(CameraUBOData) == 208);
 
-// Binding point for the camera UBO. Shader load wires CameraBlock here
-// (via glUniformBlockBinding) for every program that declares the block.
 static constexpr GLuint kCameraUBOBinding = 0;
 
-// Tells `prog` to source its CameraBlock (if it has one) from
-// kCameraUBOBinding. No-op for shaders that don't declare the block.
 static void bindCameraBlock(GLuint prog) {
   GLuint blockIdx = glGetUniformBlockIndex(prog, "CameraBlock");
   if (blockIdx != GL_INVALID_INDEX) {
@@ -55,19 +47,14 @@ static void bindCameraBlock(GLuint prog) {
   }
 }
 
-// Resolution of the directional shadow map. 2048² ≈ 12 MB at 24-bit depth.
 static constexpr int kDirShadowMapSize = 2048;
-
-// Point-light cubemap array. K_MAX_POINT_LIGHTS × 6 faces × 1024² ≈ 24 MB.
 static constexpr int kPointShadowSize = 1024;
-// Counts/ranges live in shared/shader_constants.h so C++ and GLSL stay in sync.
 using shared::kMaxLightingShaderLights;
 using shared::kMaxPointLights;
 using shared::kPointShadowFar;
 using shared::kPointShadowLayers;
 using shared::kPointShadowNear;
 
-// CPU-side mirror of one PointLight uniform struct.
 struct LightUpload {
   glm::vec3 position;
   float constant;
@@ -79,9 +66,6 @@ struct LightUpload {
   int shadowIdx;  // -1 = non-shadow-casting
 };
 
-// Iterates the ECS PointLight view, copies up to kMaxLightingShaderLights
-// into out, and assigns the first kMaxPointLights with castsShadow=true to
-// shadow slots 0..(kMaxPointLights-1). Returns the active light count.
 static int collectPointLights(const ClientGame& game,
                               LightUpload out[kMaxLightingShaderLights]) {
   int count = 0;
@@ -104,8 +88,6 @@ static int collectPointLights(const ClientGame& game,
   return count;
 }
 
-// Pushes the collected lights into the deferred lighting shader's uniform
-// arrays.
 static void uploadPointLights(const Shader& shader, const LightUpload* lights,
                               int count) {
   shader.setInt("numPointLights", count);
@@ -131,8 +113,6 @@ static void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
                                        GLuint /*id*/, GLenum severity,
                                        GLsizei /*length*/, const GLchar* msg,
                                        const void* /*userParam*/) {
-  // Filter out the noisy NOTIFICATION-level messages (buffer-detail spam from
-  // some drivers); everything else gets surfaced.
   if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
   const char* sev = severity == GL_DEBUG_SEVERITY_HIGH     ? "HIGH"
                     : severity == GL_DEBUG_SEVERITY_MEDIUM ? "MED"
@@ -142,9 +122,8 @@ static void GLAPIENTRY glDebugCallback(GLenum /*source*/, GLenum type,
           type == GL_DEBUG_TYPE_ERROR ? " ERROR" : "", msg);
 }
 
-// Returns the active directional light direction (ECS override beats scene
-// default). If no directional light is configured, returns a sensible
-// fallback so the shadow pass still runs without crashing.
+// ECS DirectionalLight overrides the scene default; falls back to a fixed
+// direction so the shadow pass still runs if neither is configured.
 static glm::vec3 directionalLightDir(const ClientGame& game) {
   auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
   for (auto ent : dlView) {
@@ -161,36 +140,24 @@ static glm::vec3 directionalLightDir(const ClientGame& game) {
   return {0.3f, 1.0f, -0.4f};
 }
 
-// Builds 24 light-space matrices for the point-light cubemap-array shadow
-// pass. Active light slots get real per-face matrices; inactive slots get a
-// "kill" matrix that produces clip-space z > 1, so emitted geometry is
-// clipped and never writes to those layers (their cleared depth=1.0
-// remains, meaning "not in shadow" when sampled). Also writes the per-light
-// world-space positions into outPositions, padded with origins for
-// inactive slots.
-//
-// Reads shadow-slot assignments from the LightUpload array so that the
-// lighting shader and the shadow shader agree on which cubemap layer each
-// shadow-casting light owns.
+// Inactive shadow slots get a "kill" matrix that clips all geometry so the
+// cleared depth=1.0 remains (sampled as "not in shadow").
 static void computePointShadowMatrices(
     const LightUpload* lights, int count,
     glm::mat4 outMatrices[kPointShadowLayers],
     glm::vec3 outPositions[kMaxPointLights]) {
-  // Cube-face directions/ups. Same convention learnopengl uses; the cube
-  // map is its own coordinate system, independent of the world's up axis.
   static const struct {
     glm::vec3 dir;
     glm::vec3 up;
   } faces[6] = {
-      {.dir = {1, 0, 0}, .up = {0, -1, 0}},   // +X
-      {.dir = {-1, 0, 0}, .up = {0, -1, 0}},  // -X
-      {.dir = {0, 1, 0}, .up = {0, 0, 1}},    // +Y
-      {.dir = {0, -1, 0}, .up = {0, 0, -1}},  // -Y
-      {.dir = {0, 0, 1}, .up = {0, -1, 0}},   // +Z
-      {.dir = {0, 0, -1}, .up = {0, -1, 0}},  // -Z
+      {.dir = {1, 0, 0}, .up = {0, -1, 0}},
+      {.dir = {-1, 0, 0}, .up = {0, -1, 0}},
+      {.dir = {0, 1, 0}, .up = {0, 0, 1}},
+      {.dir = {0, -1, 0}, .up = {0, 0, -1}},
+      {.dir = {0, 0, 1}, .up = {0, -1, 0}},
+      {.dir = {0, 0, -1}, .up = {0, -1, 0}},
   };
 
-  // Kill matrix: any input → clip space (0, 0, 2, 1) → NDC z = 2 → clipped.
   glm::mat4 kill(0.0f);
   kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
   for (int i = 0; i < kPointShadowLayers; ++i) outMatrices[i] = kill;
@@ -211,34 +178,21 @@ static void computePointShadowMatrices(
   }
 }
 
-// Builds a light-space matrix that wraps an ortho frustum around the camera.
-// The frustum follows the camera so distant objects get shadows too without
-// burning the whole shadow map on the world origin.
-//
-// Texel-snapping: lightPos slides continuously with the camera, which makes
-// the projected shadow texels drift across world surfaces and produces a
-// visible "swimming" shimmer on static geometry. We quantize lightPos to
-// whole-texel increments along the light's tangent plane so each texel
-// always covers the same world-space patch frame-over-frame.
+// Camera-following ortho frustum. lightPos is texel-snapped to the light's
+// tangent plane so static geometry doesn't shimmer as the camera moves.
 static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
                                                const glm::vec3& lightDir) {
   glm::vec3 dir = glm::normalize(lightDir);
   glm::vec3 up = glm::abs(dir.z) > 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f)
                                         : glm::vec3(0.0f, 0.0f, 1.0f);
-  // Build the light's tangent plane (right, lightUp) so we can snap the
-  // camera's projection onto it.
   glm::vec3 right = glm::normalize(glm::cross(dir, up));
   glm::vec3 lightUp = glm::cross(right, dir);
-  // Ortho frustum half-extent. ±20 covers the visible play area.
   constexpr float kHalfExtent = 20.0f;
-  // World-space size of one shadow-map texel along the tangent plane.
   const float texelWorld = (2.0f * kHalfExtent) / kDirShadowMapSize;
   float u = glm::dot(cameraPos, right);
   float v = glm::dot(cameraPos, lightUp);
   u = std::floor(u / texelWorld) * texelWorld;
   v = std::floor(v / texelWorld) * texelWorld;
-  // Reconstruct a snapped camera anchor in the light's tangent plane,
-  // then push it back along -dir to place the virtual sun.
   glm::vec3 snapped = right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
   glm::vec3 lightPos = snapped - dir * 30.0f;
   glm::mat4 view = glm::lookAt(lightPos, snapped, up);
@@ -260,7 +214,7 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
-  // Extract yaw only so entity pitch/roll doesn't tilt the camera.
+  // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
   flat.z = 0.0f;
   flat = glm::normalize(flat);
@@ -274,12 +228,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   return CameraState{.position = pos, .view = view};
 }
 
-static void setupCameraMatrix(const Shader& shader, const CameraState& camera) {
-  shader.setMat4("view", camera.view);
-  shader.setVec3("viewPos", camera.position.x, camera.position.y,
-                 camera.position.z);
-}
-
 static const shared::SceneInfo* currentScene(const ClientGame& game) {
   auto sceneView = game.renderRegistry.view<shared::Scene>();
   for (auto ent : sceneView) {
@@ -290,10 +238,9 @@ static const shared::SceneInfo* currentScene(const ClientGame& game) {
   return nullptr;
 }
 
-static void updateDirectionalLight(const Shader& shader,
+// ECS DirectionalLight overrides the scene default. First entity wins.
+static void uploadDirectionalLight(const Shader& shader,
                                    const ClientGame& game) {
-  // ECS DirectionalLight overrides the scene's default. First entity wins;
-  // subsequent ones are ignored (shader has only one dirLight slot).
   auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
   for (auto ent : dlView) {
     const auto& dl = dlView.get<shared::DirectionalLight>(ent);
@@ -342,16 +289,12 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
     auto& entity = view.get<shared::Entity>(ent);
     if (forShadowPass) {
-      // Light-marker meshes (the visible cube on a point/dir light) sit at
-      // the light's origin; rendering them into the shadow map makes the
-      // light shadow itself. Skip any entity whose render mesh represents
-      // a light source.
+      // Light-marker meshes sit at the light's origin and would shadow
+      // their own light if rendered into the shadow map.
       if (game.renderRegistry
               .any_of<shared::PointLight, shared::DirectionalLight>(ent))
         continue;
     } else {
-      // Main pass: skip the camera entity (we'd see our own model
-      // first-person otherwise).
       if (entity.id == game.renderEntityId) continue;
     }
     auto it = models.find(renderInfo.modelName);
@@ -388,18 +331,15 @@ bool Graphics::load(int width, int height) {
   }
 
   glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);  // vsync: cap to display refresh rate
+  glfwSwapInterval(1);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   if (glfwRawMouseMotionSupported())
     glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
-  // Stash this Graphics instance on the window so the framebuffer-size
-  // callback can route resize events back into resizeBuffers.
   glfwSetWindowUserPointer(window, this);
   glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-  // Capture windowed geometry for fullscreen restore.
   glfwGetWindowPos(window, &windowedX, &windowedY);
   glfwGetWindowSize(window, &windowedW, &windowedH);
   glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
@@ -408,8 +348,6 @@ bool Graphics::load(int width, int height) {
   printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
 
-  // KHR_debug is core in GL 4.3 and broadly available as an extension on
-  // 4.1 — install the callback if glad loaded a function pointer.
   if (glDebugMessageCallback) {
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
@@ -442,10 +380,9 @@ bool Graphics::load(int width, int height) {
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
 
-  // Shader::Shader silently fails (m_id=0) on missing/uncompilable source so
-  // that F5 hot-reload can keep running with the previous program. At
-  // startup we don't have a previous program, so a silent failure produces
-  // a black window with one stderr line. Fail fast instead.
+  // Shader ctor failures are silent at runtime so F5 hot-reload can keep
+  // the previous program — at startup there is no previous program, so
+  // fail fast instead of starting with a black window.
   const std::optional<Shader>* required[] = {
       &gbufferShader,   &lightingShader,    &skyboxShader, &presentShader,
       &blurShader,      &tonemapShader,     &ssaoShader,   &ssaoBlurShader,
@@ -458,16 +395,13 @@ bool Graphics::load(int width, int height) {
     }
   }
 
-  // Allocate the directional shadow map once; size is independent of window
-  // size so resizeBuffers leaves it alone.
+  // Directional shadow map. Size is fixed; resizeBuffers leaves it alone.
   glGenFramebuffers(1, &dirShadowFBO);
   glGenTextures(1, &dirShadowMap);
   glBindTexture(GL_TEXTURE_2D, dirShadowMap);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kDirShadowMapSize,
                kDirShadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-  // GL_LINEAR with TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE gives 2×2
-  // hardware PCF per tap — each manual disc/grid sample blends 4 stored
-  // depth comparisons for free.
+  // LINEAR + COMPARE_REF_TO_TEXTURE → 2×2 hardware PCF per tap.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -475,7 +409,7 @@ bool Graphics::load(int width, int height) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
                   GL_COMPARE_REF_TO_TEXTURE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-  // Outside the frustum returns "lit" (visibility=1.0).
+  // Outside the frustum returns visibility=1.0 (fully lit).
   float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
   glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, white);
   glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
@@ -488,9 +422,8 @@ bool Graphics::load(int width, int height) {
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Point-light cubemap array shadow target. One depth attachment, 24
-  // layer-faces (4 cubes × 6 faces). The whole array is bound to the FBO
-  // via glFramebufferTexture so the GS can pick layers via gl_Layer.
+  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces) bound as
+  // a layered attachment so the geometry shader can route via gl_Layer.
   glGenFramebuffers(1, &pointShadowFBO);
   glGenTextures(1, &pointShadowMaps);
   glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
@@ -505,7 +438,6 @@ bool Graphics::load(int width, int height) {
                   GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R,
                   GL_CLAMP_TO_EDGE);
-  // Hardware PCF on cubemap-array depth.
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_MODE,
                   GL_COMPARE_REF_TO_TEXTURE);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
@@ -519,26 +451,21 @@ bool Graphics::load(int width, int height) {
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Empty VAO for fullscreen-triangle draws (positions synthesized in vert
-  // shader via gl_VertexID).
+  // Empty VAO for fullscreen-triangle draws; positions synthesized from
+  // gl_VertexID in vertex_present.glsl.
   glGenVertexArrays(1, &fullscreenVAO);
 
-  // Per-frame camera UBO. Allocated once with persistent storage; written
-  // each frame in render() via glBufferSubData and consumed by every shader
-  // that declares CameraBlock.
   glGenBuffers(1, &cameraUBO);
   glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
   glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraUBOData), nullptr,
                GL_DYNAMIC_DRAW);
   glBindBufferBase(GL_UNIFORM_BUFFER, kCameraUBOBinding, cameraUBO);
-  // Wire CameraBlock → binding point 0 for every program that declares it.
   for (auto* s : {&*gbufferShader, &*lightingShader, &*ssaoShader}) {
     bindCameraBlock(s->id());
   }
 
-  // SSAO hemisphere kernel: 64 random vectors in the +z hemisphere, biased
-  // towards the origin so closer samples carry more weight. Uploaded once
-  // as a uniform array; the SSAO shader rotates each sample into view-space.
+  // SSAO: 64-sample hemisphere kernel biased towards the origin so closer
+  // samples weight more heavily.
   {
     std::default_random_engine gen(0xc4b1u);
     std::uniform_real_distribution<float> rand01(0.0f, 1.0f);
@@ -554,8 +481,8 @@ bool Graphics::load(int width, int height) {
       sample *= lerp(0.1f, 1.0f, scale * scale);
       ssaoKernel.push_back(sample);
     }
-    // 4×4 noise texture of tangent-space rotation vectors (z=0 so we rotate
-    // around the surface normal). GL_REPEAT tiles it across the screen.
+    // 4×4 noise tile of tangent-space rotation vectors; z=0 so rotation is
+    // around the surface normal.
     std::vector<glm::vec3> noise(16);
     for (int i = 0; i < 16; ++i) {
       noise[i] =
@@ -585,8 +512,7 @@ bool Graphics::load(int width, int height) {
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
-  // Register per-node sub-models from the active map. Server-side map_loader
-  // spawns entities whose RenderInfo.modelName uses these same keys.
+  // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
   auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
@@ -618,11 +544,9 @@ void Graphics::resizeBuffers(int width, int height) {
   projection = glm::perspective(
       glm::radians(45.0f),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 100.0f);
-  // Projection is uploaded each frame via the camera UBO; resize doesn't
-  // need to push it into individual shaders anymore.
 
-  // G-buffer attachments. Position and normal are RGBA16F so we don't lose
-  // precision on world-space coords; albedo+spec and emissive are RGBA8.
+  // RGBA16F for position/normal preserves world-space precision; albedo,
+  // specular, and emissive fit in RGBA8.
   if (!gBufferFBO) glGenFramebuffers(1, &gBufferFBO);
   if (!gPosition) glGenTextures(1, &gPosition);
   if (!gNormal) glGenTextures(1, &gNormal);
@@ -672,9 +596,8 @@ void Graphics::resizeBuffers(int width, int height) {
     fprintf(stderr, "gBufferFBO incomplete\n");
   }
 
-  // Lit FBO: deferred lighting writes via MRT (litColor + brightColor);
-  // skybox forward-renders to litColor afterward (drawBuffers swapped).
-  // Both color attachments are RGBA16F so highlights can exceed 1.0.
+  // litColor + brightColor: HDR MRT for deferred lighting; skybox writes
+  // litColor only on the second pass.
   if (!litFBO) glGenFramebuffers(1, &litFBO);
   if (!litColor) glGenTextures(1, &litColor);
   if (!brightColor) glGenTextures(1, &brightColor);
@@ -707,7 +630,6 @@ void Graphics::resizeBuffers(int width, int height) {
     fprintf(stderr, "litFBO incomplete\n");
   }
 
-  // Bloom ping-pong FBOs.
   for (int i = 0; i < 2; ++i) {
     if (!pingFBO[i]) glGenFramebuffers(1, &pingFBO[i]);
     if (!pingColor[i]) glGenTextures(1, &pingColor[i]);
@@ -720,7 +642,6 @@ void Graphics::resizeBuffers(int width, int height) {
     }
   }
 
-  // SSAO + blur targets. Single-channel, framebuffer-sized.
   auto allocSsao = [&](GLuint& fbo, GLuint& tex) {
     if (!fbo) glGenFramebuffers(1, &fbo);
     if (!tex) glGenTextures(1, &tex);
@@ -737,15 +658,14 @@ void Graphics::resizeBuffers(int width, int height) {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
       fprintf(stderr, "ssao FBO incomplete\n");
     }
-    // Clear to 1.0 ("no occlusion") so the first frame's lighting pass — or
-    // any frame that runs before the SSAO pass — reads sensible values.
+    // Clear to 1.0 (no occlusion) so the lighting pass reads valid values
+    // before SSAO has run.
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
   };
   allocSsao(ssaoFBO, ssaoColor);
   allocSsao(ssaoBlurFBO, ssaoBlurColor);
 
-  // LDR target after tonemap; FXAA reads this.
   if (!ldrFBO) glGenFramebuffers(1, &ldrFBO);
   if (!ldrColor) glGenTextures(1, &ldrColor);
   glBindTexture(GL_TEXTURE_2D, ldrColor);
@@ -765,10 +685,7 @@ void Graphics::resizeBuffers(int width, int height) {
 }
 
 void Graphics::initShaderUniforms() {
-  // Camera state (view/projection/viewPos/lightSpaceMatrix/pointFarPlane)
-  // lives in the camera UBO and is uploaded once per frame in render().
-  // Re-bind each program's CameraBlock to binding=0 (idempotent; needed
-  // after a hot-reload that produces a fresh program object).
+  // Re-bind CameraBlock after hot-reload produces a fresh program object.
   for (auto* s : {&gbufferShader, &lightingShader, &ssaoShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
@@ -779,7 +696,7 @@ void Graphics::reloadShaders() {
     std::optional<Shader>& slot;
     const char* vert;
     const char* frag;
-    const char* geom;  // empty string when no geometry stage
+    const char* geom;  // "" = no geometry stage
   };
   Reload reloads[] = {
       {.slot = gbufferShader,
@@ -907,7 +824,6 @@ void Graphics::drawDebugOverlay() {
   }
   if (!texToShow) return;
 
-  // Top-right quarter-screen tile.
   int cornerW = fbWidth / 4;
   int cornerH = fbHeight / 4;
   if (cornerW <= 0 || cornerH <= 0) return;
@@ -919,9 +835,8 @@ void Graphics::drawDebugOverlay() {
   debugOverlay->use();
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texToShow);
-  // Shadow textures are kept in COMPARE_REF_TO_TEXTURE for hardware PCF,
-  // but the debug overlay samples via plain sampler2D — temporarily disable
-  // compare so we get raw depth values, then restore.
+  // Shadow textures use COMPARE_REF_TO_TEXTURE for hardware PCF, but the
+  // overlay samples as plain sampler2D — temporarily flip compare off.
   bool isDirShadow = (debugChannel == DebugChannel::DirShadowMap);
   if (isDirShadow) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -942,18 +857,14 @@ void Graphics::render(ClientGame& game) {
   auto camera = computeCamera(game);
   if (!camera) return;
 
-  // Per-frame light collection. Done up front so the shadow passes and the
-  // lighting pass agree on shadow-slot assignments.
+  // Collect lights up front so shadow passes and the lighting pass agree
+  // on shadow-slot assignments.
   LightUpload lights[kMaxLightingShaderLights];
   int numLights = collectPointLights(game, lights);
 
-  // Directional shadow pass. Light-space matrix tracks the camera so shadows
-  // stay sharp around the player.
   lightSpaceMatrix = computeDirectionalLightMatrix(camera->position,
                                                    directionalLightDir(game));
 
-  // Upload the per-frame camera UBO. Every shader with a CameraBlock will
-  // pick up these values without needing per-program setMat4 calls.
   {
     CameraUBOData ubo{};
     ubo.view = camera->view;
@@ -970,8 +881,8 @@ void Graphics::render(ClientGame& game) {
     glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
-    // Polygon offset alone — front-face culling stacks with this and causes
-    // peter-panning on non-watertight geometry (floor/walls are single-sided).
+    // Polygon offset only; front-face culling here causes peter-panning
+    // on the single-sided floor/walls.
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowDirShader->use();
@@ -980,18 +891,11 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // Point-light shadow pass: 24 cubemap-array layers populated in one draw
-  // via geometry-shader instancing. Inactive shadow slots (and lights with
-  // castsShadow=false) get kill matrices so their layers stay cleared.
+  // 24 cubemap-array layers populated in one draw via geometry-shader
+  // instancing; computePointShadowMatrices fills active slots and writes
+  // kill matrices into the rest.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
-  // Initialize to kill matrices for all 24 layers.
-  {
-    glm::mat4 kill(0.0f);
-    kill[3] = glm::vec4(0.0f, 0.0f, 2.0f, 1.0f);
-    for (auto& pointMat : pointMats) pointMat = kill;
-    for (auto& pointPosition : pointPositions) pointPosition = glm::vec3(0);
-  }
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
   if (shadowPointShader && shadowPointShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
@@ -1011,25 +915,20 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // Geometry pass: write the g-buffer.
   {
     SIMPLE_PROFILE_SCOPE("GBuffer");
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-    // Clear color = (0,0,0,0); the .a=0 sentinel in gPosition tells the
-    // lighting shader "this pixel was never written; skip it" so the skybox
-    // can take over.
+    // gPosition.a = 0 marks "no geometry written" so the skybox can take
+    // those pixels.
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gbufferShader->use();
-    // view/projection sourced from the camera UBO bound at index 0.
     renderEntities(*gbufferShader, game, models);
   }
 
-  // SSAO pass: read view-space position/normal from g-buffer, compute
-  // per-pixel occlusion factor, write to ssaoColor.
   if (ssaoShader && ssaoShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAO");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
@@ -1046,7 +945,6 @@ void Graphics::render(ClientGame& game) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
     ssaoShader->setInt("texNoise", 2);
-    // view/projection from the camera UBO.
     ssaoShader->setVec3Array("samples", static_cast<int>(ssaoKernel.size()),
                              glm::value_ptr(ssaoKernel[0]));
     ssaoShader->setInt("kernelSize", ssaoKernelSize);
@@ -1059,7 +957,6 @@ void Graphics::render(ClientGame& game) {
     glBindVertexArray(0);
   }
 
-  // SSAO blur: 4×4 box blur to wash out the per-pixel rotation noise.
   if (ssaoBlurShader && ssaoBlurShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAOBlur");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
@@ -1075,9 +972,6 @@ void Graphics::render(ClientGame& game) {
     glBindVertexArray(0);
   }
 
-  // Lighting pass: full-screen triangle reads the g-buffer + shadow maps and
-  // writes (litColor, brightColor) via MRT into litFBO. Sky pixels
-  // (gPosition.a == 0) are discarded so the skybox can take over.
   {
     SIMPLE_PROFILE_SCOPE("Lighting");
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
@@ -1114,35 +1008,7 @@ void Graphics::render(ClientGame& game) {
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
       lightingShader->setInt("pointShadowMaps", 7);
-      // lightSpaceMatrix, pointFarPlane, viewPos all come from the camera UBO.
-      // Directional light: ECS override beats scene default.
-      bool dirSet = false;
-      auto dlView = game.renderRegistry.view<shared::DirectionalLight>();
-      for (auto ent : dlView) {
-        const auto& dl = dlView.get<shared::DirectionalLight>(ent);
-        lightingShader->setVec3("dirLight.direction", dl.dirX, dl.dirY,
-                                dl.dirZ);
-        lightingShader->setVec3("dirLight.ambient", dl.ambientR, dl.ambientG,
-                                dl.ambientB);
-        lightingShader->setVec3("dirLight.diffuse", dl.diffuseR, dl.diffuseG,
-                                dl.diffuseB);
-        lightingShader->setVec3("dirLight.specular", dl.specularR, dl.specularG,
-                                dl.specularB);
-        dirSet = true;
-        break;
-      }
-      if (!dirSet) {
-        if (auto* info = currentScene(game)) {
-          lightingShader->setVec3("dirLight.direction", info->dirX, info->dirY,
-                                  info->dirZ);
-          lightingShader->setVec3("dirLight.ambient", info->ambientR,
-                                  info->ambientG, info->ambientB);
-          lightingShader->setVec3("dirLight.diffuse", info->diffuseR,
-                                  info->diffuseG, info->diffuseB);
-          lightingShader->setVec3("dirLight.specular", info->specularR,
-                                  info->specularG, info->specularB);
-        }
-      }
+      uploadDirectionalLight(*lightingShader, game);
       uploadPointLights(*lightingShader, lights, numLights);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -1150,9 +1016,8 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
-  // Skybox: blit g-buffer depth into litFBO so the skybox depth-tests
-  // correctly, then draw forward — but only into litColor, not brightColor
-  // (skybox shouldn't bloom).
+  // Blit g-buffer depth into litFBO so the skybox depth-tests against
+  // scene geometry. Skybox writes litColor only (no bloom).
   {
     SIMPLE_PROFILE_SCOPE("Skybox");
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
@@ -1174,7 +1039,6 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
-  // Bloom blur: ping-pong separable Gaussian, seeded from brightColor.
   GLuint finalBloomColor = brightColor;
   if (blurShader && blurShader->valid() && bloomBlurIterations > 0) {
     SIMPLE_PROFILE_SCOPE("Bloom");
@@ -1200,7 +1064,6 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
-  // Tonemap: combine HDR lit + bloom, exposure-tonemap, write LDR.
   {
     SIMPLE_PROFILE_SCOPE("Tonemap");
     glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
@@ -1223,7 +1086,6 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
-  // FXAA present: samples LDR, writes to default framebuffer.
   {
     SIMPLE_PROFILE_SCOPE("Present");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1247,10 +1109,8 @@ void Graphics::render(ClientGame& game) {
 void Graphics::swap() { glfwSwapBuffers(window); }
 
 Graphics::~Graphics() {
-  // Process exit reclaims every GL handle we allocated; we don't recycle
-  // the renderer at runtime, so per-handle glDelete* would just be dead
-  // code. Tear down GLFW (window + library) so things shut down cleanly
-  // before atexit, which is enough.
+  // Renderer isn't recycled at runtime, so per-handle glDelete* would be
+  // dead code. Tearing down GLFW is enough.
   if (window) {
     glfwDestroyWindow(window);
     window = nullptr;

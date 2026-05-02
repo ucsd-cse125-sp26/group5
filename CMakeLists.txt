@@ -132,8 +132,7 @@ add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
 target_link_libraries(server PRIVATE server_lib)
 
-# Server needs the assets directory (map .glb, mesh files) at runtime,
-# resolved via exeDir(). Mirrors the client's POST_BUILD copy.
+# Server resolves assets via exeDir() at runtime; mirror the client copy.
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_custom_command(TARGET server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory

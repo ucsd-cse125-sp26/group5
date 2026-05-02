@@ -37,17 +37,10 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
 
 namespace {
 
-// Cache key combines the parsed model's source path with the node name so the
-// same node from the same file always hits the cache, regardless of the
-// per-call transform.
 std::string cacheKey(const shared::ParsedModel& parsed, const aiNode& node) {
   return parsed.path() + ":" + node.mName.C_Str();
 }
 
-// Accumulates the AABB of the meshes referenced by `node`. `xform` maps each
-// vertex from mesh-local space to the desired space (use identity to keep
-// mesh-local). Updates `mn`/`mx` in place so callers can iterate over many
-// nodes. Returns true if any vertex was processed.
 template <typename Xform>
 bool accumulateMeshAABB(const aiNode& node, const aiScene& scene, Xform xform,
                         glm::vec3& mn, glm::vec3& mx) {
@@ -64,16 +57,8 @@ bool accumulateMeshAABB(const aiNode& node, const aiScene& scene, Xform xform,
   return any;
 }
 
-// Drops degenerate and non-finite triangles in place. Jolt's narrow-phase
-// (CollideConvexVsTriangles → EPA) crashes when an unnormalized triangle
-// normal underflows to zero, and Jolt's own sanitizer doesn't always catch
-// slivers — see JoltPhysics issue #1352. Returns the number of triangles
-// dropped.
-//
-// Threshold rationale: |edge1 × edge2|² < 1e-10 corresponds to a triangle
-// area below ~5 µm × 5 µm — far smaller than anything that could matter
-// for collision in a meter-scale game, and ~100× looser than Jolt's
-// internal IsNearZero default to give floating-point math headroom.
+// Jolt's narrow-phase (EPA) crashes on slivers its own sanitizer misses
+// (JoltPhysics #1352). 1e-10 ≈ 5 µm² area — well below anything physical.
 size_t pruneDegenerateTriangles(JPH::TriangleList& tris) {
   constexpr float kMinCrossSq = 1e-10f;
   auto finite3 = [](const JPH::Float3& v) {
@@ -96,8 +81,6 @@ size_t pruneDegenerateTriangles(JPH::TriangleList& tris) {
   return dropped;
 }
 
-// Wraps `tris` in a Jolt MeshShape, logging build failures with `tag`.
-// Returns nullptr on empty input or build error.
 JPH::ShapeRefC buildMeshShape(JPH::TriangleList&& tris, const char* tag) {
   if (tris.empty()) return nullptr;
   size_t dropped = pruneDegenerateTriangles(tris);
@@ -212,15 +195,12 @@ JPH::BodyID PhysicsEngine::createBoxBody(const shared::ParsedModel& parsed,
     boxExtentsCache_[key] = ext;
   }
 
-  // Body stays at `pos` (matching the ECS entity's Position); the AABB
-  // center offset lives inside the shape via RotatedTranslatedShape so the
-  // per-tick Jolt→ECS sync doesn't write an offset value back into Position.
+  // Center offset goes inside the shape (RotatedTranslatedShape) so the
+  // body stays at `pos` and Jolt→ECS sync doesn't drift Position.
   return createBoxBody(ext.halfExtents * scale, pos, rot, ext.center * scale);
 }
 
-// Reject scales Jolt can't safely consume. Anything below ~1e-3 builds a
-// near-degenerate shape; non-finite or non-positive components are crash
-// material in the contact resolver. Caller treats {} as "not built".
+// Anything below ~1e-3 or non-finite crashes Jolt's contact resolver.
 static bool isUsableScale(const glm::vec3& s) {
   constexpr float kMinScale = 1e-3f;
   return std::isfinite(s.x) && std::isfinite(s.y) && std::isfinite(s.z) &&
@@ -235,14 +215,12 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
            scale.x, scale.y, scale.z, modelName.c_str());
     return nullptr;
   }
-  // Cache key is just modelName since asset orientation is baked in.
   BoxExtents ext;
   if (auto it = assetBoxCache_.find(modelName); it != assetBoxCache_.end()) {
     ext = it->second;
   } else {
     const auto* asset = shared::findAsset(modelName);
     if (asset && !asset->filename.empty()) {
-      // Mesh-backed asset: load and walk hierarchy with orientation applied.
       glm::quat orient(asset->qw, asset->qx, asset->qy, asset->qz);
       shared::ParsedModel parsed;
       if (!parsed.load(
@@ -268,7 +246,7 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
                                .halfExtents = glm::vec3(0.5f)};
       }
     } else {
-      // Procedural asset (cube, light_cube): unit box centered at origin.
+      // Procedural asset (cube, light_cube).
       ext = {.center = glm::vec3(0.0f), .halfExtents = glm::vec3(0.5f)};
     }
     assetBoxCache_[modelName] = ext;
@@ -301,9 +279,7 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
     unscaled = it->second;
   } else {
     const auto* asset = shared::findAsset(modelName);
-    if (!asset || asset->filename.empty()) {
-      return nullptr;  // procedural/unknown — no triangle mesh available
-    }
+    if (!asset || asset->filename.empty()) return nullptr;
     glm::quat orient(asset->qw, asset->qx, asset->qy, asset->qz);
     shared::ParsedModel parsed;
     if (!parsed.load(std::string(asset->filename),
@@ -346,12 +322,9 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
 
 JPH::ShapeRefC PhysicsEngine::playerShapeForAsset(const std::string& modelName,
                                                   const glm::vec3& scale) {
-  // Both procedural and mesh-backed players use a box. Vertical (Z) center
-  // offset is baked in so the asset's "feet" align with the box's bottom —
-  // the bear's mesh has its origin at its feet, and without this Z offset
-  // the body would settle 9 units above the ground (and the deep floor
-  // penetration on swap segfaulted Jolt's contact resolver). XY offsets are
-  // dropped so the collision pivot matches the player's movement pivot.
-  return boxShapeForAsset(modelName, scale,
-                          /*centerOffsetMask=*/glm::vec3(0.0f, 0.0f, 1.0f));
+  // Z-only center offset: aligns the asset's mesh-origin feet with the box
+  // bottom. Without it the bear settles 9 units above the floor (and a
+  // previous floor-penetration segfaulted Jolt's contact resolver). XY
+  // offsets are dropped so the collision pivot matches movement pivot.
+  return boxShapeForAsset(modelName, scale, glm::vec3(0.0f, 0.0f, 1.0f));
 }

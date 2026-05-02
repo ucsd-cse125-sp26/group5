@@ -35,7 +35,6 @@ int main() {
     printf("A new client connected from %x:%u.\n", peer->address.host,
            peer->address.port);
 
-    // Send full state of all existing entities to the new client
     std::vector<entt::entity> existing;
     auto view = g.registry.view<shared::Entity>();
     for (auto ent : view) existing.push_back(ent);
@@ -46,7 +45,6 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-    // Create the new player entity
     peer->data = (void*)"Client information";
     auto [entity_id, entity] = new_entity(g);
     g.peerEntityMap[peer] = entity;
@@ -64,13 +62,11 @@ int main() {
     g.registry.emplace<shared::PhysicsBody>(entity,
                                             bodyId.GetIndexAndSequenceNumber());
 
-    // Broadcast the new entity's full state to all clients
     auto buf =
         serializeEntities(g.registry, g.componentRegistry,
                           shared::PacketType::SPAWN_ENTITY, {entity}, false);
     net::broadcastRaw(network.getHost(), buf.data(), buf.size());
 
-    // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
     assignPkt.entityId = entity_id;
@@ -95,12 +91,9 @@ int main() {
   loadMap(game, (exeDir() / shared::DEFAULT_MAP_PATH).string());
   loadLevel(game);
 
-  // Static demo objects: floor, cube, two bears (one box collision, one
-  // triangle-mesh). One desc → one ECS entity; render and physics share
-  // modelName + scale + asset orientation, so collision lines up with visual.
   spawnStaticEntities(
       game, {
-                // Floor: 100x100x100 cube whose top surface sits at z=0.
+                // 100³ floor cube; top surface lands on z=0.
                 StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
                                  .modelName = "cube",
                                  .scale = glm::vec3(100.0f)},
@@ -117,7 +110,6 @@ int main() {
                                  .collision = CollisionShape::Mesh},
             });
 
-  // Demo point light (spins via hardcoded_spinning_light).
   auto [light_entity_id, light_entity] = new_entity(game);
   game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
@@ -146,13 +138,10 @@ int main() {
       render_model_change(game, fixedDt);
       hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
 
-      // Step Jolt physics
       game.physics.step(fixedDt);
-      // printf("Jolt step ok\n");
 
-      // Sync Jolt → ECS Position. Translation always; rotation only for
-      // entities without PlayerInput, since the player capsule has rotation-
-      // locked Jolt DOFs and its yaw is owned by movement_system.
+      // Jolt → ECS sync. Skip rotation for player entities; their yaw is
+      // movement_system's responsibility (Jolt rotation DOFs are locked).
       auto& bi = game.physics.getBodyInterface();
       auto physicsView =
           game.registry.view<shared::Position, shared::PhysicsBody>();
@@ -176,8 +165,7 @@ int main() {
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
-      // Broadcast delta state to all clients (dirtyOnly=false for now — full
-      // snapshot every tick)
+      // dirtyOnly=false: full snapshot every tick for now.
       std::vector<entt::entity> allEnts;
       auto view = game.registry.view<shared::Entity>();
       for (auto ent : view) allEnts.push_back(ent);
@@ -189,8 +177,7 @@ int main() {
       SIMPLE_PROFILE_FRAME_START();
     }
 
-    // Yield control to the OS briefly if we have plenty of time.
-    // This stops the server from spin-locking the CPU at 100%.
+    // Yield so the loop doesn't spin-lock at 100% CPU.
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 

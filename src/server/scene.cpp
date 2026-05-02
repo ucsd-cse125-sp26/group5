@@ -34,8 +34,6 @@ void spawnStaticEntities(ServerGame& game,
     }
     if (!shape) continue;
 
-    // Asset orientation is baked into the shape, so the body sits at
-    // (d.position, d.rotation) and the per-tick Jolt→ECS sync is a no-op.
     JPH::BodyID bodyId =
         game.physics.createStaticBody(shape, d.position, d.rotation);
     game.registry.emplace<shared::PhysicsBody>(

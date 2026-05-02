@@ -21,11 +21,10 @@ class ParsedModel {
 
   const aiMatrix4x4* worldTransform(const aiNode* node) const;
 
-  // Resolves via aiScene::FindNode — returns the first DFS match. glTF
-  // allows duplicate node names; prefer the aiNode* overload when iterating.
+  // First DFS match by name. glTF allows duplicate names; prefer the
+  // aiNode* overload when iterating.
   const aiMatrix4x4* worldTransform(const std::string& name) const;
 
-  // Iteration order is unspecified.
   template <typename Fn>
   void forEachMeshNode(Fn fn) const {
     for (const auto& [node, mat] : worldTransforms_) {
@@ -40,12 +39,11 @@ class ParsedModel {
   const aiScene* scene_ = nullptr;
   std::string path_;
   std::string error_;
-  // Keyed by aiNode* so duplicate or empty node names (both legal in glTF)
-  // don't collapse into a single transform.
+  // Keyed by pointer so duplicate/empty glTF node names don't collide.
   std::unordered_map<const aiNode*, aiMatrix4x4> worldTransforms_;
 };
 
-// Positions are in mesh-local space (no node transform applied).
+// Positions are mesh-local; node transform is NOT applied.
 void flattenNodeGeometry(const aiNode& node, const aiScene& scene,
                          std::vector<aiVector3D>& outPositions,
                          std::vector<uint32_t>& outIndices);

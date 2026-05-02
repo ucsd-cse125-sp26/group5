@@ -1,16 +1,13 @@
 #version 410 core
-// Lightweight FXAA. Detects luma contrast in a 3x3 neighborhood; if above a
-// threshold, finds the dominant edge direction and blends along it.
-// Approximate but cheap — enough to mask the aliasing we lost when MSAA
-// went away in phase 2.
+// Lightweight FXAA: 3x3 luma contrast detect, blend along the dominant edge.
 in vec2 vUV;
 out vec4 FragColor;
 
 uniform sampler2D src;
 
-const float kEdgeThreshold = 0.0625;       // ~1/16 of luma range
-const float kMinEdgeContrast = 0.0312;     // baseline noise floor
-const float kSubpixelBlend = 0.75;          // strength of the final blend
+const float kEdgeThreshold = 0.0625;
+const float kMinEdgeContrast = 0.0312;
+const float kSubpixelBlend = 0.75;
 
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
@@ -33,18 +30,15 @@ void main() {
   float lMax = max(lM, max(max(lN, lS), max(lE, lW)));
   float range = lMax - lMin;
 
-  // Below the noise floor: no edge — passthrough.
   if (range < max(kMinEdgeContrast, lMax * kEdgeThreshold)) {
     FragColor = vec4(cM, 1.0);
     return;
   }
 
-  // Pick edge direction by comparing horizontal vs vertical luma gradients.
   float horz = abs(lN + lS - 2.0 * lM);
   float vert = abs(lE + lW - 2.0 * lM);
   bool isHorz = horz >= vert;
 
-  // Average two samples along the edge (perpendicular to the gradient).
   vec3 avg = isHorz ? (cE + cW) * 0.5 : (cN + cS) * 0.5;
   vec3 result = mix(cM, avg, kSubpixelBlend);
   FragColor = vec4(result, 1.0);

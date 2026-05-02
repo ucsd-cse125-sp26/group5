@@ -1,11 +1,7 @@
 #version 410 core
 in vec2 vUV;
-// MRT outputs:
-//   FragColor (loc 0)   = HDR lit color, lands in litFBO/litColor
-//   BrightColor (loc 1) = HDR color where brightness > threshold; seeds the
-//                         bloom blur ping-pong
-layout(location = 0) out vec4 FragColor;
-layout(location = 1) out vec4 BrightColor;
+layout(location = 0) out vec4 FragColor;    // litColor (HDR)
+layout(location = 1) out vec4 BrightColor;  // bloom seed
 
 uniform float bloomThreshold;
 
@@ -15,10 +11,8 @@ uniform sampler2D gAlbedo;
 uniform sampler2D gSpecular;
 uniform sampler2D gEmissive;
 uniform sampler2D ssao;
-// Hardware-PCF shadow samplers (GL_TEXTURE_COMPARE_MODE = COMPARE_REF_TO_TEXTURE
-// with GL_LEQUAL). texture() returns a "visibility" value in [0,1] — 1.0
-// means the fragment is in front of the occluder (lit), 0.0 in shadow,
-// fractional values come from 2×2 bilinear comparison filtering.
+// Hardware-PCF shadow samplers (COMPARE_REF_TO_TEXTURE + LEQUAL).
+// texture() returns visibility in [0,1] — 1.0 = lit, 0.0 = in shadow.
 uniform sampler2DShadow dirShadowMap;
 uniform samplerCubeArrayShadow pointShadowMaps;
 
@@ -46,9 +40,7 @@ struct PointLight {
   vec3 ambient;
   vec3 diffuse;
   vec3 specular;
-  // -1 if this light is non-shadow-casting; otherwise the cubemap-array
-  // layer index 0..(K_MAX_POINT_LIGHTS-1).
-  int shadowIdx;
+  int shadowIdx;  // -1 = non-shadow-casting, else cubemap-array layer
 };
 uniform PointLight pointLights[K_MAX_LIGHTING_SHADER_LIGHTS];
 uniform int numPointLights;
@@ -66,11 +58,10 @@ float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
   vec3 proj = fragPosLightSpace.xyz / fragPosLightSpace.w;
   proj = proj * 0.5 + 0.5;
   if (proj.z > 1.0) return 0.0;
-  // Slope-scaled bias: surfaces near-perpendicular to the light direction
-  // need less bias (small dot is large angle), grazing surfaces need more.
+  // Slope-scaled bias — grazing surfaces need more.
   float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
   float refDepth = proj.z - bias;
-  // 3×3 grid × 2×2 hardware PCF = effective 5×5 smoothing at 9 taps.
+  // 3×3 grid × 2×2 hardware PCF ≈ 5×5 smoothing at 9 taps.
   vec2 texelSize = 1.0 / vec2(textureSize(dirShadowMap, 0));
   float visibility = 0.0;
   for (int x = -1; x <= 1; ++x) {
@@ -79,7 +70,6 @@ float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
           dirShadowMap, vec3(proj.xy + vec2(x, y) * texelSize, refDepth));
     }
   }
-  // texture() returned 1.0 for "lit"; convert to "shadow factor" in [0,1].
   return 1.0 - visibility / 9.0;
 }
 
@@ -89,15 +79,12 @@ float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,
   vec3 frag2light = worldPos - lightPos;
   float currentDepth = length(frag2light);
   if (currentDepth >= camera.pointFarPlane) return 0.0;
-  // Back-facing fragments are self-shadowed by geometry; skip the 20-tap
-  // cubemap PCF entirely and report fully shadowed.
+  // Back-facing fragments are self-shadowed; skip the 20-tap PCF.
   vec3 lightDir = -frag2light / max(currentDepth, 1e-4);
   if (dot(normal, lightDir) <= 0.0) return 1.0;
   float viewDistance = length(camera.viewPos - worldPos);
   float diskRadius = (1.0 + viewDistance / camera.pointFarPlane) / 25.0;
   float bias = 0.05;
-  // Reference value compared against stored depth (both in [0,1] range
-  // representing distance/pointFarPlane).
   float refDepth = (currentDepth - bias) / camera.pointFarPlane;
   float visibility = 0.0;
   for (int i = 0; i < 20; ++i) {
@@ -110,7 +97,7 @@ float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,
 
 void main() {
   vec4 posSample = texture(gPosition, vUV);
-  // Sky / unwritten pixel — let the skybox forward pass own this fragment.
+  // a==0 = sky/unwritten; let the skybox pass own this fragment.
   if (posSample.a == 0.0) discard;
   vec3 worldPos = posSample.rgb;
   vec4 normSample = texture(gNormal, vUV);
@@ -119,13 +106,10 @@ void main() {
   vec3 albedo = texture(gAlbedo, vUV).rgb;
   vec3 specularTint = texture(gSpecular, vUV).rgb;
   vec3 emissive = texture(gEmissive, vUV).rgb;
-  // Screen-space ambient occlusion factor; only modulates ambient terms.
-  float ssaoFactor = texture(ssao, vUV).r;
+  float ssaoFactor = texture(ssao, vUV).r;  // applied to ambient only
   vec3 viewDir = normalize(camera.viewPos - worldPos);
 
   vec3 result = vec3(0.0);
-
-  // Directional light + shadow.
   {
     vec3 lightDir = normalize(-dirLight.direction);
     float diff = max(dot(norm, lightDir), 0.0);
@@ -138,16 +122,13 @@ void main() {
     result += ambient + (1.0 - shadow) * (diffuse + specular);
   }
 
-  // Point lights.
   for (int i = 0; i < numPointLights; ++i) {
     PointLight L = pointLights[i];
     vec3 toLight = L.position - worldPos;
     float dist = length(toLight);
     float attenuation = 1.0 /
         (L.constant + L.linear * dist + L.quadratic * dist * dist);
-    // Skip the rest of the loop body once the light's contribution drops
-    // below ~1/255 (one LDR step). Saves the shadow PCF and Blinn-Phong work
-    // on far-away lights that wouldn't visibly change the pixel anyway.
+    // ~1/255 ≈ one LDR step; bail before the expensive PCF + lighting.
     if (attenuation < 0.004) continue;
     vec3 lightDir = toLight / max(dist, 1e-4);
     float diff = max(dot(norm, lightDir), 0.0);
@@ -166,9 +147,7 @@ void main() {
   result += emissive;
   FragColor = vec4(result, 1.0);
 
-  // Bright-pass extraction for bloom. Soft knee: smoothstep over a small
-  // band around the threshold so a pixel at exactly threshold doesn't snap
-  // from "no contribution" to "full contribution".
+  // Soft-knee bright-pass for bloom.
   float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
   float knee = max(bloomThreshold * 0.1, 0.05);
   float weight = smoothstep(bloomThreshold - knee, bloomThreshold + knee,

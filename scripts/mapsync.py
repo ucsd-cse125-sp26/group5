@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Collaborative .blend map workflow over the CSE125 server. See README.MD."""
-
 from __future__ import annotations
 
 import argparse
@@ -89,9 +87,8 @@ def ssh_base_args(state: dict) -> list[str]:
 
 
 def rsync_base_args(state: dict) -> list[str]:
-    # rsync default behavior writes to a hidden temp file in the destination
-    # dir and atomic-renames on success, so a partial transfer never replaces
-    # the existing file.
+    # rsync writes to a hidden temp file and atomic-renames; partial
+    # transfers never replace the existing file.
     return ["rsync", "-q", "-e", f"ssh -p {state['server_port']}"]
 
 
@@ -99,7 +96,7 @@ def remote_path(state: dict, *parts: str) -> str:
     return "/".join([state["server_root"].rstrip("/"), *parts])
 
 
-# str.format is unsafe here: shell templates contain literal { and }.
+# Avoid str.format: shell templates contain literal { and }.
 def render_script(template: str, **subs: str) -> str:
     out = template
     for key, value in subs.items():
@@ -238,8 +235,7 @@ TS=__TS__
 mkdir -p "$ROOT"
 chmod 2770 "$ROOT" 2>/dev/null || true
 DIR="$ROOT/$NAME"
-# Atomic existence check via mkdir; the [ -e ] + mkdir pattern races and
-# loses on concurrent 'new' for the same name.
+# mkdir as the atomic claim; [ -e ] + mkdir races on concurrent 'new'.
 if ! mkdir "$DIR" 2>/dev/null; then
   if [ -e "$DIR" ]; then
     echo "EXISTS" >&2
@@ -308,9 +304,8 @@ if [ ! -d "$DIR" ]; then
   exit 3
 fi
 EPOCH="$(cat "$DIR/epoch" 2>/dev/null || echo '?')"
-# Atomic acquire: build a staging dir with metadata already inside, then
-# rename it into place. mv -T fails if the target exists — that's our
-# mutex. No window where LOCK exists without metadata, no separate upload.
+# Stage metadata in place, then mv -T to acquire — mv -T fails if the
+# target exists, giving us a mutex with no metadata-less window.
 STAGING="$DIR/.LOCK.staging.$$"
 trap 'rm -rf "$STAGING"' EXIT
 mkdir "$STAGING" || { echo "STAGE_FAIL" >&2; exit 6; }
@@ -342,8 +337,8 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
     LOCAL_MAPS_DIR.mkdir(exist_ok=True)
     local_blend = LOCAL_MAPS_DIR / f"{name}.blend"
 
-    # Metadata lands atomically with the LOCK rename; epoch is patched in
-    # afterward since the server picks it.
+    # Metadata lands atomically with LOCK; epoch patched after since the
+    # server picks it.
     lock_uuid = str(uuid.uuid4())
     meta_pending = lock_metadata(state, args.message, -1, lock_uuid)
     meta_json = json.dumps(meta_pending, sort_keys=True)
@@ -377,9 +372,8 @@ def cmd_checkout(args: argparse.Namespace, state: dict) -> int:
     if not out.startswith("ACQUIRED "):
         die(f"unexpected server response: {out!r}")
 
-    # Lock is now held on the server. Every code path from here must release
-    # it on failure — including SystemExit from die() and KeyboardInterrupt,
-    # which is why the catch is BaseException, not Exception.
+    # Lock is held on the server — every failure path below must release
+    # it, including SystemExit and KeyboardInterrupt, hence BaseException.
     release = textwrap.dedent(rf"""
         set -u
         DIR={shlex.quote(remote_path(state, name))}
@@ -559,17 +553,14 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
         EXPECT_UUID={shlex.quote(expect_arg)}
         FORCE={shlex.quote("1" if args.force else "0")}
 
-        # Refuse if epoch advanced since probe; otherwise we'd archive over
-        # someone else's history slot and reset the epoch counter backward.
+        # If epoch advanced we'd archive over someone else's history slot.
         CURRENT_EPOCH="$(cat "$DIR/epoch" 2>/dev/null || echo '?')"
         if [ "$FORCE" != "1" ] && [ "$CURRENT_EPOCH" != "$EXPECTED_EPOCH" ]; then
           echo "EPOCH_DRIFT $CURRENT_EPOCH" >&2
           exit 8
         fi
 
-        # Fail-closed lock identity check: with EXPECT_UUID we require LOCK
-        # to exist with matching UUID, else abort. Empty/unreadable UUID is
-        # treated as mismatch — never silently fall through.
+        # Fail-closed: empty/unreadable UUID is mismatch, never pass-through.
         if [ "$FORCE" != "1" ] && [ -n "$EXPECT_UUID" ]; then
           if [ ! -d "$DIR/LOCK" ]; then
             echo "LOCK_GONE" >&2
@@ -586,16 +577,14 @@ def cmd_checkin(args: argparse.Namespace, state: dict) -> int:
           fi
         fi
 
-        # Atomicity: keep current.blend valid throughout. Hard-link the
-        # outgoing version into history (cheap, same fs) before the rename
-        # that overwrites current. If we're killed between any two ops,
-        # there is no window where current.blend is missing.
+        # Hard-link the outgoing version into history before overwriting
+        # current.blend so no window leaves current.blend missing.
         if [ -f "$DIR/current.blend" ]; then
           ln -f "$DIR/current.blend" "$DIR/history/.$ARCHIVE.new" 2>/dev/null \
             || cp "$DIR/current.blend" "$DIR/history/.$ARCHIVE.new"
           mv -f "$DIR/history/.$ARCHIVE.new" "$DIR/history/$ARCHIVE"
         fi
-        # Stage epoch first so the swap-then-finalize window is one rename.
+        # Stage epoch first so the visible swap is a single rename.
         printf '%s\n' "$NEW_EPOCH" > "$DIR/.epoch.tmp"
         mv -f "$DIR/$INCOMING" "$DIR/current.blend"
         mv -f "$DIR/.epoch.tmp" "$DIR/epoch"
@@ -647,9 +636,8 @@ if [ ! -d "$DIR/LOCK" ]; then
   echo "NOLOCK"
   exit 0
 fi
-# Atomic claim: rename LOCK to a unique victim name. After this point a
-# new mkdir LOCK by another client would succeed, so anything we do
-# operates on the dir we just claimed — no race with re-acquire.
+# Rename LOCK to a unique victim — past this point a new mkdir LOCK by
+# another client succeeds, and we operate on the dir we already claimed.
 VICTIM="$DIR/.LOCK.victim.$$"
 if ! mv -T "$DIR/LOCK" "$VICTIM" 2>/dev/null; then
   # Lost the race: someone else removed it first.
@@ -667,8 +655,7 @@ if [ "$ALLOW_BREAK" = "1" ]; then
   echo "RELEASED"
   exit 0
 fi
-# UUID match is the strongest identity check; fall back to user name when
-# the lock was acquired by an older client without UUID support.
+# UUID is the strong check; fall back to username for older clients.
 OWNED=0
 if [ -n "$EXPECT_UUID" ] && [ "$HOLDER_UUID" = "$EXPECT_UUID" ]; then
   OWNED=1
@@ -681,9 +668,7 @@ if [ "$OWNED" = "1" ]; then
   echo "RELEASED"
   exit 0
 fi
-# Not ours: try to atomically restore the lock so the rightful holder
-# isn't disrupted. If a third client already raced in and recreated LOCK,
-# discard our victim.
+# Not ours — restore the lock so the rightful holder isn't disrupted.
 if mv -T "$VICTIM" "$DIR/LOCK" 2>/dev/null; then
   echo "OTHER $HOLDER"
   exit 5

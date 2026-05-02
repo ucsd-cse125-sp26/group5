@@ -1,6 +1,5 @@
-// Standalone inspector: loads a glTF/glb (or any assimp-readable file) and
-// prints its scene summary, node tree, and material list. Used as a debugging
-// aid while building out the map loader.
+// Standalone inspector — prints scene/node/material/light summary for any
+// assimp-readable file. Diagnostic aid for the map loader.
 
 #include <assimp/light.h>
 #include <assimp/material.h>

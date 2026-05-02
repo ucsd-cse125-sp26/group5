@@ -9,9 +9,7 @@
 #include "shared/shader_constants.h"
 #include "shared/util.h"
 
-// Builds the GLSL `#define` block injected into every shader after its
-// `#version` directive. Single source of truth: edit shader_constants.h and
-// add a matching line below.
+// Mirror shader_constants.h as GLSL #defines; injected after #version.
 static std::string buildShaderConstantsBlock() {
   std::ostringstream s;
   s << "#define K_MAX_POINT_LIGHTS " << shared::kMaxPointLights << "\n";
@@ -23,10 +21,6 @@ static std::string buildShaderConstantsBlock() {
   return s.str();
 }
 
-// Inserts the shared-constants block immediately after the source's
-// `#version ...` line so GLSL preprocessor sees the macros before any code.
-// If the source has no `#version` line we return it unchanged (the compiler
-// will error out anyway).
 static std::string injectConstants(const std::string& source) {
   static const std::string block = buildShaderConstantsBlock();
   size_t versionEnd = source.find('\n');
@@ -62,8 +56,7 @@ static bool compileStage(GLuint shaderId, const char* source, const char* tag) {
   return result == GL_TRUE;
 }
 
-// Shared link path for both ctors. Compiles all provided stages, links, logs
-// errors, and assigns m_id only on success. Empty path strings skip a stage.
+// Empty geomPath skips the geometry stage. Returns 0 on any failure.
 static GLuint linkProgram(const std::string& vertPath,
                           const std::string& fragPath,
                           const std::string& geomPath) {
@@ -158,10 +151,8 @@ GLuint Shader::id() const { return m_id; }
 GLint Shader::getLocation(const std::string& name) const {
   auto it = m_locationCache.find(name);
   if (it != m_locationCache.end()) return it->second;
-  // glGetUniformLocation returns -1 for uniforms the linker stripped because
-  // they were never read. Silently caching that is the standard behavior;
-  // setting a uniform on -1 is a no-op. Avoids stderr spam when the same
-  // mesh data is rendered with a stripped-down shader (e.g. depth-only).
+  // -1 (uniform stripped by the linker) is cached too — setting -1 is a
+  // no-op, which keeps depth-only shaders from spamming stderr.
   GLint loc = glGetUniformLocation(m_id, name.c_str());
   m_locationCache[name] = loc;
   return loc;

@@ -48,7 +48,7 @@ void flattenNodeGeometry(const aiNode& node, const aiScene& scene,
                         mesh->mVertices + mesh->mNumVertices);
     for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
       const aiFace& face = mesh->mFaces[f];
-      if (face.mNumIndices != 3) continue;  // post-triangulate guarantee
+      if (face.mNumIndices != 3) continue;
       outIndices.push_back(base + face.mIndices[0]);
       outIndices.push_back(base + face.mIndices[1]);
       outIndices.push_back(base + face.mIndices[2]);

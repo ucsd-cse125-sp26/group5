@@ -24,12 +24,8 @@
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
   return {v.x, v.y, v.z};
 }
-static inline glm::vec2 vec2_cast(const aiVector3D& v) {
-  return {v.x, v.y};
-}  // it's aiVector3D because assimp's texture coordinates use that
-static inline glm::quat quat_cast(const aiQuaternion& q) {
-  return {q.w, q.x, q.y, q.z};
-}
+// aiVector3D because assimp stores UVs in 3-component vectors.
+static inline glm::vec2 vec2_cast(const aiVector3D& v) { return {v.x, v.y}; }
 static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) {
   return glm::transpose(glm::make_mat4(&m.a1));
 }
@@ -37,9 +33,6 @@ static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) {
 MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
                           const aiScene* scene);
 
-// Uploads vertex/index buffers and binds the standard 3-attribute VAO layout
-// (position/normal/texCoord). Caller fills the vectors; this owns the GL
-// resource creation.
 static Mesh buildMesh(std::vector<Vertex> vertices,
                       const std::vector<GLuint>& indices,
                       unsigned materialIndex) {
@@ -131,13 +124,13 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     bool ownedByStb = false;
     if (auto embedded = scene->GetEmbeddedTexture(path.C_Str())) {
       if (embedded->mHeight == 0) {
-        // Compressed embedded blob; mWidth is the byte length.
+        // Compressed blob; mWidth is the byte length.
         pixels =
             stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData),
                                   embedded->mWidth, &w, &h, &channels, 4);
         ownedByStb = pixels != nullptr;
       } else {
-        // Uncompressed BGRA8 directly in scene memory.
+        // Uncompressed BGRA8 in scene memory.
         w = embedded->mWidth;
         h = embedded->mHeight;
         pixelOrder = GL_BGRA;
@@ -149,9 +142,8 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       ownedByStb = pixels != nullptr;
     }
 
-    // DIFFUSE and EMISSIVE are perceptual color (authored in sRGB tools);
-    // upload as GL_SRGB8_ALPHA8 so the GPU decodes to linear on sample.
-    // SPECULAR/AMBIENT are typically masks or scene-linear; keep as RGBA8.
+    // sRGB upload for perceptual channels so the GPU samples them linearly;
+    // specular/ambient are masks and stay in linear RGBA8.
     const bool perceptual =
         type == aiTextureType_DIFFUSE || type == aiTextureType_EMISSIVE;
     const GLint internal = perceptual ? GL_SRGB8_ALPHA8 : GL_RGBA8;
@@ -177,7 +169,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     return MaterialSlot{.constant = glm::vec3(1.0f), .texture = id};
   }
 
-  aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);  // default white
+  aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
   switch (type) {
     case aiTextureType_DIFFUSE:
       mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
@@ -198,9 +190,8 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       static_cast<uint8_t>(color.r * 255), static_cast<uint8_t>(color.g * 255),
       static_cast<uint8_t>(color.b * 255), static_cast<uint8_t>(color.a * 255)};
 
-  // Constant fallbacks for diffuse/emissive: same sRGB convention as the
-  // texture path so a model with one diffuse texture and one diffuse
-  // constant doesn't render with two different gamma assumptions.
+  // Same sRGB convention as the texture path so constant and texture
+  // fallbacks stay gamma-consistent.
   const bool perceptual =
       type == aiTextureType_DIFFUSE || type == aiTextureType_EMISSIVE;
   const GLint internal = perceptual ? GL_SRGB8_ALPHA8 : GL_RGBA8;
@@ -216,8 +207,8 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
 }
 
 Model* loadModel(const std::string& filename) {
-  // MinGW's std::filesystem::path::string_type is wstring, so the implicit
-  // conversions that work on Linux don't work here. Convert explicitly.
+  // MinGW's path::string_type is wstring; convert explicitly so the
+  // assimp call links on Windows.
   const std::string fullPath = (exeDir() / filename).string();
   shared::ParsedModel parsed;
   if (!parsed.load(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs)) {
@@ -229,8 +220,6 @@ Model* loadModel(const std::string& filename) {
   auto* model = new Model();
   model->materials = buildMaterials(scene);
 
-  // Upload every aiMesh in scene-mesh order; mesh_instances below indexes
-  // into model->meshes via the same scene-mesh index.
   for (unsigned i = 0; i < scene->mNumMeshes; ++i) {
     model->meshes.push_back(uploadMeshFromAi(scene->mMeshes[i]));
   }
@@ -262,8 +251,8 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     glm::vec3 normal;
     glm::vec3 corners[4];
   };
-  // Face order: back, front, left, right, bottom, top (matches the palette
-  // below; each face samples one texel of a 6x1 diffuse texture).
+  // Face order matches the 6x1 palette below: back, front, left, right,
+  // bottom, top.
   const Face faces[6] = {
       {.normal = {0, 0, -1},
        .corners = {{-0.5f, -0.5f, -0.5f},
@@ -318,8 +307,7 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     indices.push_back(base + 3);
   }
 
-  // 6x1 diffuse palette, one texel per face (matches `faces` order above).
-  // Palette colors are picked visually, so they're sRGB.
+  // 6x1 sRGB palette, one texel per face (faces[] order).
   GLuint diffuseTex;
   glGenTextures(1, &diffuseTex);
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
@@ -440,7 +428,6 @@ static const float skyboxVertices[] = {
 // clang-format on
 
 Skybox loadSkybox(const std::string& directory) {
-  // Create VAO for the skybox cube
   GLuint vao, vbo;
   glGenVertexArrays(1, &vao);
   glGenBuffers(1, &vbo);
@@ -468,8 +455,7 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
 
   std::vector<Material> materials = buildMaterials(scene);
 
-  // Memoize so multiple nodes referencing the same aiMesh (glTF instancing)
-  // share VAO/VBO/EBO handles instead of each building their own.
+  // glTF instancing: nodes can reuse the same aiMesh — share GL handles.
   std::unordered_map<unsigned, Mesh> meshTable;
   auto getMesh = [&](unsigned sceneMeshIndex) -> const Mesh& {
     auto it = meshTable.find(sceneMeshIndex);
@@ -487,8 +473,8 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
     model->materials = materials;
     for (unsigned i = 0; i < node.mNumMeshes; ++i) {
       model->meshes.push_back(getMesh(node.mMeshes[i]));
-      // Identity local transform — node's world transform lives on the
-      // server-spawned entity's Position + RenderInfo.scale.
+      // Local transform stays identity; node world transform lives on the
+      // server entity's Position + RenderInfo.scale.
       model->mesh_instances.emplace_back(
           static_cast<unsigned>(model->meshes.size() - 1), glm::mat4(1.0f));
     }

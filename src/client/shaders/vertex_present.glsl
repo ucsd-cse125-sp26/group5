@@ -1,9 +1,6 @@
 #version 410 core
 
-// Synthesizes a single screen-covering triangle from gl_VertexID with no
-// vertex attributes. Bind an empty VAO and call glDrawArrays(GL_TRIANGLES, 0, 3).
-// Vertex 0 = (-1,-1), 1 = (3,-1), 2 = (-1,3) — the rasterizer clips the
-// off-screen overhang for free, and UVs are derived from clip-space xy.
+// Fullscreen triangle synthesized from gl_VertexID — bind empty VAO, draw 3.
 out vec2 vUV;
 
 void main() {
