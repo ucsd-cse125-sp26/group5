@@ -17,6 +17,7 @@ endif()
 add_library(shared
     src/shared/hello.cpp
     src/shared/util.cpp
+    src/shared/mesh_loader.cpp
     )
 target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -39,7 +40,7 @@ target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
 add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE lib/stb)
 
-target_link_libraries(shared PUBLIC zpp_bits)
+target_link_libraries(shared PUBLIC zpp_bits assimp)
 
 # Path to glad directory
 set(GLAD_SOURCES_DIR "${PROJECT_SOURCE_DIR}/lib/glad/")
@@ -106,6 +107,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     )
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets)
+    add_custom_command(TARGET client POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets
+            $<TARGET_FILE_DIR:client>/maps/assets
+    )
+endif()
+
 # this is for testing purposes
 add_library(server_lib STATIC
     src/server/server_network.cpp
@@ -113,6 +122,7 @@ add_library(server_lib STATIC
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp
+    src/server/map_loader.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)
@@ -122,10 +132,38 @@ add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
 target_link_libraries(server PRIVATE server_lib)
 
+# Server resolves assets via exeDir() at runtime; mirror the client copy.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_custom_command(TARGET server POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:server>/assets
+    )
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets)
+    add_custom_command(TARGET server POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/maps/assets
+            $<TARGET_FILE_DIR:server>/maps/assets
+    )
+endif()
+
 add_executable(client_link_smoke src/client/link_smoke.cpp)
 target_link_libraries(client_link_smoke PRIVATE
     shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image
 )
+
+add_executable(gltf_inspect src/server/gltf_inspect.cpp)
+target_link_libraries(gltf_inspect PRIVATE shared assimp)
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    add_custom_command(TARGET gltf_inspect POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:gltf_inspect>/assets
+    )
+endif()
 
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
