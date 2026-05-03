@@ -186,7 +186,7 @@ scripts/mapsync.py checkout my_new_map -m "continue editing after import"
 - `blend2glb` requires Blender on your `PATH`, or a `BLENDER` environment variable pointing to the Blender binary.
 - If `new` fails after creating the remote directory, the server may still contain a partial map entry. Coordinate before retrying blindly.
 
-## Profiling with Tracy
+## Profiling
 
 To diagnose performance and stuttering issues, you can compile the client and server with Profiling enabled using:
 
