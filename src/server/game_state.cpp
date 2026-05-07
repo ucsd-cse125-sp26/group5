@@ -165,69 +165,67 @@ void initWorldEntities(ServerGame& game) {
 
   // --- Overworld ---
   spawnDemoLight<shared::OverworldTag>(game, "sunny");
-  loadMap<shared::OverworldTag>(
-      game, (exeDir() / shared::DEFAULT_MAP_PATH).string());
+  loadMap<shared::OverworldTag>(game,
+                                (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
-      game,
-      {
-          // 100³ floor cube; top surface lands on z=0.
-          StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(100.0f)},
-          StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
-                           .modelName = "cube"},
-          StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(1.5f)},
-          StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(0.8f)},
-          StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(2.0f)},
-          StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.5f),
-                           .collision = CollisionShape::Box},
-          StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.5f),
-                           .collision = CollisionShape::Mesh},
-      });
+      game, {
+                // 100³ floor cube; top surface lands on z=0.
+                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(100.0f)},
+                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
+                                 .modelName = "cube"},
+                StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(1.5f)},
+                StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(0.8f)},
+                StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(2.0f)},
+                StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.5f),
+                                 .collision = CollisionShape::Box},
+                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.5f),
+                                 .collision = CollisionShape::Mesh},
+            });
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(
-      game,
-      {
-          StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(100.0f)},
-          StaticEntityDesc{.position = glm::vec3(3.0f, 0.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.1f),
-                           .collision = CollisionShape::Mesh},
-          StaticEntityDesc{.position = glm::vec3(-3.0f, 0.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.1f),
-                           .collision = CollisionShape::Mesh},
-          StaticEntityDesc{.position = glm::vec3(0.0f, 5.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.2f),
-                           .collision = CollisionShape::Mesh},
-          StaticEntityDesc{.position = glm::vec3(0.0f, -5.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.2f),
-                           .collision = CollisionShape::Mesh},
-          StaticEntityDesc{.position = glm::vec3(6.0f, 6.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.15f),
-                           .collision = CollisionShape::Mesh},
-          StaticEntityDesc{.position = glm::vec3(-6.0f, -6.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.15f),
-                           .collision = CollisionShape::Mesh},
-      });
+      game, {
+                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(100.0f)},
+                StaticEntityDesc{.position = glm::vec3(3.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.1f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(-3.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.1f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(0.0f, 5.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.2f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(0.0f, -5.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.2f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(6.0f, 6.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.15f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(-6.0f, -6.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.15f),
+                                 .collision = CollisionShape::Mesh},
+            });
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
@@ -235,9 +233,9 @@ void initWorldEntities(ServerGame& game) {
     PlayerAvatars slots;
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
-    spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, "cube", glm::vec3(startX, 0.0f, 0.0f),
-        glm::vec3(1.0f));
+    spawnPlayerAvatar<shared::OverworldTag>(game, overworldEntity, "cube",
+                                            glm::vec3(startX, 0.0f, 0.0f),
+                                            glm::vec3(1.0f));
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);

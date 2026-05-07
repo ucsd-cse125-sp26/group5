@@ -296,7 +296,7 @@ void printMaterialProperties(const aiMaterial* mat) {
     switch (prop->mType) {
       case aiPTI_Float: {
         unsigned n = prop->mDataLength / sizeof(float);
-        const float* f = reinterpret_cast<const float*>(prop->mData);
+        const auto* f = reinterpret_cast<const float*>(prop->mData);
         std::printf("[");
         for (unsigned k = 0; k < n; ++k)
           std::printf("%s%g", k ? ", " : "", f[k]);
@@ -305,7 +305,7 @@ void printMaterialProperties(const aiMaterial* mat) {
       }
       case aiPTI_Double: {
         unsigned n = prop->mDataLength / sizeof(double);
-        const double* d = reinterpret_cast<const double*>(prop->mData);
+        const auto* d = reinterpret_cast<const double*>(prop->mData);
         std::printf("[");
         for (unsigned k = 0; k < n; ++k)
           std::printf("%s%g", k ? ", " : "", d[k]);
@@ -314,7 +314,7 @@ void printMaterialProperties(const aiMaterial* mat) {
       }
       case aiPTI_Integer: {
         unsigned n = prop->mDataLength / sizeof(int32_t);
-        const int32_t* v = reinterpret_cast<const int32_t*>(prop->mData);
+        const auto* v = reinterpret_cast<const int32_t*>(prop->mData);
         std::printf("[");
         for (unsigned k = 0; k < n; ++k)
           std::printf("%s%d", k ? ", " : "", v[k]);

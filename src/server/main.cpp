@@ -123,9 +123,9 @@ int main() {
       std::vector<entt::entity> allEnts =
           game.gameStateManager.currentState()->getStateEntities(game);
       if (!allEnts.empty()) {
-        auto buf =
-            serializeEntities(game.registry, game.componentRegistry,
-                              shared::PacketType::UPDATE_ENTITY, allEnts, false);
+        auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                     shared::PacketType::UPDATE_ENTITY, allEnts,
+                                     false);
         net::broadcastRaw(network.getHost(), buf.data(), buf.size());
       }
       SIMPLE_PROFILE_FRAME_END("Server");
