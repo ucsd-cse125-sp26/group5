@@ -5,6 +5,11 @@
 #include "input.h"
 
 namespace shared {
+
+// tags
+struct OverworldTag {};
+struct MazeTag {};
+
 struct Position {
   float x, y, z;
   float qw, qx, qy, qz;

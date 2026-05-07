@@ -8,3 +8,6 @@ html/
 latex/
 /assets/
 .DS_Store
+/maps/
+/.mapsync.local.json
+__pycache__/
