@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 5
+1. What were your concrete goals for the week?  
+I wanted to continue working with Leon to begin implementing the lower level details of the puzzles, especially since we had worked out the implementation details with the tech team during last week's Friday meeting. 
+2. What goals were you able to accomplish?  
+Frankly I was not able to accomplish anything. Leon and I were just able to plan out what we wanted to do on the team's Master Google Doc.
+3. If the week went differently than you had planned, what were the reasons?  
+This week went extremely off track due to a lab assignment that ended up taking much longer than I thought it would, and unfortunately I was not able to contribute at all this week. 
+4. What are your specific goals for the next week?  
+I really want to get back on track. I want to work on puzzle game logic and really figure out how it all ties together with the modeling that Rebecca and Sarah are doing, and how my work will integrate with everyone else's work.
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I didn't learn much this week, mainly due to lack of time working on this class.
+6. What is your individual morale (which might be different from the overall group morale)?  
+My morale this week was really hit by the work in ECE 108 (the lab assignment). I really wish things had gone differently so that I could have contributed more to the team and pulled my own weight. 
+
 ## Week 4
 1. What were your concrete goals for the week?  
 I wanted to implement ECS for the overall game state and puzzle logic, so basically adding in components and creating the entities needed to keep progress and game attributes at game start.
