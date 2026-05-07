@@ -68,6 +68,15 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 **Sarah**
 - No progress this week due to CSE 123 midterm and PA crunch.
 - Plan after midterms: work on the skeleton for the base model and potentially redo the mouse design.
+<img src="{{ '/assets/week5/sarah/1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/3.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/4.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/5.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/6.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/7.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/8.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/9.png' | relative_url }}" alt="thing">
 
 ## Game logic: Minigames / Puzzles
 **Philip**
