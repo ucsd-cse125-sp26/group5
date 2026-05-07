@@ -18,7 +18,7 @@
 #include <glm/ext/vector_float3.hpp>
 #include <unordered_map>
 
-class aiNode;
+struct aiNode;
 namespace shared {
 class ParsedModel;
 }
