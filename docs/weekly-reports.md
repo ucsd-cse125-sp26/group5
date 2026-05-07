@@ -42,6 +42,59 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
+## Week 5 Group report
+
+## Network and graphics 
+**Tim**
+- Spoke with Jacob and reached consensus on minigame architecture: the engine needs to support spawning a new game and creating a 2D minigame within the main game.
+- Some games will be more intuitive as 2D and will run on the surface of the main map; others can spawn a separate 3D world. This flexibility means if time runs short, the 2D game can stand alone.
+- End-to-end functionality is the prioritylandscape must be in place. Don't stress over specific details.
+- Suggested looking into the map loading branch to explore whether an end-to-end game is feasible from it.
+
+## Rendering
+**Jacob**
+- Rendering changes in progress; map uploading is on a side branch.
+- Focused on exam this week.
+- Next step: Thursday 9am sync to figure out individual report for approximation.
+
+## Modeling
+**Rebecca**
+- Worked on the landscape; coloring is done, also worked on some assets. 
+<img src="{{ '/assets/week5/rebecca/1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/rebecca/2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/rebecca/3.png' | relative_url }}" alt="thing">
+
+
+**Sarah**
+- No progress this week due to CSE 123 midterm and PA crunch.
+- Plan after midterms: work on the skeleton for the base model and potentially redo the mouse design.
+<img src="{{ '/assets/week5/sarah/1.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/2.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/3.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/4.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/5.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/6.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/7.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/8.png' | relative_url }}" alt="thing">
+<img src="{{ '/assets/week5/sarah/9.png' | relative_url }}" alt="thing">
+
+## Game logic: Minigames / Puzzles
+**Philip**
+- Met with Leon during Friday's tech team meeting to discuss puzzle implementation details, determined whether each puzzle will be 2D or a separate 3D game.
+- Needs to review and merge a PR from Tim into his branch (checking with Leon on whether it's already been done).
+- Will regroup with Leon this week to sort out next steps.
+
+**Leon**
+- Implemented basic functions for cubes.
+- Next step: test whether the functions work correctly when the game window is opened (e.g. verifying cube behaviour at runtime).
+
+## Physics
+**Alain**
+- Cleaning up code and working on getting hitboxes functional for Jacob's debugging (hitbox rendering).
+- Jacob flagged that hitbox rendering may no longer be needed. Many things now default to mesh hitboxes via a PR. Needs to check the relevant PR assignment.
+- Next focus: sound.
+
+---
 ## Week 4 Group report 
 ## Admin 
 **Rebecca & Jacob**   
@@ -92,6 +145,9 @@ Came up with detailed design and color for character Gurf
 - Working on proper map generation pipeline to enable collaborative world building. 
 - Investigating a file conversion workflow to map Blender objects to in-game objects, since Blender's export format does not match the required file size constraints.
 - Goal is to split a single Blender model into separate meshes and create a clear mapping from Blender assets to game map entities, making it easy to place objects (e.g., trees on hills) in the correct positions.
+<img style="width: 70%" src="{{ '/assets/week4/jacob/fullscreen.png' | relative_url }}" alt="Note">
+<img style="width: 70%" src="{{ '/assets/week4/jacob/map.png' | relative_url }}" alt="Note">
+<img style="width: 70%" src="{{ '/assets/week4/jacob/blender.png' | relative_url }}" alt="Note">
 
 ## Game State & Minigames
 **Tim**

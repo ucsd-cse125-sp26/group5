@@ -37,7 +37,8 @@ aiColor3D normalizeLightColor(const aiColor3D& c) {
 
 }  // namespace
 
-bool loadMap(ServerGame& game, const std::string& path) {
+bool loadMap(ServerGame& game, const std::string& path,
+             const std::function<void(ServerGame&, entt::entity)>& tagEntity) {
   shared::ParsedModel parsed;
   if (!parsed.load(path, shared::MAP_LOAD_FLAGS)) {
     printf("loadMap: failed to load \"%s\": %s\n", path.c_str(),
@@ -45,6 +46,9 @@ bool loadMap(ServerGame& game, const std::string& path) {
     return false;
   }
   const aiScene* scene = parsed.scene();
+  auto tag = [&](entt::entity e) {
+    if (tagEntity) tagEntity(game, e);
+  };
 
   unsigned meshEntities = 0;
   unsigned pointLights = 0;
@@ -58,6 +62,7 @@ bool loadMap(ServerGame& game, const std::string& path) {
     decompose(world, pos, rot, scale);
 
     auto [id, entity] = new_entity(game);
+    tag(entity);
     game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, rot.w,
                                             rot.x, rot.y, rot.z);
     game.registry.emplace<shared::RenderInfo>(
@@ -99,6 +104,7 @@ bool loadMap(ServerGame& game, const std::string& path) {
         }
       }
       auto [id, entity] = new_entity(game);
+      tag(entity);
       game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z,
                                               rot.w, rot.x, rot.y, rot.z);
       game.registry.emplace<shared::PointLight>(
@@ -111,6 +117,7 @@ bool loadMap(ServerGame& game, const std::string& path) {
       // glTF directional light points along node-local -Z.
       glm::vec3 worldDir = rot * glm::vec3(0.0f, 0.0f, -1.0f);
       auto [id, entity] = new_entity(game);
+      tag(entity);
       game.registry.emplace<shared::DirectionalLight>(
           entity, worldDir.x, worldDir.y, worldDir.z,
           // ambient / diffuse / specular

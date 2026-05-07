@@ -1,22 +1,16 @@
 #include <chrono>
-#include <cstdint>
 #include <iostream>
+#include <memory>
 #include <thread>
 
-#include "map_loader.h"
-#include "scene.h"
+#include "game_state.h"
 #include "server_game.h"
-#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
-#include "shared/input.h"
-#include "shared/lighting.h"
-#include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
-#include "shared/util.h"
 
 int main() {
   std::cout << "Hello World Server";
@@ -30,14 +24,33 @@ int main() {
   if (!network.init(7777, 4)) {
     return EXIT_FAILURE;
   }
+  game.network = &network;
+
+  registerServerHandlers(network);
+
+  initWorldEntities(game);
+
+  // Start in the Overworld
+  game.gameStateManager.changeState(game, std::make_unique<OverworldState>());
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
     printf("A new client connected from %x:%u.\n", peer->address.host,
            peer->address.port);
 
-    std::vector<entt::entity> existing;
-    auto view = g.registry.view<shared::Entity>();
-    for (auto ent : view) existing.push_back(ent);
+    if (g.unused_player_slots.empty()) {
+      enet_peer_disconnect(peer, 0);
+      return;
+    }
+
+    peer->data = (void*)"Client information";
+    PlayerAvatars slots = g.unused_player_slots.back();
+    g.unused_player_slots.pop_back();
+    g.active_players[peer] = slots;
+
+    auto* currentState = g.gameStateManager.currentState();
+    entt::entity activeEntity = currentState->getClientAvatar(slots);
+    std::vector<entt::entity> existing = currentState->getStateEntities(g);
+
     if (!existing.empty()) {
       auto buf =
           serializeEntities(g.registry, g.componentRegistry,
@@ -45,81 +58,24 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-    peer->data = (void*)"Client information";
-    auto [entity_id, entity] = new_entity(g);
-    g.peerEntityMap[peer] = entity;
-    g.registry.emplace<shared::Position>(entity, 0.0f, 0.0f, 5.0f, 1.0f, 0.0f,
-                                         0.0f, 0.0f);
-    g.registry.emplace<shared::Velocity>(entity, 10.0f, 10.0f);
-    g.registry.emplace<shared::RenderInfo>(entity, "cube", 1.0f, 1.0f, 1.0f);
-    g.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
-    g.registry.emplace<shared::PlayerInput>(
-        entity, static_cast<InputKeys>(0), static_cast<InputKeys>(0),
-        static_cast<InputKeys>(0), 0.0f, 0.0f);
-    JPH::BodyID bodyId = g.physics.createPlayerBody(
-        "cube", glm::vec3(0.0f, 0.0f, 5.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-        glm::vec3(1.0f));
-    g.registry.emplace<shared::PhysicsBody>(entity,
-                                            bodyId.GetIndexAndSequenceNumber());
-
-    auto buf =
-        serializeEntities(g.registry, g.componentRegistry,
-                          shared::PacketType::SPAWN_ENTITY, {entity}, false);
-    net::broadcastRaw(network.getHost(), buf.data(), buf.size());
-
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
-    assignPkt.entityId = entity_id;
+    assignPkt.entityId = g.registry.get<shared::Entity>(activeEntity).id;
     net::sendPacket(peer, assignPkt);
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
-    printf("%s disconnected.\n", static_cast<const char*>(peer->data));
-    auto entity = g.peerEntityMap[peer];
+    auto it = g.active_players.find(peer);
+    if (it == g.active_players.end()) return;
 
-    shared::DespawnPacket despawnPkt;
-    despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
-    despawnPkt.entityId = g.registry.get<shared::Entity>(entity).id;
-    net::broadcastPacket(network.getHost(), despawnPkt);
+    printf("%s disconnected.\n", (const char*)peer->data);
+    PlayerAvatars slots = it->second;
 
-    g.registry.destroy(entity);  // on_destroy<PhysicsBody> removes the body
-    g.peerEntityMap.erase(peer);
+    slots.resetControls(g.registry);
+    g.unused_player_slots.push_back(slots);
+    g.active_players.erase(it);
     peer->data = nullptr;
   };
-
-  registerServerHandlers(network);
-  loadMap(game, (exeDir() / shared::DEFAULT_MAP_PATH).string());
-  loadLevel(game);
-
-  spawnStaticEntities(
-      game, {
-                // 100³ floor cube; top surface lands on z=0.
-                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(100.0f)},
-                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(1.0f)},
-                StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Box},
-                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Mesh},
-            });
-
-  auto [light_entity_id, light_entity] = new_entity(game);
-  game.registry.emplace<shared::Position>(light_entity, 5.0f, 0.0f, 3.0f, 1.0f,
-                                          0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(light_entity, "light_cube", 0.2f,
-                                            0.2f, 0.2f);
-  constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
-  game.registry.emplace<shared::PointLight>(
-      light_entity, 5.0f, 0.0f, 3.0f, kAtt.constant, kAtt.linear,
-      kAtt.quadratic, 0.1f, 0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-  game.registry.emplace<shared::Scene>(light_entity, "sunny");
 
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
@@ -133,10 +89,7 @@ int main() {
     previousTime = currentTime;
     accumulator += dt;
     while (accumulator >= fixedDt) {
-      input_tick(game.registry);
-      movement_system(game, fixedDt);
-      render_model_change(game, fixedDt);
-      hardcoded_spinning_light(game.registry, fixedDt, light_entity_id);
+      game.gameStateManager.update(game, fixedDt);
 
       game.physics.step(fixedDt);
 
@@ -149,6 +102,8 @@ int main() {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
         JPH::BodyID id(pb.bodyId);
+        if (!bi.IsAdded(id)) continue;
+
         JPH::RVec3 jp = bi.GetPosition(id);
         pos.x = jp.GetX();
         pos.y = jp.GetY();
@@ -165,14 +120,14 @@ int main() {
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
-      // dirtyOnly=false: full snapshot every tick for now.
-      std::vector<entt::entity> allEnts;
-      auto view = game.registry.view<shared::Entity>();
-      for (auto ent : view) allEnts.push_back(ent);
-      auto buf =
-          serializeEntities(game.registry, game.componentRegistry,
-                            shared::PacketType::UPDATE_ENTITY, allEnts, false);
-      net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      std::vector<entt::entity> allEnts =
+          game.gameStateManager.currentState()->getStateEntities(game);
+      if (!allEnts.empty()) {
+        auto buf =
+            serializeEntities(game.registry, game.componentRegistry,
+                              shared::PacketType::UPDATE_ENTITY, allEnts, false);
+        net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      }
       SIMPLE_PROFILE_FRAME_END("Server");
       SIMPLE_PROFILE_FRAME_START();
     }
