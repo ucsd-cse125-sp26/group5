@@ -8,6 +8,53 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
+### Week 5 (May 07)
+
+1. What were your concrete goals for the week?
+
+- shadows, hdr, bloom, deferred shading, framebuffer debugging
+- skeletal animations
+- make it possible to collaborate on map (invent worse p4 from first principles)
+- Figure out a solution for ECS metadata in map editing
+- vram profiling
+- multiple maps (maybe)
+- delegate subset of below
+- debug UI
+- input refactor + debug console
+- loading screen (maybe)
+- sound
+
+1. What goals were you able to accomplish?
+
+- shadows, hdr, bloom, deferred shading, framebuffer debugging
+- make it possible to collaborate on map (invent worse p4 from first principles)
+- Figure out a solution for ECS metadata in map editing
+- multiple maps
+- delegate sound
+
+1. If the week went differently than you had planned, what were the reasons?
+
+Midterms were unfortunate, so less got done than was ideal. Largely this manifested as things being completed but not being fully polished and merged.
+
+1. What are your specific goals for the next week?
+
+- skeletal animations
+- vram profiling
+- 2d rendering if needed
+- debug UI
+- input refactor + debug console
+- instancing (maybe)
+- actually run the game on windows
+- delegate subset of below
+- loading screen (maybe)
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+This week was largely applying stuff I knew already.
+
+1. What is your individual morale (which might be different from the overall group morale)?
+High. Workload was high but now I should have more time.
+
 ### Week 4 (Apr 30)
 
 1. What were your concrete goals for the week?
