@@ -113,23 +113,31 @@ int main() {
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
 
+      {
+        SIMPLE_PROFILE_SCOPE("Physics Step");
+        game.physics.step(fixedDt);
+      }
+
       // Step Jolt physics
       game.physics.step(fixedDt);
 
       // Sync Jolt positions back into ECS
-      auto physicsView =
-          game.registry.view<shared::Position, shared::PhysicsBody>();
-      auto& bodyInterface = game.physics.getBodyInterface();
-      for (auto ent : physicsView) {
-        auto& pos = physicsView.get<shared::Position>(ent);
-        auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::BodyID bodyId(pb.bodyId);
-        if (!bodyInterface.IsAdded(bodyId)) continue;
+      {
+        SIMPLE_PROFILE_SCOPE("Physics Sync ECS");
+        auto physicsView =
+            game.registry.view<shared::Position, shared::PhysicsBody>();
+        auto& bodyInterface = game.physics.getBodyInterface();
+        for (auto ent : physicsView) {
+          auto& pos = physicsView.get<shared::Position>(ent);
+          auto& pb = physicsView.get<shared::PhysicsBody>(ent);
+          JPH::BodyID bodyId(pb.bodyId);
+          if (!bodyInterface.IsAdded(bodyId)) continue;
 
-        JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyId);
-        pos.x = joltPos.GetX();
-        pos.y = joltPos.GetY();
-        pos.z = joltPos.GetZ();
+          JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyId);
+          pos.x = joltPos.GetX();
+          pos.y = joltPos.GetY();
+          pos.z = joltPos.GetZ();
+        }
       }
       scene_cycle_system(game.registry);
       accumulator -= fixedDt;
