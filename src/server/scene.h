@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdio>
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/ext/vector_float3.hpp>
-#include <cstdio>
 #include <string>
 #include <vector>
 
