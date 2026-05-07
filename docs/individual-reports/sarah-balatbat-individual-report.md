@@ -6,6 +6,81 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
+<!-- Sarah's template 
+## Week 5
+### Goals
+
+### Achieved
+
+### Progress Evaluation
+
+### Upcoming Goals
+
+### Lessons Learned
+
+### Individual Morale
+-->
+
+## Week 5
+### Goals
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf - WIP
+  - [ ] Goose
+  - [ ] Mouse - WIP
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+- [x] Continue tutorial for rigging lesson
+
+### Achieved
+
+- Gurf concept art iteration
+  - More Gurf references
+  <img src="{{ '/assets/week5/sarah/gurf-refs-fat.png' | relative_url }}" alt="Gurf fat cat references">
+  - Considering making Gurf fatter in the body to match chonky cats
+  <img src="{{ '/assets/week5/sarah/gurf-fatter-body.jpg' | relative_url }}" alt="Gurf fatter body design">
+- Mouse concept art iteration
+  - More mouse references
+  <img src="{{ '/assets/week5/sarah/mouse-refs.png' | relative_url }}" alt="Mouse references">
+  - Considering bigger ears and different snout shape
+  <img src="{{ '/assets/week5/sarah/mouse-big-ears.jpg' | relative_url }}" alt="Mouse bigger ears design">
+
+- Rigging tutorial
+  - Finished rig
+  <img src="{{ '/assets/week5/sarah/rig.png' | relative_url }}" alt="Low poly cat tutorial rig">
+  - Simple pose
+  <img src="{{ '/assets/week5/sarah/rig-pose.png' | relative_url }}" alt="Rig pose wireframe">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-front.png' | relative_url }}" alt="Rig pose front view">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-back.png' | relative_url }}" alt="Rig pose back view">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-side.png' | relative_url }}" alt="Rig pose 3/4 view">
+  - Base model rig sketch
+  <img src="{{ '/assets/week5/sarah/base-model-rig-sketch.jpg' | relative_url }}" alt="Sketch of rig for base model at rest and simple pose">
+
+### Progress Evaluation
+
+Didn't really get to work on things until the night before report deadline, which is becoming a pattern these past few weeks. Rigging wasn't as hard as I thought, but I'm glad I finally got the tutorial out of the way. I think I'll always wish that I got to do more every week, but such is having to deal with a 16-unit courseload, specifically with CSE 123 in it.
+
+### Upcoming Goals
+
+- [ ] Create rig for base model
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+
+### Lessons Learned
+
+- Rigging itself is not too bad
+- Gotta get out of iteration loop at some point to move onto next step of design and development
+- Also gotta be ok with losing some (CSE 123 ngl) to win some (fun in here)
+
+### Individual Morale
+
+CSE 123 midterm was a beast to study for, and thankfully light itself. I feel like I would've been doing so much more per week if not for this class I need for my requirements. I still feel like I'm behind relative to the rest of the team, but I'm trying to remind myself this is more of a proof of concept than a polished end product. I still would like to get as far as I can, at the very least with my beloved Gurf. Idk, I'm on roughly 8 hours sleep in the past 48 or so hours. I also forgot we needed server maintenance tonight :D
+
 ## Week 4
 ### Goals
 - [x] Create concept art for other MVPs
