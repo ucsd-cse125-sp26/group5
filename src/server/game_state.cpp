@@ -55,9 +55,14 @@ static void despawnTaggedEntities(ServerGame& game) {
   }
 }
 
+// Find the demo light by looking for a PointLight with a RenderInfo (the cube
+// marker). Map-loaded point lights have no RenderInfo, so this filter excludes
+// them — without it EnTT's newest-first iteration returns a map light and
+// hardcoded_spinning_light moves the wrong entity.
 template <typename Tag>
 static uint32_t findLightEntityId(ServerGame& game) {
-  auto view = game.registry.view<Tag, shared::PointLight, shared::Entity>();
+  auto view = game.registry.view<Tag, shared::PointLight, shared::RenderInfo,
+                                 shared::Entity>();
   for (auto e : view) {
     return view.template get<shared::Entity>(e).id;
   }
@@ -324,7 +329,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
   if (lightId != kInvalidEntityId)
     hardcoded_spinning_light(game.registry, dt, lightId);
-  scene_cycle_system(game.registry);
+  scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
 
 // ── MazeState ────────────────────────────────────────────
@@ -369,5 +374,5 @@ void MazeState::update(ServerGame& game, float dt) {
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
   if (lightId != kInvalidEntityId)
     hardcoded_spinning_light(game.registry, dt, lightId);
-  scene_cycle_system(game.registry);
+  scene_cycle_system(game.registry, StateType::MAZE);
 }

@@ -187,17 +187,17 @@ static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
                                         : glm::vec3(0.0f, 0.0f, 1.0f);
   glm::vec3 right = glm::normalize(glm::cross(dir, up));
   glm::vec3 lightUp = glm::cross(right, dir);
-  constexpr float kHalfExtent = 20.0f;
+  constexpr float kHalfExtent = 80.0f;
   const float texelWorld = (2.0f * kHalfExtent) / kDirShadowMapSize;
   float u = glm::dot(cameraPos, right);
   float v = glm::dot(cameraPos, lightUp);
   u = std::floor(u / texelWorld) * texelWorld;
   v = std::floor(v / texelWorld) * texelWorld;
   glm::vec3 snapped = right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
-  glm::vec3 lightPos = snapped - dir * 30.0f;
+  glm::vec3 lightPos = snapped - dir * 120.0f;
   glm::mat4 view = glm::lookAt(lightPos, snapped, up);
   glm::mat4 proj = glm::ortho(-kHalfExtent, kHalfExtent, -kHalfExtent,
-                              kHalfExtent, 1.0f, 80.0f);
+                              kHalfExtent, 1.0f, 320.0f);
   return proj * view;
 }
 
@@ -543,9 +543,10 @@ void Graphics::resizeBuffers(int width, int height) {
   glViewport(0, 0, fbWidth, fbHeight);
   projection = glm::perspective(
       glm::radians(45.0f),
-      static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 100.0f);
+      static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 500.0f);
 
-  // RGBA16F for position/normal preserves world-space precision; albedo,
+  // gPosition: full FP32 — half-float quantizes distant world-space neighbors
+  // to the same value, breaking SSAO. Normal fits in RGBA16F; albedo,
   // specular, and emissive fit in RGBA8.
   if (!gBufferFBO) glGenFramebuffers(1, &gBufferFBO);
   if (!gPosition) glGenTextures(1, &gPosition);
@@ -565,14 +566,16 @@ void Graphics::resizeBuffers(int width, int height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   };
-  allocColor(gPosition, GL_RGBA16F, GL_RGBA, GL_FLOAT);
+  // RGBA32F: world position needs full FP32 precision so SSAO/shadows on
+  // distant geometry don't quantize neighbors to the same value.
+  allocColor(gPosition, GL_RGBA32F, GL_RGBA, GL_FLOAT);
   allocColor(gNormal, GL_RGBA16F, GL_RGBA, GL_FLOAT);
   allocColor(gAlbedo, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gSpecular, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gEmissive, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
 
   glBindRenderbuffer(GL_RENDERBUFFER, gBufferDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
@@ -616,7 +619,7 @@ void Graphics::resizeBuffers(int width, int height) {
   allocHDR(brightColor);
 
   glBindRenderbuffer(GL_RENDERBUFFER, litDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fbWidth,
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
