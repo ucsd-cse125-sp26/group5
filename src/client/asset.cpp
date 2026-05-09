@@ -179,9 +179,9 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
   // Per-type default: white for DIFFUSE so untextured meshes are visible;
   // black for SPECULAR/EMISSIVE/AMBIENT so missing properties don't blow
   // out the surface (white emissive would add 1.0 to every fragment).
-  aiColor4D color =
-      (type == aiTextureType_DIFFUSE) ? aiColor4D(1.0f, 1.0f, 1.0f, 1.0f)
-                                      : aiColor4D(0.0f, 0.0f, 0.0f, 1.0f);
+  aiColor4D color = (type == aiTextureType_DIFFUSE)
+                        ? aiColor4D(1.0f, 1.0f, 1.0f, 1.0f)
+                        : aiColor4D(0.0f, 0.0f, 0.0f, 1.0f);
   switch (type) {
     case aiTextureType_DIFFUSE:
       mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);

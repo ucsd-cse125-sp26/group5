@@ -61,8 +61,9 @@ static void despawnTaggedEntities(ServerGame& game) {
 // hardcoded_spinning_light moves the wrong entity.
 template <typename Tag>
 static uint32_t findLightEntityId(ServerGame& game) {
-  auto view = game.registry.view<Tag, shared::PointLight, shared::RenderInfo,
-                                 shared::Entity>();
+  auto view =
+      game.registry
+          .view<Tag, shared::PointLight, shared::RenderInfo, shared::Entity>();
   for (auto e : view) {
     return view.template get<shared::Entity>(e).id;
   }
