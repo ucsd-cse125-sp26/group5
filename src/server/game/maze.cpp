@@ -157,8 +157,8 @@ bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId,
   if (!game.registry.all_of<shared::MazeSpiritGrid>(spiritEnt)) return false;
   auto& grid = game.registry.get<shared::MazeSpiritGrid>(spiritEnt);
 
-  const int8_t nx = static_cast<int8_t>(grid.gx + ddx);
-  const int8_t ny = static_cast<int8_t>(grid.gy + ddy);
+  const auto nx = static_cast<int8_t>(grid.gx + ddx);
+  const auto ny = static_cast<int8_t>(grid.gy + ddy);
 
   auto applyPenalty = [&]() {
     if (badMovePenaltyMs == 0) return;

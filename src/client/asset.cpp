@@ -420,11 +420,11 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
 
   const uint8_t* top = spec.palette[5];
   const bool topBright = top[0] > 160 && top[1] > 160 && top[2] > 160;
-  const uint8_t dr = static_cast<uint8_t>(topBright ? 30 : 250);
-  const uint8_t dg = static_cast<uint8_t>(topBright ? 30 : 250);
-  const uint8_t db = static_cast<uint8_t>(topBright ? 30 : 250);
+  const auto dr = static_cast<uint8_t>(topBright ? 30 : 250);
+  const auto dg = static_cast<uint8_t>(topBright ? 30 : 250);
+  const auto db = static_cast<uint8_t>(topBright ? 30 : 250);
   const uint8_t digitRgba[4] = {dr, dg, db, 255};
-  const uint8_t di = static_cast<uint8_t>(slot - 1);
+  const auto di = static_cast<uint8_t>(slot - 1);
   for (int dy = 0; dy < 5; dy++) {
     for (int dx = 0; dx < 3; dx++) {
       if (kPatterns[di][static_cast<size_t>(dy)][static_cast<size_t>(dx)] !=
@@ -445,7 +445,7 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
     if (f < 5) {
       const float u = (static_cast<float>(f * 8 + 4) + 0.5f) / 48.0f;
       const float v = (4.0f + 0.5f) / 8.0f;
-      for (int i = 0; i < 4; i++) uv[i] = {u, v};
+      for (auto& i : uv) i = {u, v};
     } else {
       uv[0] = {(40.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
       uv[1] = {(47.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
