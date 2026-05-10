@@ -1,9 +1,11 @@
 #include "server/game/maze.h"
 
+#include <Jolt/Physics/Body/BodyID.h>
+
 #include <array>
 #include <cinttypes>
-#include <cstdint>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <optional>
 #include <utility>
@@ -13,12 +15,10 @@
 #include "shared/components.h"
 #include "shared/input.h"
 
-#include <Jolt/Physics/Body/BodyID.h>
-
 namespace {
 
 entt::entity findEntityByNumericId(const entt::registry& reg,
-                                     uint32_t numericId) {
+                                   uint32_t numericId) {
   auto view = reg.view<shared::Entity>();
   for (auto e : view) {
     if (view.get<shared::Entity>(e).id == numericId) return e;
@@ -38,9 +38,11 @@ entt::entity findWinterSection(const entt::registry& reg) {
 bool mazePuzzleAllowsSpiritMove(const ServerGame& game) {
   entt::entity winter = findWinterSection(game.registry);
   if (winter == entt::null) return false;
-  const uint32_t puzzleId = game.registry.get<shared::SectionController>(winter).puzzleID;
+  const uint32_t puzzleId =
+      game.registry.get<shared::SectionController>(winter).puzzleID;
   entt::entity puzzleEnt = findEntityByNumericId(game.registry, puzzleId);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return false;
   return game.registry.get<shared::PuzzleComponent>(puzzleEnt).phase ==
          shared::RunPhase::INPROGRESS;
@@ -67,7 +69,8 @@ void mazeDirToDelta(shared::MazeDirection d, int8_t& dx, int8_t& dy) {
   }
 }
 
-// Must match client `computeCamera` maze FPV: slot -> world XY "look" / forward.
+// Must match client `computeCamera` maze FPV: slot -> world XY "look" /
+// forward.
 shared::MazeDirection mazeDirectionForJoinSlot(uint8_t slot) {
   switch (slot) {
     case 1:
@@ -98,8 +101,10 @@ void EnterMazePuzzle(ServerGame& game) {
   if (winter == entt::null) return;
 
   const auto& section = game.registry.get<shared::SectionController>(winter);
-  entt::entity puzzleEnt = findEntityByNumericId(game.registry, section.puzzleID);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  entt::entity puzzleEnt =
+      findEntityByNumericId(game.registry, section.puzzleID);
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return;
 
   auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
@@ -109,11 +114,13 @@ void EnterMazePuzzle(ServerGame& game) {
 
   for (auto e : game.registry.view<shared::RunState>()) {
     auto& run = game.registry.get<shared::RunState>(e);
-    if (run.phase == shared::RunPhase::LOBBY) run.phase = shared::RunPhase::INPROGRESS;
+    if (run.phase == shared::RunPhase::LOBBY)
+      run.phase = shared::RunPhase::INPROGRESS;
   }
 
   game.registry.emplace_or_replace<shared::MazeUIState>(puzzleEnt, true);
-  printf("[GameLogic] EnterMazePuzzle: puzzle id %" PRIu32 " -> INPROGRESS, maze UI on\n",
+  printf("[GameLogic] EnterMazePuzzle: puzzle id %" PRIu32
+         " -> INPROGRESS, maze UI on\n",
          section.puzzleID);
 }
 
@@ -122,7 +129,8 @@ void ExitMazePuzzle(ServerGame& game) {
   if (winter == entt::null) return;
 
   const auto& section = game.registry.get<shared::SectionController>(winter);
-  entt::entity puzzleEnt = findEntityByNumericId(game.registry, section.puzzleID);
+  entt::entity puzzleEnt =
+      findEntityByNumericId(game.registry, section.puzzleID);
   if (puzzleEnt == entt::null) return;
   if (!game.registry.all_of<shared::PuzzleComponent>(puzzleEnt)) return;
 
@@ -135,12 +143,14 @@ void ExitMazePuzzle(ServerGame& game) {
   printf("[GameLogic] ExitMazePuzzle: maze UI cleared (puzzle was FINISHED)\n");
 }
 
-bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId, entt::entity spiritEnt,
-                      int8_t ddx, int8_t ddy, int8_t gridW, int8_t gridH,
-                      uint64_t wallMask, uint32_t badMovePenaltyMs) {
+bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId,
+                      entt::entity spiritEnt, int8_t ddx, int8_t ddy,
+                      int8_t gridW, int8_t gridH, uint64_t wallMask,
+                      uint32_t badMovePenaltyMs) {
   if (gridW <= 0 || gridH <= 0) return false;
   entt::entity puzzleEnt = findEntityByNumericId(game.registry, puzzleEntityId);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return false;
 
   auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
@@ -154,7 +164,8 @@ bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId, entt::entity sp
 
   auto applyPenalty = [&]() {
     if (badMovePenaltyMs == 0) return;
-    uint64_t sum = static_cast<uint64_t>(puzzle.puzzleElapsedTimeMs) + badMovePenaltyMs;
+    uint64_t sum =
+        static_cast<uint64_t>(puzzle.puzzleElapsedTimeMs) + badMovePenaltyMs;
     puzzle.puzzleElapsedTimeMs =
         sum > UINT32_MAX ? UINT32_MAX : static_cast<uint32_t>(sum);
   };
@@ -164,7 +175,8 @@ bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId, entt::entity sp
     return false;
   }
 
-  const int idx = static_cast<int>(ny) * static_cast<int>(gridW) + static_cast<int>(nx);
+  const int idx =
+      static_cast<int>(ny) * static_cast<int>(gridW) + static_cast<int>(nx);
   if (idx >= 0 && idx < 64 && ((wallMask >> idx) & 1ull) != 0) {
     applyPenalty();
     return false;
@@ -175,11 +187,13 @@ bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId, entt::entity sp
   return true;
 }
 
-void ClaimDirectionPad(ServerGame& game, uint32_t puzzleEntityId, entt::entity p0,
-                       entt::entity p1, entt::entity p2, entt::entity p3,
+void ClaimDirectionPad(ServerGame& game, uint32_t puzzleEntityId,
+                       entt::entity p0, entt::entity p1, entt::entity p2,
+                       entt::entity p3,
                        const std::array<shared::MazeDirection, 4>& padOrder) {
   entt::entity puzzleEnt = findEntityByNumericId(game.registry, puzzleEntityId);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return;
 
   const auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
@@ -189,12 +203,14 @@ void ClaimDirectionPad(ServerGame& game, uint32_t puzzleEntityId, entt::entity p
 
   for (int i = 0; i < 4; i++) {
     if (players[i] == entt::null) continue;
-    game.registry.emplace_or_replace<shared::MazePadBinding>(players[i], padOrder[static_cast<size_t>(i)]);
+    game.registry.emplace_or_replace<shared::MazePadBinding>(
+        players[i], padOrder[static_cast<size_t>(i)]);
   }
 }
 
-void ClaimDirectionPad(ServerGame& game, uint32_t puzzleEntityId, entt::entity p0,
-                       entt::entity p1, entt::entity p2, entt::entity p3) {
+void ClaimDirectionPad(ServerGame& game, uint32_t puzzleEntityId,
+                       entt::entity p0, entt::entity p1, entt::entity p2,
+                       entt::entity p3) {
   static constexpr std::array<shared::MazeDirection, 4> kDefault{
       shared::MazeDirection::UP, shared::MazeDirection::DOWN,
       shared::MazeDirection::LEFT, shared::MazeDirection::RIGHT};
@@ -206,8 +222,10 @@ void CollectMazeFragment(ServerGame& game) {
   if (winter == entt::null) return;
 
   auto& winterSection = game.registry.get<shared::SectionController>(winter);
-  entt::entity puzzleEnt = findEntityByNumericId(game.registry, winterSection.puzzleID);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  entt::entity puzzleEnt =
+      findEntityByNumericId(game.registry, winterSection.puzzleID);
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return;
 
   auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
@@ -220,7 +238,8 @@ void CollectMazeFragment(ServerGame& game) {
     auto& gs = game.registry.get<shared::GameSection>(e);
     if (gs.sectionsCompleted < 255) gs.sectionsCompleted++;
   }
-  printf("[GameLogic] CollectMazeFragment: winter done, sections completed++\n");
+  printf(
+      "[GameLogic] CollectMazeFragment: winter done, sections completed++\n");
 }
 
 bool HasUnlockedWinterSection(const ServerGame& game) {
@@ -240,7 +259,8 @@ uint32_t GetWinterPuzzleNumericId(ServerGame& game) {
 
 void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
   entt::entity puzzleEnt = findEntityByNumericId(game.registry, puzzleEntityId);
-  if (puzzleEnt == entt::null || !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
+  if (puzzleEnt == entt::null ||
+      !game.registry.all_of<shared::PuzzleComponent>(puzzleEnt))
     return;
   if (game.registry.get<shared::PuzzleComponent>(puzzleEnt).phase !=
       shared::RunPhase::INPROGRESS)
@@ -258,7 +278,8 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
     const auto pad = mazeDirectionForJoinSlot(slot);
     game.registry.emplace_or_replace<shared::MazePadBinding>(m, pad);
     uint32_t eid = game.registry.get<shared::Entity>(m).id;
-    printf("[GameLogic]   entity %" PRIu32 " slot=%" PRIu8 " pad=%d (UP key = this facing)\n",
+    printf("[GameLogic]   entity %" PRIu32 " slot=%" PRIu8
+           " pad=%d (UP key = this facing)\n",
            eid, slot, static_cast<int>(pad));
   }
 }
@@ -323,8 +344,7 @@ void TickMazeExploration(ServerGame& game, float dt) {
   }
 
   JPH::Vec3 curVel = bodyInterface.GetLinearVelocity(spiritBody);
-  bodyInterface.SetLinearVelocity(
-      spiritBody, JPH::Vec3(vx, vy, curVel.GetZ()));
+  bodyInterface.SetLinearVelocity(spiritBody, JPH::Vec3(vx, vy, curVel.GetZ()));
 
   if (game.registry.all_of<shared::Velocity>(spirit)) {
     auto& vel = game.registry.get<shared::Velocity>(spirit);
@@ -335,7 +355,8 @@ void TickMazeExploration(ServerGame& game, float dt) {
 }
 
 void ResetMazeSpiritSpawn(ServerGame& game) {
-  for (auto e : game.registry.view<shared::MazeSpiritGrid, shared::PhysicsBody>()) {
+  for (auto e :
+       game.registry.view<shared::MazeSpiritGrid, shared::PhysicsBody>()) {
     auto& bodyInterface = game.physics.getBodyInterface();
     auto& pb = game.registry.get<shared::PhysicsBody>(e);
     JPH::BodyID bodyId(pb.bodyId);

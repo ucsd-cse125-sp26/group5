@@ -419,17 +419,16 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   }
 
   const uint8_t* top = spec.palette[5];
-  const uint8_t dr =
-      static_cast<uint8_t>((top[0] > 160 && top[1] > 160 && top[2] > 160) ? 30 : 250);
-  const uint8_t dg =
-      static_cast<uint8_t>((top[0] > 160 && top[1] > 160 && top[2] > 160) ? 30 : 250);
-  const uint8_t db =
-      static_cast<uint8_t>((top[0] > 160 && top[1] > 160 && top[2] > 160) ? 30 : 250);
+  const bool topBright = top[0] > 160 && top[1] > 160 && top[2] > 160;
+  const uint8_t dr = static_cast<uint8_t>(topBright ? 30 : 250);
+  const uint8_t dg = static_cast<uint8_t>(topBright ? 30 : 250);
+  const uint8_t db = static_cast<uint8_t>(topBright ? 30 : 250);
   const uint8_t digitRgba[4] = {dr, dg, db, 255};
   const uint8_t di = static_cast<uint8_t>(slot - 1);
   for (int dy = 0; dy < 5; dy++) {
     for (int dx = 0; dx < 3; dx++) {
-      if (kPatterns[di][static_cast<size_t>(dy)][static_cast<size_t>(dx)] != 0) {
+      if (kPatterns[di][static_cast<size_t>(dy)][static_cast<size_t>(dx)] !=
+          0) {
         const int ty = 6 - dy;
         setPx(40 + 2 + dx, ty, digitRgba);
       }
@@ -474,8 +473,8 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   glBindVertexArray(vao);
 
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(),
-               GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
+               vertices.data(), GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
