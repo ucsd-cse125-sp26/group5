@@ -1,5 +1,3 @@
-#include <Jolt/Physics/Body/BodyID.h>
-
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>

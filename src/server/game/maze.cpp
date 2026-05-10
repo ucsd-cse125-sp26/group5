@@ -1,7 +1,5 @@
 #include "server/game/maze.h"
 
-#include <Jolt/Physics/Body/BodyID.h>
-
 #include <array>
 #include <cinttypes>
 #include <cmath>
