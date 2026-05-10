@@ -51,6 +51,8 @@ class Shader;
 
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel(const shared::CubeSpec& spec);
+// Player join order 1–4: same rainbow cube with digit 1–4 on the top face.
+Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot);
 Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);

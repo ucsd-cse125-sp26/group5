@@ -4,6 +4,8 @@
 #include <memory>
 #include <vector>
 
+#include "game/maze.h"
+#include "game/overworld.h"
 #include "scene.h"
 #include "server_game.h"
 #include "server_network.h"
@@ -198,13 +200,13 @@ void initWorldEntities(ServerGame& game) {
   // --- Maze Map ---
   {
     auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
+    game.registry.emplace<shared::Position>(ent, 7.0f, 7.0f, 9.0f, 1.0f, 0.0f,
                                             0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
     game.registry.emplace<shared::PointLight>(
-        ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
-        0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-    game.registry.emplace<shared::Scene>(ent, "night");
+        ent, 7.0f, 7.0f, 9.0f, 1.0f, 0.045f, 0.0075f, 0.35f, 0.35f, 0.38f, 1.35f,
+        1.35f, 1.25f, 0.65f, 0.65f, 0.6f);
+    game.registry.emplace<shared::Scene>(ent, "overcast");
     game.registry.emplace<shared::MazeTag>(ent);
   }
   {
@@ -228,6 +230,14 @@ void initWorldEntities(ServerGame& game) {
                                                       .halfX = 100.0f,
                                                       .halfY = 100.0f,
                                                       .halfZ = 1.0f},
+                                                     // Fixed landmark at board center (8x8 cells, spacing 2): see if camera/spirit moves.
+                                                     {.x = 7.0f,
+                                                      .y = 7.0f,
+                                                      .z = 0.65f,
+                                                      .modelName = "cube",
+                                                      .scale = 1.25f,
+                                                      .meshPath = "",
+                                                      .render = true},
                                                      {.x = 3.0f,
                                                       .y = 0.0f,
                                                       .z = 0.0f,
@@ -376,6 +386,11 @@ void OverworldState::update(ServerGame& game, float dt) {
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
+      if (game.active_players.size() < 4) {
+        printf("[State] Need 4 connected players to enter Maze (currently %zu)\n",
+               game.active_players.size());
+        continue;
+      }
       game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
       return;
     }
@@ -394,11 +409,29 @@ void OverworldState::update(ServerGame& game, float dt) {
 
 void MazeState::onEnter(ServerGame& game) {
   addPhysicsBodies<shared::MazeTag>(game);
+  ResetMazeSpiritSpawn(game);
+
+  auto& bodyInterface = game.physics.getBodyInterface();
+  for (auto ent : game.registry.view<shared::MazeTag, shared::PhysicsBody,
+                                      shared::PlayerInput>()) {
+    if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) continue;
+    auto& pb = game.registry.get<shared::PhysicsBody>(ent);
+    JPH::BodyID id(pb.bodyId);
+    if (bodyInterface.IsAdded(id)) {
+      bodyInterface.SetLinearVelocity(id, JPH::Vec3::sZero());
+    }
+  }
+
   enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
+  EnterMazePuzzle(game);
+  if (HasUnlockedWinterSection(game)) {
+    ClaimPadsForActivePlayers(game, GetWinterPuzzleNumericId(game));
+  }
 }
 
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
+  ExitMazePuzzle(game);
   removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
   despawnTaggedEntities<shared::MazeTag>(game);
@@ -414,6 +447,7 @@ std::vector<entt::entity> MazeState::getStateEntities(ServerGame& game) const {
 
 void MazeState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
+  TickMazeExploration(game, dt);
 
   // Press Q → back to overworld
   auto inputView = game.registry.view<shared::PlayerInput, shared::MazeTag>();
@@ -426,7 +460,7 @@ void MazeState::update(ServerGame& game, float dt) {
     }
   }
 
-  movement_system(game, dt, StateType::MAZE);
+  // Maze uses shared-cube arrow logic; keep per-player WASD movement disabled here.
   render_model_change(game.registry, dt);
 
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
