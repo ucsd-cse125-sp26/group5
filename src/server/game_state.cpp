@@ -204,8 +204,8 @@ void initWorldEntities(ServerGame& game) {
                                             0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
     game.registry.emplace<shared::PointLight>(
-        ent, 7.0f, 7.0f, 9.0f, 1.0f, 0.045f, 0.0075f, 0.35f, 0.35f, 0.38f, 1.35f,
-        1.35f, 1.25f, 0.65f, 0.65f, 0.6f);
+        ent, 7.0f, 7.0f, 9.0f, 1.0f, 0.045f, 0.0075f, 0.35f, 0.35f, 0.38f,
+        1.35f, 1.35f, 1.25f, 0.65f, 0.65f, 0.6f);
     game.registry.emplace<shared::Scene>(ent, "overcast");
     game.registry.emplace<shared::MazeTag>(ent);
   }
@@ -218,69 +218,70 @@ void initWorldEntities(ServerGame& game) {
 
     const std::string bearMesh =
         (exeDir() / "assets/bear/bear_full.obj").string();
-    spawnStaticEntitiesForWorld<shared::MazeTag>(game,
-                                                 {
-                                                     {.x = 0.0f,
-                                                      .y = 0.0f,
-                                                      .z = -1.0f,
-                                                      .modelName = "floor",
-                                                      .scale = 1.0f,
-                                                      .meshPath = "",
-                                                      .render = false,
-                                                      .halfX = 100.0f,
-                                                      .halfY = 100.0f,
-                                                      .halfZ = 1.0f},
-                                                     // Fixed landmark at board center (8x8 cells, spacing 2): see if camera/spirit moves.
-                                                     {.x = 7.0f,
-                                                      .y = 7.0f,
-                                                      .z = 0.65f,
-                                                      .modelName = "cube",
-                                                      .scale = 1.25f,
-                                                      .meshPath = "",
-                                                      .render = true},
-                                                     {.x = 3.0f,
-                                                      .y = 0.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.1f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = -3.0f,
-                                                      .y = 0.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.1f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 0.0f,
-                                                      .y = 5.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.2f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 0.0f,
-                                                      .y = -5.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.2f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 6.0f,
-                                                      .y = 6.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.15f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = -6.0f,
-                                                      .y = -6.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.15f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                 });
+    spawnStaticEntitiesForWorld<shared::MazeTag>(
+        game, {
+                  {.x = 0.0f,
+                   .y = 0.0f,
+                   .z = -1.0f,
+                   .modelName = "floor",
+                   .scale = 1.0f,
+                   .meshPath = "",
+                   .render = false,
+                   .halfX = 100.0f,
+                   .halfY = 100.0f,
+                   .halfZ = 1.0f},
+                  // Fixed landmark at board center (8x8 cells, spacing 2): see
+                  // if camera/spirit moves.
+                  {.x = 7.0f,
+                   .y = 7.0f,
+                   .z = 0.65f,
+                   .modelName = "cube",
+                   .scale = 1.25f,
+                   .meshPath = "",
+                   .render = true},
+                  {.x = 3.0f,
+                   .y = 0.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.1f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = -3.0f,
+                   .y = 0.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.1f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 0.0f,
+                   .y = 5.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.2f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 0.0f,
+                   .y = -5.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.2f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = 6.0f,
+                   .y = 6.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.15f,
+                   .meshPath = bearMesh,
+                   .render = true},
+                  {.x = -6.0f,
+                   .y = -6.0f,
+                   .z = 0.0f,
+                   .modelName = "bear",
+                   .scale = 0.15f,
+                   .meshPath = bearMesh,
+                   .render = true},
+              });
   }
 
   // --- Pool slots ---
@@ -387,8 +388,9 @@ void OverworldState::update(ServerGame& game, float dt) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
       if (game.active_players.size() < 4) {
-        printf("[State] Need 4 connected players to enter Maze (currently %zu)\n",
-               game.active_players.size());
+        printf(
+            "[State] Need 4 connected players to enter Maze (currently %zu)\n",
+            game.active_players.size());
         continue;
       }
       game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
@@ -412,8 +414,10 @@ void MazeState::onEnter(ServerGame& game) {
   ResetMazeSpiritSpawn(game);
 
   auto& bodyInterface = game.physics.getBodyInterface();
-  for (auto ent : game.registry.view<shared::MazeTag, shared::PhysicsBody,
-                                      shared::PlayerInput>()) {
+  auto mazeInputBodies =
+      game.registry
+          .view<shared::MazeTag, shared::PhysicsBody, shared::PlayerInput>();
+  for (auto ent : mazeInputBodies) {
     if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) continue;
     auto& pb = game.registry.get<shared::PhysicsBody>(ent);
     JPH::BodyID id(pb.bodyId);
@@ -460,7 +464,8 @@ void MazeState::update(ServerGame& game, float dt) {
     }
   }
 
-  // Maze uses shared-cube arrow logic; keep per-player WASD movement disabled here.
+  // Maze uses shared-cube arrow logic; keep per-player WASD movement disabled
+  // here.
   render_model_change(game.registry, dt);
 
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);

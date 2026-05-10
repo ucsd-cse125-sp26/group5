@@ -9,7 +9,8 @@ bool winterSectionCompleted(const ServerGame& game) {
   auto view = game.registry.view<shared::SectionController>();
   for (auto e : view) {
     const auto& sc = view.get<shared::SectionController>(e);
-    if (sc.type == shared::SectionSeasonMap::WINTER && sc.completed) return true;
+    if (sc.type == shared::SectionSeasonMap::WINTER && sc.completed)
+      return true;
   }
   return false;
 }
@@ -44,11 +45,15 @@ void tickOverworldGameLogic(ServerGame& game, float dt) {
   MoveInMainMap(game, dt);
 }
 
-bool RestoreWinterColor(const ServerGame& game) { return winterSectionCompleted(game); }
+bool RestoreWinterColor(const ServerGame& game) {
+  return winterSectionCompleted(game);
+}
 
-void GatherAtExitSwitch(ServerGame& game, entt::entity switchEnt, float minX, float minY,
-                        float maxX, float maxY, unsigned requiredPlayersInZone) {
-  if (switchEnt == entt::null || !game.registry.all_of<shared::SwitchComponent>(switchEnt))
+void GatherAtExitSwitch(ServerGame& game, entt::entity switchEnt, float minX,
+                        float minY, float maxX, float maxY,
+                        unsigned requiredPlayersInZone) {
+  if (switchEnt == entt::null ||
+      !game.registry.all_of<shared::SwitchComponent>(switchEnt))
     return;
   if (!winterSectionCompleted(game)) return;
 
@@ -56,7 +61,8 @@ void GatherAtExitSwitch(ServerGame& game, entt::entity switchEnt, float minX, fl
   unsigned count = 0;
   for (auto e : view) {
     const auto& pos = view.get<shared::Position>(e);
-    if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) count++;
+    if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY)
+      count++;
   }
 
   if (count >= requiredPlayersInZone) {
@@ -64,11 +70,13 @@ void GatherAtExitSwitch(ServerGame& game, entt::entity switchEnt, float minX, fl
   }
 }
 
-void OpenSectionDoor(ServerGame& game, entt::entity doorEnt, entt::entity switchEnt,
-                     entt::entity fallSectionEnt) {
+void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
+                     entt::entity switchEnt, entt::entity fallSectionEnt) {
   if (!winterSectionCompleted(game)) return;
   if (doorEnt == entt::null || switchEnt == entt::null) return;
-  if (!game.registry.all_of<shared::SectionDoorComponent, shared::Entity>(doorEnt)) return;
+  if (!game.registry.all_of<shared::SectionDoorComponent, shared::Entity>(
+          doorEnt))
+    return;
   if (!game.registry.all_of<shared::SwitchComponent>(switchEnt)) return;
 
   auto& sw = game.registry.get<shared::SwitchComponent>(switchEnt);
@@ -82,7 +90,8 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt, entt::entity switch
 
   if (fallSectionEnt != entt::null &&
       game.registry.all_of<shared::SectionController>(fallSectionEnt)) {
-    game.registry.get<shared::SectionController>(fallSectionEnt).unlocked = true;
+    game.registry.get<shared::SectionController>(fallSectionEnt).unlocked =
+        true;
   }
 
   for (auto e : game.registry.view<shared::GameSection>()) {

@@ -14,13 +14,14 @@ void loadLevel(ServerGame& game) {
   auto [puzzleID, puzzle1] = new_entity(game);
   game.registry.emplace<shared::PuzzleComponent>(puzzle1);
 
-  // Shared memory spirit for maze grid (logic only; minimal rendering if synced later).
+  // Shared memory spirit for maze grid (logic only; minimal rendering if
+  // synced later).
   auto [spiritNumericId, spiritEnt] = new_entity(game);
   (void)spiritNumericId;
   game.registry.emplace<shared::MazeSpiritGrid>(
       spiritEnt, static_cast<int8_t>(0), static_cast<int8_t>(0));
-  game.registry.emplace<shared::Position>(spiritEnt, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-                                          0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(spiritEnt, 0.0f, 0.0f, 0.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(spiritEnt, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(spiritEnt, "cube", 0.8f);
   game.registry.emplace<shared::MazeTag>(spiritEnt);
@@ -28,7 +29,8 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::PhysicsBody>(
       spiritEnt, spiritBody.GetIndexAndSequenceNumber());
 
-  // Visual maze board: 8x8 checker tiles to make shared-cube movement easier to read.
+  // Visual maze board: 8x8 checker tiles to make shared-cube movement easier
+  // to read.
   constexpr int kGrid = 8;
   constexpr float kCell = 2.0f;
   constexpr float kTileScale = 0.45f;
@@ -37,8 +39,8 @@ void loadLevel(ServerGame& game) {
       auto [tileId, tile] = new_entity(game);
       (void)tileId;
       game.registry.emplace<shared::Position>(
-          tile, static_cast<float>(gx) * kCell, static_cast<float>(gy) * kCell, -0.8f,
-          1.0f, 0.0f, 0.0f, 0.0f);
+          tile, static_cast<float>(gx) * kCell, static_cast<float>(gy) * kCell,
+          -0.8f, 1.0f, 0.0f, 0.0f, 0.0f);
       game.registry.emplace<shared::RenderInfo>(tile, "cube", kTileScale);
       game.registry.emplace<shared::MazeTag>(tile);
     }

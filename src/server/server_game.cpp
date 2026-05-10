@@ -154,8 +154,9 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     auto& pos = view.get<shared::Position>(entity);
     auto& light = view.get<shared::PointLight>(entity);
 
-    // Maze board is roughly [0,14] x [0,14]: keep a bright lamp over the center
-    // instead of orbiting the overworld origin (which leaves the maze in shadow).
+    // Maze board is roughly [0,14] x [0,14]: keep a bright lamp over the
+    // center instead of orbiting the overworld origin (which leaves the maze in
+    // shadow).
     if (registry.all_of<shared::MazeTag>(entity)) {
       pos.x = 7.0f;
       pos.y = 7.0f;

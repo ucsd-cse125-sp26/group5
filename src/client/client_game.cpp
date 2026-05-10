@@ -152,7 +152,8 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) keys |= KEY_SPIRIT_UP;
   if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) keys |= KEY_SPIRIT_DOWN;
   if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) keys |= KEY_SPIRIT_LEFT;
-  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) keys |= KEY_SPIRIT_RIGHT;
+  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    keys |= KEY_SPIRIT_RIGHT;
   if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) keys |= KEY_MAZE_COLLECT;
 
   static bool mouseInit = false;

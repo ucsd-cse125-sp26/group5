@@ -1,3 +1,5 @@
+#include <Jolt/Physics/Body/BodyID.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
@@ -7,13 +9,11 @@
 #include <thread>
 
 #include "game_state.h"
-#include "server_level_loader.h"
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
-
-#include <Jolt/Physics/Body/BodyID.h>
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
@@ -176,14 +176,14 @@ int main() {
             bodyInterface.SetPosition(bodyId, JPH::RVec3(pos.x, pos.y, pos.z),
                                       JPH::EActivation::Activate);
             JPH::Vec3 v = bodyInterface.GetLinearVelocity(bodyId);
-            bodyInterface.SetLinearVelocity(
-                bodyId, JPH::Vec3(0.0f, 0.0f, v.GetZ()));
+            bodyInterface.SetLinearVelocity(bodyId,
+                                            JPH::Vec3(0.0f, 0.0f, v.GetZ()));
           }
           auto& grid = game.registry.get<shared::MazeSpiritGrid>(ent);
-          grid.gx = static_cast<int8_t>(std::clamp(
-              static_cast<int>(std::lround(pos.x * 0.5f)), 0, 7));
-          grid.gy = static_cast<int8_t>(std::clamp(
-              static_cast<int>(std::lround(pos.y * 0.5f)), 0, 7));
+          const int gxCell = static_cast<int>(std::lround(pos.x * 0.5f));
+          const int gyCell = static_cast<int>(std::lround(pos.y * 0.5f));
+          grid.gx = static_cast<int8_t>(std::clamp(gxCell, 0, 7));
+          grid.gy = static_cast<int8_t>(std::clamp(gyCell, 0, 7));
         }
       }
       scene_cycle_system(game.registry);

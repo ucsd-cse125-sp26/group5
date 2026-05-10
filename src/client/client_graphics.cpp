@@ -9,13 +9,13 @@
 #include <iostream>
 #include <string>
 
+#include "client/asset.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
 #include "glm/ext/quaternion_trigonometric.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/quaternion.hpp"
-#include "client/asset.h"
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/simple_profiler.h"
@@ -49,10 +49,13 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
-  const auto& selfRender = game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
+  const auto& selfRender =
+      game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
-  // Maze mode: all clients use first-person cameras attached to the shared spirit cube.
-  // Each player's join slot picks one side, so all windows move together when the cube moves.
+  // Maze mode: all clients use first-person cameras attached to the shared
+  // spirit cube.
+  // Each player's join slot picks one side, so all windows move together when
+  // the cube moves.
   if (selfRender.modelName == "bear") {
     entt::entity spirit = entt::null;
     auto spiritView =
@@ -86,7 +89,8 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
       }
 
       glm::vec3 pos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
-      glm::mat4 view = glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
+      glm::mat4 view =
+          glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
       return CameraState{.position = pos, .view = view};
     }
   }
