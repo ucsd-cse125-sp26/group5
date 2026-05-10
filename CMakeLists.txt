@@ -114,6 +114,9 @@ add_library(server_lib STATIC
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp
+    src/server/game/maze.cpp
+    src/server/game/overworld.cpp
+    src/server/game/shared.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(server_lib PUBLIC shared enet EnTT::EnTT glm::glm Jolt assimp)

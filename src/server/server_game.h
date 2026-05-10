@@ -1,6 +1,7 @@
 #pragma once
 #include <enet/enet.h>
 
+#include <cstdint>
 #include <entt/entt.hpp>
 #include <map>
 #include <vector>
@@ -43,6 +44,8 @@ struct ServerGame {
   std::map<ENetPeer*, PlayerAvatars> active_players;
   std::vector<PlayerAvatars> unused_player_slots;
   uint32_t nextEntityId = 0;
+  // Next display index for clients (1–4) in connection order.
+  uint8_t nextPlayerJoinSlot = 1;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
   PhysicsEngine physics;

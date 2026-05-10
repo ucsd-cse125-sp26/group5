@@ -22,6 +22,8 @@ struct Velocity {
 struct RenderInfo {
   std::string modelName;
   float scale;
+  // 1–4 = join order for player avatars (shown on cube top); 0 = no slot label.
+  uint8_t playerSlot = 0;
 };
 
 struct Camera {
@@ -82,6 +84,21 @@ struct PuzzleComponent {
   RunPhase phase = RunPhase::LOBBY;
   uint32_t puzzleElapsedTimeMs = 0;
   uint32_t puzzleTimeLimitMs = 0;
+};
+
+enum class MazeDirection : uint8_t { NONE = 0, UP, DOWN, LEFT, RIGHT };
+
+struct MazeSpiritGrid {
+  int8_t gx = 0;
+  int8_t gy = 0;
+};
+
+struct MazePadBinding {
+  MazeDirection pad = MazeDirection::NONE;
+};
+
+struct MazeUIState {
+  bool open = false;
 };
 
 struct TimeComponent {

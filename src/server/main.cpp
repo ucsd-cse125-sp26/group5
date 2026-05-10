@@ -1,13 +1,19 @@
+#include <algorithm>
 #include <chrono>
+#include <cinttypes>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <thread>
 
 #include "game_state.h"
+#include "server_level_loader.h"
 #include "server_game.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/hello.h"
+
+#include <Jolt/Physics/Body/BodyID.h>
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
@@ -27,6 +33,7 @@ int main() {
 
   registerServerHandlers(network);
 
+  loadLevel(game);
   initWorldEntities(game);
 
   // Start in the Overworld
@@ -45,6 +52,14 @@ int main() {
     PlayerAvatars slots = g.unused_player_slots.back();
     g.unused_player_slots.pop_back();
     g.active_players[peer] = slots;
+
+    const uint8_t slot = g.nextPlayerJoinSlot++;
+    for (entt::entity av : {slots.overworld_avatar, slots.maze_avatar}) {
+      if (g.registry.valid(av) && g.registry.all_of<shared::RenderInfo>(av)) {
+        g.registry.get<shared::RenderInfo>(av).playerSlot = slot;
+      }
+    }
+    printf("[Server] Client assigned player slot %" PRIu8 "\n", slot);
 
     auto* currentState = g.gameStateManager.currentState();
     entt::entity activeEntity = currentState->getClientAvatar(slots);
@@ -94,9 +109,17 @@ int main() {
     // despawnAvatar(slots.overworld_avatar);
     // despawnAvatar(slots.maze_avatar);
 
+    for (entt::entity av : {slots.overworld_avatar, slots.maze_avatar}) {
+      if (g.registry.valid(av) && g.registry.all_of<shared::RenderInfo>(av)) {
+        g.registry.get<shared::RenderInfo>(av).playerSlot = 0;
+      }
+    }
     slots.resetControls(g.registry);
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
+    if (g.active_players.empty()) {
+      g.nextPlayerJoinSlot = 1;
+    }
     peer->data = nullptr;
   };
   auto previousTime = std::chrono::high_resolution_clock::now();
@@ -130,6 +153,38 @@ int main() {
         pos.x = joltPos.GetX();
         pos.y = joltPos.GetY();
         pos.z = joltPos.GetZ();
+
+        if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) {
+          constexpr float kMin = 0.5f;
+          constexpr float kMax = 13.5f;
+          bool bounced = false;
+          if (pos.x < kMin) {
+            pos.x = kMin;
+            bounced = true;
+          } else if (pos.x > kMax) {
+            pos.x = kMax;
+            bounced = true;
+          }
+          if (pos.y < kMin) {
+            pos.y = kMin;
+            bounced = true;
+          } else if (pos.y > kMax) {
+            pos.y = kMax;
+            bounced = true;
+          }
+          if (bounced) {
+            bodyInterface.SetPosition(bodyId, JPH::RVec3(pos.x, pos.y, pos.z),
+                                      JPH::EActivation::Activate);
+            JPH::Vec3 v = bodyInterface.GetLinearVelocity(bodyId);
+            bodyInterface.SetLinearVelocity(
+                bodyId, JPH::Vec3(0.0f, 0.0f, v.GetZ()));
+          }
+          auto& grid = game.registry.get<shared::MazeSpiritGrid>(ent);
+          grid.gx = static_cast<int8_t>(std::clamp(
+              static_cast<int>(std::lround(pos.x * 0.5f)), 0, 7));
+          grid.gy = static_cast<int8_t>(std::clamp(
+              static_cast<int>(std::lround(pos.y * 0.5f)), 0, 7));
+        }
       }
       scene_cycle_system(game.registry);
       accumulator -= fixedDt;
