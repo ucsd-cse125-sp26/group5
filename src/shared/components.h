@@ -22,6 +22,7 @@ struct Velocity {
 struct RenderInfo {
   std::string modelName;
   float scale;
+  bool isColorized = false;
 };
 
 struct Camera {
