@@ -21,7 +21,7 @@ struct Velocity {
 
 struct RenderInfo {
   std::string modelName;
-  float scale;
+  float sx, sy, sz;
 };
 
 struct Camera {
@@ -46,6 +46,14 @@ struct PointLight {
   float constant;
   float linear;
   float quadratic;
+  float ambientR, ambientG, ambientB;
+  float diffuseR, diffuseG, diffuseB;
+  float specularR, specularG, specularB;
+  bool castsShadow = true;
+};
+
+struct DirectionalLight {
+  float dirX, dirY, dirZ;
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;

@@ -37,7 +37,10 @@ struct PlayerAvatars {
   }
 };
 
+// `physics` first so it's destroyed last — the on_destroy<PhysicsBody> hook
+// fires during ~registry and needs physics live.
 struct ServerGame {
+  PhysicsEngine physics;
   shared::ComponentRegistry componentRegistry;
   entt::registry registry;
   std::map<ENetPeer*, PlayerAvatars> active_players;
@@ -45,12 +48,15 @@ struct ServerGame {
   uint32_t nextEntityId = 0;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
-  PhysicsEngine physics;
 };
+
+// Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,
+// destroy bodies by removing the entity, not via physics.destroyBody.
+void initServerGame(ServerGame& game);
 
 void input_tick(entt::registry& registry);
 void movement_system(ServerGame& game, float dt, StateType stateType);
-void render_model_change(entt::registry& registry, float dt);
+void render_model_change(ServerGame& game, float dt);
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t lightEntity);
 void scene_cycle_system(entt::registry& registry);
