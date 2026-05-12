@@ -22,9 +22,11 @@ struct Material {
 uniform Material material;
 
 void main() {
+  vec4 diffuse = texture(material.diffuse, vTexCoords);
+  if (diffuse.a < 0.5) discard;
   gPosition = vec4(worldPos, 1.0);
   gNormal = vec4(normalize(worldNormal), material.shininess);
-  gAlbedo = vec4(texture(material.diffuse, vTexCoords).rgb, 1.0);
+  gAlbedo = vec4(diffuse.rgb, 1.0);
   gSpecular = vec4(texture(material.specular, vTexCoords).rgb, 1.0);
   gEmissive = vec4(texture(material.emissive, vTexCoords).rgb, 1.0);
 }
