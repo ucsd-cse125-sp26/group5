@@ -116,7 +116,6 @@ int main() {
           pos.qz = jr.GetZ();
         }
       }
-      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
