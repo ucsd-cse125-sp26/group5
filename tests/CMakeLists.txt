@@ -16,6 +16,16 @@ target_link_libraries(network_tests PRIVATE
     server_lib
 )
 
+add_executable(maze_generation_tests
+    maze_generation_tests.cpp
+)
+
+target_link_libraries(maze_generation_tests PRIVATE
+    GTest::gtest_main
+    server_lib
+)
+
 include(GoogleTest)
 gtest_discover_tests(smoke_tests)
 gtest_discover_tests(network_tests)
+gtest_discover_tests(maze_generation_tests)
