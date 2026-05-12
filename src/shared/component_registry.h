@@ -120,6 +120,11 @@ enum ComponentIds : ComponentTypeId {
   CID_POINTLIGHT = 6,
   CID_SCENE = 7,
   CID_DIRECTIONALLIGHT = 8,
+  CID_MINIGAME_SESSION = 9,
+  CID_MINIGAME_2D = 10,
+  CID_RENDERABLE_2D = 11,
+  CID_TEXT_RENDERABLE_2D = 12,
+  CID_TILEMAP_RENDERABLE_2D = 13,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
@@ -131,6 +136,10 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<PointLight>(CID_POINTLIGHT);
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
+  reg.registerComponent<MiniGameSession>(CID_MINIGAME_SESSION);
+  reg.registerComponent<MiniGame2D>(CID_MINIGAME_2D);
+  reg.registerComponent<Renderable2D>(CID_RENDERABLE_2D);
+  reg.registerComponent<TilemapRenderable2D>(CID_TILEMAP_RENDERABLE_2D);
   return reg;
 }
 

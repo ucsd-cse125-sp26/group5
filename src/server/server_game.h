@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "game_state.h"
+#include "mini_game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
@@ -47,6 +48,7 @@ struct ServerGame {
   std::vector<PlayerAvatars> unused_player_slots;
   uint32_t nextEntityId = 0;
   GameStateManager gameStateManager;
+  MiniGameStateManager miniGameManager;
   ServerNetwork* network = nullptr;
 };
 

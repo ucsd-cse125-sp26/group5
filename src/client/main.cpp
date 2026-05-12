@@ -35,6 +35,7 @@ int main() {
   }
 
   InputKeys prevKeys = 0;
+  InputKeys prevMiniGameKeys = 0;
 
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(graphics.window)) {
@@ -61,7 +62,8 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, game.inputQueue, prevKeys);
+    processInput(graphics.window, game.inputQueue, game.miniGameInputQueue,
+                 prevKeys, prevMiniGameKeys);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 
@@ -77,6 +79,7 @@ void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
       network.poll(game);
     }
     network.drainInputQueue(game.inputQueue);
+    network.drainMiniGameInputQueue(game.miniGameInputQueue);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   network.disconnect();

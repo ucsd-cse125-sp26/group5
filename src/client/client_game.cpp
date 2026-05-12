@@ -130,9 +130,10 @@ void syncToRender(ClientGame& game) {
 
 // ── Input ────────────────────────────────────────────────
 
-void processInput(GLFWwindow* window,
-                  SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys) {
+void processInput(
+    GLFWwindow* window, SpscQueue<shared::InputPacket, 256>& inputQueue,
+    SpscQueue<shared::MiniGameInputPacket, 256>& miniGameInputQueue,
+    InputKeys& prevKeys, InputKeys& prevMiniGameKeys) {
   InputKeys keys = 0;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
@@ -147,6 +148,20 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
   if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) keys |= KEY_ENTER_MAZE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+
+  InputKeys miniGameKeys = 0;
+  if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+    miniGameKeys |= KEY_MINIGAME_UP;
+  if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+    miniGameKeys |= KEY_MINIGAME_DOWN;
+  if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    miniGameKeys |= KEY_MINIGAME_LEFT;
+  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    miniGameKeys |= KEY_MINIGAME_RIGHT;
+  if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS)
+    miniGameKeys |= KEY_START_2D_MINIGAME;
+  if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
+    miniGameKeys |= KEY_STOP_2D_MINIGAME;
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
@@ -176,6 +191,24 @@ void processInput(GLFWwindow* window,
     inputQueue.tryPush(pkt);
   }
   prevKeys = keys;
+
+  if (miniGameKeys != prevMiniGameKeys) {
+    shared::MiniGameInputPacket pkt;
+    pkt.type = shared::PacketType::MINIGAME_INPUT;
+    pkt.sessionId = 0;
+    pkt.surfaceEntityId = 0;
+    pkt.keys = miniGameKeys;
+    pkt.axisX = 0.0f;
+    pkt.axisY = 0.0f;
+    if (miniGameKeys & KEY_MINIGAME_LEFT) pkt.axisX -= 1.0f;
+    if (miniGameKeys & KEY_MINIGAME_RIGHT) pkt.axisX += 1.0f;
+    if (miniGameKeys & KEY_MINIGAME_DOWN) pkt.axisY -= 1.0f;
+    if (miniGameKeys & KEY_MINIGAME_UP) pkt.axisY += 1.0f;
+    pkt.pointerU = 0.0f;
+    pkt.pointerV = 0.0f;
+    miniGameInputQueue.tryPush(pkt);
+  }
+  prevMiniGameKeys = miniGameKeys;
 }
 
 // ── Debug ────────────────────────────────────────────────

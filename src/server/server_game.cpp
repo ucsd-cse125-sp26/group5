@@ -289,6 +289,7 @@ void registerServerHandlers(ServerNetwork& network) {
   network.dispatcher().on(
       shared::PacketType::INPUT,
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+        (void)len;
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
@@ -307,6 +308,22 @@ void registerServerHandlers(ServerNetwork& network) {
         playerInput.keys = pkt.keys;
         playerInput.mouseDx += pkt.mouseDx;
         playerInput.mouseDy += pkt.mouseDy;
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::MINIGAME_INPUT,
+      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+        (void)len;
+        shared::MiniGameInputPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        auto it = game.active_players.find(sender);
+        if (it == game.active_players.end()) return;
+
+        auto* state = game.gameStateManager.currentState();
+        if (!state) return;
+        entt::entity avatar = state->getClientAvatar(it->second);
+        uint32_t playerEntityId = game.registry.get<shared::Entity>(avatar).id;
+        game.miniGameManager.handleInput(game, playerEntityId, pkt);
       });
 }
 

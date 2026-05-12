@@ -7,6 +7,7 @@
 
 #include "asset.h"
 #include "client/client_game.h"
+#include "client/renderer2d.h"
 #include "client/shaders.h"
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -37,6 +38,7 @@ struct Graphics {
   std::optional<Shader> debugOverlay;
   std::unordered_map<std::string, Model*> models;
   std::unordered_map<std::string, Skybox> skyboxes;
+  std::unordered_map<std::string, GLuint> textures2d;
   glm::mat4 projection{1.0f};
 
   // G-buffer (reallocated on resize):
@@ -63,6 +65,18 @@ struct Graphics {
 
   GLuint ldrFBO = 0;
   GLuint ldrColor = 0;
+
+  struct MiniGameOverlay {
+    GLuint fbo = 0;
+    GLuint colorTex = 0;
+    int texWidth = 512;
+    int texHeight = 512;
+
+    void ensureFramebuffer();
+    void resize(int w, int h);
+  };
+  MiniGameOverlay miniGameOverlay;
+  Renderer2D renderer2d;
 
   std::optional<Shader> blurShader;
   std::optional<Shader> tonemapShader;
@@ -128,4 +142,5 @@ struct Graphics {
   void cycleDebugChannel();
   void processDebugKeys();
   void drawDebugOverlay();
+  void drawMiniGameOverlay(ClientGame& game);
 };

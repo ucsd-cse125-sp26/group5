@@ -5,8 +5,8 @@
 
 #include "client_graphics.h"
 
+#include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <random>
 #include <string>
 #include <vector>
@@ -528,6 +528,20 @@ bool Graphics::load(int width, int height) {
     }
   }
 
+  {
+    GLuint brickTex = loadTexture2D("assets/textures/brick.png");
+    if (brickTex) textures2d["brick"] = brickTex;
+    GLuint flagTex = loadTexture2D("assets/textures/flag.png");
+    if (flagTex) textures2d["flag"] = flagTex;
+    GLuint playerTex = loadTexture2D("assets/textures/character-circle.avif");
+    if (playerTex) textures2d["player"] = playerTex;
+  }
+
+  if (!renderer2d.init()) {
+    fprintf(stderr, "Graphics::load: Renderer2D init failed\n");
+    return false;
+  }
+
   glEnable(GL_DEPTH_TEST);
 
   resizeBuffers(fbWidth, fbHeight);
@@ -759,6 +773,7 @@ void Graphics::reloadShaders() {
               r.frag);
     }
   }
+  renderer2d.reloadShaders();
   initShaderUniforms();
 }
 
@@ -852,6 +867,164 @@ void Graphics::drawDebugOverlay() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
                     GL_COMPARE_REF_TO_TEXTURE);
   }
+  glViewport(0, 0, fbWidth, fbHeight);
+}
+
+void Graphics::MiniGameOverlay::ensureFramebuffer() {
+  if (fbo && colorTex) return;
+
+  glGenFramebuffers(1, &fbo);
+  glGenTextures(1, &colorTex);
+  glBindTexture(GL_TEXTURE_2D, colorTex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texWidth, texHeight, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         colorTex, 0);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "miniGameFBO incomplete\n");
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Graphics::MiniGameOverlay::resize(int w, int h) {
+  if (w == texWidth && h == texHeight && fbo && colorTex) return;
+  texWidth = w;
+  texHeight = h;
+  if (colorTex) {
+    glDeleteTextures(1, &colorTex);
+    colorTex = 0;
+  }
+  if (fbo) {
+    glDeleteFramebuffers(1, &fbo);
+    fbo = 0;
+  }
+  ensureFramebuffer();
+}
+
+namespace {
+
+const shared::MiniGameSession* findRunningMiniGameSession(ClientGame& game) {
+  auto sessionView = game.renderRegistry.view<shared::MiniGameSession>();
+  for (auto ent : sessionView) {
+    const auto& session = sessionView.get<shared::MiniGameSession>(ent);
+    if (session.phase == shared::MiniGamePhase::RUNNING) {
+      return &session;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+void Graphics::drawMiniGameOverlay(ClientGame& game) {
+  if (!debugOverlay || !debugOverlay->valid() || !fullscreenVAO) return;
+
+  const auto* session = findRunningMiniGameSession(game);
+  if (!session) return;
+
+  auto view =
+      game.renderRegistry.view<shared::MiniGame2D, shared::Renderable2D>();
+  struct DrawItem {
+    uint8_t layer;
+    entt::entity entity;
+  };
+  std::vector<DrawItem> items;
+  for (auto ent : view) {
+    const auto& mg = view.get<shared::MiniGame2D>(ent);
+    if (mg.sessionId != session->sessionId) continue;
+    items.push_back({mg.layer, ent});
+  }
+  if (items.empty()) return;
+  std::sort(items.begin(), items.end(),
+            [](const DrawItem& a, const DrawItem& b) {
+              return a.layer < b.layer;
+            });
+
+  miniGameOverlay.ensureFramebuffer();
+
+  glBindFramebuffer(GL_FRAMEBUFFER, miniGameOverlay.fbo);
+  glViewport(0, 0, miniGameOverlay.texWidth, miniGameOverlay.texHeight);
+  glDisable(GL_DEPTH_TEST);
+  glClearColor(0.04f, 0.05f, 0.07f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  renderer2d.begin(session->logicalWidth, session->logicalHeight);
+  for (const auto& item : items) {
+    const auto& r = view.get<shared::Renderable2D>(item.entity);
+    glm::vec4 color{r.r, r.g, r.b, r.a};
+    switch (r.type) {
+      case shared::Renderable2DType::SPRITE: {
+        auto it = textures2d.find(r.spriteName);
+        if (it != textures2d.end()) {
+          renderer2d.drawTexturedRect(r.x, r.y, r.width, r.height, it->second,
+                                      color);
+        } else {
+          renderer2d.drawRect(r.x, r.y, r.width, r.height, color);
+        }
+        break;
+      }
+      case shared::Renderable2DType::TILEMAP: {
+        auto* tm = game.renderRegistry
+                       .try_get<shared::TilemapRenderable2D>(item.entity);
+        if (!tm || tm->cols == 0 || tm->rows == 0) break;
+        float cellW = r.width / tm->cols;
+        float cellH = r.height / tm->rows;
+        auto wallIt = textures2d.find("brick");
+        for (int row = 0; row < tm->rows; ++row) {
+          for (int col = 0; col < tm->cols; ++col) {
+            uint8_t tile = tm->tiles[row * tm->cols + col];
+            float cx = r.x + col * cellW;
+            float cy = r.y + row * cellH;
+            if (tile == 1 && wallIt != textures2d.end()) {
+              renderer2d.drawTexturedRect(cx, cy, cellW, cellH,
+                                          wallIt->second, color);
+            } else {
+              glm::vec4 floorColor =
+                  (tile == 0) ? glm::vec4(0.15f, 0.15f, 0.18f, 1.0f)
+                              : glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+              renderer2d.drawRect(cx, cy, cellW, cellH, floorColor);
+            }
+          }
+        }
+        break;
+      }
+      case shared::Renderable2DType::RECT:
+      case shared::Renderable2DType::TEXT:
+      default:
+        renderer2d.drawRect(r.x, r.y, r.width, r.height, color);
+        break;
+    }
+  }
+  renderer2d.end();
+
+  glDisable(GL_BLEND);
+
+  int overlayW = fbWidth / 4;
+  int overlayH = fbHeight / 4;
+  if (overlayW <= 0 || overlayH <= 0) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fbWidth, fbHeight);
+    return;
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(fbWidth - overlayW, fbHeight - overlayH, overlayW, overlayH);
+  debugOverlay->use();
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, miniGameOverlay.colorTex);
+  debugOverlay->setInt("src", 0);
+  glBindVertexArray(fullscreenVAO);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindVertexArray(0);
   glViewport(0, 0, fbWidth, fbHeight);
 }
 
@@ -1106,6 +1279,7 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
+  drawMiniGameOverlay(game);
   drawDebugOverlay();
 }
 

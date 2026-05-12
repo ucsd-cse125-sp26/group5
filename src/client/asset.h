@@ -59,3 +59,6 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
 // server-spawned entity's Position + RenderInfo.scale.
 std::vector<std::pair<std::string, Model*>> loadMapModels(
     const std::string& filename);
+
+// Load a standalone image file as a GL_TEXTURE_2D. Returns 0 on failure.
+GLuint loadTexture2D(const std::string& path);

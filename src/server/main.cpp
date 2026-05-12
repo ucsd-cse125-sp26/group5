@@ -50,6 +50,8 @@ int main() {
     auto* currentState = g.gameStateManager.currentState();
     entt::entity activeEntity = currentState->getClientAvatar(slots);
     std::vector<entt::entity> existing = currentState->getStateEntities(g);
+    auto miniEnts = g.miniGameManager.getActiveEntities(g);
+    existing.insert(existing.end(), miniEnts.begin(), miniEnts.end());
 
     if (!existing.empty()) {
       auto buf =
@@ -72,6 +74,14 @@ int main() {
     PlayerAvatars slots = it->second;
 
     slots.resetControls(g.registry);
+    if (auto* currentState = g.gameStateManager.currentState()) {
+      entt::entity activeEntity = currentState->getClientAvatar(slots);
+      if (g.registry.valid(activeEntity) &&
+          g.registry.all_of<shared::Entity>(activeEntity)) {
+        g.miniGameManager.removePlayer(
+            g.registry.get<shared::Entity>(activeEntity).id);
+      }
+    }
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
     peer->data = nullptr;
@@ -90,6 +100,7 @@ int main() {
     accumulator += dt;
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
+      game.miniGameManager.update(game, fixedDt);
 
       game.physics.step(fixedDt);
 
@@ -121,6 +132,8 @@ int main() {
       SIMPLE_PROFILE_SCOPE("Broadcast State");
       std::vector<entt::entity> allEnts =
           game.gameStateManager.currentState()->getStateEntities(game);
+      auto miniEnts = game.miniGameManager.getActiveEntities(game);
+      allEnts.insert(allEnts.end(), miniEnts.begin(), miniEnts.end());
       if (!allEnts.empty()) {
         auto buf = serializeEntities(game.registry, game.componentRegistry,
                                      shared::PacketType::UPDATE_ENTITY, allEnts,

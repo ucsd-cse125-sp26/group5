@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -73,6 +74,67 @@ struct PhysicsBody {
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
 
 enum class Outcome : uint8_t { UNDECIDED, WIN, LOSE };
+
+enum class MiniGameType : uint8_t {
+  NONE,
+  BALL_DEMO,
+  MAZE,
+};
+
+enum class MiniGamePhase : uint8_t {
+  INACTIVE,
+  WAITING_FOR_PLAYER,
+  RUNNING,
+  COMPLETE,
+  FAILED,
+};
+
+struct MiniGameSession {
+  uint32_t sessionId = 0;
+  uint32_t surfaceEntityId = 0;
+  MiniGameType type = MiniGameType::NONE;
+  MiniGamePhase phase = MiniGamePhase::INACTIVE;
+  uint32_t elapsedMs = 0;
+  uint32_t timeLimitMs = 0;
+  float logicalWidth = 1.0f;
+  float logicalHeight = 1.0f;
+};
+
+struct MiniGame2D {
+  uint32_t sessionId = 0;
+  uint8_t layer = 0;
+};
+
+enum class Renderable2DType : uint8_t {
+  RECT = 0,
+  SPRITE = 1,
+  TEXT = 2,
+  TILEMAP = 3,
+};
+
+struct Renderable2D {
+  Renderable2DType type = Renderable2DType::RECT;
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+  float r = 1.0f;
+  float g = 1.0f;
+  float b = 1.0f;
+  float a = 1.0f;
+  std::string spriteName;
+};
+
+struct TextRenderable2D {
+  char text[64] = {};
+  float fontSize = 16.0f;
+};
+
+struct TilemapRenderable2D {
+  uint8_t cols = 0;
+  uint8_t rows = 0;
+  std::array<uint8_t, 256> tiles{};
+};
 
 enum class SectionSeasonMap : uint8_t { WINTER, FALL, SUMMER, SPRING };
 
