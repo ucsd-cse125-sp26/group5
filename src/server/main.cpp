@@ -18,6 +18,7 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  initServerGame(game);
 
   ServerNetwork network;
   if (!network.init(7777, 4)) {
@@ -50,7 +51,6 @@ int main() {
     entt::entity activeEntity = currentState->getClientAvatar(slots);
     std::vector<entt::entity> existing = currentState->getStateEntities(g);
 
-    // Send full state of all existing entities
     if (!existing.empty()) {
       auto buf =
           serializeEntities(g.registry, g.componentRegistry,
@@ -58,7 +58,6 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-    // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
     assignPkt.entityId = g.registry.get<shared::Entity>(activeEntity).id;
@@ -72,33 +71,12 @@ int main() {
     printf("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
 
-    // if we wanted to immediately despawn the player's avatar on disconnect, we
-    // could do it here.
-
-    // shared::DespawnPacket despawnPkt;
-    // despawnPkt.type = shared::PacketType::DESPAWN_ENTITY;
-
-    // // Both slots
-    // auto despawnAvatar = [&](entt::entity e) {
-    //   if (g.registry.valid(e)) {
-    //     despawnPkt.entityId = g.registry.get<shared::Entity>(e).id;
-    //     net::broadcastPacket(network.getHost(), despawnPkt);
-
-    //     if (g.registry.all_of<shared::PhysicsBody>(e)) {
-    //       auto& pb = g.registry.get<shared::PhysicsBody>(e);
-    //       g.physics.destroyBody(pb.bodyId);
-    //     }
-    //     g.registry.destroy(e);
-    //   }
-    // };
-    // despawnAvatar(slots.overworld_avatar);
-    // despawnAvatar(slots.maze_avatar);
-
     slots.resetControls(g.registry);
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
     peer->data = nullptr;
   };
+
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -113,30 +91,29 @@ int main() {
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
 
-      {
-        SIMPLE_PROFILE_SCOPE("Physics Step");
-        game.physics.step(fixedDt);
-      }
-
-      // Step Jolt physics
       game.physics.step(fixedDt);
 
-      // Sync Jolt positions back into ECS
-      {
-        SIMPLE_PROFILE_SCOPE("Physics Sync ECS");
-        auto physicsView =
-            game.registry.view<shared::Position, shared::PhysicsBody>();
-        auto& bodyInterface = game.physics.getBodyInterface();
-        for (auto ent : physicsView) {
-          auto& pos = physicsView.get<shared::Position>(ent);
-          auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-          JPH::BodyID bodyId(pb.bodyId);
-          if (!bodyInterface.IsAdded(bodyId)) continue;
+      // Jolt → ECS sync. Skip rotation for player entities; their yaw is
+      // movement_system's responsibility (Jolt rotation DOFs are locked).
+      auto& bi = game.physics.getBodyInterface();
+      auto physicsView =
+          game.registry.view<shared::Position, shared::PhysicsBody>();
+      for (auto ent : physicsView) {
+        auto& pos = physicsView.get<shared::Position>(ent);
+        auto& pb = physicsView.get<shared::PhysicsBody>(ent);
+        JPH::BodyID id(pb.bodyId);
+        if (!bi.IsAdded(id)) continue;
 
-          JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyId);
-          pos.x = joltPos.GetX();
-          pos.y = joltPos.GetY();
-          pos.z = joltPos.GetZ();
+        JPH::RVec3 jp = bi.GetPosition(id);
+        pos.x = jp.GetX();
+        pos.y = jp.GetY();
+        pos.z = jp.GetZ();
+        if (!game.registry.all_of<shared::PlayerInput>(ent)) {
+          JPH::Quat jr = bi.GetRotation(id);
+          pos.qw = jr.GetW();
+          pos.qx = jr.GetX();
+          pos.qy = jr.GetY();
+          pos.qz = jr.GetZ();
         }
       }
       scene_cycle_system(game.registry);
@@ -155,6 +132,7 @@ int main() {
       SIMPLE_PROFILE_FRAME_START();
     }
 
+    // Yield so the loop doesn't spin-lock at 100% CPU.
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
