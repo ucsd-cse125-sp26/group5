@@ -121,4 +121,12 @@ struct SwitchComponent {
   bool switchOn = false;
 };
 
+struct FragmentComponent {
+  SectionSeasonMap season;
+  bool isPickedUp;
+};
+
+struct SeasonComponent {
+  SectionSeasonMap season = SectionSeasonMap::WINTER;
+};
 }  // namespace shared
