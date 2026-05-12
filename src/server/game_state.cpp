@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "game/maze_generation.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
@@ -157,6 +158,38 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
       entity, bodyId.GetIndexAndSequenceNumber());
 }
 
+std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
+  constexpr int kMazeWidth = 8;
+  constexpr int kMazeHeight = 8;
+  constexpr uint32_t kMazeSeed = 12505;
+  constexpr float kTileSpacing = 1.5f;
+
+  const maze::MazeLayout layout =
+      maze::GenerateMazeLayout(kMazeWidth, kMazeHeight, kMazeSeed);
+  const maze::MazeTileGrid tileGrid = maze::ConvertToTileGrid(layout);
+
+  std::vector<StaticEntityDesc> entities;
+  entities.push_back(StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                      .modelName = "cube",
+                                      .scale = glm::vec3(100.0f)});
+
+  for (int y = 0; y < tileGrid.height; ++y) {
+    for (int x = 0; x < tileGrid.width; ++x) {
+      if (tileGrid.Tile(x, y) != maze::MazeTile::Wall) continue;
+
+      entities.push_back(StaticEntityDesc{
+          .position =
+              glm::vec3((static_cast<float>(x) - 1.0f) * kTileSpacing,
+                        (static_cast<float>(y) - 1.0f) * kTileSpacing, 0.75f),
+          .modelName = "cube",
+          .scale = glm::vec3(0.7f, 0.7f, 1.5f),
+      });
+    }
+  }
+
+  return entities;
+}
+
 }  // namespace
 
 void initWorldEntities(ServerGame& game) {
@@ -196,36 +229,7 @@ void initWorldEntities(ServerGame& game) {
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
-  spawnStaticEntities<shared::MazeTag>(
-      game, {
-                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(100.0f)},
-                StaticEntityDesc{.position = glm::vec3(3.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.1f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(-3.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.1f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(0.0f, 5.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.2f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(0.0f, -5.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.2f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(6.0f, 6.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.15f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(-6.0f, -6.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.15f),
-                                 .collision = CollisionShape::Mesh},
-            });
+  spawnStaticEntities<shared::MazeTag>(game, buildGeneratedMazeEntities());
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
