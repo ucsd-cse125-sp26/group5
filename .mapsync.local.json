@@ -1,0 +1,14 @@
+{
+  "checkouts": {
+    "default": {
+      "checked_out_at": "2026-05-03T03:46:41Z",
+      "description": "redo arena lighting",
+      "epoch_at_checkout": 8,
+      "lock_uuid": "8d6e2305-6b2d-4b02-b571-551b08d2c7bc"
+    }
+  },
+  "server_host": "cse125.ucsd.edu",
+  "server_port": 222,
+  "server_root": "/var/www/html/cse125/2026/cse125g5/maps",
+  "server_user": "jic098"
+}
