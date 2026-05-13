@@ -422,8 +422,9 @@ bool Graphics::load(int width, int height) {
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces) bound as
-  // a layered attachment so the geometry shader can route via gl_Layer.
+  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces).
+  // Each face is bound individually via glFramebufferTextureLayer in the
+  // render loop to avoid geometry-shader emulation overhead on macOS.
   glGenFramebuffers(1, &pointShadowFBO);
   glGenTextures(1, &pointShadowMaps);
   glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
@@ -443,7 +444,8 @@ bool Graphics::load(int width, int height) {
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
                   GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
-  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps, 0);
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            pointShadowMaps, 0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -787,19 +789,44 @@ void Graphics::cycleDebugChannel() {
   debugChannel = static_cast<DebugChannel>(next);
   const char* name = "?";
   switch (debugChannel) {
-    case DebugChannel::Off:          name = "Off"; break;
-    case DebugChannel::DirShadowMap: name = "DirShadowMap"; break;
-    case DebugChannel::GPosition:    name = "GPosition"; break;
-    case DebugChannel::GNormal:      name = "GNormal"; break;
-    case DebugChannel::GAlbedo:      name = "GAlbedo"; break;
-    case DebugChannel::GSpecular:    name = "GSpecular"; break;
-    case DebugChannel::GEmissive:    name = "GEmissive"; break;
-    case DebugChannel::Ssao:         name = "SSAO"; break;
-    case DebugChannel::SsaoBlur:     name = "SSAOBlur"; break;
-    case DebugChannel::LitColor:     name = "LitColor"; break;
-    case DebugChannel::BrightColor:  name = "BrightColor"; break;
-    case DebugChannel::LdrColor:     name = "LdrColor"; break;
-    case DebugChannel::Count:        break;
+    case DebugChannel::Off:
+      name = "Off";
+      break;
+    case DebugChannel::DirShadowMap:
+      name = "DirShadowMap";
+      break;
+    case DebugChannel::GPosition:
+      name = "GPosition";
+      break;
+    case DebugChannel::GNormal:
+      name = "GNormal";
+      break;
+    case DebugChannel::GAlbedo:
+      name = "GAlbedo";
+      break;
+    case DebugChannel::GSpecular:
+      name = "GSpecular";
+      break;
+    case DebugChannel::GEmissive:
+      name = "GEmissive";
+      break;
+    case DebugChannel::Ssao:
+      name = "SSAO";
+      break;
+    case DebugChannel::SsaoBlur:
+      name = "SSAOBlur";
+      break;
+    case DebugChannel::LitColor:
+      name = "LitColor";
+      break;
+    case DebugChannel::BrightColor:
+      name = "BrightColor";
+      break;
+    case DebugChannel::LdrColor:
+      name = "LdrColor";
+      break;
+    case DebugChannel::Count:
+      break;
   }
   printf("Debug overlay: %s\n", name);
 }
@@ -825,17 +852,50 @@ void Graphics::drawDebugOverlay() {
   GLuint texToShow = 0;
   int mode = 0;
   switch (debugChannel) {
-    case DebugChannel::DirShadowMap: texToShow = dirShadowMap;   mode = 3; break;
-    case DebugChannel::GPosition:    texToShow = gPosition;      mode = 2; break;
-    case DebugChannel::GNormal:      texToShow = gNormal;        mode = 1; break;
-    case DebugChannel::GAlbedo:      texToShow = gAlbedo;        mode = 0; break;
-    case DebugChannel::GSpecular:    texToShow = gSpecular;      mode = 0; break;
-    case DebugChannel::GEmissive:    texToShow = gEmissive;      mode = 0; break;
-    case DebugChannel::Ssao:         texToShow = ssaoColor;      mode = 3; break;
-    case DebugChannel::SsaoBlur:     texToShow = ssaoBlurColor;  mode = 3; break;
-    case DebugChannel::LitColor:     texToShow = litColor;       mode = 2; break;
-    case DebugChannel::BrightColor:  texToShow = brightColor;    mode = 2; break;
-    case DebugChannel::LdrColor:     texToShow = ldrColor;       mode = 0; break;
+    case DebugChannel::DirShadowMap:
+      texToShow = dirShadowMap;
+      mode = 3;
+      break;
+    case DebugChannel::GPosition:
+      texToShow = gPosition;
+      mode = 2;
+      break;
+    case DebugChannel::GNormal:
+      texToShow = gNormal;
+      mode = 1;
+      break;
+    case DebugChannel::GAlbedo:
+      texToShow = gAlbedo;
+      mode = 0;
+      break;
+    case DebugChannel::GSpecular:
+      texToShow = gSpecular;
+      mode = 0;
+      break;
+    case DebugChannel::GEmissive:
+      texToShow = gEmissive;
+      mode = 0;
+      break;
+    case DebugChannel::Ssao:
+      texToShow = ssaoColor;
+      mode = 3;
+      break;
+    case DebugChannel::SsaoBlur:
+      texToShow = ssaoBlurColor;
+      mode = 3;
+      break;
+    case DebugChannel::LitColor:
+      texToShow = litColor;
+      mode = 2;
+      break;
+    case DebugChannel::BrightColor:
+      texToShow = brightColor;
+      mode = 2;
+      break;
+    case DebugChannel::LdrColor:
+      texToShow = ldrColor;
+      mode = 0;
+      break;
     case DebugChannel::Off:
     case DebugChannel::Count:
       return;
@@ -937,8 +997,7 @@ void Graphics::render(ClientGame& game) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                   pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
-        shadowPointShader->setMat4("lightSpaceMatrix",
-                                   pointMats[slot * 6 + f]);
+        shadowPointShader->setMat4("lightSpaceMatrix", pointMats[slot * 6 + f]);
         renderEntities(*shadowPointShader, game, models,
                        /*forShadowPass=*/true);
       }
