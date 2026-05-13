@@ -938,13 +938,12 @@ void Graphics::drawMiniGameOverlay(ClientGame& game) {
   for (auto ent : view) {
     const auto& mg = view.get<shared::MiniGame2D>(ent);
     if (mg.sessionId != session->sessionId) continue;
-    items.push_back({mg.layer, ent});
+    items.push_back({.layer = mg.layer, .entity = ent});
   }
   if (items.empty()) return;
-  std::sort(items.begin(), items.end(),
-            [](const DrawItem& a, const DrawItem& b) {
-              return a.layer < b.layer;
-            });
+  std::ranges::sort(items, [](const DrawItem& a, const DrawItem& b) {
+    return a.layer < b.layer;
+  });
 
   miniGameOverlay.ensureFramebuffer();
 
@@ -973,8 +972,8 @@ void Graphics::drawMiniGameOverlay(ClientGame& game) {
         break;
       }
       case shared::Renderable2DType::TILEMAP: {
-        auto* tm = game.renderRegistry
-                       .try_get<shared::TilemapRenderable2D>(item.entity);
+        auto* tm = game.renderRegistry.try_get<shared::TilemapRenderable2D>(
+            item.entity);
         if (!tm || tm->cols == 0 || tm->rows == 0) break;
         float cellW = r.width / tm->cols;
         float cellH = r.height / tm->rows;
@@ -985,12 +984,12 @@ void Graphics::drawMiniGameOverlay(ClientGame& game) {
             float cx = r.x + col * cellW;
             float cy = r.y + row * cellH;
             if (tile == 1 && wallIt != textures2d.end()) {
-              renderer2d.drawTexturedRect(cx, cy, cellW, cellH,
-                                          wallIt->second, color);
+              renderer2d.drawTexturedRect(cx, cy, cellW, cellH, wallIt->second,
+                                          color);
             } else {
-              glm::vec4 floorColor =
-                  (tile == 0) ? glm::vec4(0.15f, 0.15f, 0.18f, 1.0f)
-                              : glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+              glm::vec4 floorColor = (tile == 0)
+                                         ? glm::vec4(0.15f, 0.15f, 0.18f, 1.0f)
+                                         : glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
               renderer2d.drawRect(cx, cy, cellW, cellH, floorColor);
             }
           }

@@ -52,9 +52,9 @@ class BallDemoMiniGame : public IMiniGameState {
     game.registry.emplace<shared::MiniGame2D>(ballEntity, sessionId_,
                                               uint8_t{1});
     game.registry.emplace<shared::Renderable2D>(
-        ballEntity, shared::Renderable2DType::SPRITE,
-        0.5f - kBallSize * 0.5f, 0.5f - kBallSize * 0.5f, kBallSize,
-        kBallSize, 1.0f, 1.0f, 1.0f, 1.0f, std::string("brick"));
+        ballEntity, shared::Renderable2DType::SPRITE, 0.5f - kBallSize * 0.5f,
+        0.5f - kBallSize * 0.5f, kBallSize, kBallSize, 1.0f, 1.0f, 1.0f, 1.0f,
+        std::string("brick"));
 
     sessionEntity_ = sessionEntity;
     ballEntity_ = ballEntity;
@@ -169,8 +169,8 @@ class MazeMiniGame : public IMiniGameState {
   explicit MazeMiniGame(uint32_t sessionId) : sessionId_(sessionId) {}
 
   void onEnter(ServerGame& game) override {
-    const float logW = static_cast<float>(kMazeCols);
-    const float logH = static_cast<float>(kMazeRows);
+    const auto logW = static_cast<float>(kMazeCols);
+    const auto logH = static_cast<float>(kMazeRows);
 
     auto [sessionEntityId, sessionEntity] = new_entity(game);
     (void)sessionEntityId;
@@ -181,8 +181,7 @@ class MazeMiniGame : public IMiniGameState {
 
     auto [tmId, tmEntity] = new_entity(game);
     (void)tmId;
-    game.registry.emplace<shared::MiniGame2D>(tmEntity, sessionId_,
-                                              uint8_t{0});
+    game.registry.emplace<shared::MiniGame2D>(tmEntity, sessionId_, uint8_t{0});
     game.registry.emplace<shared::Renderable2D>(
         tmEntity, shared::Renderable2DType::TILEMAP, 0.0f, 0.0f, logW, logH,
         1.0f, 1.0f, 1.0f, 1.0f, std::string{});
@@ -213,17 +212,16 @@ class MazeMiniGame : public IMiniGameState {
                                               uint8_t{2});
     game.registry.emplace<shared::Renderable2D>(
         playerEntity, shared::Renderable2DType::SPRITE,
-        static_cast<float>(kMazeStartCol),
-        static_cast<float>(kMazeStartRow), 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-        1.0f, std::string("player"));
+        static_cast<float>(kMazeStartCol), static_cast<float>(kMazeStartRow),
+        1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, std::string("player"));
     playerEntity_ = playerEntity;
 
     broadcastSpawn(game, getEntities(game));
   }
 
   void onExit(ServerGame& game) override {
-    for (auto ent : {playerEntity_, goalEntity_, tilemapEntity_,
-                     sessionEntity_}) {
+    for (auto ent :
+         {playerEntity_, goalEntity_, tilemapEntity_, sessionEntity_}) {
       broadcastDespawn(game, ent);
       if (ent != entt::null && game.registry.valid(ent))
         game.registry.destroy(ent);

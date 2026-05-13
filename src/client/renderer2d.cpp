@@ -134,8 +134,8 @@ void Renderer2D::flush() {
 }
 
 void Renderer2D::pushQuad(float x, float y, float w, float h, float u0,
-                          float v0, float u1, float v1,
-                          const glm::vec4& color, GLuint texture) {
+                          float v0, float u1, float v1, const glm::vec4& color,
+                          GLuint texture) {
   if (texture != boundTexture_ && quadCount_ > 0) {
     flush();
   }
@@ -144,10 +144,38 @@ void Renderer2D::pushQuad(float x, float y, float w, float h, float u0,
   }
   boundTexture_ = texture;
 
-  Vertex2D bl = {x, y, u0, v0, color.r, color.g, color.b, color.a};
-  Vertex2D br = {x + w, y, u1, v0, color.r, color.g, color.b, color.a};
-  Vertex2D tr = {x + w, y + h, u1, v1, color.r, color.g, color.b, color.a};
-  Vertex2D tl = {x, y + h, u0, v1, color.r, color.g, color.b, color.a};
+  Vertex2D bl = {.x = x,
+                 .y = y,
+                 .u = u0,
+                 .v = v0,
+                 .r = color.r,
+                 .g = color.g,
+                 .b = color.b,
+                 .a = color.a};
+  Vertex2D br = {.x = x + w,
+                 .y = y,
+                 .u = u1,
+                 .v = v0,
+                 .r = color.r,
+                 .g = color.g,
+                 .b = color.b,
+                 .a = color.a};
+  Vertex2D tr = {.x = x + w,
+                 .y = y + h,
+                 .u = u1,
+                 .v = v1,
+                 .r = color.r,
+                 .g = color.g,
+                 .b = color.b,
+                 .a = color.a};
+  Vertex2D tl = {.x = x,
+                 .y = y + h,
+                 .u = u0,
+                 .v = v1,
+                 .r = color.r,
+                 .g = color.g,
+                 .b = color.b,
+                 .a = color.a};
 
   vertices_.push_back(bl);
   vertices_.push_back(br);
@@ -156,8 +184,7 @@ void Renderer2D::pushQuad(float x, float y, float w, float h, float u0,
   quadCount_++;
 }
 
-void Renderer2D::drawRect(float x, float y, float w, float h,
-                          glm::vec4 color) {
+void Renderer2D::drawRect(float x, float y, float w, float h, glm::vec4 color) {
   pushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, color, whiteTexture_);
 }
 
@@ -166,9 +193,8 @@ void Renderer2D::drawTexturedRect(float x, float y, float w, float h,
   pushQuad(x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tint, texture);
 }
 
-void Renderer2D::drawSubRect(float x, float y, float w, float h,
-                             GLuint texture, glm::vec4 uvRect,
-                             glm::vec4 tint) {
+void Renderer2D::drawSubRect(float x, float y, float w, float h, GLuint texture,
+                             glm::vec4 uvRect, glm::vec4 tint) {
   pushQuad(x, y, w, h, uvRect.x, uvRect.y, uvRect.z, uvRect.w, tint, texture);
 }
 
