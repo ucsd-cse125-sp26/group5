@@ -20,6 +20,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
@@ -857,6 +858,7 @@ void Graphics::drawDebugOverlay() {
 
 void Graphics::render(ClientGame& game) {
   SIMPLE_PROFILE_SCOPE("Render");
+  GPU_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
 
@@ -880,6 +882,7 @@ void Graphics::render(ClientGame& game) {
   }
   if (shadowDirShader && shadowDirShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowDir");
+    GPU_PROFILE_SCOPE("ShadowDir");
     glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
     glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
@@ -902,6 +905,7 @@ void Graphics::render(ClientGame& game) {
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
   if (shadowPointShader && shadowPointShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
+    GPU_PROFILE_SCOPE("ShadowPoint");
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
     glViewport(0, 0, kPointShadowSize, kPointShadowSize);
     glEnable(GL_DEPTH_TEST);
@@ -920,6 +924,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("GBuffer");
+    GPU_PROFILE_SCOPE("GBuffer");
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glEnable(GL_DEPTH_TEST);
@@ -934,6 +939,7 @@ void Graphics::render(ClientGame& game) {
 
   if (ssaoShader && ssaoShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAO");
+    GPU_PROFILE_SCOPE("SSAO");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -962,6 +968,7 @@ void Graphics::render(ClientGame& game) {
 
   if (ssaoBlurShader && ssaoBlurShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAOBlur");
+    GPU_PROFILE_SCOPE("SSAOBlur");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -977,6 +984,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Lighting");
+    GPU_PROFILE_SCOPE("Lighting");
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum litDrawBufs[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, litDrawBufs);
@@ -1023,6 +1031,7 @@ void Graphics::render(ClientGame& game) {
   // scene geometry. Skybox writes litColor only (no bloom).
   {
     SIMPLE_PROFILE_SCOPE("Skybox");
+    GPU_PROFILE_SCOPE("Skybox");
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, litFBO);
     glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight,
@@ -1045,6 +1054,7 @@ void Graphics::render(ClientGame& game) {
   GLuint finalBloomColor = brightColor;
   if (blurShader && blurShader->valid() && bloomBlurIterations > 0) {
     SIMPLE_PROFILE_SCOPE("Bloom");
+    GPU_PROFILE_SCOPE("Bloom");
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, fbWidth, fbHeight);
     blurShader->use();
@@ -1069,6 +1079,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Tonemap");
+    GPU_PROFILE_SCOPE("Tonemap");
     glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -1091,6 +1102,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Present");
+    GPU_PROFILE_SCOPE("Present");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
