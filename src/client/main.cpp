@@ -11,6 +11,7 @@
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
+#include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
 #include "shared/simple_profiler.h"
@@ -51,6 +52,7 @@ int main() {
     graphics.render(game);
     graphics.swap();
     GPU_PROFILE_FRAME_END();
+    GPU_MEM_FRAME_END();
     glfwPollEvents();
     graphics.processDebugKeys();
 
