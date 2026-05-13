@@ -43,6 +43,22 @@ Still learned more in blender, definitely have gotten the speed of my workflow u
 Getting a bit tired, but we are doing fine. 
 
 
+## Week 5
+1. What were your concrete goals for the week?
+Getting the coloring of the map done, and finish working on a good portion of the assets. 
+2. What goals were you able to accomplish?
+Colored the map; I would say majority of the assets are done, I will ahve to start putting them onto the map and see what else are needed though. 
+3. If the week went differently than you had planned, what were the reasons? 
+Tired, extra events, but compared to my teammates who are suffering in midterm, I am in a much better state. 
+4. What are your specific goals for the next week?
+    1. Try to add the glittering sand texture to landscape so it looks less low poly. 
+    2. Finish paving the path 
+    3. Add all necessary assets to the map. This is quite important. 
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Still learned more in blender, definitely have gotten the speed of my workflow up. So that's quite good. 
+6. What is your individual morale (which might be different from the overall group morale)?
+Getting a bit tired, but we are doing fine. 
+
 ## Week 4 
 1. What were your concrete goals for the week?
 This week, I wanted to: 

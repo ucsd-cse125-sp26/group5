@@ -5,28 +5,64 @@
 #include <map>
 #include <vector>
 
+#include "game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
-
 class ServerNetwork;
 
-struct ServerGame {
-  shared::ComponentRegistry componentRegistry;
-  entt::registry registry;
-  std::map<ENetPeer*, entt::entity> peerEntityMap;
-  uint32_t nextEntityId = 0;
-  PhysicsEngine physics;
+struct PlayerAvatars {
+  entt::entity overworld_avatar;
+  entt::entity maze_avatar;
+
+  void resetControls(entt::registry& registry) const {
+    auto resetAvatar = [&registry](entt::entity avatar) {
+      if (registry.all_of<shared::PlayerInput>(avatar)) {
+        auto& input = registry.get<shared::PlayerInput>(avatar);
+        input.keys = 0;
+        input.keys_prev = 0;
+        input.keys_newly_pressed = 0;
+        input.mouseDx = 0.0f;
+        input.mouseDy = 0.0f;
+      }
+      if (registry.all_of<shared::Velocity>(avatar)) {
+        auto& velocity = registry.get<shared::Velocity>(avatar);
+        velocity.dx = 0.0f;
+        velocity.dy = 0.0f;
+        velocity.dz = 0.0f;
+      }
+    };
+    resetAvatar(overworld_avatar);
+    resetAvatar(maze_avatar);
+  }
 };
 
+// `physics` first so it's destroyed last — the on_destroy<PhysicsBody> hook
+// fires during ~registry and needs physics live.
+struct ServerGame {
+  PhysicsEngine physics;
+  shared::ComponentRegistry componentRegistry;
+  entt::registry registry;
+  std::map<ENetPeer*, PlayerAvatars> active_players;
+  std::vector<PlayerAvatars> unused_player_slots;
+  uint32_t nextEntityId = 0;
+  GameStateManager gameStateManager;
+  ServerNetwork* network = nullptr;
+};
+
+// Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,
+// destroy bodies by removing the entity, not via physics.destroyBody.
+void initServerGame(ServerGame& game);
+
 void input_tick(entt::registry& registry);
-void movement_system(ServerGame& game, float dt);
-void render_model_change(entt::registry& registry, float dt);
+void movement_system(ServerGame& game, float dt, StateType stateType);
+void render_model_change(ServerGame& game, float dt);
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t lightEntity);
-void scene_cycle_system(entt::registry& registry);
+void scene_cycle_system(entt::registry& registry, StateType stateType);
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
+void initWorldEntities(ServerGame& game);
 
 std::vector<uint8_t> serializeEntities(
     entt::registry& registry,

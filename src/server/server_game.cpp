@@ -15,7 +15,19 @@
 
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
-// ── Movement system ──────────────────────────────────────
+namespace {
+
+void onPhysicsBodyDestroyed(PhysicsEngine& physics, entt::registry& reg,
+                            entt::entity ent) {
+  physics.destroyBody(reg.get<shared::PhysicsBody>(ent).bodyId);
+}
+
+}  // namespace
+
+void initServerGame(ServerGame& game) {
+  game.registry.on_destroy<shared::PhysicsBody>()
+      .connect<&onPhysicsBodyDestroyed>(game.physics);
+}
 
 // Process input on tick
 void input_tick(entt::registry& registry) {
@@ -30,22 +42,24 @@ void input_tick(entt::registry& registry) {
 
 // ── Movement system ──────────────────────────────────────
 
-void movement_system(ServerGame& game, float dt) {
+template <typename WorldTag>
+static void movement_system_for_world(ServerGame& game, float dt) {
   SIMPLE_PROFILE_SCOPE("Movement System");
   const float sensitivity = 0.002f;
   const float pitchLimit = glm::half_pi<float>() - 0.01f;
   auto& bodyInterface = game.physics.getBodyInterface();
 
-  auto view = game.registry.view<shared::Position, shared::Velocity,
-                                 shared::PlayerInput, shared::PhysicsBody>();
+  auto view =
+      game.registry.view<shared::Position, shared::Velocity,
+                         shared::PlayerInput, shared::PhysicsBody, WorldTag>();
   for (auto entity : view) {
-    auto& position = view.get<shared::Position>(entity);
-    auto& velocity = view.get<shared::Velocity>(entity);
-    auto& input = view.get<shared::PlayerInput>(entity);
-    auto& pb = view.get<shared::PhysicsBody>(entity);
+    auto& position = view.template get<shared::Position>(entity);
+    auto& velocity = view.template get<shared::Velocity>(entity);
+    auto& input = view.template get<shared::PlayerInput>(entity);
+    auto& pb = view.template get<shared::PhysicsBody>(entity);
     JPH::BodyID bodyId(pb.bodyId);
+    if (!bodyInterface.IsAdded(bodyId)) continue;
 
-    // Apply mouse look
     if (input.mouseDx != 0.0f) {
       float yawDelta = -input.mouseDx * sensitivity;
       glm::quat q(position.qw, position.qx, position.qy, position.qz);
@@ -55,6 +69,10 @@ void movement_system(ServerGame& game, float dt) {
       position.qx = q.x;
       position.qy = q.y;
       position.qz = q.z;
+
+      // Push yaw so asymmetric shapes (bear box) track the facing.
+      JPH::Quat joltRot(q.x, q.y, q.z, q.w);
+      bodyInterface.SetRotation(bodyId, joltRot, JPH::EActivation::Activate);
     }
 
     if (game.registry.all_of<shared::Camera>(entity)) {
@@ -84,34 +102,77 @@ void movement_system(ServerGame& game, float dt) {
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 
-    // Get current vertical velocity from Jolt to preserve gravity
+    // Preserve gravity-driven Z velocity.
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    // Jump
     if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
 
-    // Set velocity on Jolt body instead of manually moving position
     bodyInterface.SetLinearVelocity(
         bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
   }
 }
 
-// Model modification system
-void render_model_change(entt::registry& registry, float dt) {
-  auto view = registry.view<shared::RenderInfo, shared::PlayerInput>();
-  for (auto entity : view) {
-    auto& renderInfo = view.get<shared::RenderInfo>(entity);
-    auto& input = view.get<shared::PlayerInput>(entity);
-    if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
-      renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
-    }
-    if (input.keys & KEY_MODEL_BIGGER) renderInfo.scale *= 1.1;
-    if (input.keys & KEY_MODEL_SMALLER) renderInfo.scale /= 1.1;
+void movement_system(ServerGame& game, float dt, StateType stateType) {
+  switch (stateType) {
+    case StateType::OVERWORLD:
+      movement_system_for_world<shared::OverworldTag>(game, dt);
+      break;
+    case StateType::MAZE:
+      movement_system_for_world<shared::MazeTag>(game, dt);
+      break;
   }
 }
 
-// Temporary - used to demonstrate server-controlled point light
+// ── Held-key model resize ────────────────────────────────
+//
+// Resize is uncapped from input; clamp before sub-FLT_MIN scale crashes the
+// Jolt narrow-phase or extreme scales wreck broadphase.
+void render_model_change(ServerGame& game, float dt) {
+  auto& bodyInterface = game.physics.getBodyInterface();
+  auto view =
+      game.registry
+          .view<shared::RenderInfo, shared::PlayerInput, shared::PhysicsBody>();
+  constexpr float kMinPlayerScale = 0.05f;
+  constexpr float kMaxPlayerScale = 20.0f;
+  for (auto entity : view) {
+    auto& renderInfo = view.get<shared::RenderInfo>(entity);
+    auto& input = view.get<shared::PlayerInput>(entity);
+    auto& pb = view.get<shared::PhysicsBody>(entity);
+    bool shapeDirty = false;
+    if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
+      renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+      shapeDirty = true;
+    }
+    if (input.keys & KEY_MODEL_BIGGER) {
+      renderInfo.sx = std::min(renderInfo.sx * 1.1f, kMaxPlayerScale);
+      renderInfo.sy = std::min(renderInfo.sy * 1.1f, kMaxPlayerScale);
+      renderInfo.sz = std::min(renderInfo.sz * 1.1f, kMaxPlayerScale);
+      shapeDirty = true;
+    }
+    if (input.keys & KEY_MODEL_SMALLER) {
+      renderInfo.sx = std::max(renderInfo.sx / 1.1f, kMinPlayerScale);
+      renderInfo.sy = std::max(renderInfo.sy / 1.1f, kMinPlayerScale);
+      renderInfo.sz = std::max(renderInfo.sz / 1.1f, kMinPlayerScale);
+      shapeDirty = true;
+    }
+    if (shapeDirty) {
+      JPH::ShapeRefC newShape = game.physics.playerShapeForAsset(
+          renderInfo.modelName,
+          glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
+      // Don't recompute mass: a 14x11x18 bear box at default density is
+      // ~2.7M kg, which combined with locked rotation DOFs produces
+      // NaN/Inf in the next physics step.
+      if (newShape) {
+        bodyInterface.SetShape(JPH::BodyID(pb.bodyId), newShape,
+                               /*update mass*/ false,
+                               JPH::EActivation::Activate);
+      }
+    }
+  }
+}
+
+// Demo: server-controlled point light orbiting the origin.
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t light_entity_id) {
   bool brighten = false;
@@ -125,7 +186,7 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
   }
 
   static float angle = 0.0f;
-  angle += dt * 1.0f;  // 1 radian/sec
+  angle += dt;  // rad/sec
 
   const float radius = 5.0f;
   const float height = 3.0f;
@@ -143,7 +204,6 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     pos.y = radius * std::sin(angle);
     pos.z = height;
 
-    // Orient the cube to face the origin
     glm::vec3 p(pos.x, pos.y, pos.z);
     glm::vec3 dir = glm::normalize(-p);
     glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -175,11 +235,16 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
   }
 }
 
-void scene_cycle_system(entt::registry& registry) {
+// Cycle only the active world's Scene anchor. Iterating all Scene
+// components would mutate an inactive anchor (Maze's, since EnTT iterates
+// newest-first), and that change never reaches clients because UPDATE_ENTITY
+// only broadcasts the active state's tagged entities.
+template <typename Tag>
+static void scene_cycle_system_for_world(entt::registry& registry) {
   bool cycle = false;
-  auto inputView = registry.view<shared::PlayerInput>();
+  auto inputView = registry.view<Tag, shared::PlayerInput>();
   for (auto entity : inputView) {
-    auto& input = inputView.get<shared::PlayerInput>(entity);
+    auto& input = inputView.template get<shared::PlayerInput>(entity);
     if (input.keys_newly_pressed & KEY_CYCLE_SCENE) {
       cycle = true;
       break;
@@ -187,9 +252,9 @@ void scene_cycle_system(entt::registry& registry) {
   }
   if (!cycle) return;
 
-  auto sceneView = registry.view<shared::Scene>();
+  auto sceneView = registry.view<Tag, shared::Scene>();
   for (auto entity : sceneView) {
-    auto& scene = sceneView.get<shared::Scene>(entity);
+    auto& scene = sceneView.template get<shared::Scene>(entity);
     for (std::size_t i = 0; i < shared::SCENE_COUNT; i++) {
       if (shared::SCENES[i].name == scene.name) {
         scene.name =
@@ -201,7 +266,17 @@ void scene_cycle_system(entt::registry& registry) {
   }
 }
 
-// Entity creation helper
+void scene_cycle_system(entt::registry& registry, StateType stateType) {
+  switch (stateType) {
+    case StateType::OVERWORLD:
+      scene_cycle_system_for_world<shared::OverworldTag>(registry);
+      break;
+    case StateType::MAZE:
+      scene_cycle_system_for_world<shared::MazeTag>(registry);
+      break;
+  }
+}
+
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
   auto entity = g.registry.create();
   auto id = g.nextEntityId;
@@ -210,17 +285,23 @@ std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {
   return {id, entity};
 }
 
-// ── Packet handlers ──────────────────────────────────────
-
 void registerServerHandlers(ServerNetwork& network) {
   network.dispatcher().on(
       shared::PacketType::INPUT,
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.peerEntityMap.find(sender);
-        if (it == game.peerEntityMap.end()) return;
-        auto ent = it->second;
+        auto it = game.active_players.find(sender);
+        if (it == game.active_players.end()) return;
+
+        entt::entity ent = entt::null;
+        auto state = game.gameStateManager.currentState();
+        if (state && state->getStateType() == StateType::OVERWORLD) {
+          ent = it->second.overworld_avatar;
+        } else if (state && state->getStateType() == StateType::MAZE) {
+          ent = it->second.maze_avatar;
+        }
+        if (ent == entt::null) return;
 
         auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
         playerInput.keys = pkt.keys;

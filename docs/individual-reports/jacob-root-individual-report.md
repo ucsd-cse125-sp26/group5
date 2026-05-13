@@ -8,7 +8,110 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
-### Week 3
+### Week 5 (May 07)
+
+1. What were your concrete goals for the week?
+
+- shadows, hdr, bloom, deferred shading, framebuffer debugging
+- skeletal animations
+- make it possible to collaborate on map (invent worse p4 from first principles)
+- Figure out a solution for ECS metadata in map editing
+- vram profiling
+- multiple maps (maybe)
+- delegate subset of below
+- debug UI
+- input refactor + debug console
+- loading screen (maybe)
+- sound
+
+1. What goals were you able to accomplish?
+
+- shadows, hdr, bloom, deferred shading, framebuffer debugging
+- make it possible to collaborate on map (invent worse p4 from first principles)
+- Figure out a solution for ECS metadata in map editing
+- multiple maps
+- delegate sound
+
+1. If the week went differently than you had planned, what were the reasons?
+
+Midterms were unfortunate, so less got done than was ideal. Largely this manifested as things being completed but not being fully polished and merged.
+
+1. What are your specific goals for the next week?
+
+- skeletal animations
+- vram profiling
+- 2d rendering if needed
+- debug UI
+- input refactor + debug console
+- instancing (maybe)
+- actually run the game on windows
+- delegate subset of below
+- loading screen (maybe)
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+This week was largely applying stuff I knew already.
+
+1. What is your individual morale (which might be different from the overall group morale)?
+High. Workload was high but now I should have more time.
+
+### Week 4 (Apr 30)
+
+1. What were your concrete goals for the week?
+
+- design work
+- ecs resources
+- input refactor
+- debug console
+- proper maps (maybe - hook up with debug console somehow)
+- shadows
+- HDR/bloom
+- deferred shading (maybe - potential prereq for HDR/shadows as it involves thinking about quads and fb textures)
+- fbdebug (maybe)
+- physics debug mode
+- basic frametime profiling/warnings (maybe)
+- skeletal animation (maybe - head movement on player would be nice but fine with pushing 1 week)
+- work with tim on smoothness
+- work with alain on integrating physics
+- work with leon and phillip on minigame rendering
+- planning work for next technical steps
+- loading screen (maybe)
+
+1. What goals were you able to accomplish?
+
+- map creation in blender + coupled map loading
+- blinn-phong shading
+- sent ecs design resources
+- physics cleanup
+
+1. If the week went differently than you had planned, what were the reasons?
+
+Changed focus onto the map editor because this would help unblock the actual game working. Did some extra work on rendering stuff (shadows, hdr, deferrred) but didn't finish that in time due to PA business + unexpected social commitments. Did not get as much done as I would've liked, but goals are aspirational and I think the current stack is manageable. I think the way I split my goals last time was not ideal so I started grouping them by what I'd probably do at a time.
+
+1. What are your specific goals for the next week?
+
+- shadows, hdr, bloom, deferred shading, framebuffer debugging
+- skeletal animations
+- make it possible to collaborate on map (invent worse p4 from first principles)
+- Figure out a solution for ECS metadata in map editing
+- vram profiling
+- multiple maps (maybe)
+- delegate subset of below
+- debug UI
+- input refactor + debug console
+- loading screen (maybe)
+- sound
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+gltf internals, blender gltf export details, assimp gltf handling. I didn't expect to learn this, and this direction was unexpected, but probably better than what I initially envisioned for map editing.
+
+it turns out assimp supports importing lights, unfortunately the docs didn't say this anywhere
+
+1. What is your individual morale (which might be different from the overall group morale)?
+high; I have a large stack but it seems pretty manageable. Next week has midterms so I am theoretically busy.
+
+### Week 3 (Apr 23)
 
 1. What were your concrete goals for the week?
 
@@ -65,7 +168,7 @@ thought about performance, ECS architecture stuff, glfw text input handling
 1. What is your individual morale (which might be different from the overall group morale)?
 6.7/10, largely due to busy week academically and an anticipated busy week next week.
 
-### Week 2
+### Week 2 (Apr 16)
 
 1. What were your concrete goals for the week?
 
