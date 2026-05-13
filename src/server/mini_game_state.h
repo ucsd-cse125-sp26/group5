@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "shared/components.h"
-#include "shared/protocol.h"
 
 struct ServerGame;
 
@@ -17,8 +16,6 @@ class IMiniGameState {
   virtual void onEnter(ServerGame& game) = 0;
   virtual void onExit(ServerGame& game) = 0;
   virtual void update(ServerGame& game, float dt) = 0;
-  virtual void handleInput(ServerGame& game, uint32_t playerEntityId,
-                           const shared::MiniGameInputPacket& input) = 0;
   virtual void removePlayer(uint32_t playerEntityId) = 0;
 
   virtual shared::MiniGameType type() const = 0;
@@ -32,8 +29,6 @@ class MiniGameStateManager {
   void requestStop(ServerGame& game);
   void start(ServerGame& game, std::unique_ptr<IMiniGameState> state);
   void update(ServerGame& game, float dt);
-  void handleInput(ServerGame& game, uint32_t playerEntityId,
-                   const shared::MiniGameInputPacket& input);
   void removePlayer(uint32_t playerEntityId);
 
   std::vector<entt::entity> getActiveEntities(ServerGame& game) const;

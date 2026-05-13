@@ -1,7 +1,7 @@
 #pragma once
-#include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "input.h"
 
@@ -133,7 +133,7 @@ struct TextRenderable2D {
 struct TilemapRenderable2D {
   uint8_t cols = 0;
   uint8_t rows = 0;
-  std::array<uint8_t, 256> tiles{};
+  std::vector<uint8_t> tiles;
 };
 
 enum class SectionSeasonMap : uint8_t { WINTER, FALL, SUMMER, SPRING };

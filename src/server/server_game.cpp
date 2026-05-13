@@ -289,41 +289,22 @@ void registerServerHandlers(ServerNetwork& network) {
   network.dispatcher().on(
       shared::PacketType::INPUT,
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
-        (void)len;
+        if (len < sizeof(shared::InputPacket)) return;
         shared::InputPacket pkt;
-        std::memcpy(&pkt, data, sizeof(pkt));
-        auto it = game.active_players.find(sender);
-        if (it == game.active_players.end()) return;
-
-        entt::entity ent = entt::null;
-        auto state = game.gameStateManager.currentState();
-        if (state && state->getStateType() == StateType::OVERWORLD) {
-          ent = it->second.overworld_avatar;
-        } else if (state && state->getStateType() == StateType::MAZE) {
-          ent = it->second.maze_avatar;
-        }
-        if (ent == entt::null) return;
-
-        auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
-        playerInput.keys = pkt.keys;
-        playerInput.mouseDx += pkt.mouseDx;
-        playerInput.mouseDy += pkt.mouseDy;
-      });
-
-  network.dispatcher().on(
-      shared::PacketType::MINIGAME_INPUT,
-      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
-        (void)len;
-        shared::MiniGameInputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
         if (it == game.active_players.end()) return;
 
         auto* state = game.gameStateManager.currentState();
         if (!state) return;
-        entt::entity avatar = state->getClientAvatar(it->second);
-        uint32_t playerEntityId = game.registry.get<shared::Entity>(avatar).id;
-        game.miniGameManager.handleInput(game, playerEntityId, pkt);
+
+        entt::entity ent = state->getClientAvatar(it->second);
+        if (ent == entt::null) return;
+
+        auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
+        playerInput.keys = pkt.keys;
+        playerInput.mouseDx += pkt.mouseDx;
+        playerInput.mouseDy += pkt.mouseDy;
       });
 }
 

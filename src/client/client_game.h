@@ -28,13 +28,11 @@ struct ClientGame {
   std::atomic<bool> running = true;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
-  SpscQueue<shared::MiniGameInputPacket, 256> miniGameInputQueue;
 };
 
 void syncToRender(ClientGame& game);
 void registerClientHandlers(ClientNetwork& network);
-void processInput(
-    GLFWwindow* window, SpscQueue<shared::InputPacket, 256>& inputQueue,
-    SpscQueue<shared::MiniGameInputPacket, 256>& miniGameInputQueue,
-    InputKeys& prevKeys, InputKeys& prevMiniGameKeys);
+void processInput(GLFWwindow* window,
+                  SpscQueue<shared::InputPacket, 256>& inputQueue,
+                  InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);

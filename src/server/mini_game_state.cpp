@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <memory>
 #include <vector>
 
@@ -37,11 +36,6 @@ void broadcastDespawn(ServerGame& game, entt::entity entity) {
   net::broadcastPacket(game.network->getHost(), pkt);
 }
 
-float normalizedAxis(float negative, float positive) {
-  float axis = positive - negative;
-  return std::clamp(axis, -1.0f, 1.0f);
-}
-
 class BallDemoMiniGame : public IMiniGameState {
  public:
   explicit BallDemoMiniGame(uint32_t sessionId) : sessionId_(sessionId) {}
@@ -64,7 +58,6 @@ class BallDemoMiniGame : public IMiniGameState {
 
     sessionEntity_ = sessionEntity;
     ballEntity_ = ballEntity;
-    playerAxes_.clear();
 
     broadcastSpawn(game, getEntities(game));
   }
@@ -82,7 +75,6 @@ class BallDemoMiniGame : public IMiniGameState {
 
     sessionEntity_ = entt::null;
     ballEntity_ = entt::null;
-    playerAxes_.clear();
   }
 
   void update(ServerGame& game, float dt) override {
@@ -93,10 +85,13 @@ class BallDemoMiniGame : public IMiniGameState {
 
     float axisX = 0.0f;
     float axisY = 0.0f;
-    for (const auto& [playerId, axis] : playerAxes_) {
-      (void)playerId;
-      axisX += axis.x;
-      axisY += axis.y;
+    auto inputView = game.registry.view<shared::PlayerInput>();
+    for (auto ent : inputView) {
+      const auto& pi = inputView.get<shared::PlayerInput>(ent);
+      if (pi.keys & KEY_MINIGAME_RIGHT) axisX += 1.0f;
+      if (pi.keys & KEY_MINIGAME_LEFT) axisX -= 1.0f;
+      if (pi.keys & KEY_MINIGAME_UP) axisY += 1.0f;
+      if (pi.keys & KEY_MINIGAME_DOWN) axisY -= 1.0f;
     }
     axisX = std::clamp(axisX, -1.0f, 1.0f);
     axisY = std::clamp(axisY, -1.0f, 1.0f);
@@ -120,26 +115,7 @@ class BallDemoMiniGame : public IMiniGameState {
     }
   }
 
-  void handleInput(ServerGame& game, uint32_t playerEntityId,
-                   const shared::MiniGameInputPacket& input) override {
-    (void)game;
-    if (input.sessionId != 0 && input.sessionId != sessionId_) return;
-
-    PlayerAxis axis;
-    axis.x = input.axisX;
-    axis.y = input.axisY;
-    if (axis.x == 0.0f && axis.y == 0.0f) {
-      axis.x = normalizedAxis((input.keys & KEY_MINIGAME_LEFT) ? 1.0f : 0.0f,
-                              (input.keys & KEY_MINIGAME_RIGHT) ? 1.0f : 0.0f);
-      axis.y = normalizedAxis((input.keys & KEY_MINIGAME_DOWN) ? 1.0f : 0.0f,
-                              (input.keys & KEY_MINIGAME_UP) ? 1.0f : 0.0f);
-    }
-    playerAxes_[playerEntityId] = axis;
-  }
-
-  void removePlayer(uint32_t playerEntityId) override {
-    playerAxes_.erase(playerEntityId);
-  }
+  void removePlayer(uint32_t /*playerEntityId*/) override {}
 
   shared::MiniGameType type() const override {
     return shared::MiniGameType::BALL_DEMO;
@@ -159,15 +135,9 @@ class BallDemoMiniGame : public IMiniGameState {
   }
 
  private:
-  struct PlayerAxis {
-    float x = 0.0f;
-    float y = 0.0f;
-  };
-
   uint32_t sessionId_ = 0;
   entt::entity sessionEntity_ = entt::null;
   entt::entity ballEntity_ = entt::null;
-  std::map<uint32_t, PlayerAxis> playerAxes_;
 };
 
 // clang-format off
@@ -220,6 +190,7 @@ class MazeMiniGame : public IMiniGameState {
     shared::TilemapRenderable2D tm;
     tm.cols = kMazeCols;
     tm.rows = kMazeRows;
+    tm.tiles.resize(kMazeCols * kMazeRows);
     for (int r = 0; r < kMazeRows; ++r)
       for (int c = 0; c < kMazeCols; ++c)
         tm.tiles[r * kMazeCols + c] = kMazeLayout[r][c];
@@ -265,9 +236,6 @@ class MazeMiniGame : public IMiniGameState {
 
   void update(ServerGame& /*game*/, float /*dt*/) override {}
 
-  void handleInput(ServerGame& /*game*/, uint32_t /*playerEntityId*/,
-                   const shared::MiniGameInputPacket& /*input*/) override {}
-
   void removePlayer(uint32_t /*playerEntityId*/) override {}
 
   shared::MiniGameType type() const override {
@@ -298,7 +266,7 @@ class MazeMiniGame : public IMiniGameState {
 
 void MiniGameStateManager::requestStart(ServerGame& game) {
   if (active_) return;
-  start(game, std::make_unique<MazeMiniGame>(nextSessionId_++));
+  start(game, std::make_unique<BallDemoMiniGame>(nextSessionId_++));
 }
 
 void MiniGameStateManager::requestStop(ServerGame& game) {
@@ -315,21 +283,18 @@ void MiniGameStateManager::start(ServerGame& game,
 }
 
 void MiniGameStateManager::update(ServerGame& game, float dt) {
+  auto inputView = game.registry.view<shared::PlayerInput>();
+  for (auto ent : inputView) {
+    const auto& pi = inputView.get<shared::PlayerInput>(ent);
+    if (pi.keys_newly_pressed & KEY_START_2D_MINIGAME) {
+      requestStart(game);
+    }
+    if (pi.keys_newly_pressed & KEY_STOP_2D_MINIGAME) {
+      requestStop(game);
+      return;
+    }
+  }
   if (active_) active_->update(game, dt);
-}
-
-void MiniGameStateManager::handleInput(
-    ServerGame& game, uint32_t playerEntityId,
-    const shared::MiniGameInputPacket& input) {
-  if (input.keys & KEY_START_2D_MINIGAME) {
-    requestStart(game);
-  }
-  if (input.keys & KEY_STOP_2D_MINIGAME) {
-    requestStop(game);
-    return;
-  }
-  if (!active_) return;
-  active_->handleInput(game, playerEntityId, input);
 }
 
 void MiniGameStateManager::removePlayer(uint32_t playerEntityId) {

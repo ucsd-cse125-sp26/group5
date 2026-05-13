@@ -7,7 +7,6 @@ namespace shared {
 enum class PacketType : uint8_t {
   // input packets from client to server
   INPUT,
-  MINIGAME_INPUT,
   // state update packets from server to client
   UPDATE_ENTITY,
   SPAWN_ENTITY,
@@ -30,16 +29,5 @@ struct InputPacket {
   InputKeys keys;
   float mouseDx;
   float mouseDy;
-};
-
-struct MiniGameInputPacket {
-  PacketType type;
-  uint32_t sessionId;
-  uint32_t surfaceEntityId;
-  InputKeys keys;
-  float axisX;
-  float axisY;
-  float pointerU;
-  float pointerV;
 };
 }  // namespace shared

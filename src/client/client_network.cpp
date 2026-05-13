@@ -103,11 +103,3 @@ void ClientNetwork::drainInputQueue(
     send(pkt);
   }
 }
-
-void ClientNetwork::drainMiniGameInputQueue(
-    SpscQueue<shared::MiniGameInputPacket, 256>& inputQueue) {
-  shared::MiniGameInputPacket pkt;
-  while (inputQueue.tryPop(pkt)) {
-    send(pkt);
-  }
-}

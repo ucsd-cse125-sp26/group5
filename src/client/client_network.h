@@ -22,8 +22,6 @@ class ClientNetwork {
   }
 
   void drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue);
-  void drainMiniGameInputQueue(
-      SpscQueue<shared::MiniGameInputPacket, 256>& inputQueue);
 
  private:
   ENetHost* client_ = nullptr;
