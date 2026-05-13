@@ -919,7 +919,8 @@ void Graphics::render(ClientGame& game) {
                                   pointShadowMaps, 0, layer);
         glClear(GL_DEPTH_BUFFER_BIT);
         shadowPointShader->setMat4("shadowMatrix", pointMats[layer]);
-        renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
+        renderEntities(*shadowPointShader, game, models,
+                       /*forShadowPass=*/true);
       }
     }
     glDisable(GL_POLYGON_OFFSET_FILL);
