@@ -2,8 +2,12 @@
 layout(location = 0) in vec3 position;
 
 uniform mat4 model;
+uniform mat4 lightSpaceMatrix;
+
+out vec3 fragWorldPos;
 
 void main() {
-  // GS does the per-face light-space transform.
-  gl_Position = model * vec4(position, 1.0);
+  vec4 world = model * vec4(position, 1.0);
+  fragWorldPos = world.xyz;
+  gl_Position = lightSpaceMatrix * world;
 }

@@ -376,8 +376,7 @@ bool Graphics::load(int width, int height) {
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
-                            "shaders/fragment_shadow_point.glsl",
-                            "shaders/geometry_shadow_point.glsl");
+                            "shaders/fragment_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
 
@@ -742,7 +741,7 @@ void Graphics::reloadShaders() {
       {.slot = shadowPointShader,
        .vert = "shaders/vertex_shadow_point.glsl",
        .frag = "shaders/fragment_shadow_point.glsl",
-       .geom = "shaders/geometry_shadow_point.glsl"},
+       .geom = ""},
       {.slot = debugOverlay,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_debug_overlay.glsl",
@@ -897,28 +896,37 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // 24 cubemap-array layers populated in one draw via geometry-shader
-  // instancing; computePointShadowMatrices fills active slots and writes
-  // kill matrices into the rest.
+  // Point shadows: one depth pass per active light × 6 cube faces. Each
+  // iteration rebinds the FBO depth attachment to a single cubemap-array
+  // layer. Avoids the geometry-shader expansion that dominated GPU time
+  // when this was a single layered draw.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
-  if (shadowPointShader && shadowPointShader->valid()) {
+  if (shadowPointShader && shadowPointShader->valid() && numLights > 0) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
     GPU_PROFILE_SCOPE("ShadowPoint");
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
     glViewport(0, 0, kPointShadowSize, kPointShadowSize);
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowPointShader->use();
-    shadowPointShader->setMat4Array("shadowMatrices", kPointShadowLayers,
-                                    glm::value_ptr(pointMats[0]));
-    shadowPointShader->setVec3Array("lightPositions", kMaxPointLights,
-                                    glm::value_ptr(pointPositions[0]));
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
-    renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
+    for (int i = 0; i < numLights; ++i) {
+      int slot = lights[i].shadowIdx;
+      if (slot < 0 || slot >= kMaxPointLights) continue;
+      shadowPointShader->setVec3("lightPos", lights[i].position);
+      for (int f = 0; f < 6; ++f) {
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                  pointShadowMaps, 0, slot * 6 + f);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shadowPointShader->setMat4("lightSpaceMatrix",
+                                   pointMats[slot * 6 + f]);
+        renderEntities(*shadowPointShader, game, models,
+                       /*forShadowPass=*/true);
+      }
+    }
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
