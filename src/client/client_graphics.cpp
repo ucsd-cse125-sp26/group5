@@ -787,14 +787,19 @@ void Graphics::cycleDebugChannel() {
   debugChannel = static_cast<DebugChannel>(next);
   const char* name = "?";
   switch (debugChannel) {
-    case DebugChannel::Off:
-      name = "Off";
-      break;
-    case DebugChannel::DirShadowMap:
-      name = "DirShadowMap";
-      break;
-    case DebugChannel::Count:
-      break;
+    case DebugChannel::Off:          name = "Off"; break;
+    case DebugChannel::DirShadowMap: name = "DirShadowMap"; break;
+    case DebugChannel::GPosition:    name = "GPosition"; break;
+    case DebugChannel::GNormal:      name = "GNormal"; break;
+    case DebugChannel::GAlbedo:      name = "GAlbedo"; break;
+    case DebugChannel::GSpecular:    name = "GSpecular"; break;
+    case DebugChannel::GEmissive:    name = "GEmissive"; break;
+    case DebugChannel::Ssao:         name = "SSAO"; break;
+    case DebugChannel::SsaoBlur:     name = "SSAOBlur"; break;
+    case DebugChannel::LitColor:     name = "LitColor"; break;
+    case DebugChannel::BrightColor:  name = "BrightColor"; break;
+    case DebugChannel::LdrColor:     name = "LdrColor"; break;
+    case DebugChannel::Count:        break;
   }
   printf("Debug overlay: %s\n", name);
 }
@@ -816,11 +821,21 @@ void Graphics::drawDebugOverlay() {
   if (debugChannel == DebugChannel::Off) return;
   if (!debugOverlay || !debugOverlay->valid() || !fullscreenVAO) return;
 
+  // mode: 0=direct rgb, 1=normal-vis, 2=HDR tonemap, 3=single R as gray.
   GLuint texToShow = 0;
+  int mode = 0;
   switch (debugChannel) {
-    case DebugChannel::DirShadowMap:
-      texToShow = dirShadowMap;
-      break;
+    case DebugChannel::DirShadowMap: texToShow = dirShadowMap;   mode = 3; break;
+    case DebugChannel::GPosition:    texToShow = gPosition;      mode = 2; break;
+    case DebugChannel::GNormal:      texToShow = gNormal;        mode = 1; break;
+    case DebugChannel::GAlbedo:      texToShow = gAlbedo;        mode = 0; break;
+    case DebugChannel::GSpecular:    texToShow = gSpecular;      mode = 0; break;
+    case DebugChannel::GEmissive:    texToShow = gEmissive;      mode = 0; break;
+    case DebugChannel::Ssao:         texToShow = ssaoColor;      mode = 3; break;
+    case DebugChannel::SsaoBlur:     texToShow = ssaoBlurColor;  mode = 3; break;
+    case DebugChannel::LitColor:     texToShow = litColor;       mode = 2; break;
+    case DebugChannel::BrightColor:  texToShow = brightColor;    mode = 2; break;
+    case DebugChannel::LdrColor:     texToShow = ldrColor;       mode = 0; break;
     case DebugChannel::Off:
     case DebugChannel::Count:
       return;
@@ -845,6 +860,7 @@ void Graphics::drawDebugOverlay() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
   }
   debugOverlay->setInt("src", 0);
+  debugOverlay->setInt("mode", mode);
   glBindVertexArray(fullscreenVAO);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindVertexArray(0);
