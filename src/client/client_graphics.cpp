@@ -20,6 +20,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
 #include "shared/shader_constants.h"
@@ -401,6 +402,8 @@ bool Graphics::load(int width, int height) {
   glBindTexture(GL_TEXTURE_2D, dirShadowMap);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kDirShadowMapSize,
                kDirShadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  GPU_MEM_TEX2D("ShadowDir", GL_DEPTH_COMPONENT24, kDirShadowMapSize,
+                kDirShadowMapSize);
   // LINEAR + COMPARE_REF_TO_TEXTURE → 2×2 hardware PCF per tap.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -431,6 +434,8 @@ bool Graphics::load(int width, int height) {
   glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT24,
                kPointShadowSize, kPointShadowSize, kPointShadowLayers, 0,
                GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  GPU_MEM_TEX3D("ShadowPoint", GL_DEPTH_COMPONENT24, kPointShadowSize,
+                kPointShadowSize, kPointShadowLayers);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S,
@@ -461,6 +466,7 @@ bool Graphics::load(int width, int height) {
   glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
   glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraUBOData), nullptr,
                GL_DYNAMIC_DRAW);
+  GPU_MEM_ADD("UBO", sizeof(CameraUBOData));
   glBindBufferBase(GL_UNIFORM_BUFFER, kCameraUBOBinding, cameraUBO);
   for (auto* s : {&*gbufferShader, &*lightingShader, &*ssaoShader}) {
     bindCameraBlock(s->id());
@@ -494,6 +500,7 @@ bool Graphics::load(int width, int height) {
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT,
                  noise.data());
+    GPU_MEM_TEX2D("SSAONoise", GL_RGB16F, 4, 4);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -547,6 +554,14 @@ void Graphics::resizeBuffers(int width, int height) {
       glm::radians(45.0f),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 500.0f);
 
+  // Same texture names get reallocated to the new dimensions, so reset the
+  // categories before re-adding their byte sizes below.
+  GPU_MEM_CLEAR("GBuffer");
+  GPU_MEM_CLEAR("LitHDR");
+  GPU_MEM_CLEAR("PingPong");
+  GPU_MEM_CLEAR("SSAO");
+  GPU_MEM_CLEAR("LDR");
+
   // gPosition: full FP32 — half-float quantizes distant world-space neighbors
   // to the same value, breaking SSAO. Normal fits in RGBA16F; albedo,
   // specular, and emissive fit in RGBA8.
@@ -575,10 +590,16 @@ void Graphics::resizeBuffers(int width, int height) {
   allocColor(gAlbedo, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gSpecular, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gEmissive, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA32F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA16F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
 
   glBindRenderbuffer(GL_RENDERBUFFER, gBufferDepth);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
+  GPU_MEM_RENDERBUFFER("GBuffer", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -619,10 +640,13 @@ void Graphics::resizeBuffers(int width, int height) {
   };
   allocHDR(litColor);
   allocHDR(brightColor);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
 
   glBindRenderbuffer(GL_RENDERBUFFER, litDepth);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
+  GPU_MEM_RENDERBUFFER("LitHDR", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -639,6 +663,7 @@ void Graphics::resizeBuffers(int width, int height) {
     if (!pingFBO[i]) glGenFramebuffers(1, &pingFBO[i]);
     if (!pingColor[i]) glGenTextures(1, &pingColor[i]);
     allocHDR(pingColor[i]);
+    GPU_MEM_TEX2D("PingPong", GL_RGBA16F, fbWidth, fbHeight);
     glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[i]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                            pingColor[i], 0);
@@ -653,6 +678,7 @@ void Graphics::resizeBuffers(int width, int height) {
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, fbWidth, fbHeight, 0, GL_RED,
                  GL_FLOAT, nullptr);
+    GPU_MEM_TEX2D("SSAO", GL_R16F, fbWidth, fbHeight);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -676,6 +702,7 @@ void Graphics::resizeBuffers(int width, int height) {
   glBindTexture(GL_TEXTURE_2D, ldrColor);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, nullptr);
+  GPU_MEM_TEX2D("LDR", GL_RGBA8, fbWidth, fbHeight);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
