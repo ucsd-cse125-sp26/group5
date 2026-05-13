@@ -11,6 +11,7 @@
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
+#include "shared/gpu_profiler.h"
 #include "shared/hello.h"
 #include "shared/simple_profiler.h"
 
@@ -39,6 +40,7 @@ int main() {
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
   while (!glfwWindowShouldClose(graphics.window)) {
     SIMPLE_PROFILE_FRAME_START();
+    GPU_PROFILE_FRAME_BEGIN();
 
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::scoped_lock lock(game.snapshotMutex);
@@ -48,6 +50,7 @@ int main() {
 
     graphics.render(game);
     graphics.swap();
+    GPU_PROFILE_FRAME_END();
     glfwPollEvents();
     graphics.processDebugKeys();
 
