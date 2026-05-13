@@ -5,6 +5,11 @@
 #include "input.h"
 
 namespace shared {
+
+// tags
+struct OverworldTag {};
+struct MazeTag {};
+
 struct Position {
   float x, y, z;
   float qw, qx, qy, qz;
@@ -16,7 +21,7 @@ struct Velocity {
 
 struct RenderInfo {
   std::string modelName;
-  float scale;
+  float sx, sy, sz;
 };
 
 struct Camera {
@@ -41,6 +46,14 @@ struct PointLight {
   float constant;
   float linear;
   float quadratic;
+  float ambientR, ambientG, ambientB;
+  float diffuseR, diffuseG, diffuseB;
+  float specularR, specularG, specularB;
+  bool castsShadow = true;
+};
+
+struct DirectionalLight {
+  float dirX, dirY, dirZ;
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
