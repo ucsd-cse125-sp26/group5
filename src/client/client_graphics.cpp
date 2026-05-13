@@ -375,8 +375,7 @@ bool Graphics::load(int width, int height) {
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
-                            "shaders/fragment_shadow_point.glsl",
-                            "shaders/geometry_shadow_point.glsl");
+                            "shaders/fragment_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
 
@@ -422,8 +421,9 @@ bool Graphics::load(int width, int height) {
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces) bound as
-  // a layered attachment so the geometry shader can route via gl_Layer.
+  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces).
+  // Each face is bound individually via glFramebufferTextureLayer in the
+  // render loop to avoid geometry-shader emulation overhead on macOS.
   glGenFramebuffers(1, &pointShadowFBO);
   glGenTextures(1, &pointShadowMaps);
   glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
@@ -443,7 +443,8 @@ bool Graphics::load(int width, int height) {
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
                   GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
-  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps, 0);
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            pointShadowMaps, 0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -741,7 +742,7 @@ void Graphics::reloadShaders() {
       {.slot = shadowPointShader,
        .vert = "shaders/vertex_shadow_point.glsl",
        .frag = "shaders/fragment_shadow_point.glsl",
-       .geom = "shaders/geometry_shadow_point.glsl"},
+       .geom = ""},
       {.slot = debugOverlay,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_debug_overlay.glsl",
@@ -894,9 +895,8 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // 24 cubemap-array layers populated in one draw via geometry-shader
-  // instancing; computePointShadowMatrices fills active slots and writes
-  // kill matrices into the rest.
+  // Multi-pass point shadows: one draw per cubemap face per active light.
+  // Avoids the geometry shader, which macOS must emulate via Metal.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
@@ -905,16 +905,24 @@ void Graphics::render(ClientGame& game) {
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
     glViewport(0, 0, kPointShadowSize, kPointShadowSize);
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowPointShader->use();
-    shadowPointShader->setMat4Array("shadowMatrices", kPointShadowLayers,
-                                    glm::value_ptr(pointMats[0]));
-    shadowPointShader->setVec3Array("lightPositions", kMaxPointLights,
-                                    glm::value_ptr(pointPositions[0]));
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
-    renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
+    for (int i = 0; i < numLights; ++i) {
+      int slot = lights[i].shadowIdx;
+      if (slot < 0 || slot >= kMaxPointLights) continue;
+      shadowPointShader->setVec3("lightPosition", pointPositions[slot]);
+      for (int face = 0; face < 6; ++face) {
+        int layer = slot * 6 + face;
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                  pointShadowMaps, 0, layer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shadowPointShader->setMat4("shadowMatrix", pointMats[layer]);
+        renderEntities(*shadowPointShader, game, models,
+                       /*forShadowPass=*/true);
+      }
+    }
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
