@@ -59,7 +59,7 @@ void movement_system(ServerGame& game, float dt, StateType stateType);
 void render_model_change(ServerGame& game, float dt);
 void hardcoded_spinning_light(entt::registry& registry, float dt,
                               uint32_t lightEntity);
-void scene_cycle_system(entt::registry& registry);
+void scene_cycle_system(entt::registry& registry, StateType stateType);
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g);
 void registerServerHandlers(ServerNetwork& network);
 void initWorldEntities(ServerGame& game);
