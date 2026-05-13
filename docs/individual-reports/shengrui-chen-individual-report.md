@@ -8,6 +8,26 @@ permalink: /project-spec/shengrui-chen-individual-report/
 
 ## Weekly Notes
 
+## Week 6 (May 13)
+
+1. What were your concrete goals for the week?  
+I wanted the Winter maze space to feel less like a one-off demo and more like something we can iterate on: layouts that can vary in a predictable way, a hub-side preview so people understand the puzzle before they drop in, and enough automated checks that we do not break connectivity or basic layout rules by accident. I also hoped to keep the scope tight so the team could actually play with it soon rather than chasing edge cases forever.
+
+2. What goals were you able to accomplish?  
+The maze area is now driven by generated layouts instead of a fixed toy arrangement, which makes it easier to reason about difficulty and repeatability. The overworld gained a compact preview that echoes the same structure, with clearer cues for where you start and where you are headed. 
+
+3. If the week went differently than you had planned, what were the reasons?  
+I spent more time than I expected on readability and “does this read at a glance” passes, especially for the preview, because a maze that is technically correct can still feel confusing if walls and paths do not contrast enough. There was also the usual overhead of landing changes alongside everyone else’s work, which is normal but shifts time away from pure feature writing.
+
+4. What are your specific goals for the next week?  
+I want to reconcile this branch with whatever the group merged to main, run a focused multiplayer smoke pass, and then tune the Winter slice based on real feedback rather than solo guesses. If design wants different pacing or readability tweaks, I would like those requests to land while the layout pipeline is still fresh rather than bolting them on later.
+
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I was reminded that when gameplay logic is easy to exercise in isolation, you iterate faster on feel because you are not debugging rendering, input, and rules all at once. I believed that in the abstract before; this week it showed up in how quickly small layout tweaks became confident changes instead of fragile guesses.
+
+6. What is your individual morale (which might be different from the overall group morale)?  
+Overall I feel fairly positive. The maze direction feels clearer than a week ago, and the remaining work is mostly integration and polish rather than unknown research.
+
 ## Week 5 (May 7)
 
 1. What were your concrete goals for the week?  
