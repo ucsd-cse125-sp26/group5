@@ -77,11 +77,10 @@ inline void end_gpu_frame() {
   if (gpu_frame_stats.empty()) return;
   std::vector<std::pair<std::string, double>> stats(gpu_frame_stats.begin(),
                                                     gpu_frame_stats.end());
-  std::ranges::sort(stats, [](const auto& a, const auto& b) {
-    return a.second > b.second;
-  });
-  std::cout
-      << "\n=== [ Client ] GPU Timings (Average per Frame over 60 Frames) ===\n";
+  std::ranges::sort(
+      stats, [](const auto& a, const auto& b) { return a.second > b.second; });
+  std::cout << "\n=== [ Client ] GPU Timings (Average per Frame over 60 "
+               "Frames) ===\n";
   for (const auto& stat : stats) {
     double avg_stat_time = stat.second / 60.0;
     std::cout << " - " << stat.first << ": " << avg_stat_time << " ms\n";
@@ -97,9 +96,9 @@ inline void end_gpu_frame() {
 // when two scopes share a block).
 #define GPU_PROFILE_CONCAT_(a, b) a##b
 #define GPU_PROFILE_CONCAT(a, b) GPU_PROFILE_CONCAT_(a, b)
-#define GPU_PROFILE_SCOPE(name)                              \
-  shared::gpu_profiler::GpuScopeTimer GPU_PROFILE_CONCAT(    \
-      __gpu_timer_, __LINE__)(name)
+#define GPU_PROFILE_SCOPE(name)                                        \
+  shared::gpu_profiler::GpuScopeTimer GPU_PROFILE_CONCAT(__gpu_timer_, \
+                                                         __LINE__)(name)
 #define GPU_PROFILE_FRAME_BEGIN() shared::gpu_profiler::begin_gpu_frame()
 #define GPU_PROFILE_FRAME_END() shared::gpu_profiler::end_gpu_frame()
 #else

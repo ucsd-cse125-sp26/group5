@@ -77,9 +77,8 @@ inline void end_frame(const char* context = "Frame") {
 #ifdef ENABLE_PROFILING
 #define SIMPLE_PROFILE_CONCAT_(a, b) a##b
 #define SIMPLE_PROFILE_CONCAT(a, b) SIMPLE_PROFILE_CONCAT_(a, b)
-#define SIMPLE_PROFILE_SCOPE(name)                                \
-  shared::profiler::ScopeTimer SIMPLE_PROFILE_CONCAT(__timer_,    \
-                                                    __LINE__)(name)
+#define SIMPLE_PROFILE_SCOPE(name) \
+  shared::profiler::ScopeTimer SIMPLE_PROFILE_CONCAT(__timer_, __LINE__)(name)
 #define SIMPLE_PROFILE_FRAME_START() shared::profiler::start_frame()
 #define SIMPLE_PROFILE_FRAME_END(context) shared::profiler::end_frame(context)
 #else
