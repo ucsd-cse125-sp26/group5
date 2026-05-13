@@ -124,6 +124,24 @@ static void removePhysicsBodies(ServerGame& game) {
 
 namespace {
 
+constexpr int kGeneratedMazeWidth = 8;
+constexpr int kGeneratedMazeHeight = 8;
+constexpr uint32_t kGeneratedMazeSeed = 12505;
+constexpr float kMazeTileSpacing = 1.5f;
+
+struct GeneratedMazeData {
+  maze::MazeLayout layout;
+  maze::MazeTileGrid tileGrid;
+};
+
+GeneratedMazeData buildGeneratedMazeData() {
+  GeneratedMazeData data;
+  data.layout = maze::GenerateMazeLayout(kGeneratedMazeWidth, kGeneratedMazeHeight,
+                                         kGeneratedMazeSeed);
+  data.tileGrid = maze::ConvertToTileGrid(data.layout);
+  return data;
+}
+
 template <typename Tag>
 void spawnDemoLight(ServerGame& game, const char* sceneName) {
   auto [eid, ent] = new_entity(game);
@@ -159,33 +177,84 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
 }
 
 std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
-  constexpr int kMazeWidth = 8;
-  constexpr int kMazeHeight = 8;
-  constexpr uint32_t kMazeSeed = 12505;
-  constexpr float kTileSpacing = 1.5f;
-
-  const maze::MazeLayout layout =
-      maze::GenerateMazeLayout(kMazeWidth, kMazeHeight, kMazeSeed);
-  const maze::MazeTileGrid tileGrid = maze::ConvertToTileGrid(layout);
+  const GeneratedMazeData data = buildGeneratedMazeData();
 
   std::vector<StaticEntityDesc> entities;
   entities.push_back(StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
                                       .modelName = "cube",
                                       .scale = glm::vec3(100.0f)});
 
-  for (int y = 0; y < tileGrid.height; ++y) {
-    for (int x = 0; x < tileGrid.width; ++x) {
-      if (tileGrid.Tile(x, y) != maze::MazeTile::Wall) continue;
+  for (int y = 0; y < data.tileGrid.height; ++y) {
+    for (int x = 0; x < data.tileGrid.width; ++x) {
+      if (data.tileGrid.Tile(x, y) != maze::MazeTile::Wall) continue;
 
       entities.push_back(StaticEntityDesc{
           .position =
-              glm::vec3((static_cast<float>(x) - 1.0f) * kTileSpacing,
-                        (static_cast<float>(y) - 1.0f) * kTileSpacing, 0.75f),
+              glm::vec3((static_cast<float>(x) - 1.0f) * kMazeTileSpacing,
+                        (static_cast<float>(y) - 1.0f) * kMazeTileSpacing, 0.75f),
           .modelName = "cube",
           .scale = glm::vec3(0.7f, 0.7f, 1.5f),
       });
     }
   }
+
+  return entities;
+}
+
+std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
+  const GeneratedMazeData data = buildGeneratedMazeData();
+  constexpr glm::vec3 kPreviewCenter = glm::vec3(0.0f, 16.0f, 4.5f);
+  constexpr float kPreviewTileSpacing = 0.18f;
+  constexpr float kFloorDepthOffset = -0.20f;
+  constexpr float kWallDepthOffset = -0.08f;
+  constexpr glm::vec3 kFloorScale = glm::vec3(0.18f, 0.02f, 0.18f);
+  constexpr glm::vec3 kWallScale = glm::vec3(0.18f, 0.12f, 0.18f);
+  constexpr float kMarkerDepthOffset = -0.30f;
+  constexpr glm::vec3 kStartMarkerScale = glm::vec3(0.24f, 0.16f, 0.24f);
+  constexpr glm::vec3 kGoalMarkerScale = glm::vec3(0.28f, 0.16f, 0.28f);
+
+  const float xOffset =
+      (static_cast<float>(data.tileGrid.width) - 1.0f) * 0.5f;
+  const float yOffset =
+      (static_cast<float>(data.tileGrid.height) - 1.0f) * 0.5f;
+
+  auto previewPosition = [&](int x, int y, float yOffsetFromBoard) {
+    return glm::vec3(kPreviewCenter.x +
+                         (static_cast<float>(x) - xOffset) * kPreviewTileSpacing,
+                     kPreviewCenter.y + yOffsetFromBoard,
+                     kPreviewCenter.z +
+                         (yOffset - static_cast<float>(y)) * kPreviewTileSpacing);
+  };
+
+  std::vector<StaticEntityDesc> entities;
+
+  for (int y = 0; y < data.tileGrid.height; ++y) {
+    for (int x = 0; x < data.tileGrid.width; ++x) {
+      const bool isWall = data.tileGrid.Tile(x, y) == maze::MazeTile::Wall;
+
+      entities.push_back(StaticEntityDesc{
+          .position =
+              previewPosition(x, y, isWall ? kWallDepthOffset : kFloorDepthOffset),
+          .modelName = isWall ? "light_cube" : "cube",
+          .scale = isWall ? kWallScale : kFloorScale,
+      });
+    }
+  }
+
+  const int startTileX = data.layout.startX * 2 + 1;
+  const int startTileY = data.layout.startY * 2 + 1;
+  const int goalTileX = data.layout.goalX * 2 + 1;
+  const int goalTileY = data.layout.goalY * 2 + 1;
+  entities.push_back(StaticEntityDesc{
+      .position = previewPosition(startTileX, startTileY, kMarkerDepthOffset),
+      .modelName = "start_cube",
+      .scale = kStartMarkerScale,
+  });
+  entities.push_back(StaticEntityDesc{
+      .position = previewPosition(goalTileX, goalTileY, kMarkerDepthOffset),
+      .modelName = "goal_cube",
+      .scale = kGoalMarkerScale,
+  });
 
   return entities;
 }
@@ -226,6 +295,8 @@ void initWorldEntities(ServerGame& game) {
                                  .scale = glm::vec3(0.5f),
                                  .collision = CollisionShape::Mesh},
             });
+  spawnStaticEntities<shared::OverworldTag>(game,
+                                            buildOverworldMazePreviewEntities());
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
