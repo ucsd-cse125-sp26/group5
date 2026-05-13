@@ -5,6 +5,43 @@ permalink: /project-spec/jiaying-chen-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 6
+1. What were your concrete goals for the week?
+I had a forward plan of trying to put as much assets onto the map as possible; I was able to do a portion of it, but what got in my way was the way randomizing object is set up. it is quite painful in some way. 
+Imagination (ideal): With existing asset, use a modifier to scatter it, so all the mesh are the same, only scale, rotation and other transformations differ. This makes the amount of information we need to store much less. 
+Reality: No scatter object modifier allow me to naturally do so without having upside down or floating trees. To fix those things, I would have to apply transform, then separate them into parts. Optimization goes bye-bye. This is why I am so reluctant to proceed.
+After talking with Jacob today I have realized that I literally have to place assets by hand, so there goes it, it'll be somewhat painful going forward but we do what we have to do 😭
+
+2. What goals were you able to accomplish?
+I was able to work a lot on assets, but I am breaking my brain over how to place them so they look good. With deadlines approaching I think I am going to worry about this less and less, but now I still want to get some work in. 
+
+3. If the week went differently than you had planned, what were the reasons? 
+It's mainly the unexpected behavior of the scatter modifier driving me slightly nuts
+
+4. What are your specific goals for the next week?
+Try to figure out how the scatter thing is going to work; Hopefully have a quite complete map by then. I also want to wrap up making assets and focus on placing everything onto the map. I also want to figure out how to stylize the cherry blossom tree. 
+
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Still more modeling, Styling, etc. 
+6. What is your individual morale (which might be different from the overall group morale)?
+Not too sure; I just want to get things done. 
+
+## Week 5
+1. What were your concrete goals for the week?
+Getting the coloring of the map done, and finish working on a good portion of the assets.
+2. What goals were you able to accomplish?
+Colored the map; I would say majority of the assets are done, I will ahve to start putting them onto the map and see what else are needed though.
+3. If the week went differently than you had planned, what were the reasons?
+Tired, extra events, but compared to my teammates who are suffering in midterm, I am in a much better state.
+4. What are your specific goals for the next week?
+    1. Try to add the glittering sand texture to landscape so it looks less low poly.
+    2. Finish paving the path
+    3. Add all necessary assets to the map. This is quite important.
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Still learned more in blender, definitely have gotten the speed of my workflow up. So that's quite good.
+6. What is your individual morale (which might be different from the overall group morale)?
+Getting a bit tired, but we are doing fine. 
+
 
 ## Week 5
 1. What were your concrete goals for the week?
