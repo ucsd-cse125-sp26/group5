@@ -42,6 +42,66 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
+## Week 6 Group Report
+
+## Network: Minigame 
+**Tim**
+- Mainly working on the mini games pipeline.
+  - Finished the 2D overlay pipeline; everything is rendering correctly. Cleaning up code now. 
+  - Engine-side work: the 2D **pipeline** is straightforward to work with. Objects are placed by specifying a coordinate server-side, which maps directly to the overlay position.
+  - Rendering: Set up a separate render and framebuffer for the maze, and successfully rendered a maze onto the map.
+
+## Game Logic: Minigames
+**Leon & Philip**
+- Worked on a 2D version of the maze minigame; plan to combine with Tim's 2D pipeline after his branch is pushed, followed by a refactor.
+- **Philip**: Implementing recoloring logic, since only completed parts of the map sections show color. Writing logic to determine when each section should be colored in. Core flow: collect fragment → set section complete → create bounding box for that section.
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week6/leon/m1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/leon/m2.png' | relative_url }}" alt="Note">
+</div>
+
+
+## Physics / Audio
+**Alain**
+- Reviewed Jacob's PR for the new rendering changes.
+- Continuing work on sound: exploring an open-source audio mod and thinking through how to transmit sound events so the client knows when to play them and sounds follow their source correctly.
+
+## Rendering
+**Jacob**
+- Cleaned up and merged two major PRs: map loading and the final-ish render pipeline.
+- Working on animation and planning out how to implement color correctly.
+- Investigating a lighting artifact caused by something wrong with the sun; also working on some GUI elements.
+- Looking into a Blender-side mesh deduplication workflow: linking objects via pointer tags, creating a mesh per tag, and merging identical meshes to reduce redundancy. External tools may help; will check if this becomes a problem in the next PR.
+
+## Modeling
+**Sarah**
+- Character model: Dog model in progress.
+  - Working through how to model the fluffy sections; studying references and trying to match the shading style. 
+  - Model rigging complete. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week6/sarah/dog1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/sarah/dog2.png' | relative_url }}" alt="Note">
+</div>
+
+**Rebecca**
+- Landscape model: created many more assets and have started merging them onto the main landscape model. Have already worked with Rendering team to get assets to the main world map! 
+  - Fixed landscape low poly display issue by applying tsxture nodes. Discussion with jacob to bake changes so it displays in game. 
+  - Scattered assets; Having issue with default scatter not looking good, so I did it semi mannually. Discussing with Jacob about optimizing. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week6/rebecca/a1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/a2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/a3.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/a4.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l3.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l4.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l5.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/l6.png' | relative_url }}" alt="Note">
+</div>
+
+
+---
 ## Week 5 Group report
 
 ## Network and graphics 
@@ -327,3 +387,4 @@ The team has voted on the general framework of the game. For the following week,
 N/A
 - **What blocked us**
 N/A
+
