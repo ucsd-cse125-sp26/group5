@@ -333,8 +333,10 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   Material material;
   material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
   material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
-  material.specular = {.constant = glm::vec3(1.0f),
-                       .texture = makeSolidTexture(255, 255, 255, 255)};
+  // Match the Assimp path's "missing = black" convention; white here pins
+  // specular to max on every surface and blooms blow out the frame.
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {
       .constant = glm::vec3(1.0f),
       .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
