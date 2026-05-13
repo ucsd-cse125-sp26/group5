@@ -93,8 +93,13 @@ inline void end_gpu_frame() {
 }  // namespace shared::gpu_profiler
 
 #ifdef ENABLE_PROFILING
-#define GPU_PROFILE_SCOPE(name) \
-  shared::gpu_profiler::GpuScopeTimer __gpu_timer_##__LINE__(name)
+// Two-level paste so __LINE__ expands before ## (avoids same-token collision
+// when two scopes share a block).
+#define GPU_PROFILE_CONCAT_(a, b) a##b
+#define GPU_PROFILE_CONCAT(a, b) GPU_PROFILE_CONCAT_(a, b)
+#define GPU_PROFILE_SCOPE(name)                              \
+  shared::gpu_profiler::GpuScopeTimer GPU_PROFILE_CONCAT(    \
+      __gpu_timer_, __LINE__)(name)
 #define GPU_PROFILE_FRAME_BEGIN() shared::gpu_profiler::begin_gpu_frame()
 #define GPU_PROFILE_FRAME_END() shared::gpu_profiler::end_gpu_frame()
 #else
