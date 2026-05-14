@@ -8,6 +8,63 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
+### Week 6 (May 14)
+
+🚨🚨🚨I updated the weekly report with some new images, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
+
+1. What were your concrete goals for the week?
+
+- skeletal animations
+- vram profiling
+- 2d rendering if needed
+- debug UI
+- input refactor + debug console
+- instancing (maybe)
+- actually run the game on windows
+- delegate subset of below
+- loading screen (maybe)
+
+1. What goals were you able to accomplish?
+
+- skeletal animations (sidebranch)
+- vram profiling (pr)
+- 2d rendering if needed (-->tim)
+- actually run the game on windows
+- merged maploading and the big rendering pr
+- site update gha
+- rendering alpha fix
+- toon shading + configurable grayscale (sidebranch)
+- figured out why white spotches appeared on map
+- exporter improvements (pr)
+
+1. If the week went differently than you had planned, what were the reasons?
+
+I got around as much as I expected to get done done. Unfortunately this led gui to get delayed another week.
+
+1. What are your specific goals for the next week?
+
+- merge anims
+- head motion for characters
+- integrate grayscale with phillip pr
+- finish toon shading
+- fix distance shadows
+- loading screen/start menu
+- windows misc testing, windows perf testing
+- perf improvements
+- skyboxes for rebecca
+- map object season tags (maybe)
+- map object instancing (maybe)
+- shadow alpha
+- debug menu
+- code cleanup
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+blender gltf exporter internals 💀, more blender stuff, relearned skanims, basic thinking about toon shading, that geometry shaders are slow for some reason
+
+1. What is your individual morale (which might be different from the overall group morale)?
+idk, I realized I don't evaluate morale I just make something up or use this slot to air grievances about CSE 123. The latest PA is ambiguous is a number of ways. I was hoping things would improve with the trend between 1a and 1b but I guess I was overly optimistic. I wonder how broken the autograder is right now. I actually was asked about ARP in an interview my 2nd year and forgot about it, maybe that's why I got catfished into doing full stack at that company (I thought I would be doing networking).
+
 ### Week 5 (May 07)
 
 1. What were your concrete goals for the week?
