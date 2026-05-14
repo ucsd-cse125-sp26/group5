@@ -157,6 +157,16 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::ColorBoundingBox>(entity);
+  {
+    auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
+    box.minX = 40.0f;
+    box.minY = 25.0f;
+    box.minZ = -500.0f;
+    box.maxX = 90.0f;
+    box.maxY = 55.0f;
+    box.maxZ = 500.0f;
+  }
   JPH::BodyID bodyId = game.physics.createPlayerBody(
       modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
   game.registry.emplace<shared::PhysicsBody>(
@@ -239,52 +249,6 @@ void initWorldEntities(ServerGame& game) {
     PlayerAvatars slots;
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
-    game.registry.emplace<shared::Position>(overworldEntity, startX, 0.0f, 0.0f,
-                                            1.0f, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::Velocity>(overworldEntity, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(overworldEntity, "cube", 1.0f);
-    game.registry.emplace<shared::Camera>(overworldEntity, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(
-        overworldEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
-    game.registry.emplace<shared::OverworldTag>(overworldEntity);
-    game.registry.emplace<shared::ColorBoundingBox>(overworldEntity);
-    {
-      auto& box = game.registry.get<shared::ColorBoundingBox>(overworldEntity);
-      box.minX = 40.0f;
-      box.minY = 25.0f;
-      box.minZ = -500.0f;
-      box.maxX = 90.0f;
-      box.maxY = 55.0f;
-      box.maxZ = 500.0f;
-    }
-    JPH::BodyID overworldBodyId =
-        game.physics.createPlayerBody(startX, 0.0f, 0.0f);
-    game.registry.emplace<shared::PhysicsBody>(
-        overworldEntity, overworldBodyId.GetIndexAndSequenceNumber());
-    slots.overworld_avatar = overworldEntity;
-
-    auto [mazeEntityId, mazeEntity] = new_entity(game);
-    game.registry.emplace<shared::Position>(mazeEntity, startX, 0.0f, 0.0f,
-                                            1.0f, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::Velocity>(mazeEntity, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(mazeEntity, "bear", 0.5f);
-    game.registry.emplace<shared::Camera>(mazeEntity, 0.0f, 1.0f);
-    game.registry.emplace<shared::PlayerInput>(
-        mazeEntity, InputKeys(0), InputKeys(0), InputKeys(0), 0.0f, 0.0f);
-    game.registry.emplace<shared::MazeTag>(mazeEntity);
-    game.registry.emplace<shared::ColorBoundingBox>(mazeEntity);
-    {
-      auto& box = game.registry.get<shared::ColorBoundingBox>(mazeEntity);
-      box.minX = 40.0f;
-      box.minY = 25.0f;
-      box.minZ = -500.0f;
-      box.maxX = 90.0f;
-      box.maxY = 55.0f;
-      box.maxZ = 500.0f;
-    }
-    JPH::BodyID mazeBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
-    game.registry.emplace<shared::PhysicsBody>(
-        mazeEntity, mazeBodyId.GetIndexAndSequenceNumber());
     spawnPlayerAvatar<shared::OverworldTag>(game, overworldEntity, "cube",
                                             glm::vec3(startX, 0.0f, 0.0f),
                                             glm::vec3(1.0f));
