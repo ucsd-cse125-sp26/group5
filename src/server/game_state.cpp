@@ -290,12 +290,12 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::ColorBoundingBox>(overworldEntity);
     {
       auto& box = game.registry.get<shared::ColorBoundingBox>(overworldEntity);
-      box.minX = 0.0f * shared::kColorBoundsScale;
-      box.minY = 0.0f * shared::kColorBoundsScale;
-      box.minZ = 0.0f;
-      box.maxX = 5.0f * shared::kColorBoundsScale;
-      box.maxY = 3.0f * shared::kColorBoundsScale;
-      box.maxZ = 1.0f;
+      box.minX = 40.0f;
+      box.minY = 25.0f;
+      box.minZ = -500.0f;
+      box.maxX = 90.0f;
+      box.maxY = 55.0f;
+      box.maxZ = 500.0f;
     }
     JPH::BodyID overworldBodyId =
         game.physics.createPlayerBody(startX, 0.0f, 0.0f);
@@ -315,12 +315,12 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::ColorBoundingBox>(mazeEntity);
     {
       auto& box = game.registry.get<shared::ColorBoundingBox>(mazeEntity);
-      box.minX = 0.0f * shared::kColorBoundsScale;
-      box.minY = 5.0f * shared::kColorBoundsScale;
-      box.minZ = 0.0f;
-      box.maxX = 5.0f * shared::kColorBoundsScale;
-      box.maxY = 8.0f * shared::kColorBoundsScale;
-      box.maxZ = 1.0f;
+      box.minX = 40.0f;
+      box.minY = 25.0f;
+      box.minZ = -500.0f;
+      box.maxX = 90.0f;
+      box.maxY = 55.0f;
+      box.maxZ = 500.0f;
     }
     JPH::BodyID mazeBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
     game.registry.emplace<shared::PhysicsBody>(
