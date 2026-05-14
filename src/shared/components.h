@@ -25,6 +25,24 @@ struct RenderInfo {
   bool isColorized = false;
 };
 
+struct ColorBoundingBox {
+  float minX = 0.0f;
+  float minY = 0.0f;
+  float minZ = 0.0f;
+  float maxX = 0.0f;
+  float maxY = 0.0f;
+  float maxZ = 0.0f;
+
+  bool contains(float x, float y, float z) const {
+    return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ &&
+           z <= maxZ;
+  }
+};
+
+// Global scale for color bounding boxes (logical units -> world units).
+// Adjusting this changes all season box sizes uniformly.
+constexpr float kColorBoundsScale = 10.0f;
+
 struct Camera {
   float pitch;
   float ht;
@@ -124,9 +142,5 @@ struct SwitchComponent {
 struct FragmentComponent {
   SectionSeasonMap season;
   bool isPickedUp;
-};
-
-struct SeasonComponent {
-  SectionSeasonMap season = SectionSeasonMap::WINTER;
 };
 }  // namespace shared
