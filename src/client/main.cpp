@@ -21,7 +21,6 @@ int main() {
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
-  // test_step(game);
   ClientNetwork network;
 
   if (!network.connect("localhost", 7777)) {
@@ -50,6 +49,7 @@ int main() {
     graphics.render(game);
     graphics.swap();
     glfwPollEvents();
+    graphics.processDebugKeys();
 
     // ESC releases the cursor; left-click re-captures it.
     if (glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
