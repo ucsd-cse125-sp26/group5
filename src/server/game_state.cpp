@@ -4,10 +4,14 @@
 #include <memory>
 #include <vector>
 
+#include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
+#include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
+#include "shared/lighting.h"
+#include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/util.h"
@@ -51,9 +55,15 @@ static void despawnTaggedEntities(ServerGame& game) {
   }
 }
 
+// Find the demo light by looking for a PointLight with a RenderInfo (the cube
+// marker). Map-loaded point lights have no RenderInfo, so this filter excludes
+// them — without it EnTT's newest-first iteration returns a map light and
+// hardcoded_spinning_light moves the wrong entity.
 template <typename Tag>
 static uint32_t findLightEntityId(ServerGame& game) {
-  auto view = game.registry.view<Tag, shared::PointLight, shared::Entity>();
+  auto view =
+      game.registry
+          .view<Tag, shared::PointLight, shared::RenderInfo, shared::Entity>();
   for (auto e : view) {
     return view.template get<shared::Entity>(e).id;
   }
@@ -117,161 +127,111 @@ static void removePhysicsBodies(ServerGame& game) {
 
 // ── Initialization ───────────────────────────────────────
 
+namespace {
+
+template <typename Tag>
+void spawnDemoLight(ServerGame& game, const char* sceneName) {
+  auto [eid, ent] = new_entity(game);
+  game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
+                                          0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f, 0.2f,
+                                            0.2f);
+  constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
+  game.registry.emplace<shared::PointLight>(
+      ent, 5.0f, 0.0f, 3.0f, kAtt.constant, kAtt.linear, kAtt.quadratic, 0.1f,
+      0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
+  game.registry.emplace<shared::Scene>(ent, sceneName);
+  game.registry.emplace<Tag>(ent);
+}
+
+template <typename Tag>
+void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
+                       const std::string& modelName, const glm::vec3& pos,
+                       const glm::vec3& scale) {
+  game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Velocity>(entity, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::RenderInfo>(entity, modelName, scale.x, scale.y,
+                                            scale.z);
+  game.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
+  game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
+                                             InputKeys(0), 0.0f, 0.0f);
+  game.registry.emplace<Tag>(entity);
+  JPH::BodyID bodyId = game.physics.createPlayerBody(
+      modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
+  game.registry.emplace<shared::PhysicsBody>(
+      entity, bodyId.GetIndexAndSequenceNumber());
+}
+
+}  // namespace
+
 void initWorldEntities(ServerGame& game) {
-  // --- Overworld Map ---
-  {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
-    game.registry.emplace<shared::PointLight>(
-        ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
-        0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-    game.registry.emplace<shared::Scene>(ent, "sunny");
-    game.registry.emplace<shared::OverworldTag>(ent);
-  }
-  {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
-    game.registry.emplace<shared::OverworldTag>(ent);
+  // --- Game progression entities (untagged: persist across state changes) ---
+  loadLevel(game);
 
-    spawnStaticEntitiesForWorld<shared::OverworldTag>(
-        game,
-        {
-            {.x = 5.0f,
-             .y = 5.0f,
-             .z = 0.0f,
-             .modelName = "cube",
-             .scale = 1.0f,
-             .meshPath = "",
-             .render = true},
-            {.x = 10.0f,
-             .y = 0.0f,
-             .z = -1.0f,
-             .modelName = "bear",
-             .scale = 0.5f,
-             .meshPath = (exeDir() / "assets/bear/bear_full.obj").string(),
-             .render = true},
-            {.x = 0.0f,
-             .y = 0.0f,
-             .z = -1.0f,
-             .modelName = "floor",
-             .scale = 1.0f,
-             .meshPath = "",
-             .render = false,
-             .halfX = 100.0f,
-             .halfY = 100.0f,
-             .halfZ = 1.0f},
-            {.x = 5.0f,
-             .y = 5.0f,
-             .z = 0.5f,
-             .modelName = "cube",
-             .scale = 1.0f,
-             .meshPath = "",
-             .render = true},
-            {.x = -5.0f,
-             .y = 3.0f,
-             .z = 0.5f,
-             .modelName = "cube",
-             .scale = 1.5f,
-             .meshPath = "",
-             .render = true},
-            {.x = 3.0f,
-             .y = -7.0f,
-             .z = 0.5f,
-             .modelName = "cube",
-             .scale = 0.8f,
-             .meshPath = "",
-             .render = true},
-            {.x = -8.0f,
-             .y = -4.0f,
-             .z = 0.5f,
-             .modelName = "cube",
-             .scale = 2.0f,
-             .meshPath = "",
-             .render = true},
-        });
-  }
+  // --- Overworld ---
+  spawnDemoLight<shared::OverworldTag>(game, "sunny");
+  loadMap<shared::OverworldTag>(game,
+                                (exeDir() / shared::DEFAULT_MAP_PATH).string());
+  spawnStaticEntities<shared::OverworldTag>(
+      game, {
+                // 100³ floor cube; top surface lands on z=0.
+                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(100.0f)},
+                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
+                                 .modelName = "cube"},
+                StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(1.5f)},
+                StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(0.8f)},
+                StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(2.0f)},
+                StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.5f),
+                                 .collision = CollisionShape::Box},
+                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.5f),
+                                 .collision = CollisionShape::Mesh},
+            });
 
-  // --- Maze Map ---
-  {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f);
-    game.registry.emplace<shared::PointLight>(
-        ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.09f, 0.032f, 0.1f, 0.1f, 0.1f, 0.8f,
-        0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
-    game.registry.emplace<shared::Scene>(ent, "night");
-    game.registry.emplace<shared::MazeTag>(ent);
-  }
-  {
-    auto [eid, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, 0.0f, 0.0f, -50.5f, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "cube", 100.0f);
-    game.registry.emplace<shared::MazeTag>(ent);
-
-    const std::string bearMesh =
-        (exeDir() / "assets/bear/bear_full.obj").string();
-    spawnStaticEntitiesForWorld<shared::MazeTag>(game,
-                                                 {
-                                                     {.x = 0.0f,
-                                                      .y = 0.0f,
-                                                      .z = -1.0f,
-                                                      .modelName = "floor",
-                                                      .scale = 1.0f,
-                                                      .meshPath = "",
-                                                      .render = false,
-                                                      .halfX = 100.0f,
-                                                      .halfY = 100.0f,
-                                                      .halfZ = 1.0f},
-                                                     {.x = 3.0f,
-                                                      .y = 0.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.1f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = -3.0f,
-                                                      .y = 0.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.1f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 0.0f,
-                                                      .y = 5.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.2f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 0.0f,
-                                                      .y = -5.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.2f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = 6.0f,
-                                                      .y = 6.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.15f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                     {.x = -6.0f,
-                                                      .y = -6.0f,
-                                                      .z = 0.0f,
-                                                      .modelName = "bear",
-                                                      .scale = 0.15f,
-                                                      .meshPath = bearMesh,
-                                                      .render = true},
-                                                 });
-  }
+  // --- Maze ---
+  spawnDemoLight<shared::MazeTag>(game, "night");
+  spawnStaticEntities<shared::MazeTag>(
+      game, {
+                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(100.0f)},
+                StaticEntityDesc{.position = glm::vec3(3.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.1f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(-3.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.1f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(0.0f, 5.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.2f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(0.0f, -5.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.2f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(6.0f, 6.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.15f),
+                                 .collision = CollisionShape::Mesh},
+                StaticEntityDesc{.position = glm::vec3(-6.0f, -6.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.15f),
+                                 .collision = CollisionShape::Mesh},
+            });
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
@@ -325,6 +285,15 @@ void initWorldEntities(ServerGame& game) {
     JPH::BodyID mazeBodyId = game.physics.createPlayerBody(startX, 0.0f, 0.0f);
     game.registry.emplace<shared::PhysicsBody>(
         mazeEntity, mazeBodyId.GetIndexAndSequenceNumber());
+    spawnPlayerAvatar<shared::OverworldTag>(game, overworldEntity, "cube",
+                                            glm::vec3(startX, 0.0f, 0.0f),
+                                            glm::vec3(1.0f));
+    slots.overworld_avatar = overworldEntity;
+
+    auto [mazeEntityId, mazeEntity] = new_entity(game);
+    spawnPlayerAvatar<shared::MazeTag>(game, mazeEntity, "bear",
+                                       glm::vec3(startX, 0.0f, 0.0f),
+                                       glm::vec3(0.5f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
@@ -402,12 +371,12 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   movement_system(game, dt, StateType::OVERWORLD);
-  render_model_change(game.registry, dt);
+  render_model_change(game, dt);
 
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
   if (lightId != kInvalidEntityId)
     hardcoded_spinning_light(game.registry, dt, lightId);
-  scene_cycle_system(game.registry);
+  scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
 
 // ── MazeState ────────────────────────────────────────────
@@ -447,10 +416,10 @@ void MazeState::update(ServerGame& game, float dt) {
   }
 
   movement_system(game, dt, StateType::MAZE);
-  render_model_change(game.registry, dt);
+  render_model_change(game, dt);
 
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
   if (lightId != kInvalidEntityId)
     hardcoded_spinning_light(game.registry, dt, lightId);
-  scene_cycle_system(game.registry);
+  scene_cycle_system(game.registry, StateType::MAZE);
 }

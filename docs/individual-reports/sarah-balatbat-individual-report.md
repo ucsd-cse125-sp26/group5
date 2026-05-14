@@ -6,8 +6,152 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 
+<!-- Sarah's template 
+## Week X
+### Goals
+
+### Achieved
+
+### Progress Evaluation
+
+### Upcoming Goals
+
+### Lessons Learned
+
+### Individual Morale
+-->
+
+## Week 6
+### Goals
+
+- [x] Create rig for base model
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [x] Model for existing reference sheets
+  - [x] Corgi
+- [ ] Create decryption puzzle symbols - WIP
+
+### Achieved
+
+- Base model rig
+  - Finished rig and test pose
+    <img src="{{ '/assets/week6/sarah/base-rig-front.png' | relative_url }}" alt="base model rig front view">
+    <img src="{{ '/assets/week6/sarah/base-rig-pose.png' | relative_url }}" alt="base model rig test pose">
+  
+- Corgi
+  - Created model - struggled a bit with cheek and tail fluff geometry
+    <img src="{{ '/assets/week6/sarah/dog-wip-0.png' | relative_url }}" alt="dog cheek fluff in progress no ears">
+    <img src="{{ '/assets/week6/sarah/dog-wip-1.png' | relative_url }}" alt="dog ears in progress no cheek fluff">
+    <img src="{{ '/assets/week6/sarah/dog-wip-2.png' | relative_url }}" alt="dog cheek fluff and ears in progress">
+  - Created rig and test pose - considering simplifying tail rig
+    <img src="{{ '/assets/week6/sarah/dog-rig-front.jpg' | relative_url }}" alt="dog rig wireframe front view">
+    <img src="{{ '/assets/week6/sarah/dog-rig-side.jpg' | relative_url }}" alt="dog rig wireframe side view">
+    <img src="{{ '/assets/week6/sarah/dog-rig-pose.jpg' | relative_url }}" alt="dog rig wireframe test pose">
+  - Added material - basic orange material for renders, will be textured eventually with corgi pattern
+    <img src="{{ '/assets/week6/sarah/dog-orange-0.jpg' | relative_url }}" alt="dog orange material front view">
+    <img src="{{ '/assets/week6/sarah/dog-orange-1.jpg' | relative_url }}" alt="dog orange material 3/4 profile view">
+    <img src="{{ '/assets/week6/sarah/dog-orange-pose.jpg' | relative_url }}" alt="dog orange material test pose">
+    <img src="{{ '/assets/week6/sarah/dog-orange-spin.gif' | relative_url }}" alt="dog orange material turnaround">
+
+- Decryption symbols
+  - Sketched ideas of icons for the decryption puzzle
+    <img src="{{ '/assets/week6/sarah/decrypt-icons-wip.jpg' | relative_url }}" alt="in progress collection of icons for decryption puzzle">
+    <img src="{{ '/assets/week6/sarah/decrypt-icon-ideas.jpg' | relative_url }}" alt="list of ideas for icons to be made">
+
+
+### Progress Evaluation
+
+I think this was the greatest amount of progress I've done at a given week. It still feels like not that much compared to what others in the team have done, but I'm glad I have much more to show. I feel like making the turnaround gif of the model was too much work for that small gif (plugin made it easy, but introduced other problems I had to undo with the model). The workflow is more clear, but there's still stuff down the pipeline I need to learn more about  (UV unwrapping, texturing, etc).
+
+### Upcoming Goals
+
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Continue modeling
+- [ ] Create decryption puzzle symbols
+- [ ] Watch UV unwrapping and texturing tutorials
+
+### Lessons Learned
+
+- Plugins can help with making a task faster but they can also introduce other issues
+- I do not need 360 frames for a turnaround animation
+- FFMPEG is very useful for making gifs (among other things)
+- I can manually assign weight to vertex groups for a rig, which is useful for the style I'm going for since the weights are very simple (hand movement doesn't affect body, etc)
+- I can get a lot done when I am avoiding doing my CSE 123 work
+- It is literally impossible to predict when emergencies can occur that would take me out of commission
+
+### Individual Morale
+
+I feel like every single week I am constantly behind. I still look forward to making Gurf very soon, but I also get intimidated by all the things I don't know how to do yet. Though, it's not like I haven't learned a lot in the process of this project. Blender is a lot to learn, and I think I am going at an alright pace if not for the fact we have about 3 weeks left til the demo. I also had to get an emergency root canal, so I've been having to deal with pain (physically, financially, and emotionally) this past week. With that going on, I guess my progress was not bad. I just wish I am not having to deal with it. But uhh, I guess I'm proud of that little turnaround gif even though it took much longer than it should've. Everything is a learning opportunity, I guess.
+
+## Week 5
+### Goals
+
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf - WIP
+  - [ ] Goose
+  - [ ] Mouse - WIP
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+- [x] Continue tutorial for rigging lesson
+
+### Achieved
+
+- Gurf concept art iteration
+  - More Gurf references
+  <img src="{{ '/assets/week5/sarah/gurf-refs-fat.png' | relative_url }}" alt="Gurf fat cat references">
+  - Considering making Gurf fatter in the body to match chonky cats
+  <img src="{{ '/assets/week5/sarah/gurf-fatter-body.jpg' | relative_url }}" alt="Gurf fatter body design">
+- Mouse concept art iteration
+  - More mouse references
+  <img src="{{ '/assets/week5/sarah/mouse-refs.png' | relative_url }}" alt="Mouse references">
+  - Considering bigger ears and different snout shape
+  <img src="{{ '/assets/week5/sarah/mouse-big-ears.jpg' | relative_url }}" alt="Mouse bigger ears design">
+
+- Rigging tutorial
+  - Finished rig
+  <img src="{{ '/assets/week5/sarah/rig.png' | relative_url }}" alt="Low poly cat tutorial rig">
+  - Simple pose
+  <img src="{{ '/assets/week5/sarah/rig-pose.png' | relative_url }}" alt="Rig pose wireframe">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-front.png' | relative_url }}" alt="Rig pose front view">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-back.png' | relative_url }}" alt="Rig pose back view">
+  <img src="{{ '/assets/week5/sarah/rig-pose-solid-side.png' | relative_url }}" alt="Rig pose 3/4 view">
+  - Base model rig sketch
+  <img src="{{ '/assets/week5/sarah/base-model-rig-sketch.jpg' | relative_url }}" alt="Sketch of rig for base model at rest and simple pose">
+
+### Progress Evaluation
+
+Didn't really get to work on things until the night before report deadline, which is becoming a pattern these past few weeks. Rigging wasn't as hard as I thought, but I'm glad I finally got the tutorial out of the way. I think I'll always wish that I got to do more every week, but such is having to deal with a 16-unit courseload, specifically with CSE 123 in it.
+
+### Upcoming Goals
+
+- [ ] Create rig for base model
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Model for existing reference sheets
+  - [ ] Corgi
+- [ ] Create decryption puzzle symbols
+
+### Lessons Learned
+
+- Rigging itself is not too bad
+- Gotta get out of iteration loop at some point to move onto next step of design and development
+- Also gotta be ok with losing some (CSE 123 ngl) to win some (fun in here)
+
+### Individual Morale
+
+CSE 123 midterm was a beast to study for, and thankfully light itself. I feel like I would've been doing so much more per week if not for this class I need for my requirements. I still feel like I'm behind relative to the rest of the team, but I'm trying to remind myself this is more of a proof of concept than a polished end product. I still would like to get as far as I can, at the very least with my beloved Gurf. Idk, I'm on roughly 8 hours sleep in the past 48 or so hours. I also forgot we needed server maintenance tonight :D
+
 ## Week 4
 ### Goals
+
 - [x] Create concept art for other MVPs
   - [x] Goose
   - [x] Mouse
@@ -68,6 +212,7 @@ Being sick sucked. CSE 123 continues to be a heavy stressor, especially with mid
 
 ## Week 3
 ### Goals
+
 - [ ] Continue tutorial for rigging lesson
 - [x] Start modeling base model
 - [ ] Create concept art for other MVPs
@@ -122,6 +267,7 @@ Still holding onto the motivation of being able to play my character. Got sick s
 
 ## Week 2
 ### Goals
+
 - [x] Solidify game design details
 - [x] Start creating concept art
 - [x] Start learning modeling on Blender
