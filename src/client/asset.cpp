@@ -106,7 +106,14 @@ static std::vector<Material> buildMaterials(const aiScene* scene) {
     result.diffuse = loadMaterial(aimat, aiTextureType_DIFFUSE, scene);
     result.specular = loadMaterial(aimat, aiTextureType_SPECULAR, scene);
     result.emissive = loadMaterial(aimat, aiTextureType_EMISSIVE, scene);
-    aimat->Get(AI_MATKEY_SHININESS, result.shininess);
+    // glTF reports shininess=0 (it uses roughness, not Phong). Treat 0 as
+    // "absent" so pow(_, 0)=1 doesn't pin specular at max and blow out the
+    // surface to white.
+    float shininess = 0.0f;
+    if (aimat->Get(AI_MATKEY_SHININESS, shininess) == aiReturn_SUCCESS &&
+        shininess > 0.0f) {
+      result.shininess = shininess;
+    }
     out.push_back(result);
   }
   return out;
@@ -169,7 +176,12 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     return MaterialSlot{.constant = glm::vec3(1.0f), .texture = id};
   }
 
-  aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
+  // Per-type default: white for DIFFUSE so untextured meshes are visible;
+  // black for SPECULAR/EMISSIVE/AMBIENT so missing properties don't blow
+  // out the surface (white emissive would add 1.0 to every fragment).
+  aiColor4D color = (type == aiTextureType_DIFFUSE)
+                        ? aiColor4D(1.0f, 1.0f, 1.0f, 1.0f)
+                        : aiColor4D(0.0f, 0.0f, 0.0f, 1.0f);
   switch (type) {
     case aiTextureType_DIFFUSE:
       mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);

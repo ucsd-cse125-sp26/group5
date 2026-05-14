@@ -235,11 +235,16 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
   }
 }
 
-void scene_cycle_system(entt::registry& registry) {
+// Cycle only the active world's Scene anchor. Iterating all Scene
+// components would mutate an inactive anchor (Maze's, since EnTT iterates
+// newest-first), and that change never reaches clients because UPDATE_ENTITY
+// only broadcasts the active state's tagged entities.
+template <typename Tag>
+static void scene_cycle_system_for_world(entt::registry& registry) {
   bool cycle = false;
-  auto inputView = registry.view<shared::PlayerInput>();
+  auto inputView = registry.view<Tag, shared::PlayerInput>();
   for (auto entity : inputView) {
-    auto& input = inputView.get<shared::PlayerInput>(entity);
+    auto& input = inputView.template get<shared::PlayerInput>(entity);
     if (input.keys_newly_pressed & KEY_CYCLE_SCENE) {
       cycle = true;
       break;
@@ -247,9 +252,9 @@ void scene_cycle_system(entt::registry& registry) {
   }
   if (!cycle) return;
 
-  auto sceneView = registry.view<shared::Scene>();
+  auto sceneView = registry.view<Tag, shared::Scene>();
   for (auto entity : sceneView) {
-    auto& scene = sceneView.get<shared::Scene>(entity);
+    auto& scene = sceneView.template get<shared::Scene>(entity);
     for (std::size_t i = 0; i < shared::SCENE_COUNT; i++) {
       if (shared::SCENES[i].name == scene.name) {
         scene.name =
@@ -258,6 +263,17 @@ void scene_cycle_system(entt::registry& registry) {
       }
     }
     scene.name = std::string(shared::SCENES[0].name);
+  }
+}
+
+void scene_cycle_system(entt::registry& registry, StateType stateType) {
+  switch (stateType) {
+    case StateType::OVERWORLD:
+      scene_cycle_system_for_world<shared::OverworldTag>(registry);
+      break;
+    case StateType::MAZE:
+      scene_cycle_system_for_world<shared::MazeTag>(registry);
+      break;
   }
 }
 
