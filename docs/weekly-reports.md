@@ -91,7 +91,7 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 Thank you Humam Saknini for your free image hosting
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-  <img src=https://cdn.discordapp.com/attachments/1488596387288318124/1504276591730233497/image.png?ex=6a06663f&is=6a0514bf&hm=88e164a357dcc2e75aaeec81bfd7e3e1738f165a9159fe93c077c0649b2354e1&animated=true alt="Note">
+  <img src="https://cdn.discordapp.com/attachments/1488596387288318124/1504276591730233497/image.png?ex=6a06663f&is=6a0514bf&hm=88e164a357dcc2e75aaeec81bfd7e3e1738f165a9159fe93c077c0649b2354e1&animated=true" alt="Note">
   <img src="{{ '/assets/week6/jacob/a.png' | relative_url }}" alt="Note">
 </div>
 
@@ -311,8 +311,10 @@ The team continued development across graphics, networking, physics, and puzzle 
 <img src="{{ '/assets/week3/rebecca/rebecca1.png' | relative_url }}" alt="text">
 
 **Sarah**
+
 - Came up with detailed design for character.
 <img style="width: 60%" src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
+
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
   <img src="{{ '/assets/week3/sarah/sarah2.png' | relative_url }}" alt="text">
   <img src="{{ '/assets/week3/sarah/sarah3.png' | relative_url }}" alt="text">
