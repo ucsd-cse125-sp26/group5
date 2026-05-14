@@ -82,6 +82,7 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
   <img src="{{ '/assets/week6/sarah/dog1.png' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week6/sarah/dog2.png' | relative_url }}" alt="Note">
 </div>
+<img src="{{ '/assets/week6/sarah/dog.gif' | relative_url }}" alt="Note">
 
 **Rebecca**
 - Landscape model: created many more assets and have started merging them onto the main landscape model. Have already worked with Rendering team to get assets to the main world map! 
@@ -250,6 +251,7 @@ The team continued development across graphics, networking, physics, and puzzle 
 </div>
 <img src="{{ '/assets/week3/rebecca/model1.png' | relative_url }}" alt="thing">
 <img src="{{ '/assets/week3/rebecca/rebecca1.png' | relative_url }}" alt="text">
+
 **Sarah**
 - Came up with detailed design for character. 
 <img style="width: 60%" src="{{ '/assets/week3/sarah/sarah1.jpg' | relative_url }}" alt="text">
@@ -261,6 +263,7 @@ The team continued development across graphics, networking, physics, and puzzle 
   <img src="{{ '/assets/week3/sarah/sarah6.png' | relative_url }}" alt="text">
   <img src="{{ '/assets/week3/sarah/sarah7.png' | relative_url }}" alt="text">
 </div>
+
 ## Technical
 
 **Alain**
