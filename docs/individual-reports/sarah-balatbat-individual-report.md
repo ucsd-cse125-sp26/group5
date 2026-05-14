@@ -63,13 +63,30 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Progress Evaluation
 
-I think this was the greatest amount of progress I've done at a given week. It still feels like not that much compared to what others in the team have done, but I'm glad I have much more to show. 
+I think this was the greatest amount of progress I've done at a given week. It still feels like not that much compared to what others in the team have done, but I'm glad I have much more to show. I feel like making the turnaround gif of the model was too much work for that small gif (plugin made it easy, but introduced other problems I had to undo with the model). The workflow is more clear, but there's still stuff down the pipeline I need to learn more about  (UV unwrapping, texturing, etc).
 
 ### Upcoming Goals
 
+- [ ] Create reference sheets for existing concept art
+  - [ ] Gurf
+  - [ ] Goose
+  - [ ] Mouse
+- [ ] Continue modeling
+- [ ] Create decryption puzzle symbols
+- [ ] Watch UV unwrapping and texturing tutorials
+
 ### Lessons Learned
 
+- Plugins can help with making a task faster but they can also introduce other issues
+- I do not need 360 frames for a turnaround animation
+- FFMPEG is very useful for making gifs (among other things)
+- I can manually assign weight to vertex groups for a rig, which is useful for the style I'm going for since the weights are very simple (hand movement doesn't affect body, etc)
+- I can get a lot done when I am avoiding doing my CSE 123 work
+- It is literally impossible to predict when emergencies can occur that would take me out of commission
+
 ### Individual Morale
+
+I feel like every single week I am constantly behind. I still look forward to making Gurf very soon, but I also get intimidated by all the things I don't know how to do yet. Though, it's not like I haven't learned a lot in the process of this project. Blender is a lot to learn, and I think I am going at an alright pace if not for the fact we have about 3 weeks left til the demo. I also had to get an emergency root canal, so I've been having to deal with pain (physically, financially, and emotionally) this past week. With that going on, I guess my progress was not bad. I just wish I am not having to deal with it. But uhh, I guess I'm proud of that little turnaround gif even though it took much longer than it should've. Everything is a learning opportunity, I guess.
 
 ## Week 5
 ### Goals
