@@ -78,11 +78,10 @@ inline constexpr GLenum kNvxTotalAvailable = 0x9048;
 inline constexpr GLenum kNvxCurrentAvailable = 0x9049;
 
 inline void print() {
-  std::vector<std::pair<std::string, size_t>> sorted(
-      bytes_per_category.begin(), bytes_per_category.end());
-  std::ranges::sort(sorted, [](const auto& a, const auto& b) {
-    return a.second > b.second;
-  });
+  std::vector<std::pair<std::string, size_t>> sorted(bytes_per_category.begin(),
+                                                     bytes_per_category.end());
+  std::ranges::sort(
+      sorted, [](const auto& a, const auto& b) { return a.second > b.second; });
 
   size_t tracked_total = 0;
   for (const auto& [_, v] : sorted) tracked_total += v;
@@ -122,9 +121,9 @@ inline void end_frame() {
 #define GPU_MEM_ADD(category, bytes) \
   shared::gpu_mem_profiler::add(category, bytes)
 #define GPU_MEM_CLEAR(category) shared::gpu_mem_profiler::clear(category)
-#define GPU_MEM_TEX2D(category, internal_format, w, h)        \
-  shared::gpu_mem_profiler::add(                              \
-      category,                                               \
+#define GPU_MEM_TEX2D(category, internal_format, w, h) \
+  shared::gpu_mem_profiler::add(                       \
+      category,                                        \
       shared::gpu_mem_profiler::tex2d_bytes(internal_format, w, h, false))
 #define GPU_MEM_TEX2D_MIPPED(category, internal_format, w, h) \
   shared::gpu_mem_profiler::add(                              \
