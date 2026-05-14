@@ -56,8 +56,8 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 - Worked on a 2D version of the maze minigame; plan to combine with Tim's 2D pipeline after his branch is pushed, followed by a refactor.
 - **Philip**: Implementing recoloring logic, since only completed parts of the map sections show color. Writing logic to determine when each section should be colored in. Core flow: collect fragment → set section complete → create bounding box for that section.
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-  <img src="{{ '/assets/week6/leon/m1.png' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week6/leon/m2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/leon/m1.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/leon/m2.jpg' | relative_url }}" alt="Note">
 </div>
 
 
