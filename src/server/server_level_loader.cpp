@@ -86,7 +86,6 @@ void loadLevel(ServerGame& game) {
                                           1.0f, 0.0f, 0.0f, 0.0f);
 	game.registry.emplace<shared::RenderInfo>(winterFragment, "cube", 0.5f, false);
   game.registry.emplace<shared::FragmentComponent>(winterFragment, shared::SectionSeasonMap::WINTER, false);
-  game.registry.emplace<shared::SeasonComponent>(winterFragment, shared::SectionSeasonMap::WINTER);
 	game.registry.emplace<shared::OverworldTag>(winterFragment);
 
 	auto [fallFragmentID, fallFragment] = new_entity(game);
@@ -94,7 +93,6 @@ void loadLevel(ServerGame& game) {
                                           1.0f, 0.0f, 0.0f, 0.0f);
 	game.registry.emplace<shared::RenderInfo>(fallFragment, "cube", 0.5f, false);
   game.registry.emplace<shared::FragmentComponent>(fallFragment, shared::SectionSeasonMap::FALL, false);
-  game.registry.emplace<shared::SeasonComponent>(fallFragment, shared::SectionSeasonMap::FALL);
 	game.registry.emplace<shared::OverworldTag>(fallFragment);
 
 	auto [summerFragmentID, summerFragment] = new_entity(game);
@@ -102,7 +100,6 @@ void loadLevel(ServerGame& game) {
                                           1.0f, 0.0f, 0.0f, 0.0f);
 	game.registry.emplace<shared::RenderInfo>(summerFragment, "cube", 0.5f, false);
   game.registry.emplace<shared::FragmentComponent>(summerFragment, shared::SectionSeasonMap::SUMMER, false);
-  game.registry.emplace<shared::SeasonComponent>(summerFragment, shared::SectionSeasonMap::SUMMER);
 	game.registry.emplace<shared::OverworldTag>(summerFragment);
 
 	auto [springFragmentID, springFragment] = new_entity(game);
@@ -110,6 +107,5 @@ void loadLevel(ServerGame& game) {
                                           1.0f, 0.0f, 0.0f, 0.0f);
 	game.registry.emplace<shared::RenderInfo>(springFragment, "cube", 0.5f, false);
   game.registry.emplace<shared::FragmentComponent>(springFragment, shared::SectionSeasonMap::SPRING, false);
-  game.registry.emplace<shared::SeasonComponent>(springFragment, shared::SectionSeasonMap::SPRING);
 	game.registry.emplace<shared::OverworldTag>(springFragment);
 }
