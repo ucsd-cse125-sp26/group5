@@ -21,7 +21,6 @@ struct Velocity {
 
 struct RenderInfo {
   std::string modelName;
-  float scale;
   float sx, sy, sz;
 };
 
