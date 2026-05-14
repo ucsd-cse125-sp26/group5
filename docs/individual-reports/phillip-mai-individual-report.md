@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 6
+1. What were your concrete goals for the week?  
+Originally the goal was to implement a 3d maze generator that could render out cubes on a 2d array making up a maze, but it changed to implementing the logic for restoring color in each of the sections and working out how the section doors would work. 
+2. What goals were you able to accomplish?  
+I am currently 80% done with the color restoration logic, and Leon actually handled the section door logic in his most recent pull request. I was able to create a maze generator but it is unknown if that will be used at all. 
+3. If the week went differently than you had planned, what were the reasons?  
+This week went as planned, mainly because there was not a lab assignment due for ECE 108. This week was one of the more peaceful weeks. 
+4. What are your specific goals for the next week?  
+I would like to finish up my color restoration logic and begin working on something else. I suspect my next task will likely be the next puzzle after the maze. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I don't think I learned too much, but I was able to brainstorm with Jacob and try out many different ways of implementing the color restoration logic. I think I developed a sense of what is good design and what would be considered poor approaches to design, what kinds of approaches lead to better performance and less work. 
+6. What is your individual morale (which might be different from the overall group morale)?  
+My morale is better than last week, but we do have a Lab assignment for ECE108 to be done this week so I am living in great fear of the future. 
+
 ## Week 5
 1. What were your concrete goals for the week?  
 I wanted to continue working with Leon to begin implementing the lower level details of the puzzles, especially since we had worked out the implementation details with the tech team during last week's Friday meeting. 

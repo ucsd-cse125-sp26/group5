@@ -59,6 +59,14 @@ struct PointLight {
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
+  bool castsShadow = true;
+};
+
+struct DirectionalLight {
+  float dirX, dirY, dirZ;
+  float ambientR, ambientG, ambientB;
+  float diffuseR, diffuseG, diffuseB;
+  float specularR, specularG, specularB;
 };
 
 struct Scene {

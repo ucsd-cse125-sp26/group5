@@ -1,55 +1,61 @@
 #pragma once
+
 #include <cstdio>
+#include <glm/ext/quaternion_float.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <string>
 #include <vector>
 
+#include "physics_engine.h"
 #include "server_game.h"
+#include "shared/components.h"
+
+enum class CollisionShape {
+  Box,   // post-orientation AABB; cheap, works for procedural assets
+  Mesh,  // triangle mesh; mesh-backed assets only
+};
 
 struct StaticEntityDesc {
-  float x, y, z;
-  std::string modelName;
-  float scale;
-  std::string meshPath;
-  bool render = true;  // default true, set false for physics-only
-  float halfX = -1.0f, halfY = -1.0f, halfZ = -1.0f;
+  glm::vec3 position{0.0f};
+  glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+  std::string modelName;  // "" → no visual entity
+  glm::vec3 scale{1.0f, 1.0f, 1.0f};
+  CollisionShape collision = CollisionShape::Box;
 };
 
 template <typename WorldTag>
-void spawnStaticEntitiesForWorld(ServerGame& game,
-                                 const std::vector<StaticEntityDesc>& descs) {
-  for (auto& desc : descs) {
+void spawnStaticEntities(ServerGame& game,
+                         const std::vector<StaticEntityDesc>& descs) {
+  for (const auto& d : descs) {
     auto [id, entity] = new_entity(game);
-    game.registry.emplace<shared::Position>(entity, desc.x, desc.y, desc.z,
-                                            1.0f, 0.0f, 0.0f, 0.0f);
-    game.registry.emplace<WorldTag>(entity);
+    game.registry.template emplace<shared::Position>(
+        entity, d.position.x, d.position.y, d.position.z, d.rotation.w,
+        d.rotation.x, d.rotation.y, d.rotation.z);
+    game.registry.template emplace<WorldTag>(entity);
 
-    if (desc.render) {
-      game.registry.emplace<shared::RenderInfo>(entity, desc.modelName,
-                                                desc.scale);
+    if (!d.modelName.empty()) {
+      game.registry.template emplace<shared::RenderInfo>(
+          entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
     }
 
-    JPH::BodyID bodyId;
-    if (desc.meshPath.empty()) {
-      auto& bi = game.physics.getBodyInterface();
-      float hx = desc.halfX > 0 ? desc.halfX : desc.scale * 0.5f;
-      float hy = desc.halfY > 0 ? desc.halfY : desc.scale * 0.5f;
-      float hz = desc.halfZ > 0 ? desc.halfZ : desc.scale * 0.5f;
-      JPH::BoxShapeSettings box(JPH::Vec3(hx, hy, hz));
-      box.SetEmbedded();
-      JPH::ShapeRefC shape = box.Create().Get();
-      printf("Box halfX=%.3f halfY=%.3f halfZ=%.3f\n", hx, hy, hz);
-      JPH::BodyCreationSettings settings(
-          shape, JPH::RVec3(desc.x, desc.y, desc.z), JPH::Quat::sIdentity(),
-          JPH::EMotionType::Static, Layers::NON_MOVING);
-      JPH::Body* body = bi.CreateBody(settings);
-      bi.AddBody(body->GetID(), JPH::EActivation::DontActivate);
-      bodyId = body->GetID();
+    JPH::ShapeRefC shape;
+    if (d.collision == CollisionShape::Mesh) {
+      shape = game.physics.meshShapeForAsset(d.modelName, d.scale);
+      if (!shape) {
+        printf(
+            "spawnStaticEntities: %s has no mesh geometry, falling back "
+            "to box\n",
+            d.modelName.c_str());
+        shape = game.physics.boxShapeForAsset(d.modelName, d.scale);
+      }
     } else {
-      bodyId = game.physics.createMeshBody(desc.meshPath, desc.x, desc.y,
-                                           desc.z, desc.scale);
+      shape = game.physics.boxShapeForAsset(d.modelName, d.scale);
     }
+    if (!shape) continue;
 
-    game.registry.emplace<shared::PhysicsBody>(
+    JPH::BodyID bodyId =
+        game.physics.createStaticBody(shape, d.position, d.rotation);
+    game.registry.template emplace<shared::PhysicsBody>(
         entity, bodyId.GetIndexAndSequenceNumber());
   }
 }

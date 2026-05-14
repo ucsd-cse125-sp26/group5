@@ -39,7 +39,6 @@ struct Model {
   std::vector<Material> materials;
   std::vector<std::pair<unsigned int, glm::mat4>> mesh_instances;
   glm::quat orientation{1.0f, 0.0f, 0.0f, 0.0f};
-  GLuint test;
 };
 
 struct Skybox {
@@ -54,3 +53,9 @@ Model* makeCubeModel(const shared::CubeSpec& spec);
 Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
+
+// One Model per mesh-bearing glTF node, keyed by MAP_MODEL_PREFIX + name.
+// Local mesh transforms are identity; node world transform lives on the
+// server-spawned entity's Position + RenderInfo.scale.
+std::vector<std::pair<std::string, Model*>> loadMapModels(
+    const std::string& filename);
