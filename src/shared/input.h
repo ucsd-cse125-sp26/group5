@@ -16,3 +16,9 @@ constexpr InputKeys KEY_LIGHT_BRIGHT = 1 << 9;
 constexpr InputKeys KEY_CYCLE_SCENE = 1 << 10;
 constexpr InputKeys KEY_ENTER_MAZE = 1 << 11;
 constexpr InputKeys KEY_EXIT_MINIGAME = 1 << 12;
+// Maze minigame (server reads these on maze avatars; arrow keys in client).
+constexpr InputKeys KEY_SPIRIT_UP = 1 << 13;
+constexpr InputKeys KEY_SPIRIT_DOWN = 1 << 14;
+constexpr InputKeys KEY_SPIRIT_LEFT = 1 << 15;
+constexpr InputKeys KEY_SPIRIT_RIGHT = 1 << 16;
+constexpr InputKeys KEY_MAZE_COLLECT = 1 << 17;

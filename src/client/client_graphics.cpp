@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "client/asset.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -209,8 +210,58 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
           selfIt->second)) {
     return std::nullopt;
   }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(selfIt->second)) {
+    return std::nullopt;
+  }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
+  const auto& selfRender =
+      game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
+
+  // Maze mode: all clients use first-person cameras attached to the shared
+  // spirit cube.
+  // Each player's join slot picks one side, so all windows move together when
+  // the cube moves.
+  if (selfRender.modelName == "bear") {
+    entt::entity spirit = entt::null;
+    auto spiritView =
+        game.renderRegistry.view<shared::Position, shared::RenderInfo>();
+    for (auto ent : spiritView) {
+      const auto& ri = spiritView.get<shared::RenderInfo>(ent);
+      if (ri.modelName == "cube" && std::abs(ri.sx - 0.8f) < 0.0001f &&
+          std::abs(ri.sy - 0.8f) < 0.0001f &&
+          std::abs(ri.sz - 0.8f) < 0.0001f) {
+        spirit = ent;
+        break;
+      }
+    }
+    if (spirit != entt::null) {
+      const auto& sp = game.renderRegistry.get<shared::Position>(spirit);
+      int slot = selfRender.playerSlot;
+      if (slot < 1 || slot > 4) slot = 1;
+
+      glm::vec3 side(0.0f);
+      switch (slot) {
+        case 1:
+          side = glm::vec3(0.0f, 1.0f, 0.0f);
+          break;
+        case 2:
+          side = glm::vec3(0.0f, -1.0f, 0.0f);
+          break;
+        case 3:
+          side = glm::vec3(-1.0f, 0.0f, 0.0f);
+          break;
+        case 4:
+          side = glm::vec3(1.0f, 0.0f, 0.0f);
+          break;
+      }
+
+      glm::vec3 pos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
+      glm::mat4 view =
+          glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
+      return CameraState{.position = pos, .view = view};
+    }
+  }
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
@@ -297,9 +348,18 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     } else {
       if (entity.id == game.renderEntityId) continue;
     }
-    auto it = models.find(renderInfo.modelName);
-    if (it == models.end() || !it->second) continue;
-    Model* modelAsset = it->second;
+    std::string modelKey = renderInfo.modelName;
+    if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
+        renderInfo.modelName == "cube") {
+      modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+    }
+    auto it = models.find(modelKey);
+    Model* modelAsset = it != models.end() ? it->second : nullptr;
+    if (!modelAsset) {
+      auto fallbackIt = models.find(renderInfo.modelName);
+      modelAsset = fallbackIt != models.end() ? fallbackIt->second : nullptr;
+    }
+    if (!modelAsset) continue;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
@@ -511,6 +571,16 @@ bool Graphics::load(int width, int height) {
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  for (uint8_t s = 1; s <= 4; s++) {
+    std::string name = "cube_slot" + std::to_string(s);
+    Model* m = makePlayerSlotCubeModel(shared::CUBE_RAINBOW, s);
+    if (m) {
+      m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[name] = m;
+      printf("Loaded asset: %s (player join order)\n", name.c_str());
+    }
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
