@@ -145,7 +145,6 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
-  if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) keys |= KEY_ENTER_MAZE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
 
   static bool mouseInit = false;

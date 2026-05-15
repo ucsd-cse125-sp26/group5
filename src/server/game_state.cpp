@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "game/maze_generation.h"
+#include "game/maze_trigger.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
@@ -209,7 +210,8 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
 
 std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
   const GeneratedMazeData data = buildGeneratedMazeData();
-  constexpr glm::vec3 kPreviewCenter = glm::vec3(0.0f, 16.0f, 4.5f);
+  constexpr glm::vec3 kPreviewCenter =
+      glm::vec3(maze_trigger::kCenterX, maze_trigger::kCenterY, 4.5f);
   constexpr float kPreviewTileSpacing = 0.18f;
   constexpr float kFloorDepthOffset = -0.20f;
   constexpr float kWallDepthOffset = -0.08f;
@@ -303,6 +305,8 @@ void initWorldEntities(ServerGame& game) {
             });
   spawnStaticEntities<shared::OverworldTag>(game,
                                             buildOverworldMazePreviewEntities());
+  spawnStaticEntities<shared::OverworldTag>(
+      game, maze_trigger::buildMazeTriggerMarkerEntities());
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
@@ -388,15 +392,13 @@ std::vector<entt::entity> OverworldState::getStateEntities(
 void OverworldState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
 
-  // Press 1 → enter maze
-  auto inputView =
-      game.registry.view<shared::PlayerInput, shared::OverworldTag>();
-  for (auto ent : inputView) {
-    auto& input = game.registry.get<shared::PlayerInput>(ent);
-    if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
-      game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
-      return;
-    }
+  const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
+  if (!allInTrigger) {
+    game.overworldMazeTriggerArmed = true;
+  } else if (game.overworldMazeTriggerArmed) {
+    game.overworldMazeTriggerArmed = false;
+    game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
+    return;
   }
 
   movement_system(game, dt, StateType::OVERWORLD);
@@ -417,6 +419,7 @@ void MazeState::onEnter(ServerGame& game) {
 
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
+  game.overworldMazeTriggerArmed = false;
   removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
   despawnTaggedEntities<shared::MazeTag>(game);
