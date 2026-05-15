@@ -145,8 +145,8 @@ struct GeneratedMazeData {
 
 GeneratedMazeData buildGeneratedMazeData() {
   GeneratedMazeData data;
-  data.layout = maze::GenerateMazeLayout(kGeneratedMazeWidth, kGeneratedMazeHeight,
-                                         kGeneratedMazeSeed);
+  data.layout = maze::GenerateMazeLayout(
+      kGeneratedMazeWidth, kGeneratedMazeHeight, kGeneratedMazeSeed);
   data.tileGrid = maze::ConvertToTileGrid(data.layout);
   return data;
 }
@@ -208,9 +208,9 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
       if (data.tileGrid.Tile(x, y) != maze::MazeTile::Wall) continue;
 
       entities.push_back(StaticEntityDesc{
-          .position =
-              glm::vec3((static_cast<float>(x) - 1.0f) * kMazeTileSpacing,
-                        (static_cast<float>(y) - 1.0f) * kMazeTileSpacing, 0.75f),
+          .position = glm::vec3(
+              (static_cast<float>(x) - 1.0f) * kMazeTileSpacing,
+              (static_cast<float>(y) - 1.0f) * kMazeTileSpacing, 0.75f),
           .modelName = "cube",
           .scale = glm::vec3(0.7f, 0.7f, 1.5f),
       });
@@ -233,17 +233,16 @@ std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
   constexpr glm::vec3 kStartMarkerScale = glm::vec3(0.24f, 0.16f, 0.24f);
   constexpr glm::vec3 kGoalMarkerScale = glm::vec3(0.28f, 0.16f, 0.28f);
 
-  const float xOffset =
-      (static_cast<float>(data.tileGrid.width) - 1.0f) * 0.5f;
+  const float xOffset = (static_cast<float>(data.tileGrid.width) - 1.0f) * 0.5f;
   const float yOffset =
       (static_cast<float>(data.tileGrid.height) - 1.0f) * 0.5f;
 
   auto previewPosition = [&](int x, int y, float yOffsetFromBoard) {
-    return glm::vec3(kPreviewCenter.x +
-                         (static_cast<float>(x) - xOffset) * kPreviewTileSpacing,
+    return glm::vec3(kPreviewCenter.x + (static_cast<float>(x) - xOffset) *
+                                            kPreviewTileSpacing,
                      kPreviewCenter.y + yOffsetFromBoard,
-                     kPreviewCenter.z +
-                         (yOffset - static_cast<float>(y)) * kPreviewTileSpacing);
+                     kPreviewCenter.z + (yOffset - static_cast<float>(y)) *
+                                            kPreviewTileSpacing);
   };
 
   std::vector<StaticEntityDesc> entities;
@@ -253,8 +252,8 @@ std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
       const bool isWall = data.tileGrid.Tile(x, y) == maze::MazeTile::Wall;
 
       entities.push_back(StaticEntityDesc{
-          .position =
-              previewPosition(x, y, isWall ? kWallDepthOffset : kFloorDepthOffset),
+          .position = previewPosition(
+              x, y, isWall ? kWallDepthOffset : kFloorDepthOffset),
           .modelName = isWall ? "light_cube" : "cube",
           .scale = isWall ? kWallScale : kFloorScale,
       });
@@ -312,8 +311,8 @@ void initWorldEntities(ServerGame& game) {
                                  .scale = glm::vec3(0.5f),
                                  .collision = CollisionShape::Mesh},
             });
-  spawnStaticEntities<shared::OverworldTag>(game,
-                                            buildOverworldMazePreviewEntities());
+  spawnStaticEntities<shared::OverworldTag>(
+      game, buildOverworldMazePreviewEntities());
   spawnStaticEntities<shared::OverworldTag>(
       game, maze_trigger::buildMazeTriggerMarkerEntities());
 
