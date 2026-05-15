@@ -22,6 +22,7 @@ int main() {
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
+  initServerGame(game);
 
   ServerNetwork network;
   if (!network.init(7777, 4)) {
@@ -63,7 +64,6 @@ int main() {
     entt::entity activeEntity = currentState->getClientAvatar(slots);
     std::vector<entt::entity> existing = currentState->getStateEntities(g);
 
-    // Send full state of all existing entities
     if (!existing.empty()) {
       auto buf =
           serializeEntities(g.registry, g.componentRegistry,
@@ -71,7 +71,6 @@ int main() {
       net::sendRaw(peer, buf.data(), buf.size());
     }
 
-    // Tell the new client which entity is theirs
     shared::AssignPacket assignPkt;
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
     assignPkt.entityId = g.registry.get<shared::Entity>(activeEntity).id;
@@ -120,6 +119,7 @@ int main() {
     }
     peer->data = nullptr;
   };
+
   auto previousTime = std::chrono::high_resolution_clock::now();
   const float fixedDt = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -134,23 +134,23 @@ int main() {
     while (accumulator >= fixedDt) {
       game.gameStateManager.update(game, fixedDt);
 
-      // Step Jolt physics
       game.physics.step(fixedDt);
 
-      // Sync Jolt positions back into ECS
+      // Jolt → ECS sync. Skip rotation for player entities; their yaw is
+      // movement_system's responsibility (Jolt rotation DOFs are locked).
+      auto& bi = game.physics.getBodyInterface();
       auto physicsView =
           game.registry.view<shared::Position, shared::PhysicsBody>();
-      auto& bodyInterface = game.physics.getBodyInterface();
       for (auto ent : physicsView) {
         auto& pos = physicsView.get<shared::Position>(ent);
         auto& pb = physicsView.get<shared::PhysicsBody>(ent);
-        JPH::BodyID bodyId(pb.bodyId);
-        if (!bodyInterface.IsAdded(bodyId)) continue;
+        JPH::BodyID id(pb.bodyId);
+        if (!bi.IsAdded(id)) continue;
 
-        JPH::RVec3 joltPos = bodyInterface.GetPosition(bodyId);
-        pos.x = joltPos.GetX();
-        pos.y = joltPos.GetY();
-        pos.z = joltPos.GetZ();
+        JPH::RVec3 jp = bi.GetPosition(id);
+        pos.x = jp.GetX();
+        pos.y = jp.GetY();
+        pos.z = jp.GetZ();
 
         if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) {
           constexpr float kMin = 0.5f;
@@ -171,11 +171,10 @@ int main() {
             bounced = true;
           }
           if (bounced) {
-            bodyInterface.SetPosition(bodyId, JPH::RVec3(pos.x, pos.y, pos.z),
-                                      JPH::EActivation::Activate);
-            JPH::Vec3 v = bodyInterface.GetLinearVelocity(bodyId);
-            bodyInterface.SetLinearVelocity(bodyId,
-                                            JPH::Vec3(0.0f, 0.0f, v.GetZ()));
+            bi.SetPosition(id, JPH::RVec3(pos.x, pos.y, pos.z),
+                           JPH::EActivation::Activate);
+            JPH::Vec3 v = bi.GetLinearVelocity(id);
+            bi.SetLinearVelocity(id, JPH::Vec3(0.0f, 0.0f, v.GetZ()));
           }
           auto& grid = game.registry.get<shared::MazeSpiritGrid>(ent);
           const int gxCell = static_cast<int>(std::lround(pos.x * 0.5f));
@@ -183,8 +182,14 @@ int main() {
           grid.gx = static_cast<int8_t>(std::clamp(gxCell, 0, 7));
           grid.gy = static_cast<int8_t>(std::clamp(gyCell, 0, 7));
         }
+        if (!game.registry.all_of<shared::PlayerInput>(ent)) {
+          JPH::Quat jr = bi.GetRotation(id);
+          pos.qw = jr.GetW();
+          pos.qx = jr.GetX();
+          pos.qy = jr.GetY();
+          pos.qz = jr.GetZ();
+        }
       }
-      scene_cycle_system(game.registry);
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");
@@ -200,6 +205,7 @@ int main() {
       SIMPLE_PROFILE_FRAME_START();
     }
 
+    // Yield so the loop doesn't spin-lock at 100% CPU.
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 

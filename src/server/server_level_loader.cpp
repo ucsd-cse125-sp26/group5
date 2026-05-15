@@ -1,5 +1,7 @@
 #include "server_level_loader.h"
 
+#include "glm/ext/quaternion_float.hpp"
+#include "glm/ext/vector_float3.hpp"
 #include "server_game.h"
 #include "shared/components.h"
 
@@ -23,9 +25,12 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::Position>(spiritEnt, 0.0f, 0.0f, 0.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(spiritEnt, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(spiritEnt, "cube", 0.8f);
+  game.registry.emplace<shared::RenderInfo>(spiritEnt, "cube", 0.8f, 0.8f,
+                                            0.8f);
   game.registry.emplace<shared::MazeTag>(spiritEnt);
-  JPH::BodyID spiritBody = game.physics.createPlayerBody(0.0f, 0.0f, 0.0f);
+  JPH::BodyID spiritBody = game.physics.createPlayerBody(
+      "cube", glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+      glm::vec3(0.8f));
   game.registry.emplace<shared::PhysicsBody>(
       spiritEnt, spiritBody.GetIndexAndSequenceNumber());
 
@@ -41,7 +46,8 @@ void loadLevel(ServerGame& game) {
       game.registry.emplace<shared::Position>(
           tile, static_cast<float>(gx) * kCell, static_cast<float>(gy) * kCell,
           -0.8f, 1.0f, 0.0f, 0.0f, 0.0f);
-      game.registry.emplace<shared::RenderInfo>(tile, "cube", kTileScale);
+      game.registry.emplace<shared::RenderInfo>(tile, "cube", kTileScale,
+                                                kTileScale, kTileScale);
       game.registry.emplace<shared::MazeTag>(tile);
     }
   }
