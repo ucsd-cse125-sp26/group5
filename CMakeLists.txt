@@ -123,6 +123,9 @@ add_library(server_lib STATIC
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp
+    src/server/game/maze.cpp
+    src/server/game/overworld.cpp
+    src/server/game/shared.cpp
     src/server/map_loader.cpp
 )
 target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
