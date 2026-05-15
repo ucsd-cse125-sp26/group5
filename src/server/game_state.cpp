@@ -15,7 +15,7 @@
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/util.h"
-
+#include "shared/sound_constants.h"
 // ── GameStateManager ─────────────────────────────────────
 
 void GameStateManager::changeState(ServerGame& game,
@@ -193,7 +193,13 @@ void initWorldEntities(ServerGame& game) {
                 StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
                                  .modelName = "bear",
                                  .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Box},
+                                 .collision = CollisionShape::Box,
+                                 .soundLayers = {
+                                    shared::SoundLayer{
+                                        .soundId = static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
+                                        .trigger = shared::SoundTriggerType::ALWAYS,
+                                        .volume = 0.5f
+                                    },}},
                 StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
                                  .modelName = "bear",
                                  .scale = glm::vec3(0.5f),

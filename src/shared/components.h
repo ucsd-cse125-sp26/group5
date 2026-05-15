@@ -70,6 +70,26 @@ struct PhysicsBody {
   uint32_t bodyId;
 };
 
+enum class SoundTriggerType : uint8_t {
+    ALWAYS,      // loop forever while entity exists
+    PROXIMITY,   // loop while player within range
+    ON_EVENT,    // one-shot via SoundEventPacket
+};
+
+struct SoundLayer {
+    uint32_t soundId = 0;
+    SoundTriggerType trigger = SoundTriggerType::ALWAYS;
+    float volume = 1.0f;
+    float proximityRange = 10.0f;
+};
+
+// shared/components.h
+struct SoundEmitter {
+    static constexpr uint8_t MAX_LAYERS = 4;
+    SoundLayer layers[MAX_LAYERS];
+    uint8_t layerCount = 0;
+};
+
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
 
 enum class Outcome : uint8_t { UNDECIDED, WIN, LOSE };

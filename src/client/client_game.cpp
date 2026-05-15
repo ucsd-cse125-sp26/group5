@@ -82,6 +82,7 @@ void registerClientHandlers(ClientNetwork& network) {
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
+          game.audio.stopAllForEntity(pkt.entityId);
           game.networkRegistry.destroy(it->second);
           game.networkEntityMap.erase(it);
           printf("Destroyed entity %d\n", pkt.entityId);
@@ -119,6 +120,13 @@ void registerClientHandlers(ClientNetwork& network) {
           }
         }
       });
+
+  network.dispatcher().on(shared::PacketType::SOUND_EVENT,
+    [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::SoundEventPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.audio.playSound(pkt.soundId, pkt.x, pkt.y, pkt.z, pkt.volume);
+    });
 }
 
 void syncToRender(ClientGame& game) {
@@ -188,4 +196,22 @@ void printEntityPositions(const ClientGame& game) {
     printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
            e.id == game.renderEntityId ? " (me)" : "");
   }
+}
+
+// Sound
+void updateSoundEmitters(ClientGame& game,
+                          float listenerX, float listenerY, float listenerZ) {
+    SIMPLE_PROFILE_SCOPE("Sound Emitters");
+    auto view = game.renderRegistry.view<shared::Entity,
+                                         shared::Position,
+                                         shared::SoundEmitter>();
+    for (auto ent : view) {
+        auto& entity = view.get<shared::Entity>(ent);
+        auto& pos = view.get<shared::Position>(ent);
+        auto& emitter = view.get<shared::SoundEmitter>(ent);
+
+        game.audio.updateEmitter(entity.id, emitter,
+                                  pos.x, pos.y, pos.z,
+                                  listenerX, listenerY, listenerZ);
+    }
 }

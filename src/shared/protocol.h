@@ -12,6 +12,7 @@ enum class PacketType : uint8_t {
   SPAWN_ENTITY,
   ASSIGN_ENTITY,
   DESPAWN_ENTITY,
+  SOUND_EVENT,
 };
 
 struct AssignPacket {
@@ -29,5 +30,12 @@ struct InputPacket {
   InputKeys keys;
   float mouseDx;
   float mouseDy;
+};
+
+struct SoundEventPacket {
+    PacketType type = PacketType::SOUND_EVENT;
+    uint32_t soundId;
+    float x, y, z;
+    float volume = 1.0f;
 };
 }  // namespace shared

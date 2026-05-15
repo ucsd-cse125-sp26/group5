@@ -76,6 +76,47 @@ add_library(imgui
     lib/imgui/backends/imgui_impl_glfw.cpp
     lib/imgui/backends/imgui_impl_opengl3.cpp
 )
+# SoLoud
+add_library(soloud STATIC
+    lib/soloud/src/core/soloud.cpp
+    lib/soloud/src/core/soloud_audiosource.cpp
+    lib/soloud/src/core/soloud_bus.cpp
+    lib/soloud/src/core/soloud_core_3d.cpp
+    lib/soloud/src/core/soloud_core_basicops.cpp
+    lib/soloud/src/core/soloud_core_faderops.cpp
+    lib/soloud/src/core/soloud_core_filterops.cpp
+    lib/soloud/src/core/soloud_core_getters.cpp
+    lib/soloud/src/core/soloud_core_setters.cpp
+    lib/soloud/src/core/soloud_core_voicegroup.cpp
+    lib/soloud/src/core/soloud_core_voiceops.cpp
+    lib/soloud/src/core/soloud_fader.cpp
+    lib/soloud/src/core/soloud_fft.cpp
+    lib/soloud/src/core/soloud_fft_lut.cpp
+    lib/soloud/src/core/soloud_file.cpp
+    lib/soloud/src/core/soloud_filter.cpp
+    lib/soloud/src/core/soloud_queue.cpp
+    lib/soloud/src/core/soloud_thread.cpp
+    lib/soloud/src/audiosource/wav/soloud_wav.cpp
+    lib/soloud/src/audiosource/wav/soloud_wavstream.cpp
+    lib/soloud/src/audiosource/wav/dr_impl.cpp
+    lib/soloud/src/backend/miniaudio/soloud_miniaudio.cpp
+    lib/soloud/src/audiosource/wav/stb_vorbis.c
+)
+target_include_directories(soloud PUBLIC lib/soloud/include)
+target_compile_definitions(soloud PUBLIC 
+    WITH_MINIAUDIO 
+    #MA_DEBUG_OUTPUT
+    MA_NO_RUNTIME_LINKING
+)
+target_link_libraries(soloud PUBLIC
+    "-framework CoreFoundation"
+    "-framework CoreAudio"
+    "-framework AudioToolbox"
+    "-framework AudioUnit"
+)
+if(WIN32)
+    target_compile_definitions(soloud PUBLIC NOMINMAX)
+endif()
 target_include_directories(imgui PUBLIC
     lib/imgui
     lib/imgui/backends
@@ -90,8 +131,11 @@ target_sources(client PRIVATE
     src/client/client_graphics.cpp
     src/client/shaders.cpp
     src/client/asset.cpp
+    src/client/audio_engine.cpp
 )
-target_link_libraries(client PRIVATE shared glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt)
+target_link_libraries(client PRIVATE shared 
+    glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud
+)
 
 add_custom_command(TARGET client POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
