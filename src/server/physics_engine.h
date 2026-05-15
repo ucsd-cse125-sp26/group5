@@ -9,7 +9,19 @@
 #include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
+
+#include <glm/ext/quaternion_float.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <unordered_map>
+
+struct aiNode;
+namespace shared {
+class ParsedModel;
+}
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
@@ -135,12 +147,60 @@ class PhysicsEngine {
     getBodyInterface().DestroyBody(joltId);
   }
 
-  JPH::BodyID createPlayerBody(float x, float y, float z);
-  JPH::BodyID createFloor();
-  JPH::BodyID createMeshBody(const std::string& filename, float x, float y,
-                             float z, float scale = 1.0f);
+  // Dynamic player body. Rotation DOFs are locked; rotation is driven by
+  // SetRotation, not physics.
+  JPH::BodyID createPlayerBody(const std::string& modelName,
+                               const glm::vec3& pos, const glm::quat& rot,
+                               const glm::vec3& scale);
+
+  // Asset orientation is baked into the shape so the body's rotation can
+  // stay equal to the entity's rotation. `centerOffsetMask` is multiplied
+  // per-axis with the AABB's local-space center before baking — use (0,0,1)
+  // for player bodies (vertical alignment only; XY collision pivot stays
+  // on the body origin so movement pivot matches).
+  JPH::ShapeRefC boxShapeForAsset(
+      const std::string& modelName, const glm::vec3& scale,
+      const glm::vec3& centerOffsetMask = glm::vec3(1.0f));
+
+  // Returns nullptr if the asset is procedural (no triangle source).
+  JPH::ShapeRefC meshShapeForAsset(const std::string& modelName,
+                                   const glm::vec3& scale);
+
+  JPH::ShapeRefC playerShapeForAsset(const std::string& modelName,
+                                     const glm::vec3& scale);
+
+  JPH::BodyID createStaticBody(const JPH::ShapeRefC& shape,
+                               const glm::vec3& pos, const glm::quat& rot);
+
+  // `localCenterOffset` keeps the body at `pos` while shifting the collision
+  // volume — avoids the per-tick sync writing an offset back into Position.
+  JPH::BodyID createBoxBody(
+      const glm::vec3& halfExtents, const glm::vec3& pos, const glm::quat& rot,
+      const glm::vec3& localCenterOffset = glm::vec3(0.0f));
+
+  // Caches the unscaled MeshShape per (model path, node name); per-call
+  // scale is applied via ScaledShape.
+  JPH::BodyID createMeshBody(const shared::ParsedModel& parsed,
+                             const aiNode& node, const glm::vec3& pos,
+                             const glm::quat& rot, const glm::vec3& scale);
+
+  // Box centered on the local AABB so off-center node geometry collides
+  // correctly. Caches the local AABB per (model path, node name).
+  JPH::BodyID createBoxBody(const shared::ParsedModel& parsed,
+                            const aiNode& node, const glm::vec3& pos,
+                            const glm::quat& rot, const glm::vec3& scale);
 
  private:
+  struct BoxExtents {
+    glm::vec3 center;
+    glm::vec3 halfExtents;
+  };
+  std::unordered_map<std::string, JPH::ShapeRefC> meshShapeCache_;
+  std::unordered_map<std::string, BoxExtents> boxExtentsCache_;
+
+  std::unordered_map<std::string, BoxExtents> assetBoxCache_;
+  std::unordered_map<std::string, JPH::ShapeRefC> assetMeshCache_;
+
   BPLayerInterfaceImpl broadPhaseLayerInterface_;
   ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhaseLayerFilter_;
   ObjectLayerPairFilterImpl objectLayerPairFilter_;
