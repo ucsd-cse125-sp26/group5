@@ -48,6 +48,9 @@ struct ServerGame {
   uint32_t nextEntityId = 0;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
+  // Overworld maze trigger: when false, all players must leave the trigger
+  // region once before another auto-enter (avoids instant re-entry after Q).
+  bool overworldMazeTriggerArmed = true;
 };
 
 // Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,
