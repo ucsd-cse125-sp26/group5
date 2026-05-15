@@ -159,6 +159,16 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::ColorBoundingBox>(entity);
+  {
+    auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
+    box.minX = 40.0f;
+    box.minY = 25.0f;
+    box.minZ = -500.0f;
+    box.maxX = 90.0f;
+    box.maxY = 55.0f;
+    box.maxZ = 500.0f;
+  }
   JPH::BodyID bodyId = game.physics.createPlayerBody(
       modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
   game.registry.emplace<shared::PhysicsBody>(
