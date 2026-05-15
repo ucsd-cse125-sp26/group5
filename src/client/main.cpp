@@ -34,6 +34,10 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  if (!game.audio.init()) {
+    return EXIT_FAILURE;
+  }
+
   InputKeys prevKeys = 0;
 
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
@@ -45,8 +49,24 @@ int main() {
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
     }
+    // get listener position from camera entity
+    float lx = 0, ly = 0, lz = 0;
+    float fwdX = 0, fwdY = 1, fwdZ = 0;
+    auto camView = game.renderRegistry.view<shared::Position, shared::Camera>();
+    for (auto ent : camView) {
+        auto& pos = camView.get<shared::Position>(ent);
+        lx = pos.x; ly = pos.y; lz = pos.z;
+        break;
+    }
+    game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
+    updateSoundEmitters(game, lx, ly, lz);
+    printf("Listener pos: %.1f %.1f %.1f\n", lx, ly, lz);
 
     graphics.render(game);
+    {
+      SIMPLE_PROFILE_SCOPE("Audio Update");
+      game.audio.update();
+    }
     graphics.swap();
     glfwPollEvents();
     graphics.processDebugKeys();
@@ -67,6 +87,7 @@ int main() {
 
   game.running.store(false, std::memory_order_release);
   networkThread.join();
+  game.audio.shutdown();
   return 0;
 }
 

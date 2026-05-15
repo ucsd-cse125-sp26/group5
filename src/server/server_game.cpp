@@ -12,7 +12,8 @@
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/simple_profiler.h"
-
+#include "shared/sound_constants.h"
+#include "shared/net/packet_utils.h"
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
 namespace {
@@ -106,7 +107,15 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
+    if (input.keys_newly_pressed & KEY_JUMP) {
+      verticalVel = 10.0f;
+      shared::SoundEventPacket pkt;
+      pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
+      pkt.x = position.x;
+      pkt.y = position.y;
+      pkt.z = position.z;
+      net::broadcastPacket(game.network->getHost(), pkt);
+    }
 
     bodyInterface.SetLinearVelocity(
         bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
