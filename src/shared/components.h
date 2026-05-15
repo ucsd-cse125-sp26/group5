@@ -28,6 +28,15 @@ struct RenderInfo {
   uint8_t playerSlot = 0;
 };
 
+struct ColorBoundingBox {
+  float minX = 0.0f;
+  float minY = 0.0f;
+  float minZ = 0.0f;
+  float maxX = 0.0f;
+  float maxY = 0.0f;
+  float maxZ = 0.0f;
+};
+
 struct Camera {
   float pitch;
   float ht;
@@ -147,4 +156,8 @@ struct SwitchComponent {
   bool switchOn = false;
 };
 
+struct FragmentComponent {
+  SectionSeasonMap season;
+  bool isPickedUp;
+};
 }  // namespace shared
