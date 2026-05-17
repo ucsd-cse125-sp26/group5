@@ -22,6 +22,7 @@
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/map_format.h"
+#include "shared/maze_preview.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 
@@ -264,6 +265,18 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   }
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
+
+  // Overworld: while standing in the maze trigger, look at the mini-board.
+  if (selfRender.modelName == "cube" &&
+      shared::maze_preview::isInsideTriggerRegion(p.x, p.y)) {
+    const glm::vec3 target(shared::maze_preview::kLookAtX,
+                           shared::maze_preview::kLookAtY,
+                           shared::maze_preview::kLookAtZ);
+    glm::mat4 view = glm::lookAt(pos, target, worldUp);
+    return CameraState{.position = pos, .view = view};
+  }
+
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
@@ -274,7 +287,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
   glm::vec3 forward = yawRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
-  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
   glm::mat4 view = glm::lookAt(pos, pos + forward, worldUp);
   return CameraState{.position = pos, .view = view};
 }

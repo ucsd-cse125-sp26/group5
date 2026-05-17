@@ -34,6 +34,15 @@ target_link_libraries(maze_trigger_tests PRIVATE
     server_lib
 )
 
+add_executable(maze_camera_tests
+    maze_camera_tests.cpp
+)
+
+target_link_libraries(maze_camera_tests PRIVATE
+    GTest::gtest_main
+    server_lib
+)
+
 add_executable(maze_logic_tests
     maze_logic_tests.cpp
 )
@@ -57,5 +66,6 @@ gtest_discover_tests(smoke_tests)
 gtest_discover_tests(network_tests)
 gtest_discover_tests(maze_generation_tests)
 gtest_discover_tests(maze_trigger_tests)
+gtest_discover_tests(maze_camera_tests)
 gtest_discover_tests(maze_logic_tests)
 gtest_discover_tests(overworld_logic_tests)

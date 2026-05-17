@@ -54,6 +54,8 @@ struct ServerGame {
   // Overworld maze trigger: when false, all players must leave the trigger
   // region once before another auto-enter (avoids instant re-entry after Q).
   bool overworldMazeTriggerArmed = true;
+  // Accumulates while four players stand in the trigger facing the preview.
+  float overworldMazeFocusTimer = 0.0f;
 };
 
 // Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,
