@@ -22,3 +22,4 @@ constexpr InputKeys KEY_SPIRIT_DOWN = 1 << 14;
 constexpr InputKeys KEY_SPIRIT_LEFT = 1 << 15;
 constexpr InputKeys KEY_SPIRIT_RIGHT = 1 << 16;
 constexpr InputKeys KEY_MAZE_COLLECT = 1 << 17;
+constexpr InputKeys KEY_INTERACT = 1 << 18;
