@@ -4,15 +4,16 @@
 
 #include "server/scene.h"
 #include "shared/components.h"
+#include "shared/maze_preview.h"
 
 struct ServerGame;
 
 namespace maze_trigger {
 
 // Horizontal AABB in x,y around the overworld maze preview (z ignored).
-constexpr float kCenterX = 0.0f;
-constexpr float kCenterY = 16.0f;
-constexpr float kHalfExtent = 4.0f;
+constexpr float kCenterX = shared::maze_preview::kCenterX;
+constexpr float kCenterY = shared::maze_preview::kCenterY;
+constexpr float kHalfExtent = shared::maze_preview::kHalfExtent;
 
 [[nodiscard]] bool isInsideMazeTriggerRegion(const shared::Position& position);
 

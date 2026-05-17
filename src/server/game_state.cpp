@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "game/maze.h"
+#include "game/maze_camera.h"
 #include "game/maze_generation.h"
 #include "game/maze_trigger.h"
 #include "game/overworld.h"
@@ -223,7 +224,8 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
 std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
   const GeneratedMazeData data = buildGeneratedMazeData();
   constexpr glm::vec3 kPreviewCenter =
-      glm::vec3(maze_trigger::kCenterX, maze_trigger::kCenterY, 4.5f);
+      glm::vec3(shared::maze_preview::kCenterX, shared::maze_preview::kCenterY,
+                shared::maze_preview::kCenterZ);
   constexpr float kPreviewTileSpacing = 0.18f;
   constexpr float kFloorDepthOffset = -0.20f;
   constexpr float kWallDepthOffset = -0.08f;
@@ -403,10 +405,17 @@ void OverworldState::update(ServerGame& game, float dt) {
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {
     game.overworldMazeTriggerArmed = true;
+    game.overworldMazeFocusTimer = 0.0f;
   } else if (game.overworldMazeTriggerArmed) {
-    game.overworldMazeTriggerArmed = false;
-    game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
-    return;
+    maze_camera::snapOverworldAvatarsFaceMazePreview(game);
+    game.overworldMazeFocusTimer += dt;
+    if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds &&
+        maze_camera::allOverworldAvatarsFacingMazePreview(game)) {
+      game.overworldMazeTriggerArmed = false;
+      game.overworldMazeFocusTimer = 0.0f;
+      game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
+      return;
+    }
   }
 
   movement_system(game, dt, StateType::OVERWORLD);
@@ -447,6 +456,7 @@ void MazeState::onEnter(ServerGame& game) {
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
   game.overworldMazeTriggerArmed = false;
+  game.overworldMazeFocusTimer = 0.0f;
   ExitMazePuzzle(game);
   removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
