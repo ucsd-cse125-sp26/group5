@@ -65,7 +65,7 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
                            .maxZ = kMaxZ};
 }
 
-void updateColorBoundingBoxes(ServerGame& game,
+void colorizeSection(ServerGame& game,
                               shared::SectionSeasonMap season) {
   auto bounds = boundsForSeason(season);
   auto view =

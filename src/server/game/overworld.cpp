@@ -2,6 +2,8 @@
 
 #include "server/server_game.h"
 #include "shared/components.h"
+#include "shared/input.h"
+#include "server/server_memory_system.h"
 
 namespace {
 
@@ -41,8 +43,50 @@ void MoveInMainMap(ServerGame& game, float dt) {
   }
 }
 
+void ProcessFragmentPickups(ServerGame& game) {
+  constexpr float PICKUP_RADIUS_SQR = 4.0f * 4.0f;
+
+  auto fragmentView = game.registry.view<shared::FragmentComponent, shared::Position>();
+  auto playerView = game.registry.view<shared::PlayerInput, shared::Position>();
+
+  for (auto fragEntity : fragmentView) {
+    auto& fragment = fragmentView.get<shared::FragmentComponent>(fragEntity);
+    if (fragment.isPickedUp) continue;
+
+    const auto& fragPos = fragmentView.get<shared::Position>(fragEntity);
+
+    for (auto playerEntity : playerView) {
+      const auto& playerPos = playerView.get<shared::Position>(playerEntity);
+      const auto& playerInput = playerView.get<shared::PlayerInput>(playerEntity);
+      
+      float dx = fragPos.x - playerPos.x;
+      float dy = fragPos.y - playerPos.y;
+      float dz = fragPos.z - playerPos.z;
+      float distSqr = (dx * dx) + (dy * dy) + (dz * dz);
+
+      if (distSqr <= PICKUP_RADIUS_SQR && (playerInput.keys_newly_pressed & KEY_INTERACT)) {
+        fragment.isPickedUp = true;
+        game.registry.remove<shared::RenderInfo>(fragEntity);
+
+        auto sectionView = game.registry.view<shared::SectionController>();
+        for (auto secEntity : sectionView) {
+          auto& section = sectionView.get<shared::SectionController>(secEntity);
+          if (section.type == fragment.season) {
+            section.completed = true;
+            break;
+          }
+        }
+
+        colorizeSection(game, fragment.season);
+        break;
+      }
+    }
+  }
+}
+
 void tickOverworldGameLogic(ServerGame& game, float dt) {
   MoveInMainMap(game, dt);
+  ProcessFragmentPickups(game);
 }
 
 bool RestoreWinterColor(const ServerGame& game) {
