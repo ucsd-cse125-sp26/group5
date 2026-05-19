@@ -16,3 +16,5 @@ constexpr InputKeys KEY_LIGHT_BRIGHT = 1 << 9;
 constexpr InputKeys KEY_CYCLE_SCENE = 1 << 10;
 constexpr InputKeys KEY_ENTER_MAZE = 1 << 11;
 constexpr InputKeys KEY_EXIT_MINIGAME = 1 << 12;
+constexpr InputKeys KEY_DEBUG_COMPLETE_SECTION = 1 << 13;
+constexpr InputKeys KEY_DEBUG_TOGGLE_BARRIERS = 1 << 14;

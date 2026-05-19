@@ -200,6 +200,25 @@ void initWorldEntities(ServerGame& game) {
                                  .collision = CollisionShape::Mesh},
             });
 
+  // Section barriers — TODO: replace positions/sizes once you have map coords
+  spawnSectionBarrier<shared::OverworldTag>(game,
+      /*sectionID=*/0,
+      /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+  // spawnSectionBarrier<shared::OverworldTag>(game,
+  //     /*sectionID=*/1,
+  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
+  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+  // spawnSectionBarrier<shared::OverworldTag>(game,
+  //     /*sectionID=*/2,
+  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
+  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+  // spawnSectionBarrier<shared::OverworldTag>(game,
+  //     /*sectionID=*/3,
+  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
+  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+  // add more per section as needed
+
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(
@@ -326,6 +345,93 @@ void OverworldState::update(ServerGame& game, float dt) {
 
   movement_system(game, dt, StateType::OVERWORLD);
   render_model_change(game, dt);
+
+  // Check SectionControllers — if completed, flag their barriers for removal
+  auto sectionView = game.registry.view<shared::SectionController>();
+  for (auto ent : sectionView) {
+      auto& sc = game.registry.get<shared::SectionController>(ent);
+      if (!sc.completed) continue;
+      auto barrierView = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+      for (auto barrier : barrierView) {
+          auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
+          if (tag.sectionID == sc.puzzleID) {
+              if (!game.registry.all_of<shared::SectionBarrierPendingRemoval>(barrier)) {
+                  game.registry.emplace<shared::SectionBarrierPendingRemoval>(barrier);
+              }
+          }
+      }
+  }
+
+  // Destroy barriers flagged for removal
+  auto pendingView = game.registry.view<shared::SectionBarrierPendingRemoval,
+                                         shared::PhysicsBody,
+                                         shared::OverworldTag>();
+  for (auto barrier : pendingView) {
+      auto& phys = pendingView.get<shared::PhysicsBody>(barrier);
+      game.physics.destroyBody(phys.bodyId);
+      game.registry.destroy(barrier);
+  }
+
+  // DEBUG: press B to complete section 0
+  for (auto ent : inputView) {
+      auto& input = game.registry.get<shared::PlayerInput>(ent);
+      if (input.keys_newly_pressed & KEY_DEBUG_COMPLETE_SECTION) {
+          auto barrierView2 = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+          for (auto barrier : barrierView2) {
+              auto& phys = game.registry.get<shared::PhysicsBody>(barrier);
+              JPH::BodyID bodyId(phys.bodyId);
+              auto& bodyInterface = game.physics.getBodyInterface();
+              if (bodyInterface.IsAdded(bodyId)) {
+                  bodyInterface.RemoveBody(bodyId);
+                  printf("DEBUG: removed collision body\n");
+              } else {
+                  bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+                  printf("DEBUG: re-added collision body\n");
+              }
+          }
+      }
+  }
+
+// DEBUG: press N to toggle barrier visibility
+  for (auto ent : inputView) {
+      auto& input = game.registry.get<shared::PlayerInput>(ent);
+      if (input.keys_newly_pressed & KEY_DEBUG_TOGGLE_BARRIERS) {
+          auto barrierView = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+          printf("DEBUG: toggling %zu barriers\n", barrierView.size_hint());
+          for (auto barrier : barrierView) {
+              auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
+              uint32_t eid = game.registry.get<shared::Entity>(barrier).id;
+
+              if (game.registry.all_of<shared::SectionBarrierVisible>(barrier)) {
+                  // hide: remove RenderInfo, tell client to despawn+respawn without it
+                  game.registry.remove<shared::RenderInfo>(barrier);
+                  game.registry.remove<shared::SectionBarrierVisible>(barrier);
+              } else {
+                  // show: add RenderInfo back
+                  game.registry.emplace<shared::RenderInfo>(
+                      barrier, "cube",
+                      tag.halfExtents.x * 2.0f,
+                      tag.halfExtents.y * 2.0f,
+                      tag.halfExtents.z * 2.0f);
+                  game.registry.emplace<shared::SectionBarrierVisible>(barrier);
+              }
+
+              // despawn then respawn so client gets fresh component list
+              shared::DespawnPacket despawn;
+              despawn.type = shared::PacketType::DESPAWN_ENTITY;
+              despawn.entityId = eid;
+              net::broadcastPacket(game.network->getHost(), despawn);
+
+              std::vector<entt::entity> toRespawn = {barrier};
+              auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                           shared::PacketType::SPAWN_ENTITY,
+                                           toRespawn, false);
+              net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+          }
+          break;
+      }
+  }
+
 
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
   if (lightId != kInvalidEntityId)

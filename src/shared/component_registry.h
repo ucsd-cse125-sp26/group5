@@ -26,6 +26,7 @@ struct ComponentMeta {
   SerializeFn serialize;
   DeserializeFn deserialize;
   CloneFn clone;
+  std::function<void(entt::registry&, entt::entity)> remove;
 };
 
 class ComponentRegistry {
@@ -58,6 +59,9 @@ class ComponentRegistry {
           if (!src.all_of<T>(srcEnt)) return;
           auto& srcComp = src.get<T>(srcEnt);
           dst.emplace_or_replace<T>(dstEnt, srcComp);
+        },
+        [](entt::registry& r, entt::entity e) {
+          r.remove<T>(e);
         }};
     syncedIds_.push_back(id);
   }
@@ -105,6 +109,10 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
   // clone components from src to dst
   for (auto [entityId, srcEntity] : srcMap) {
     auto dstEntity = dstMap[entityId];
+    for (auto id : compReg.syncedIds()) {
+      auto meta = compReg.find(id);
+      meta->remove(dst, dstEntity);
+    }
     for (auto id : compReg.syncedIds()) {
       auto meta = compReg.find(id);
       meta->clone(src, srcEntity, dst, dstEntity);
