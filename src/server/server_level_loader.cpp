@@ -119,8 +119,8 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(summerDoor);
 
   auto [winterFragmentID, winterFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(winterFragment, 65.0f, 80.0f,
-                                          0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(winterFragment, 65.0f, 80.0f, 0.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(winterFragment, "cube", 0.5f);
   game.registry.emplace<shared::FragmentComponent>(
       winterFragment, shared::SectionSeasonMap::WINTER, false);
@@ -135,16 +135,16 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(fallFragment);
 
   auto [summerFragmentID, summerFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f,
-                                          0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f, 0.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(summerFragment, "cube", 0.5f);
   game.registry.emplace<shared::FragmentComponent>(
       summerFragment, shared::SectionSeasonMap::SUMMER, false);
   game.registry.emplace<shared::OverworldTag>(summerFragment);
 
   auto [springFragmentID, springFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(springFragment, -65.0f, 0.0f,
-                                          0.0f, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(springFragment, -65.0f, 0.0f, 0.0f,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(springFragment, "cube", 0.5f);
   game.registry.emplace<shared::FragmentComponent>(
       springFragment, shared::SectionSeasonMap::SPRING, false);

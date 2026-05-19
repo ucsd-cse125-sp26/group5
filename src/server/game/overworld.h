@@ -2,6 +2,8 @@
 
 #include <entt/entity/fwd.hpp>
 
+#include "shared/components.h"
+
 struct ServerGame;
 
 // Minimal hub movement tick used in the main map.
@@ -13,16 +15,17 @@ bool RestoreFallColor(const ServerGame& game);
 bool RestoreSummerColor(const ServerGame& game);
 bool RestoreSpringColor(const ServerGame& game);
 
-// If the required season is completed, count OverworldTag entities with Position in
-// axis-aligned bounds; when count >= requiredPlayersInZone, sets
+// If the required season is completed, count OverworldTag entities with
+// Position in axis-aligned bounds; when count >= requiredPlayersInZone, sets
 // switch.switchOn = true.
 void GatherAtExitSwitch(ServerGame& game, entt::entity switchEnt, float minX,
                         float minY, float maxX, float maxY,
                         unsigned requiredPlayersInZone,
                         shared::SectionSeasonMap requiredSeason);
 
-// Requires switch on, parent matching door entity id, and required season to be completed.
-// Opens door, unlocks the next section, and transitions season -> nextSeason.
+// Requires switch on, parent matching door entity id, and required season to be
+// completed. Opens door, unlocks the next section, and transitions season ->
+// nextSeason.
 void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
                      entt::entity switchEnt, entt::entity nextSectionEnt,
                      shared::SectionSeasonMap requiredSeason,

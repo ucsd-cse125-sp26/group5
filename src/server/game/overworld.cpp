@@ -1,9 +1,9 @@
 #include "server/game/overworld.h"
 
 #include "server/server_game.h"
+#include "server/server_memory_system.h"
 #include "shared/components.h"
 #include "shared/input.h"
-#include "server/server_memory_system.h"
 
 namespace {
 
@@ -11,8 +11,7 @@ bool seasonCompleted(const ServerGame& game, shared::SectionSeasonMap season) {
   auto view = game.registry.view<shared::SectionController>();
   for (auto e : view) {
     const auto& sc = view.get<shared::SectionController>(e);
-    if (sc.type == season && sc.completed)
-      return true;
+    if (sc.type == season && sc.completed) return true;
   }
   return false;
 }
@@ -46,7 +45,8 @@ void MoveInMainMap(ServerGame& game, float dt) {
 void ProcessFragmentPickups(ServerGame& game) {
   constexpr float PICKUP_RADIUS_SQR = 4.0f * 4.0f;
 
-  auto fragmentView = game.registry.view<shared::FragmentComponent, shared::Position>();
+  auto fragmentView =
+      game.registry.view<shared::FragmentComponent, shared::Position>();
   auto playerView = game.registry.view<shared::PlayerInput, shared::Position>();
 
   for (auto fragEntity : fragmentView) {
@@ -57,14 +57,16 @@ void ProcessFragmentPickups(ServerGame& game) {
 
     for (auto playerEntity : playerView) {
       const auto& playerPos = playerView.get<shared::Position>(playerEntity);
-      const auto& playerInput = playerView.get<shared::PlayerInput>(playerEntity);
-      
+      const auto& playerInput =
+          playerView.get<shared::PlayerInput>(playerEntity);
+
       float dx = fragPos.x - playerPos.x;
       float dy = fragPos.y - playerPos.y;
       float dz = fragPos.z - playerPos.z;
       float distSqr = (dx * dx) + (dy * dy) + (dz * dz);
 
-      if (distSqr <= PICKUP_RADIUS_SQR && (playerInput.keys_newly_pressed & KEY_INTERACT)) {
+      if (distSqr <= PICKUP_RADIUS_SQR &&
+          (playerInput.keys_newly_pressed & KEY_INTERACT)) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
 
@@ -78,10 +80,14 @@ void ProcessFragmentPickups(ServerGame& game) {
         }
 
         bool shouldRestore = false;
-        if (fragment.season == shared::SectionSeasonMap::WINTER) shouldRestore = RestoreWinterColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::FALL) shouldRestore = RestoreFallColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::SUMMER) shouldRestore = RestoreSummerColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::SPRING) shouldRestore = RestoreSpringColor(game);
+        if (fragment.season == shared::SectionSeasonMap::WINTER)
+          shouldRestore = RestoreWinterColor(game);
+        else if (fragment.season == shared::SectionSeasonMap::FALL)
+          shouldRestore = RestoreFallColor(game);
+        else if (fragment.season == shared::SectionSeasonMap::SUMMER)
+          shouldRestore = RestoreSummerColor(game);
+        else if (fragment.season == shared::SectionSeasonMap::SPRING)
+          shouldRestore = RestoreSpringColor(game);
 
         if (shouldRestore) {
           colorizeSection(game, fragment.season);
