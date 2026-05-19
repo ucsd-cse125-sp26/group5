@@ -54,7 +54,7 @@ void registerClientHandlers(ClientNetwork& network) {
         uint16_t entityCount;
         std::memcpy(&entityCount, data + offset, sizeof(uint16_t));
         offset += sizeof(uint16_t);
-
+        printf("CLIENT: spawn %u entities\n", entityCount); 
         for (uint16_t i = 0; i < entityCount; i++) {
           uint32_t entityId;
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
@@ -80,6 +80,7 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
+        printf("CLIENT: despawn entity %u\n", pkt.entityId); 
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
           game.networkRegistry.destroy(it->second);
@@ -132,7 +133,8 @@ void syncToRender(ClientGame& game) {
 
 void processInput(GLFWwindow* window,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys) {
+                  InputKeys& prevKeys,
+                  bool debugMode) {
   InputKeys keys = 0;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
@@ -147,7 +149,10 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
   if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) keys |= KEY_ENTER_MAZE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
-
+  if (debugMode) {
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) keys |= KEY_DEBUG_COMPLETE_SECTION;  // DEBUG: complete section 0
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) keys |= KEY_DEBUG_TOGGLE_BARRIERS; // DEBUG: toggle barrier visibility
+  }
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
   float mouseDx = 0.0f, mouseDy = 0.0f;
