@@ -264,7 +264,7 @@ class MazeMiniGame : public IMiniGameState {
 
 void MiniGameStateManager::requestStart(ServerGame& game) {
   if (active_) return;
-  start(game, std::make_unique<BallDemoMiniGame>(nextSessionId_++));
+  start(game, std::make_unique<MazeMiniGame>(nextSessionId_++));
 }
 
 void MiniGameStateManager::requestStop(ServerGame& game) {
