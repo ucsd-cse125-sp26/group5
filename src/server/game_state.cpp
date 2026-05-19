@@ -338,7 +338,7 @@ void initWorldEntities(ServerGame& game) {
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
-    const uint8_t slot = static_cast<uint8_t>(i + 1);
+    const auto slot = static_cast<uint8_t>(i + 1);
     PlayerAvatars slots;
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);

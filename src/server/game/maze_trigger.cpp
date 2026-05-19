@@ -34,7 +34,7 @@ glm::vec3 overworldSpawnPosition(uint8_t joinSlot) {
                                           {-2.0f, 11.0f}, {2.0f, 11.0f}};
   const int idx =
       (joinSlot >= 1 && joinSlot <= 4) ? static_cast<int>(joinSlot) - 1 : 0;
-  return glm::vec3(kSpawns[idx][0], kSpawns[idx][1], 0.5f);
+  return {kSpawns[idx][0], kSpawns[idx][1], 0.5f};
 }
 
 void placeOverworldAvatarInTrigger(ServerGame& game, entt::entity avatar,
