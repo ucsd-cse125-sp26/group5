@@ -104,7 +104,8 @@ struct Graphics {
   glm::mat4 lightSpaceMatrix{1.0f};
   std::optional<Shader> shadowDirShader;
 
-  // 4 cubemaps × 6 faces = 24 layers populated in one geometry-shader pass.
+  // 4 cubemaps × 6 faces = 24 layers populated via multi-pass per-face
+  // rendering.
   GLuint pointShadowFBO = 0;
   GLuint pointShadowMaps = 0;
   std::optional<Shader> shadowPointShader;

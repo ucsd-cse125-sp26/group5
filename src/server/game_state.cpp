@@ -4,6 +4,8 @@
 #include <memory>
 #include <vector>
 
+#include "game/maze.h"
+#include "game/overworld.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
@@ -157,6 +159,16 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::ColorBoundingBox>(entity);
+  {
+    auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
+    box.minX = 40.0f;
+    box.minY = 25.0f;
+    box.minZ = -500.0f;
+    box.maxX = 90.0f;
+    box.maxY = 55.0f;
+    box.maxZ = 500.0f;
+  }
   JPH::BodyID bodyId = game.physics.createPlayerBody(
       modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
   game.registry.emplace<shared::PhysicsBody>(
@@ -166,9 +178,6 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
 }  // namespace
 
 void initWorldEntities(ServerGame& game) {
-  // --- Game progression entities (untagged: persist across state changes) ---
-  loadLevel(game);
-
   // --- Overworld ---
   spawnDemoLight<shared::OverworldTag>(game, "sunny");
   loadMap<shared::OverworldTag>(game,
@@ -319,6 +328,12 @@ void OverworldState::update(ServerGame& game, float dt) {
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
+      if (game.active_players.size() < 4) {
+        printf(
+            "[State] Need 4 connected players to enter Maze (currently %zu)\n",
+            game.active_players.size());
+        continue;
+      }
       game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
       return;
     }
@@ -337,11 +352,31 @@ void OverworldState::update(ServerGame& game, float dt) {
 
 void MazeState::onEnter(ServerGame& game) {
   addPhysicsBodies<shared::MazeTag>(game);
+  ResetMazeSpiritSpawn(game);
+
+  auto& bodyInterface = game.physics.getBodyInterface();
+  auto mazeInputBodies =
+      game.registry
+          .view<shared::MazeTag, shared::PhysicsBody, shared::PlayerInput>();
+  for (auto ent : mazeInputBodies) {
+    if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) continue;
+    auto& pb = game.registry.get<shared::PhysicsBody>(ent);
+    JPH::BodyID id(pb.bodyId);
+    if (bodyInterface.IsAdded(id)) {
+      bodyInterface.SetLinearVelocity(id, JPH::Vec3::sZero());
+    }
+  }
+
   enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
+  EnterMazePuzzle(game);
+  if (HasUnlockedWinterSection(game)) {
+    ClaimPadsForActivePlayers(game, GetWinterPuzzleNumericId(game));
+  }
 }
 
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
+  ExitMazePuzzle(game);
   removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
   despawnTaggedEntities<shared::MazeTag>(game);
@@ -357,6 +392,7 @@ std::vector<entt::entity> MazeState::getStateEntities(ServerGame& game) const {
 
 void MazeState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
+  TickMazeExploration(game, dt);
 
   // Press Q → back to overworld
   auto inputView = game.registry.view<shared::PlayerInput, shared::MazeTag>();
@@ -369,7 +405,8 @@ void MazeState::update(ServerGame& game, float dt) {
     }
   }
 
-  movement_system(game, dt, StateType::MAZE);
+  // Maze uses shared-cube arrow logic; keep per-player WASD movement disabled
+  // here.
   render_model_change(game, dt);
 
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);

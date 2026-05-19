@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "client/asset.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -209,8 +210,58 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
           selfIt->second)) {
     return std::nullopt;
   }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(selfIt->second)) {
+    return std::nullopt;
+  }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
+  const auto& selfRender =
+      game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
+
+  // Maze mode: all clients use first-person cameras attached to the shared
+  // spirit cube.
+  // Each player's join slot picks one side, so all windows move together when
+  // the cube moves.
+  if (selfRender.modelName == "bear") {
+    entt::entity spirit = entt::null;
+    auto spiritView =
+        game.renderRegistry.view<shared::Position, shared::RenderInfo>();
+    for (auto ent : spiritView) {
+      const auto& ri = spiritView.get<shared::RenderInfo>(ent);
+      if (ri.modelName == "cube" && std::abs(ri.sx - 0.8f) < 0.0001f &&
+          std::abs(ri.sy - 0.8f) < 0.0001f &&
+          std::abs(ri.sz - 0.8f) < 0.0001f) {
+        spirit = ent;
+        break;
+      }
+    }
+    if (spirit != entt::null) {
+      const auto& sp = game.renderRegistry.get<shared::Position>(spirit);
+      int slot = selfRender.playerSlot;
+      if (slot < 1 || slot > 4) slot = 1;
+
+      glm::vec3 side(0.0f);
+      switch (slot) {
+        case 1:
+          side = glm::vec3(0.0f, 1.0f, 0.0f);
+          break;
+        case 2:
+          side = glm::vec3(0.0f, -1.0f, 0.0f);
+          break;
+        case 3:
+          side = glm::vec3(-1.0f, 0.0f, 0.0f);
+          break;
+        case 4:
+          side = glm::vec3(1.0f, 0.0f, 0.0f);
+          break;
+      }
+
+      glm::vec3 pos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
+      glm::mat4 view =
+          glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
+      return CameraState{.position = pos, .view = view};
+    }
+  }
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
@@ -297,9 +348,18 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     } else {
       if (entity.id == game.renderEntityId) continue;
     }
-    auto it = models.find(renderInfo.modelName);
-    if (it == models.end() || !it->second) continue;
-    Model* modelAsset = it->second;
+    std::string modelKey = renderInfo.modelName;
+    if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
+        renderInfo.modelName == "cube") {
+      modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+    }
+    auto it = models.find(modelKey);
+    Model* modelAsset = it != models.end() ? it->second : nullptr;
+    if (!modelAsset) {
+      auto fallbackIt = models.find(renderInfo.modelName);
+      modelAsset = fallbackIt != models.end() ? fallbackIt->second : nullptr;
+    }
+    if (!modelAsset) continue;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
@@ -375,8 +435,7 @@ bool Graphics::load(int width, int height) {
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
-                            "shaders/fragment_shadow_point.glsl",
-                            "shaders/geometry_shadow_point.glsl");
+                            "shaders/fragment_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
 
@@ -422,8 +481,9 @@ bool Graphics::load(int width, int height) {
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces) bound as
-  // a layered attachment so the geometry shader can route via gl_Layer.
+  // Point-light cubemap array: 24 layer-faces (4 cubes × 6 faces).
+  // Each face is bound individually via glFramebufferTextureLayer in the
+  // render loop to avoid geometry-shader emulation overhead on macOS.
   glGenFramebuffers(1, &pointShadowFBO);
   glGenTextures(1, &pointShadowMaps);
   glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
@@ -443,7 +503,8 @@ bool Graphics::load(int width, int height) {
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
                   GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
-  glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps, 0);
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            pointShadowMaps, 0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -510,6 +571,16 @@ bool Graphics::load(int width, int height) {
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  for (uint8_t s = 1; s <= 4; s++) {
+    std::string name = "cube_slot" + std::to_string(s);
+    Model* m = makePlayerSlotCubeModel(shared::CUBE_RAINBOW, s);
+    if (m) {
+      m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[name] = m;
+      printf("Loaded asset: %s (player join order)\n", name.c_str());
+    }
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
@@ -755,7 +826,7 @@ void Graphics::reloadShaders() {
       {.slot = shadowPointShader,
        .vert = "shaders/vertex_shadow_point.glsl",
        .frag = "shaders/fragment_shadow_point.glsl",
-       .geom = "shaders/geometry_shadow_point.glsl"},
+       .geom = ""},
       {.slot = debugOverlay,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_debug_overlay.glsl",
@@ -1066,9 +1137,8 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // 24 cubemap-array layers populated in one draw via geometry-shader
-  // instancing; computePointShadowMatrices fills active slots and writes
-  // kill matrices into the rest.
+  // Multi-pass point shadows: one draw per cubemap face per active light.
+  // Avoids the geometry shader, which macOS must emulate via Metal.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
@@ -1077,16 +1147,24 @@ void Graphics::render(ClientGame& game) {
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
     glViewport(0, 0, kPointShadowSize, kPointShadowSize);
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(2.0f, 4.0f);
     shadowPointShader->use();
-    shadowPointShader->setMat4Array("shadowMatrices", kPointShadowLayers,
-                                    glm::value_ptr(pointMats[0]));
-    shadowPointShader->setVec3Array("lightPositions", kMaxPointLights,
-                                    glm::value_ptr(pointPositions[0]));
     shadowPointShader->setFloat("pointFarPlane", kPointShadowFar);
-    renderEntities(*shadowPointShader, game, models, /*forShadowPass=*/true);
+    for (int i = 0; i < numLights; ++i) {
+      int slot = lights[i].shadowIdx;
+      if (slot < 0 || slot >= kMaxPointLights) continue;
+      shadowPointShader->setVec3("lightPosition", pointPositions[slot]);
+      for (int face = 0; face < 6; ++face) {
+        int layer = slot * 6 + face;
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                  pointShadowMaps, 0, layer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shadowPointShader->setMat4("shadowMatrix", pointMats[layer]);
+        renderEntities(*shadowPointShader, game, models,
+                       /*forShadowPass=*/true);
+      }
+    }
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 

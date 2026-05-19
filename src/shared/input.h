@@ -16,9 +16,18 @@ constexpr InputKeys KEY_LIGHT_BRIGHT = 1 << 9;
 constexpr InputKeys KEY_CYCLE_SCENE = 1 << 10;
 constexpr InputKeys KEY_ENTER_MAZE = 1 << 11;
 constexpr InputKeys KEY_EXIT_MINIGAME = 1 << 12;
+
+// 2D Minigame keys (from branch)
 constexpr InputKeys KEY_MINIGAME_UP = 1 << 13;
 constexpr InputKeys KEY_MINIGAME_DOWN = 1 << 14;
 constexpr InputKeys KEY_MINIGAME_LEFT = 1 << 15;
 constexpr InputKeys KEY_MINIGAME_RIGHT = 1 << 16;
 constexpr InputKeys KEY_START_2D_MINIGAME = 1 << 17;
 constexpr InputKeys KEY_STOP_2D_MINIGAME = 1 << 18;
+
+// Maze minigame (from main)
+constexpr InputKeys KEY_SPIRIT_UP = 1 << 19;
+constexpr InputKeys KEY_SPIRIT_DOWN = 1 << 20;
+constexpr InputKeys KEY_SPIRIT_LEFT = 1 << 21;
+constexpr InputKeys KEY_SPIRIT_RIGHT = 1 << 22;
+constexpr InputKeys KEY_MAZE_COLLECT = 1 << 23;
