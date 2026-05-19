@@ -80,15 +80,15 @@ void ProcessFragmentPickups(ServerGame& game) {
         }
 
         bool shouldRestore = false;
-        if (fragment.season == shared::SectionSeasonMap::WINTER)
+        if (fragment.season == shared::SectionSeasonMap::WINTER) {
           shouldRestore = RestoreWinterColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::FALL)
+        } else if (fragment.season == shared::SectionSeasonMap::FALL) {
           shouldRestore = RestoreFallColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::SUMMER)
+        } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
           shouldRestore = RestoreSummerColor(game);
-        else if (fragment.season == shared::SectionSeasonMap::SPRING)
+        } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
           shouldRestore = RestoreSpringColor(game);
-
+        }
         if (shouldRestore) {
           colorizeSection(game, fragment.season);
         }
