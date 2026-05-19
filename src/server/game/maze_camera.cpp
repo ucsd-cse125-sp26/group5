@@ -3,6 +3,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <numbers>
 
 #include "server/server_game.h"
 #include "shared/components.h"
@@ -41,13 +42,13 @@ float yawErrorRad(const shared::Position& position, float targetX,
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
   flat.z = 0.0f;
   const float flatLen = glm::length(flat);
-  if (flatLen < 1e-4f) return 3.14159265f;
+  if (flatLen < 1e-4f) return std::numbers::pi_v<float>;
   flat /= flatLen;
   const float actualYaw = std::atan2(-flat.x, flat.y);
 
   float err = desiredYaw - actualYaw;
-  while (err > 3.14159265f) err -= 6.28318531f;
-  while (err < -3.14159265f) err += 6.28318531f;
+  while (err > std::numbers::pi_v<float>) err -= 6.28318531f;
+  while (err < -std::numbers::pi_v<float>) err += 6.28318531f;
   return std::abs(err);
 }
 
