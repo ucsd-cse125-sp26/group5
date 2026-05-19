@@ -64,6 +64,7 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
                            .maxY = 55.0f,
                            .maxZ = kMaxZ};
 }
+}  // namespace
 
 void colorizeSection(ServerGame& game, shared::SectionSeasonMap season) {
   auto bounds = boundsForSeason(season);
@@ -79,4 +80,3 @@ void colorizeSection(ServerGame& game, shared::SectionSeasonMap season) {
     box.maxZ = bounds.maxZ;
   }
 }
-}  // namespace
