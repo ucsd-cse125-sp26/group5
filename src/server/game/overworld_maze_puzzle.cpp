@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-
 #include <glm/glm.hpp>
 
 #include "server/game/maze.h"
@@ -55,10 +54,8 @@ PreviewLayout buildPreviewLayout() {
   const glm::vec3 center(shared::maze_preview::kCenterX,
                          shared::maze_preview::kCenterY,
                          shared::maze_preview::kCenterZ);
-  const float xOffset =
-      (static_cast<float>(out.tileGrid.width) - 1.0f) * 0.5f;
-  const float yOffset =
-      (static_cast<float>(out.tileGrid.height) - 1.0f) * 0.5f;
+  const float xOffset = (static_cast<float>(out.tileGrid.width) - 1.0f) * 0.5f;
+  const float yOffset = (static_cast<float>(out.tileGrid.height) - 1.0f) * 0.5f;
   out.gridCenterX = center.x;
   out.gridCenterZ = center.z;
   out.gridXOffset = xOffset;
@@ -106,10 +103,10 @@ void worldToTile(const ServerGame& game, float worldX, float worldZ, int& tx,
                  int& ty) {
   const float relX = worldX - game.overworldMazeGridCenterX;
   const float relZ = worldZ - game.overworldMazeGridCenterZ;
-  tx = static_cast<int>(std::lround(relX / kPreviewTileSpacing +
-                                    game.overworldMazeGridXOffset));
-  ty = static_cast<int>(std::lround(game.overworldMazeGridYOffset -
-                                    relZ / kPreviewTileSpacing));
+  tx = static_cast<int>(
+      std::lround(relX / kPreviewTileSpacing + game.overworldMazeGridXOffset));
+  ty = static_cast<int>(
+      std::lround(game.overworldMazeGridYOffset - relZ / kPreviewTileSpacing));
 }
 
 [[nodiscard]] bool isWalkableTile(const ServerGame& game, int tx, int ty) {
@@ -120,9 +117,9 @@ void worldToTile(const ServerGame& game, float worldX, float worldZ, int& tx,
       ty >= game.overworldMazeGridHeight) {
     return false;
   }
-  const size_t idx =
-      static_cast<size_t>(ty) * static_cast<size_t>(game.overworldMazeGridWidth) +
-      static_cast<size_t>(tx);
+  const size_t idx = static_cast<size_t>(ty) *
+                         static_cast<size_t>(game.overworldMazeGridWidth) +
+                     static_cast<size_t>(tx);
   if (idx >= game.overworldMazeGridTiles.size()) return false;
   return game.overworldMazeGridTiles[idx] != 0;
 }
@@ -301,14 +298,13 @@ void beginPuzzle(ServerGame& game) {
   (void)pieceId;
   game.registry.emplace<shared::OverworldTag>(piece);
   game.registry.emplace<shared::OverworldMazePiece>(piece);
-  game.registry.emplace<shared::Position>(
-      piece, layout.startPos.x, layout.startPos.y, layout.startPos.z, 1.0f,
-      0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::Position>(piece, layout.startPos.x,
+                                          layout.startPos.y, layout.startPos.z,
+                                          1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(piece, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(piece, "start_cube",
-                                            kStartMarkerScale.x,
-                                            kStartMarkerScale.y,
-                                            kStartMarkerScale.z);
+  game.registry.emplace<shared::RenderInfo>(
+      piece, "start_cube", kStartMarkerScale.x, kStartMarkerScale.y,
+      kStartMarkerScale.z);
 
   JPH::BodyID body = game.physics.createMazeBoardPieceBody(
       "start_cube", layout.startPos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
@@ -329,9 +325,10 @@ void beginPuzzle(ServerGame& game) {
 
   broadcastSpawnEntities(game, {piece, game.overworldMazePuzzleController});
 
-  printf("[OverworldMaze] Puzzle started on preview board at (%.2f, %.2f, "
-         "%.2f)\n",
-         layout.startPos.x, layout.startPos.y, layout.startPos.z);
+  printf(
+      "[OverworldMaze] Puzzle started on preview board at (%.2f, %.2f, "
+      "%.2f)\n",
+      layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
 void endPuzzle(ServerGame& game) {
@@ -340,7 +337,8 @@ void endPuzzle(ServerGame& game) {
   game.overworldMazePuzzleActive = false;
   setPuzzleActiveFlag(game, false);
   ExitMazePuzzle(game);
-  // Players can move with WASD again; re-arm only after everyone leaves the pad.
+  // Players can move with WASD again; re-arm only after everyone leaves the
+  // pad.
   game.overworldMazeTriggerArmed = false;
   game.overworldMazeGridTiles.clear();
   game.overworldMazeGridWidth = 0;
@@ -378,7 +376,8 @@ void updatePuzzle(ServerGame& game, float dt) {
     return;
   }
 
-  auto inputView = game.registry.view<shared::PlayerInput, shared::OverworldTag>();
+  auto inputView =
+      game.registry.view<shared::PlayerInput, shared::OverworldTag>();
   for (auto ent : inputView) {
     if (game.registry.all_of<shared::OverworldMazePiece>(ent)) continue;
     const auto& input = game.registry.get<shared::PlayerInput>(ent);

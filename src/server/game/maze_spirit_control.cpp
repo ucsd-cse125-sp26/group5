@@ -61,8 +61,7 @@ SpiritDrive collectSpiritDriveFromTag(const ServerGame& game,
     const auto& in = game.registry.get<shared::PlayerInput>(ent);
     bool pushed = false;
 
-    if (!skipSpiritGrid &&
-        game.registry.all_of<shared::MazePadBinding>(ent)) {
+    if (!skipSpiritGrid && game.registry.all_of<shared::MazePadBinding>(ent)) {
       const auto pad = game.registry.get<shared::MazePadBinding>(ent).pad;
       applyPadKeyToDrive(out, pad, in.keys, pushed);
     } else {

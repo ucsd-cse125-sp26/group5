@@ -223,7 +223,8 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
 
-  // During the preview-board puzzle only; after exit, normal FPS view immediately.
+  // During the preview-board puzzle only; after exit, normal FPS view
+  // immediately.
   if (selfRender.modelName == "cube" && isOverworldMazePuzzleActive(game)) {
     const glm::vec3 target(shared::maze_preview::kLookAtX,
                            shared::maze_preview::kLookAtY,
