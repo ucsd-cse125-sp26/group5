@@ -14,8 +14,7 @@ constexpr float kFocusHoldSeconds = 1.0f;
 void snapOverworldAvatarFaceMazePreview(ServerGame& game, entt::entity avatar);
 void snapOverworldAvatarsFaceMazePreview(ServerGame& game);
 
-[[nodiscard]] bool allOverworldAvatarsFacingMazePreview(const ServerGame& game,
-                                                        float maxYawErrorRad =
-                                                            0.35f);
+[[nodiscard]] bool allOverworldAvatarsFacingMazePreview(
+    const ServerGame& game, float maxYawErrorRad = 0.35f);
 
 }  // namespace maze_camera

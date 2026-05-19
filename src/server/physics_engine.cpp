@@ -47,8 +47,8 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
                                      Layers::MOVING);
   settings.mGravityFactor = 0.0f;
   settings.mFriction = 0.8f;
-  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
-                          JPH::EAllowedDOFs::TranslationZ;
+  settings.mAllowedDOFs =
+      JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationZ;
   settings.mMotionQuality = JPH::EMotionQuality::Discrete;
 
   JPH::Body* body = bodyInterface.CreateBody(settings);

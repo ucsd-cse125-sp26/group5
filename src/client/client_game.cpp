@@ -183,7 +183,8 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     }
     switch (slot) {
       case 1:
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) keys |= KEY_SPIRIT_UP;
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_UP;
         break;
       case 2:
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)

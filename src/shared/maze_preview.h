@@ -12,8 +12,7 @@ constexpr float kMazeGap = 2.0f;
 
 // Maze board just north of the trigger, facing south toward players.
 constexpr float kBoardCenterX = kTriggerCenterX;
-constexpr float kBoardCenterY =
-    kTriggerCenterY + kHalfExtent + kMazeGap + 0.5f;
+constexpr float kBoardCenterY = kTriggerCenterY + kHalfExtent + kMazeGap + 0.5f;
 constexpr float kBoardCenterZ = 3.8f;
 
 // Camera / avatar facing target (center of the board).

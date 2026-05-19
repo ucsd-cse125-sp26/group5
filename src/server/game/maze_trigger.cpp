@@ -30,8 +30,8 @@ bool allActivePlayersInMazeTrigger(const ServerGame& game) {
 }
 
 glm::vec3 overworldSpawnPosition(uint8_t joinSlot) {
-  static constexpr float kSpawns[4][2] = {{-2.0f, 9.0f}, {2.0f, 9.0f},
-                                          {-2.0f, 11.0f}, {2.0f, 11.0f}};
+  static constexpr float kSpawns[4][2] = {
+      {-2.0f, 9.0f}, {2.0f, 9.0f}, {-2.0f, 11.0f}, {2.0f, 11.0f}};
   const int idx =
       (joinSlot >= 1 && joinSlot <= 4) ? static_cast<int>(joinSlot) - 1 : 0;
   return {kSpawns[idx][0], kSpawns[idx][1], 0.5f};

@@ -7,8 +7,8 @@
 #include <thread>
 
 #include "game/maze_trigger.h"
-#include "server/game/overworld_maze_puzzle.h"
 #include "game_state.h"
+#include "server/game/overworld_maze_puzzle.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
