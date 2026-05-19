@@ -499,10 +499,11 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
 GLuint loadTexture2D(const std::string& path) {
   int w = 0, h = 0, channels = 0;
   stbi_set_flip_vertically_on_load(1);
-  unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
+  const std::string fullPath = (exeDir() / path).string();
+  unsigned char* data = stbi_load(fullPath.c_str(), &w, &h, &channels, 4);
   stbi_set_flip_vertically_on_load(0);
   if (!data) {
-    fprintf(stderr, "loadTexture2D: failed to load \"%s\"\n", path.c_str());
+    fprintf(stderr, "loadTexture2D: failed to load \"%s\"\n", fullPath.c_str());
     return 0;
   }
 
