@@ -38,7 +38,16 @@ add_executable(maze_camera_tests
     maze_camera_tests.cpp
 )
 
+add_executable(maze_spirit_control_tests
+    maze_spirit_control_tests.cpp
+)
+
 target_link_libraries(maze_camera_tests PRIVATE
+    GTest::gtest_main
+    server_lib
+)
+
+target_link_libraries(maze_spirit_control_tests PRIVATE
     GTest::gtest_main
     server_lib
 )
@@ -56,7 +65,16 @@ add_executable(overworld_logic_tests
     overworld_logic_tests.cpp
 )
 
+add_executable(overworld_maze_puzzle_tests
+    overworld_maze_puzzle_tests.cpp
+)
+
 target_link_libraries(overworld_logic_tests PRIVATE
+    GTest::gtest_main
+    server_lib
+)
+
+target_link_libraries(overworld_maze_puzzle_tests PRIVATE
     GTest::gtest_main
     server_lib
 )
@@ -67,5 +85,7 @@ gtest_discover_tests(network_tests)
 gtest_discover_tests(maze_generation_tests)
 gtest_discover_tests(maze_trigger_tests)
 gtest_discover_tests(maze_camera_tests)
+gtest_discover_tests(maze_spirit_control_tests)
 gtest_discover_tests(maze_logic_tests)
 gtest_discover_tests(overworld_logic_tests)
+gtest_discover_tests(overworld_maze_puzzle_tests)

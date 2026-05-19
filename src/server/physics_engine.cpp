@@ -35,6 +35,26 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
   return body->GetID();
 }
 
+JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
+    const std::string& modelName, const glm::vec3& pos, const glm::quat& rot,
+    const glm::vec3& scale) {
+  auto& bodyInterface = getBodyInterface();
+  JPH::ShapeRefC shape = playerShapeForAsset(modelName, scale);
+
+  JPH::Quat joltRot(rot.x, rot.y, rot.z, rot.w);
+  JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
+                                     joltRot, JPH::EMotionType::Dynamic,
+                                     Layers::MOVING);
+  settings.mGravityFactor = 0.0f;
+  settings.mFriction = 0.8f;
+  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
+                          JPH::EAllowedDOFs::TranslationZ;
+  settings.mMotionQuality = JPH::EMotionQuality::Discrete;
+
+  JPH::Body* body = bodyInterface.CreateBody(settings);
+  return body->GetID();
+}
+
 namespace {
 
 std::string cacheKey(const shared::ParsedModel& parsed, const aiNode& node) {
