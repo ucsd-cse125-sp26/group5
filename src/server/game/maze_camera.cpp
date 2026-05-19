@@ -53,28 +53,33 @@ float yawErrorRad(const shared::Position& position, float targetX,
 
 }  // namespace
 
+void snapOverworldAvatarFaceMazePreview(ServerGame& game, entt::entity avatar) {
+  if (!game.registry.valid(avatar) ||
+      !game.registry.all_of<shared::Position>(avatar)) {
+    return;
+  }
+  auto& position = game.registry.get<shared::Position>(avatar);
+  setYawTowardTarget(position, shared::maze_preview::kLookAtX,
+                     shared::maze_preview::kLookAtY);
+
+  if (game.registry.all_of<shared::PhysicsBody>(avatar)) {
+    auto& pb = game.registry.get<shared::PhysicsBody>(avatar);
+    auto& bodyInterface = game.physics.getBodyInterface();
+    JPH::BodyID bodyId(pb.bodyId);
+    if (bodyInterface.IsAdded(bodyId)) {
+      glm::quat q(position.qw, position.qx, position.qy, position.qz);
+      bodyInterface.SetRotation(bodyId, JPH::Quat(q.x, q.y, q.z, q.w),
+                                JPH::EActivation::Activate);
+      JPH::RVec3 p(position.x, position.y, position.z);
+      bodyInterface.SetPosition(bodyId, p, JPH::EActivation::Activate);
+    }
+  }
+}
+
 void snapOverworldAvatarsFaceMazePreview(ServerGame& game) {
   for (const auto& [peer, slots] : game.active_players) {
     (void)peer;
-    if (!game.registry.valid(slots.overworld_avatar) ||
-        !game.registry.all_of<shared::Position>(slots.overworld_avatar)) {
-      continue;
-    }
-    auto& position =
-        game.registry.get<shared::Position>(slots.overworld_avatar);
-    setYawTowardTarget(position, shared::maze_preview::kLookAtX,
-                       shared::maze_preview::kLookAtY);
-
-    if (game.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
-      auto& pb = game.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
-      auto& bodyInterface = game.physics.getBodyInterface();
-      JPH::BodyID bodyId(pb.bodyId);
-      if (bodyInterface.IsAdded(bodyId)) {
-        glm::quat q(position.qw, position.qx, position.qy, position.qz);
-        bodyInterface.SetRotation(bodyId, JPH::Quat(q.x, q.y, q.z, q.w),
-                                  JPH::EActivation::Activate);
-      }
-    }
+    snapOverworldAvatarFaceMazePreview(game, slots.overworld_avatar);
   }
 }
 

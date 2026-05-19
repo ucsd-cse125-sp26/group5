@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "server/game/maze_camera.h"
 #include "server/server_game.h"
 
 namespace maze_trigger {
@@ -26,6 +27,32 @@ bool allActivePlayersInMazeTrigger(const ServerGame& game) {
   }
 
   return true;
+}
+
+glm::vec3 overworldSpawnPosition(uint8_t joinSlot) {
+  static constexpr float kSpawns[4][2] = {{-2.0f, 9.0f}, {2.0f, 9.0f},
+                                          {-2.0f, 11.0f}, {2.0f, 11.0f}};
+  const int idx =
+      (joinSlot >= 1 && joinSlot <= 4) ? static_cast<int>(joinSlot) - 1 : 0;
+  return glm::vec3(kSpawns[idx][0], kSpawns[idx][1], 0.5f);
+}
+
+void placeOverworldAvatarInTrigger(ServerGame& game, entt::entity avatar,
+                                   uint8_t joinSlot) {
+  if (!game.registry.valid(avatar) ||
+      !game.registry.all_of<shared::Position>(avatar)) {
+    return;
+  }
+  const glm::vec3 spawn = overworldSpawnPosition(joinSlot);
+  auto& pos = game.registry.get<shared::Position>(avatar);
+  pos.x = spawn.x;
+  pos.y = spawn.y;
+  pos.z = spawn.z;
+  if (game.registry.all_of<shared::Velocity>(avatar)) {
+    auto& vel = game.registry.get<shared::Velocity>(avatar);
+    vel.dx = vel.dy = vel.dz = 0.0f;
+  }
+  maze_camera::snapOverworldAvatarFaceMazePreview(game, avatar);
 }
 
 std::vector<StaticEntityDesc> buildMazeTriggerMarkerEntities() {

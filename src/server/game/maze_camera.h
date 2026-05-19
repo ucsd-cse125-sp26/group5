@@ -1,5 +1,7 @@
 #pragma once
 
+#include <entt/entity/fwd.hpp>
+
 struct ServerGame;
 
 namespace maze_camera {
@@ -9,6 +11,7 @@ namespace maze_camera {
 constexpr float kFocusHoldSeconds = 1.0f;
 
 // Snap overworld avatar yaw so +Y faces the maze preview center.
+void snapOverworldAvatarFaceMazePreview(ServerGame& game, entt::entity avatar);
 void snapOverworldAvatarsFaceMazePreview(ServerGame& game);
 
 [[nodiscard]] bool allOverworldAvatarsFacingMazePreview(const ServerGame& game,

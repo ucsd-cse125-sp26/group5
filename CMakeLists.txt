@@ -123,6 +123,8 @@ add_library(server_lib STATIC
     src/server/game/maze_generation.cpp
     src/server/game/maze_trigger.cpp
     src/server/game/maze_camera.cpp
+    src/server/game/maze_spirit_control.cpp
+    src/server/game/overworld_maze_puzzle.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp

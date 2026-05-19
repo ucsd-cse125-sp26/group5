@@ -35,7 +35,7 @@ void addPlayerSlot(ServerGame& game, ENetPeer* peerKey, float x, float y) {
 
 TEST(MazeCamera, SnapFacesPreviewCenter) {
   ServerGame game;
-  addPlayerSlot(game, reinterpret_cast<ENetPeer*>(1), -2.0f, 14.0f);
+  addPlayerSlot(game, reinterpret_cast<ENetPeer*>(1), -2.0f, 10.0f);
 
   maze_camera::snapOverworldAvatarsFaceMazePreview(game);
 
@@ -71,9 +71,9 @@ TEST(MazeCamera, AllFacingAfterSnapWithFourPlayers) {
 
 TEST(MazeCamera, TriggerRegionMatchesPreviewConstants) {
   EXPECT_TRUE(maze_trigger::isInsideMazeTriggerRegion(
-      shared::Position{.x = maze_trigger::kCenterX,
-                       .y = maze_trigger::kCenterY}));
+      shared::Position{.x = shared::maze_preview::kTriggerCenterX,
+                       .y = shared::maze_preview::kTriggerCenterY}));
   EXPECT_FALSE(maze_trigger::isInsideMazeTriggerRegion(
-      shared::Position{.x = maze_trigger::kCenterX + 10.0f,
-                       .y = maze_trigger::kCenterY}));
+      shared::Position{.x = shared::maze_preview::kBoardCenterX,
+                       .y = shared::maze_preview::kBoardCenterY}));
 }
