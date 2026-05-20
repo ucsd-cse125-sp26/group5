@@ -41,10 +41,15 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       break;
     case GraphicsPreset::CelShaded:
       s.shadingMode = ShadingMode::Cel;
-      s.bloomEnabled = false;
-      s.fxaaEnabled = true;
-      s.outlineWidth = 1.0f;
       s.celBands = 4;
+      s.celHalfLambert = true;
+      s.celBandEpsilon = 0.02f;
+      s.textureQuantizeLevels = 16;
+      s.postQuantizeLevels = 16;
+      s.bloomEnabled = false;
+      s.fxaaEnabled = false;
+      s.outlineMode = OutlineMode::Sobel;
+      s.outlineColor = glm::vec3(0.0f);
       break;
     case GraphicsPreset::Count:
       break;

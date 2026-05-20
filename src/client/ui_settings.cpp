@@ -1,5 +1,7 @@
 #include "client/ui_settings.h"
 
+#include <cstdio>
+
 #include "client/graphics_settings.h"
 #include "imgui.h"
 
@@ -18,15 +20,64 @@ void shadingSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Shading")) return;
   const char* modes[] = {"Phong", "Cel"};
   int mode = static_cast<int>(s.shadingMode);
-  if (ImGui::Combo("Mode", &mode, modes, IM_ARRAYSIZE(modes))) {
+  if (ImGui::Combo("Shading mode", &mode, modes, IM_ARRAYSIZE(modes))) {
     s.shadingMode = static_cast<ShadingMode>(mode);
   }
-  ImGui::BeginDisabled(s.shadingMode == ShadingMode::Phong);
+  // 0/1 disable; 2..32 posterize each RGB channel into N levels at the
+  // G-buffer sample site, so both Phong and Cel see flattened colors.
+  ImGui::SliderInt("Texture quantize", &s.textureQuantizeLevels, 0, 32,
+                   s.textureQuantizeLevels < 2 ? "off" : "%d levels");
+  // Same algorithm but applied post-tonemap (after FXAA) — quantizes the
+  // final lit color including shading and shadows, not just the source.
+  ImGui::SliderInt("Post quantize", &s.postQuantizeLevels, 0, 32,
+                   s.postQuantizeLevels < 2 ? "off" : "%d levels");
+  ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
+  ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");
+  ImGui::Checkbox("Half-Lambert", &s.celHalfLambert);
+  ImGui::SliderFloat("Specular threshold", &s.celSpecularThreshold, 0.0f, 1.0f);
+  ImGui::SliderFloat("Specular epsilon", &s.celSpecularEpsilon, 0.0f, 0.2f,
+                     "%.3f");
+  ImGui::Checkbox("Use ramp texture", &s.celUseRampTexture);
+  ImGui::BeginDisabled(!s.celUseRampTexture);
+  static char rampPathBuf[256] = "";
+  if (rampPathBuf[0] == '\0' && !s.celRampPath.empty()) {
+    std::snprintf(rampPathBuf, sizeof(rampPathBuf), "%s", s.celRampPath.c_str());
+  }
+  if (ImGui::InputText("Ramp PNG path", rampPathBuf, sizeof(rampPathBuf),
+                        ImGuiInputTextFlags_EnterReturnsTrue)) {
+    s.celRampPath = rampPathBuf;
+  }
   ImGui::EndDisabled();
-  ImGui::SliderFloat("Outline width", &s.outlineWidth, 0.0f, 5.0f);
+  ImGui::EndDisabled();
+}
+
+void outlinesSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Outlines")) return;
+  const char* modes[] = {"None", "Hull", "Sobel", "Both"};
+  int mode = static_cast<int>(s.outlineMode);
+  if (ImGui::Combo("Outline mode", &mode, modes, IM_ARRAYSIZE(modes))) {
+    s.outlineMode = static_cast<OutlineMode>(mode);
+  }
   ImGui::ColorEdit3("Outline color", &s.outlineColor.x);
-  ImGui::TextDisabled("(Cel shader not wired yet)");
+
+  const bool hullActive = s.outlineMode == OutlineMode::Hull ||
+                          s.outlineMode == OutlineMode::Both;
+  ImGui::BeginDisabled(!hullActive);
+  ImGui::SliderFloat("Hull thickness", &s.outlineThickness, 0.0f, 0.2f,
+                     "%.4f");
+  ImGui::Checkbox("Screen-constant", &s.outlineScreenSpace);
+  ImGui::EndDisabled();
+
+  const bool sobelActive = s.outlineMode == OutlineMode::Sobel ||
+                           s.outlineMode == OutlineMode::Both;
+  ImGui::BeginDisabled(!sobelActive);
+  ImGui::SliderFloat("Sobel width", &s.outlineSobelWidth, 0.5f, 5.0f);
+  ImGui::SliderFloat("Depth threshold", &s.outlineDepthThreshold, 0.0f, 0.5f,
+                     "%.4f");
+  ImGui::SliderFloat("Normal threshold", &s.outlineNormalThreshold, 0.0f, 4.0f,
+                     "%.3f");
+  ImGui::EndDisabled();
 }
 
 void dirLightSection(GraphicsSettings& s) {
@@ -139,6 +190,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
 
   cameraSection(s);
   shadingSection(s);
+  outlinesSection(s);
   dirLightSection(s);
   tonemapBloomSection(s);
   ssaoSection(s);

@@ -43,6 +43,9 @@ struct Graphics {
   GLFWwindow* window = nullptr;
   std::optional<Shader> gbufferShader;
   std::optional<Shader> lightingShader;
+  std::optional<Shader> lightingCelShader;
+  std::optional<Shader> outlineHullShader;
+  std::optional<Shader> outlineSobelShader;
   std::optional<Shader> skyboxShader;
   std::optional<Shader> presentShader;
   std::optional<Shader> debugOverlay;
@@ -74,6 +77,14 @@ struct Graphics {
 
   GLuint ldrFBO = 0;
   GLuint ldrColor = 0;
+
+  // Post-process outline (Sobel) writes here when enabled.
+  GLuint sobelFBO = 0;
+  GLuint sobelColor = 0;
+
+  // Optional 1D cel ramp texture loaded from settings.celRampPath.
+  GLuint celRampTexture = 0;
+  std::string lastCelRampPath = "";
 
   std::optional<Shader> blurShader;
   std::optional<Shader> tonemapShader;
@@ -150,4 +161,7 @@ struct Graphics {
   void allocateDirShadowMap(int size);
   void allocatePointShadowMaps(int size);
   void clearShadowMaps();
+
+  // Reloads celRampTexture if settings.celRampPath changed since last call.
+  void ensureCelRampLoaded();
 };

@@ -1,10 +1,19 @@
 #pragma once
 
+#include <string>
+
 #include "glm/ext/vector_float3.hpp"
 
 enum class ShadingMode {
   Phong,
   Cel,
+};
+
+enum class OutlineMode {
+  None,
+  Hull,
+  Sobel,
+  Both,
 };
 
 struct GraphicsSettings {
@@ -45,11 +54,33 @@ struct GraphicsSettings {
   float pointShadowPolyFactor = 2.0f;
   float pointShadowPolyUnits = 4.0f;
 
-  // Shading (cel slots wired in UI; shader work is future)
+  // Shading
   ShadingMode shadingMode = ShadingMode::Phong;
+  // 0 = no quantization, otherwise per-channel level count applied to the
+  // material textures (albedo/specular/emissive) at G-buffer time.
+  int textureQuantizeLevels = 0;
+  // 0 = off, otherwise levels for HSV-V quantization of the final tonemapped
+  // color in the present shader (after FXAA so band edges stay sharp).
+  int postQuantizeLevels = 0;
   int celBands = 4;
-  float outlineWidth = 0.0f;
+  float celBandEpsilon = 0.02f;          // 0 = hard, ~0.1 = soft
+  bool celHalfLambert = true;
+  float celSpecularThreshold = 0.5f;
+  float celSpecularEpsilon = 0.05f;
+  bool celUseRampTexture = false;
+  std::string celRampPath = "";          // empty → procedural
+
+  // Outlines
+  OutlineMode outlineMode = OutlineMode::None;
   glm::vec3 outlineColor{0.0f};
+  // Inverted hull
+  float outlineThickness = 0.02f;
+  bool outlineScreenSpace = true;
+  // Post-process Sobel — depth threshold is relative (Δd / d), normal
+  // threshold is sum of 4 neighbor (1 - dot(n, nNeighbor)).
+  float outlineSobelWidth = 1.0f;
+  float outlineDepthThreshold = 0.05f;
+  float outlineNormalThreshold = 0.5f;
 
   // Directional-light override (off → scene/ECS values used)
   bool overrideDirLight = false;

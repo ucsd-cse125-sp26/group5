@@ -6,6 +6,7 @@
 #include "client_graphics.h"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <random>
 #include <string>
@@ -27,10 +28,12 @@
 #include "shared/map_format.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
+#include "shared/util.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
+#include <stb_image.h>  // implementation lives in asset.cpp
 
 // Skybox images are Y-up; the game is Z-up.
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
@@ -345,20 +348,23 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
 
 static void renderEntities(const Shader& shader, ClientGame& game,
                            std::unordered_map<std::string, Model*>& models,
-                           bool forShadowPass = false) {
+                           bool forShadowPass = false,
+                           bool forOutlinePass = false) {
   auto view = game.renderRegistry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
     auto& entity = view.get<shared::Entity>(ent);
-    if (forShadowPass) {
-      // Light-marker meshes sit at the light's origin and would shadow
-      // their own light if rendered into the shadow map.
+    // Light markers shouldn't shadow themselves, and shouldn't get outlined.
+    if (forShadowPass || forOutlinePass) {
       if (game.renderRegistry
               .any_of<shared::PointLight, shared::DirectionalLight>(ent))
         continue;
-    } else {
+    }
+    // Self entity is rendered in shadow passes (cast own shadow) but skipped
+    // in the main pass and outline pass (don't draw inside FP camera).
+    if (!forShadowPass) {
       if (entity.id == game.renderEntityId) continue;
     }
     std::string modelKey = renderInfo.modelName;
@@ -433,6 +439,12 @@ bool Graphics::load(int width, int height) {
                         "shaders/fragment_gbuffer.glsl");
   lightingShader.emplace("shaders/vertex_present.glsl",
                          "shaders/fragment_lighting_deferred.glsl");
+  lightingCelShader.emplace("shaders/vertex_present.glsl",
+                            "shaders/fragment_lighting_cel.glsl");
+  outlineHullShader.emplace("shaders/vertex_outline_hull.glsl",
+                            "shaders/fragment_outline_hull.glsl");
+  outlineSobelShader.emplace("shaders/vertex_present.glsl",
+                             "shaders/fragment_outline_sobel.glsl");
   skyboxShader.emplace("shaders/vertex_skybox.glsl",
                        "shaders/fragment_skybox.glsl");
   presentShader.emplace("shaders/vertex_present.glsl",
@@ -456,9 +468,11 @@ bool Graphics::load(int width, int height) {
   // the previous program — at startup there is no previous program, so
   // fail fast instead of starting with a black window.
   const std::optional<Shader>* required[] = {
-      &gbufferShader,   &lightingShader,    &skyboxShader, &presentShader,
-      &blurShader,      &tonemapShader,     &ssaoShader,   &ssaoBlurShader,
-      &shadowDirShader, &shadowPointShader, &debugOverlay,
+      &gbufferShader,      &lightingShader,    &lightingCelShader,
+      &outlineHullShader,  &outlineSobelShader, &skyboxShader,
+      &presentShader,      &blurShader,        &tonemapShader,
+      &ssaoShader,         &ssaoBlurShader,    &shadowDirShader,
+      &shadowPointShader,  &debugOverlay,
   };
   for (const auto* s : required) {
     if (!*s || !(*s)->valid()) {
@@ -737,12 +751,32 @@ void Graphics::resizeBuffers(int width, int height) {
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     fprintf(stderr, "ldrFBO incomplete\n");
   }
+
+  // Sobel outline output (chained after tonemap when enabled).
+  GPU_MEM_CLEAR("Outline");
+  if (!sobelFBO) glGenFramebuffers(1, &sobelFBO);
+  if (!sobelColor) glGenTextures(1, &sobelColor);
+  glBindTexture(GL_TEXTURE_2D, sobelColor);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, nullptr);
+  GPU_MEM_TEX2D("Outline", GL_RGBA8, fbWidth, fbHeight);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindFramebuffer(GL_FRAMEBUFFER, sobelFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         sobelColor, 0);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "sobelFBO incomplete\n");
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
-  for (auto* s : {&gbufferShader, &lightingShader, &ssaoShader}) {
+  for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
+                  &outlineHullShader, &outlineSobelShader, &ssaoShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -762,6 +796,18 @@ void Graphics::reloadShaders() {
       {.slot = lightingShader,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_lighting_deferred.glsl",
+       .geom = ""},
+      {.slot = lightingCelShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_lighting_cel.glsl",
+       .geom = ""},
+      {.slot = outlineHullShader,
+       .vert = "shaders/vertex_outline_hull.glsl",
+       .frag = "shaders/fragment_outline_hull.glsl",
+       .geom = ""},
+      {.slot = outlineSobelShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_outline_sobel.glsl",
        .geom = ""},
       {.slot = skyboxShader,
        .vert = "shaders/vertex_skybox.glsl",
@@ -1091,6 +1137,8 @@ void Graphics::render(ClientGame& game) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gbufferShader->use();
+    gbufferShader->setInt("textureQuantizeLevels",
+                          settings.textureQuantizeLevels);
     renderEntities(*gbufferShader, game, models);
   }
 
@@ -1155,37 +1203,57 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    if (lightingShader && lightingShader->valid()) {
-      lightingShader->use();
-      lightingShader->setFloat(
+
+    bool useCel = settings.shadingMode == ShadingMode::Cel &&
+                  lightingCelShader && lightingCelShader->valid();
+    Shader* lighting = useCel ? &*lightingCelShader : &*lightingShader;
+
+    if (lighting && lighting->valid()) {
+      if (useCel) ensureCelRampLoaded();
+      lighting->use();
+      lighting->setFloat(
           "bloomThreshold",
           settings.bloomEnabled ? settings.bloomThreshold : 1e9f);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, gPosition);
-      lightingShader->setInt("gPosition", 0);
+      lighting->setInt("gPosition", 0);
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, gNormal);
-      lightingShader->setInt("gNormal", 1);
+      lighting->setInt("gNormal", 1);
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, gAlbedo);
-      lightingShader->setInt("gAlbedo", 2);
+      lighting->setInt("gAlbedo", 2);
       glActiveTexture(GL_TEXTURE3);
       glBindTexture(GL_TEXTURE_2D, gSpecular);
-      lightingShader->setInt("gSpecular", 3);
+      lighting->setInt("gSpecular", 3);
       glActiveTexture(GL_TEXTURE4);
       glBindTexture(GL_TEXTURE_2D, gEmissive);
-      lightingShader->setInt("gEmissive", 4);
+      lighting->setInt("gEmissive", 4);
       glActiveTexture(GL_TEXTURE5);
       glBindTexture(GL_TEXTURE_2D, ssaoBlurColor);
-      lightingShader->setInt("ssao", 5);
+      lighting->setInt("ssao", 5);
       glActiveTexture(GL_TEXTURE6);
       glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-      lightingShader->setInt("dirShadowMap", 6);
+      lighting->setInt("dirShadowMap", 6);
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
-      lightingShader->setInt("pointShadowMaps", 7);
-      uploadDirectionalLight(*lightingShader, game, settings);
-      uploadPointLights(*lightingShader, lights, numLights);
+      lighting->setInt("pointShadowMaps", 7);
+      if (useCel) {
+        // Cel ramp on TEXTURE8 (bound to a 1×1 white fallback if no ramp).
+        glActiveTexture(GL_TEXTURE8);
+        glBindTexture(GL_TEXTURE_2D, celRampTexture);
+        lighting->setInt("celRamp", 8);
+        lighting->setInt("celBands", settings.celBands);
+        lighting->setFloat("celBandEpsilon", settings.celBandEpsilon);
+        lighting->setInt("halfLambert", settings.celHalfLambert ? 1 : 0);
+        lighting->setFloat("celSpecularThreshold",
+                           settings.celSpecularThreshold);
+        lighting->setFloat("celSpecularEpsilon", settings.celSpecularEpsilon);
+        lighting->setInt("useRampTexture",
+                         (settings.celUseRampTexture && celRampTexture) ? 1 : 0);
+      }
+      uploadDirectionalLight(*lighting, game, settings);
+      uploadPointLights(*lighting, lights, numLights);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -1214,6 +1282,43 @@ void Graphics::render(ClientGame& game) {
         drawSkybox(*skyboxShader, it->second, *camera, projection);
       }
     }
+  }
+
+  // Inverted-hull outlines: backfaces expanded along world normals, written
+  // to litFBO so tonemap treats them as scene color.
+  if ((settings.outlineMode == OutlineMode::Hull ||
+       settings.outlineMode == OutlineMode::Both) &&
+      outlineHullShader && outlineHullShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("OutlineHull");
+    GPU_PROFILE_SCOPE("OutlineHull");
+    glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
+    GLenum hullDrawBufs[] = {GL_COLOR_ATTACHMENT0};
+    glDrawBuffers(1, hullDrawBufs);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    // Bias hull depth slightly toward the far plane. In screen-space mode the
+    // expansion leaves clip.z untouched, so an expanded side face's front
+    // edge shares its NDC.z with the neighboring front face — without this
+    // bias, LEQUAL paints the outline color over the visible face wherever
+    // those depths tie at face borders.
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 4.0f);
+    outlineHullShader->use();
+    outlineHullShader->setFloat("outlineThickness", settings.outlineThickness);
+    outlineHullShader->setInt("outlineScreenSpace",
+                              settings.outlineScreenSpace ? 1 : 0);
+    outlineHullShader->setVec3("outlineColor", settings.outlineColor);
+    renderEntities(*outlineHullShader, game, models,
+                   /*forShadowPass=*/false,
+                   /*forOutlinePass=*/true);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glCullFace(GL_BACK);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
   }
 
   GLuint finalBloomColor = brightColor;
@@ -1269,6 +1374,37 @@ void Graphics::render(ClientGame& game) {
     }
   }
 
+  GLuint finalLDR = ldrColor;
+  if ((settings.outlineMode == OutlineMode::Sobel ||
+       settings.outlineMode == OutlineMode::Both) &&
+      outlineSobelShader && outlineSobelShader->valid()) {
+    SIMPLE_PROFILE_SCOPE("OutlineSobel");
+    GPU_PROFILE_SCOPE("OutlineSobel");
+    glBindFramebuffer(GL_FRAMEBUFFER, sobelFBO);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    outlineSobelShader->use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, ldrColor);
+    outlineSobelShader->setInt("src", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    outlineSobelShader->setInt("gNormal", 1);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    outlineSobelShader->setInt("gPosition", 2);
+    outlineSobelShader->setFloat("outlineSobelWidth", settings.outlineSobelWidth);
+    outlineSobelShader->setFloat("outlineDepthThreshold",
+                                  settings.outlineDepthThreshold);
+    outlineSobelShader->setFloat("outlineNormalThreshold",
+                                  settings.outlineNormalThreshold);
+    outlineSobelShader->setVec3("outlineColor", settings.outlineColor);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    finalLDR = sobelColor;
+  }
+
   {
     SIMPLE_PROFILE_SCOPE("Present");
     GPU_PROFILE_SCOPE("Present");
@@ -1279,9 +1415,10 @@ void Graphics::render(ClientGame& game) {
     if (presentShader && presentShader->valid()) {
       presentShader->use();
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, ldrColor);
+      glBindTexture(GL_TEXTURE_2D, finalLDR);
       presentShader->setInt("src", 0);
       presentShader->setInt("fxaaEnabled", settings.fxaaEnabled ? 1 : 0);
+      presentShader->setInt("postQuantizeLevels", settings.postQuantizeLevels);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -1395,6 +1532,45 @@ void Graphics::clearShadowMaps() {
     }
   }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Graphics::ensureCelRampLoaded() {
+  if (settings.celRampPath == lastCelRampPath && celRampTexture != 0) return;
+  lastCelRampPath = settings.celRampPath;
+
+  // Always allocate the texture handle so the cel shader has something to
+  // sample, even when the user hasn't picked a ramp yet. Fallback is a 1×1
+  // identity ramp (sample == nDotL), so sampling acts like no quantization.
+  if (!celRampTexture) glGenTextures(1, &celRampTexture);
+  glBindTexture(GL_TEXTURE_2D, celRampTexture);
+
+  bool loaded = false;
+  if (!settings.celRampPath.empty()) {
+    std::filesystem::path path =
+        std::filesystem::path(exeDir()) / settings.celRampPath;
+    int w = 0, h = 0, ch = 0;
+    stbi_set_flip_vertically_on_load(false);
+    unsigned char* pixels =
+        stbi_load(path.string().c_str(), &w, &h, &ch, 3);
+    if (pixels && w > 0 && h > 0) {
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                   pixels);
+      stbi_image_free(pixels);
+      loaded = true;
+    } else {
+      fprintf(stderr, "ensureCelRampLoaded: failed to load %s\n",
+              path.string().c_str());
+    }
+  }
+  if (!loaded) {
+    unsigned char identity[3] = {255, 255, 255};
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                 identity);
+  }
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 void Graphics::initImGui() {

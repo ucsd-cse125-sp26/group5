@@ -13,6 +13,11 @@ struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
   glm::vec2 texture_coordinates;
+  // Per-vertex averaged normal used only by the inverted-hull outline pass.
+  // Equal to `normal` for artist-authored meshes; computed in the procedural
+  // cube factories so corner vertices share one direction and the expanded
+  // hull stays gap-free at large thicknesses.
+  glm::vec3 smoothedNormal;
 };
 
 struct MaterialSlot {
