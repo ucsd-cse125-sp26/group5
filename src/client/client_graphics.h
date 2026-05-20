@@ -7,6 +7,7 @@
 
 #include "asset.h"
 #include "client/client_game.h"
+#include "client/graphics_settings.h"
 #include "client/shaders.h"
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -86,14 +87,12 @@ struct Graphics {
   GLuint ssaoNoiseTex = 0;
   std::vector<glm::vec3> ssaoKernel;
 
-  int ssaoKernelSize = 64;
-  float ssaoRadius = 0.5f;
-  float ssaoBias = 0.025f;
+  GraphicsSettings settings;
 
-  float exposure = 1.0f;
-  float bloomThreshold = 1.0f;
-  float bloomStrength = 1.0f;
-  int bloomBlurIterations = 10;
+  // Tracked from settings to detect resolution changes and reallocate.
+  int lastDirShadowSize = 0;
+  int lastPointShadowSize = 0;
+  bool prevShadowsEnabled = true;
 
   GLuint dirShadowFBO = 0;
   GLuint dirShadowMap = 0;
@@ -119,6 +118,10 @@ struct Graphics {
   bool keyF5Prev = false;
   bool keyF11Prev = false;
 
+  bool settingsMenuOpen = false;
+  bool keyEscapePrev = false;
+  bool prevSyncedMenuOpen = false;
+
   DebugChannel debugChannel = DebugChannel::Off;
 
   // Bound for fullscreen-triangle draws; positions come from gl_VertexID.
@@ -139,4 +142,12 @@ struct Graphics {
   void cycleDebugChannel();
   void processDebugKeys();
   void drawDebugOverlay();
+
+  void initImGui();
+  void shutdownImGui();
+  void drawSettingsUIFrame();
+
+  void allocateDirShadowMap(int size);
+  void allocatePointShadowMaps(int size);
+  void clearShadowMaps();
 };

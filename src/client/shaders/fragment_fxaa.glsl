@@ -4,6 +4,7 @@ in vec2 vUV;
 out vec4 FragColor;
 
 uniform sampler2D src;
+uniform int fxaaEnabled;
 
 const float kEdgeThreshold = 0.0625;
 const float kMinEdgeContrast = 0.0312;
@@ -12,9 +13,13 @@ const float kSubpixelBlend = 0.75;
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
 void main() {
-  vec2 texel = 1.0 / vec2(textureSize(src, 0));
-
   vec3 cM = texture(src, vUV).rgb;
+  if (fxaaEnabled == 0) {
+    FragColor = vec4(cM, 1.0);
+    return;
+  }
+
+  vec2 texel = 1.0 / vec2(textureSize(src, 0));
   vec3 cN = texture(src, vUV + vec2(0.0,  texel.y)).rgb;
   vec3 cS = texture(src, vUV + vec2(0.0, -texel.y)).rgb;
   vec3 cE = texture(src, vUV + vec2( texel.x, 0.0)).rgb;
