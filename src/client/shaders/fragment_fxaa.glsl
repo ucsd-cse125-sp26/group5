@@ -5,6 +5,8 @@ out vec4 FragColor;
 
 uniform sampler2D src;
 uniform int fxaaEnabled;
+// 0/1 = off; >=2 quantizes the HSV value of the final color into N levels.
+uniform int postQuantizeLevels;
 
 const float kEdgeThreshold = 0.0625;
 const float kMinEdgeContrast = 0.0312;
@@ -12,10 +14,21 @@ const float kSubpixelBlend = 0.75;
 
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
+// HSV-V quantize: snap the brightness to N plateaus, preserve hue/saturation.
+// Runs after FXAA so band edges stay crisp.
+vec3 postQuantize(vec3 c) {
+  if (postQuantizeLevels < 2) return c;
+  float L = float(postQuantizeLevels);
+  float v = max(c.r, max(c.g, c.b));
+  if (v < 1e-5) return c;
+  float qv = clamp(round(v * (L - 1.0)) / max(L - 1.0, 1.0), 0.0, 1.0);
+  return c * (qv / v);
+}
+
 void main() {
   vec3 cM = texture(src, vUV).rgb;
   if (fxaaEnabled == 0) {
-    FragColor = vec4(cM, 1.0);
+    FragColor = vec4(postQuantize(cM), 1.0);
     return;
   }
 
@@ -36,7 +49,7 @@ void main() {
   float range = lMax - lMin;
 
   if (range < max(kMinEdgeContrast, lMax * kEdgeThreshold)) {
-    FragColor = vec4(cM, 1.0);
+    FragColor = vec4(postQuantize(cM), 1.0);
     return;
   }
 
@@ -46,5 +59,5 @@ void main() {
 
   vec3 avg = isHorz ? (cE + cW) * 0.5 : (cN + cS) * 0.5;
   vec3 result = mix(cM, avg, kSubpixelBlend);
-  FragColor = vec4(result, 1.0);
+  FragColor = vec4(postQuantize(result), 1.0);
 }

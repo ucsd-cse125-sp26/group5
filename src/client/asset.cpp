@@ -61,6 +61,9 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, texture_coordinates));
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, smoothedNormal));
   glBindVertexArray(0);
 
   Mesh m;
@@ -81,6 +84,7 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh) {
     vertex.position = vec3_cast(mesh->mVertices[j]);
     vertex.normal = mesh->mNormals ? vec3_cast(mesh->mNormals[j])
                                    : glm::vec3(0.0f, 0.0f, 1.0f);
+    vertex.smoothedNormal = vertex.normal;
     vertex.texture_coordinates = mesh->mTextureCoords[0]
                                      ? vec2_cast(mesh->mTextureCoords[0][j])
                                      : glm::vec2(0.0f);
@@ -271,13 +275,14 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     glm::vec3 corners[4];
   };
   // Face order matches the 6x1 palette below: back, front, left, right,
-  // bottom, top.
+  // bottom, top. Corners are CCW from outside the cube so that GL_FRONT
+  // matches the labeled normal (required by inverted-hull outlines).
   const Face faces[6] = {
       {.normal = {0, 0, -1},
        .corners = {{-0.5f, -0.5f, -0.5f},
-                   {0.5f, -0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f},
                    {0.5f, 0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f}}},
+                   {0.5f, -0.5f, -0.5f}}},
       {.normal = {0, 0, 1},
        .corners = {{-0.5f, -0.5f, 0.5f},
                    {0.5f, -0.5f, 0.5f},
@@ -285,9 +290,9 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
                    {-0.5f, 0.5f, 0.5f}}},
       {.normal = {-1, 0, 0},
        .corners = {{-0.5f, -0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f},
+                   {-0.5f, -0.5f, 0.5f},
                    {-0.5f, 0.5f, 0.5f},
-                   {-0.5f, -0.5f, 0.5f}}},
+                   {-0.5f, 0.5f, -0.5f}}},
       {.normal = {1, 0, 0},
        .corners = {{0.5f, -0.5f, -0.5f},
                    {0.5f, 0.5f, -0.5f},
@@ -300,9 +305,9 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
                    {-0.5f, -0.5f, 0.5f}}},
       {.normal = {0, 1, 0},
        .corners = {{-0.5f, 0.5f, -0.5f},
-                   {0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, 0.5f},
                    {0.5f, 0.5f, 0.5f},
-                   {-0.5f, 0.5f, 0.5f}}},
+                   {0.5f, 0.5f, -0.5f}}},
   };
 
   std::vector<Vertex> vertices;
@@ -316,7 +321,8 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     for (auto corner : faces[f].corners) {
       vertices.push_back({.position = corner,
                           .normal = faces[f].normal,
-                          .texture_coordinates = uv});
+                          .texture_coordinates = uv,
+                          .smoothedNormal = glm::normalize(corner)});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -365,12 +371,14 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
     glm::vec3 normal;
     glm::vec3 corners[4];
   };
+  // CCW from outside the cube so GL_FRONT matches the labeled normal —
+  // required by the inverted-hull outline pass.
   const Face faces[6] = {
       {.normal = {0, 0, -1},
        .corners = {{-0.5f, -0.5f, -0.5f},
-                   {0.5f, -0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f},
                    {0.5f, 0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f}}},
+                   {0.5f, -0.5f, -0.5f}}},
       {.normal = {0, 0, 1},
        .corners = {{-0.5f, -0.5f, 0.5f},
                    {0.5f, -0.5f, 0.5f},
@@ -378,9 +386,9 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
                    {-0.5f, 0.5f, 0.5f}}},
       {.normal = {-1, 0, 0},
        .corners = {{-0.5f, -0.5f, -0.5f},
-                   {-0.5f, 0.5f, -0.5f},
+                   {-0.5f, -0.5f, 0.5f},
                    {-0.5f, 0.5f, 0.5f},
-                   {-0.5f, -0.5f, 0.5f}}},
+                   {-0.5f, 0.5f, -0.5f}}},
       {.normal = {1, 0, 0},
        .corners = {{0.5f, -0.5f, -0.5f},
                    {0.5f, 0.5f, -0.5f},
@@ -393,9 +401,9 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
                    {-0.5f, -0.5f, 0.5f}}},
       {.normal = {0, 1, 0},
        .corners = {{-0.5f, 0.5f, -0.5f},
-                   {0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, 0.5f},
                    {0.5f, 0.5f, 0.5f},
-                   {-0.5f, 0.5f, 0.5f}}},
+                   {0.5f, 0.5f, -0.5f}}},
   };
 
   static const uint8_t kPatterns[4][5][3] = {
@@ -456,15 +464,19 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
       const float v = (4.0f + 0.5f) / 8.0f;
       for (auto& i : uv) i = {u, v};
     } else {
+      // Corner order on the top face is (-x,-z), (-x,+z), (+x,+z), (+x,-z)
+      // after the winding fix; uv follows each corner's xz position.
       uv[0] = {(40.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
-      uv[1] = {(47.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
+      uv[1] = {(40.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
       uv[2] = {(47.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
-      uv[3] = {(40.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
+      uv[3] = {(47.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
     }
     for (int i = 0; i < 4; i++) {
-      vertices.push_back({.position = faces[f].corners[i],
-                          .normal = faces[f].normal,
-                          .texture_coordinates = uv[i]});
+      vertices.push_back(
+          {.position = faces[f].corners[i],
+           .normal = faces[f].normal,
+           .texture_coordinates = uv[i],
+           .smoothedNormal = glm::normalize(faces[f].corners[i])});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -498,6 +510,9 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, texture_coordinates));
+  glEnableVertexAttribArray(3);
+  glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, smoothedNormal));
 
   glBindVertexArray(0);
 
