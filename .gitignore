@@ -11,3 +11,4 @@ latex/
 /maps/
 /.mapsync.local.json
 __pycache__/
+node_modules
