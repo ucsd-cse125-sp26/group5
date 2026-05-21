@@ -509,6 +509,12 @@ bool Graphics::load(int width, int height) {
                           GL_TRUE);
   }
 
+  // Bring up ImGui + the tiny loading scene first so the user sees a
+  // spinning cube + status text while the heavy asset loads run.
+  initImGui();
+  initLoadingScreen();
+  renderLoadingFrame("Compiling shaders");
+
   gbufferShader.emplace("shaders/vertex_gbuffer.glsl",
                         "shaders/fragment_gbuffer.glsl");
   lightingShader.emplace("shaders/vertex_present.glsl",
@@ -553,6 +559,7 @@ bool Graphics::load(int width, int height) {
     }
   }
 
+  renderLoadingFrame("Allocating shadow maps");
   allocateDirShadowMap(settings.dirShadowMapSize);
   allocatePointShadowMaps(settings.pointShadowMapSize);
   lastDirShadowSize = settings.dirShadowMapSize;
@@ -608,6 +615,8 @@ bool Graphics::load(int width, int height) {
   }
 
   for (const auto& asset : shared::ASSETS) {
+    renderLoadingFrame(std::string("Loading asset: ") +
+                       std::string(asset.name));
     Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
                               : loadModel(std::string(asset.filename));
     if (!m) {
@@ -621,6 +630,7 @@ bool Graphics::load(int width, int height) {
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
+  renderLoadingFrame("Building player-slot cubes");
   for (uint8_t s = 1; s <= 4; s++) {
     std::string name = "cube_slot" + std::to_string(s);
     Model* m = makePlayerSlotCubeModel(shared::CUBE_RAINBOW, s);
@@ -632,6 +642,8 @@ bool Graphics::load(int width, int height) {
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
+  renderLoadingFrame(std::string("Loading map: ") +
+                     std::string(shared::DEFAULT_MAP_PATH));
   auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
@@ -641,6 +653,7 @@ bool Graphics::load(int width, int height) {
   for (const auto& sc : shared::SCENES) {
     std::string dir = std::string(sc.skyboxDirectory);
     if (skyboxes.find(dir) == skyboxes.end()) {
+      renderLoadingFrame(std::string("Loading skybox: ") + dir);
       skyboxes[dir] = loadSkybox(dir);
       printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
              dir.c_str());
@@ -649,11 +662,11 @@ bool Graphics::load(int width, int height) {
 
   glEnable(GL_DEPTH_TEST);
 
+  renderLoadingFrame("Allocating framebuffers");
   resizeBuffers(fbWidth, fbHeight);
   initShaderUniforms();
 
-  initImGui();
-
+  destroyLoadingScreen();
   return true;
 }
 
@@ -1686,6 +1699,172 @@ void Graphics::initImGui() {
   io.IniFilename = nullptr;  // No imgui.ini side-file.
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init("#version 410 core");
+}
+
+void Graphics::initLoadingScreen() {
+  loadingShader.emplace("shaders/vertex_loading.glsl",
+                        "shaders/fragment_loading.glsl");
+  if (!loadingShader || !loadingShader->valid()) {
+    fprintf(stderr, "initLoadingScreen: shader failed to compile\n");
+    return;
+  }
+
+  // 24-vertex cube with face normals — six quads, two triangles each.
+  // Pos + normal interleaved (6 floats per vertex).
+  struct Face {
+    glm::vec3 normal;
+    glm::vec3 corners[4];
+  };
+  const Face faces[6] = {
+      {.normal = {0, 0, 1},
+       .corners = {{-0.5f, -0.5f, 0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f}}},
+      {.normal = {0, 0, -1},
+       .corners = {{0.5f, -0.5f, -0.5f},
+                   {-0.5f, -0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f}}},
+      {.normal = {1, 0, 0},
+       .corners = {{0.5f, -0.5f, 0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, 0.5f}}},
+      {.normal = {-1, 0, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {-0.5f, -0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, -0.5f}}},
+      {.normal = {0, 1, 0},
+       .corners = {{-0.5f, 0.5f, 0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f}}},
+      {.normal = {0, -1, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {-0.5f, -0.5f, 0.5f}}},
+  };
+
+  std::vector<float> verts;
+  verts.reserve(6 * 4 * 6);
+  std::vector<GLuint> idx;
+  idx.reserve(36);
+  for (int f = 0; f < 6; ++f) {
+    const auto base = static_cast<GLuint>(verts.size() / 6);
+    for (int c = 0; c < 4; ++c) {
+      verts.push_back(faces[f].corners[c].x);
+      verts.push_back(faces[f].corners[c].y);
+      verts.push_back(faces[f].corners[c].z);
+      verts.push_back(faces[f].normal.x);
+      verts.push_back(faces[f].normal.y);
+      verts.push_back(faces[f].normal.z);
+    }
+    idx.push_back(base + 0);
+    idx.push_back(base + 1);
+    idx.push_back(base + 2);
+    idx.push_back(base + 0);
+    idx.push_back(base + 2);
+    idx.push_back(base + 3);
+  }
+
+  glGenVertexArrays(1, &loadingCubeVAO);
+  glGenBuffers(1, &loadingCubeVBO);
+  glGenBuffers(1, &loadingCubeEBO);
+  glBindVertexArray(loadingCubeVAO);
+  glBindBuffer(GL_ARRAY_BUFFER, loadingCubeVBO);
+  glBufferData(GL_ARRAY_BUFFER,
+               static_cast<GLsizeiptr>(verts.size() * sizeof(float)),
+               verts.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, loadingCubeEBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+               static_cast<GLsizeiptr>(idx.size() * sizeof(GLuint)),
+               idx.data(), GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void*)0);
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void*)(3 * sizeof(float)));
+  glBindVertexArray(0);
+  loadingCubeIndexCount = static_cast<int>(idx.size());
+  loadingStartTime = glfwGetTime();
+}
+
+void Graphics::destroyLoadingScreen() {
+  if (loadingCubeVAO) glDeleteVertexArrays(1, &loadingCubeVAO);
+  if (loadingCubeVBO) glDeleteBuffers(1, &loadingCubeVBO);
+  if (loadingCubeEBO) glDeleteBuffers(1, &loadingCubeEBO);
+  loadingCubeVAO = loadingCubeVBO = loadingCubeEBO = 0;
+  loadingCubeIndexCount = 0;
+  loadingShader.reset();
+}
+
+void Graphics::renderLoadingFrame(const std::string& status) {
+  if (!window || !loadingShader || !loadingShader->valid() ||
+      !loadingCubeIndexCount) {
+    return;
+  }
+  glfwPollEvents();
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_BLEND);
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  const float aspect = static_cast<float>(fbWidth) /
+                       static_cast<float>(std::max(1, fbHeight));
+  const float t = static_cast<float>(glfwGetTime() - loadingStartTime);
+  glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
+  glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
+                               glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat4 model = glm::rotate(glm::mat4(1.0f), t * 1.2f,
+                                glm::normalize(glm::vec3(0.3f, 1.0f, 0.2f)));
+  glm::mat4 mvp = proj * view * model;
+  glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(model)));
+
+  loadingShader->use();
+  loadingShader->setMat4("mvp", mvp);
+  loadingShader->setMat3("normalMatrix", normalMatrix);
+  glBindVertexArray(loadingCubeVAO);
+  glDrawElements(GL_TRIANGLES, loadingCubeIndexCount, GL_UNSIGNED_INT,
+                 nullptr);
+  glBindVertexArray(0);
+
+  if (ImGui::GetCurrentContext()) {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    ImGuiIO& io = ImGui::GetIO();
+    const float pad = 24.0f;
+    ImGui::SetNextWindowPos(ImVec2(pad, io.DisplaySize.y - pad),
+                            ImGuiCond_Always, ImVec2(0.0f, 1.0f));
+    ImGui::SetNextWindowBgAlpha(0.55f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
+                              ImGuiWindowFlags_NoMove |
+                              ImGuiWindowFlags_NoNav |
+                              ImGuiWindowFlags_NoFocusOnAppearing |
+                              ImGuiWindowFlags_NoInputs |
+                              ImGuiWindowFlags_AlwaysAutoResize;
+    if (ImGui::Begin("##LoadingStatus", nullptr, flags)) {
+      ImGui::TextUnformatted("Loading...");
+      ImGui::Separator();
+      ImGui::TextUnformatted(status.c_str());
+    }
+    ImGui::End();
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  }
+
+  glfwSwapBuffers(window);
 }
 
 void Graphics::shutdownImGui() {

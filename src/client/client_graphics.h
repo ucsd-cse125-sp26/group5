@@ -162,6 +162,16 @@ struct Graphics {
   // CameraBlock UBO at binding=0; mirrored by CameraUBOData in the .cpp.
   GLuint cameraUBO = 0;
 
+  // Tiny self-contained loading scene: standalone cube VAO/VBO/EBO + a
+  // minimal shader that only reads position + normal. None of the main
+  // rendering machinery needs to be online for it to draw.
+  std::optional<Shader> loadingShader;
+  GLuint loadingCubeVAO = 0;
+  GLuint loadingCubeVBO = 0;
+  GLuint loadingCubeEBO = 0;
+  int loadingCubeIndexCount = 0;
+  double loadingStartTime = 0.0;
+
   bool load(int width, int height);
   void render(ClientGame& game);
   void swap();
@@ -178,6 +188,12 @@ struct Graphics {
   void initImGui();
   void shutdownImGui();
   void drawSettingsUIFrame();
+
+  // Loading screen: minimal self-contained renderer that runs before the
+  // rest of the pipeline is online.
+  void initLoadingScreen();
+  void destroyLoadingScreen();
+  void renderLoadingFrame(const std::string& status);
 
   void allocateDirShadowMap(int size);
   void allocatePointShadowMaps(int size);
