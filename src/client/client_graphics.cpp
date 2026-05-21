@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "client/asset.h"
+#include "client/client_game.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -24,6 +25,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
+#include "shared/maze_preview.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 
@@ -220,52 +222,19 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const auto& selfRender =
       game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
-  // Maze mode: all clients use first-person cameras attached to the shared
-  // spirit cube.
-  // Each player's join slot picks one side, so all windows move together when
-  // the cube moves.
-  if (selfRender.modelName == "bear") {
-    entt::entity spirit = entt::null;
-    auto spiritView =
-        game.renderRegistry.view<shared::Position, shared::RenderInfo>();
-    for (auto ent : spiritView) {
-      const auto& ri = spiritView.get<shared::RenderInfo>(ent);
-      if (ri.modelName == "cube" && std::abs(ri.sx - 0.8f) < 0.0001f &&
-          std::abs(ri.sy - 0.8f) < 0.0001f &&
-          std::abs(ri.sz - 0.8f) < 0.0001f) {
-        spirit = ent;
-        break;
-      }
-    }
-    if (spirit != entt::null) {
-      const auto& sp = game.renderRegistry.get<shared::Position>(spirit);
-      int slot = selfRender.playerSlot;
-      if (slot < 1 || slot > 4) slot = 1;
+  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
 
-      glm::vec3 side(0.0f);
-      switch (slot) {
-        case 1:
-          side = glm::vec3(0.0f, 1.0f, 0.0f);
-          break;
-        case 2:
-          side = glm::vec3(0.0f, -1.0f, 0.0f);
-          break;
-        case 3:
-          side = glm::vec3(-1.0f, 0.0f, 0.0f);
-          break;
-        case 4:
-          side = glm::vec3(1.0f, 0.0f, 0.0f);
-          break;
-      }
-
-      glm::vec3 pos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
-      glm::mat4 view =
-          glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
-      return CameraState{.position = pos, .view = view};
-    }
+  // During the preview-board puzzle only; after exit, normal FPS view
+  // immediately.
+  if (selfRender.modelName == "cube" && isOverworldMazePuzzleActive(game)) {
+    const glm::vec3 target(shared::maze_preview::kLookAtX,
+                           shared::maze_preview::kLookAtY,
+                           shared::maze_preview::kLookAtZ);
+    glm::mat4 view = glm::lookAt(pos, target, worldUp);
+    return CameraState{.position = pos, .view = view};
   }
 
-  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
@@ -276,7 +245,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
   glm::vec3 forward = yawRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
-  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
   glm::mat4 view = glm::lookAt(pos, pos + forward, worldUp);
   return CameraState{.position = pos, .view = view};
 }

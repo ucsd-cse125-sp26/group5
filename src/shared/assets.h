@@ -32,6 +32,26 @@ inline constexpr CubeSpec CUBE_WHITE_EMISSIVE = {
     .emissive = {255, 255, 255, 255},
 };
 
+inline constexpr CubeSpec CUBE_START_MARKER = {
+    .palette = {{40, 210, 90, 255},
+                {40, 210, 90, 255},
+                {40, 210, 90, 255},
+                {40, 210, 90, 255},
+                {40, 210, 90, 255},
+                {40, 210, 90, 255}},
+    .emissive = {40, 120, 60, 255},
+};
+
+inline constexpr CubeSpec CUBE_GOAL_MARKER = {
+    .palette = {{255, 110, 40, 255},
+                {255, 110, 40, 255},
+                {255, 110, 40, 255},
+                {255, 110, 40, 255},
+                {255, 110, 40, 255},
+                {255, 110, 40, 255}},
+    .emissive = {140, 50, 20, 255},
+};
+
 struct AssetInfo {
   std::string_view name;
   std::string_view filename;
@@ -54,6 +74,20 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_WHITE_EMISSIVE},
+    {.name = "start_cube",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_START_MARKER},
+    {.name = "goal_cube",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_GOAL_MARKER},
     {.name = "bear",
      .filename = "assets/bear/bear_full.obj",
      .qw = 0.0f,
