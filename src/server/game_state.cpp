@@ -109,6 +109,12 @@ static void addPhysicsBodies(ServerGame& game) {
     if (!bodyInterface.IsAdded(bodyId)) {
       bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
     }
+    // Prime wasGrounded=true so the first grounded tick doesn't look like a landing
+    if (game.registry.all_of<shared::Grounded>(ent)) {
+        auto& g = game.registry.get<shared::Grounded>(ent);
+        g.wasGrounded = true;
+        g.isGrounded = true;
+    }
   }
 }
 
@@ -157,6 +163,7 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::Grounded>(entity);  
   JPH::BodyID bodyId = game.physics.createPlayerBody(
       modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
   game.registry.emplace<shared::PhysicsBody>(
@@ -204,6 +211,39 @@ void initWorldEntities(ServerGame& game) {
                                  .modelName = "bear",
                                  .scale = glm::vec3(0.5f),
                                  .collision = CollisionShape::Mesh},
+                // ADD YOUR SECTION SOUND MARKERS HERE FOR LEON AND PHILLIP
+                // Section 1 (Winter) — invisible marker entity at section center
+                // StaticEntityDesc{
+                //     .position = glm::vec3(50.0f, 0.0f, 0.0f),
+                //     .modelName = "cube",  // use any model, doesn't matter — could even be tiny/hidden
+                //     .scale = glm::vec3(0.01f),  // tiny so it's invisible
+                //     .soundLayers = {
+                //         shared::SoundLayer{
+                //             .soundId = static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
+                //             .trigger = shared::SoundTriggerType::PROXIMITY,
+                //             .playMode = shared::SoundPlayMode::AMBIENT,
+                //             .volume = 0.5f,
+                //             .proximityRange = 30.0f,
+                //             .fadeSpeed = 1.5f,
+                //         },
+                //     }
+                // },
+                // // Section 2 (Fall)
+                // StaticEntityDesc{
+                //     .position = glm::vec3(-50.0f, 0.0f, 0.0f),
+                //     .modelName = "cube",
+                //     .scale = glm::vec3(0.01f),
+                //     .soundLayers = {
+                //         shared::SoundLayer{
+                //             .soundId = static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
+                //             .trigger = shared::SoundTriggerType::PROXIMITY,
+                //             .playMode = shared::SoundPlayMode::AMBIENT,
+                //             .volume = 0.5f,
+                //             .proximityRange = 30.0f,
+                //             .fadeSpeed = 1.5f,
+                //         },
+                //     }
+                // },
             });
 
   // --- Maze ---
@@ -295,6 +335,10 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
+  shared::StateChangePacket pkt;
+  pkt.state = shared::GameStateType::OVERWORLD;
+  net::broadcastPacket(game.network->getHost(), pkt);
+    
   addPhysicsBodies<shared::OverworldTag>(game);
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
@@ -328,6 +372,15 @@ void OverworldState::update(ServerGame& game, float dt) {
       game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
       return;
     }
+
+    // Hijack KEY_CYCLE_SCENE for testing, e.g. cycling scenes different sounds
+    if (input.keys_newly_pressed & KEY_CYCLE_SCENE) {
+        shared::SoundEventPacket pkt;
+        pkt.soundId = static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED);
+        pkt.volume = 1.0f;
+        pkt.positional = false;
+        net::broadcastPacket(game.network->getHost(), pkt);
+    }
   }
 
   movement_system(game, dt, StateType::OVERWORLD);
@@ -342,6 +395,10 @@ void OverworldState::update(ServerGame& game, float dt) {
 // ── MazeState ────────────────────────────────────────────
 
 void MazeState::onEnter(ServerGame& game) {
+  shared::StateChangePacket pkt;
+  pkt.state = shared::GameStateType::MAZE;
+  net::broadcastPacket(game.network->getHost(), pkt);
+
   addPhysicsBodies<shared::MazeTag>(game);
   enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
 }
