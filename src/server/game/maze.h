@@ -46,8 +46,8 @@ uint32_t GetWinterPuzzleNumericId(ServerGame& game);
 // facing (same as computeCamera).
 void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId);
 
-// Per-tick: shared spirit uses Jolt velocity from UP; direction = that client's
-// join-slot facing (FPV). G = collect fragment.
+// Per-tick: four maze avatars push the visible green maze piece with arrow
+// keys. G = collect fragment.
 void TickMazeExploration(ServerGame& game, float dt = 1.0f / 60.0f);
 
 // Teleport spirit to maze origin; call when entering maze state.

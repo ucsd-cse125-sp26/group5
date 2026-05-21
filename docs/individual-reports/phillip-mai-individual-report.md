@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 7
+1. What were your concrete goals for the week?  
+I wanted to finish up the color restoration logic and was given the subsequent task of hooking up the color restoration logic with the fragment pickup logic.
+2. What goals were you able to accomplish?  
+I was able to finish everything I wanted to do, actually just today I finished testing out the fragment pickup logic that I implemented. On the server side it is hooked up to the color restoration but I can't test that out yet since I don't think we have the front end client side done just yet. We will basically have 1 full puzzle end to end finished, and it should be easy to extrapolate this into the remaining puzzles since a lot of the logic is reuseable. 
+3. If the week went differently than you had planned, what were the reasons?  
+This week actually went decently despite the lab assignment. The lab assignment was still terrible as usual, but I was able to finish it and it didn't hinder my work in this class too much.
+4. What are your specific goals for the next week?  
+I would like to get the section barrier logic finished and move onto the 2nd and 3rd puzzles. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I think I just learned a little bit about how the key presses work. In general the work I've done in the past few weeks give me a lot of insight about how the whole game system works from logic to rendering models
+6. What is your individual morale (which might be different from the overall group morale)?  
+My morale is now impacted by the fact that it is week 8. Somehow I did not realize it was week 8 until week 8 actually came by and now I feel the weight of the rapidly approaching deadline. 
+
 ## Week 6
 1. What were your concrete goals for the week?  
 Originally the goal was to implement a 3d maze generator that could render out cubes on a 2d array making up a maze, but it changed to implementing the logic for restoring color in each of the sections and working out how the section doors would work. 
