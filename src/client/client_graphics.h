@@ -118,6 +118,11 @@ struct Graphics {
 
   int fbWidth = 0;
   int fbHeight = 0;
+  // Offscreen render resolution = fbWidth/Height / pixelationScale; the
+  // present pass upscales this with GL_NEAREST to the default framebuffer.
+  int renderWidth = 0;
+  int renderHeight = 0;
+  int lastPixelationScale = 1;
 
   bool fullscreen = false;
   int windowedX = 0;
