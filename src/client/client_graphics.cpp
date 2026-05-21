@@ -1085,6 +1085,7 @@ void Graphics::render(ClientGame& game) {
     glPolygonOffset(settings.dirShadowPolyFactor, settings.dirShadowPolyUnits);
     shadowDirShader->use();
     shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
+    shadowDirShader->setFloat("alphaCutoff", settings.shadowAlphaCutoff);
     renderEntities(*shadowDirShader, game, models, /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
@@ -1109,6 +1110,7 @@ void Graphics::render(ClientGame& game) {
                     settings.pointShadowPolyUnits);
     shadowPointShader->use();
     shadowPointShader->setFloat("pointFarPlane", settings.pointShadowFarPlane);
+    shadowPointShader->setFloat("alphaCutoff", settings.shadowAlphaCutoff);
     for (int i = 0; i < numLights; ++i) {
       int slot = lights[i].shadowIdx;
       if (slot < 0 || slot >= kMaxPointLights) continue;

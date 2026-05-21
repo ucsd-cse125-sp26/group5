@@ -44,15 +44,18 @@ struct GraphicsSettings {
   int dirShadowMapSize = 2048;
   int pointShadowMapSize = 1024;
   // Directional ortho frustum + depth range.
-  float dirShadowHalfExtent = 80.0f;
-  float dirShadowBackDistance = 120.0f;
-  float dirShadowFarPlane = 320.0f;
+  float dirShadowHalfExtent = 400.0f;
+  float dirShadowBackDistance = 600.0f;
+  float dirShadowFarPlane = 1600.0f;
   float dirShadowPolyFactor = 2.0f;
   float dirShadowPolyUnits = 4.0f;
   // Point shadow projection + bias.
   float pointShadowFarPlane = 50.0f;
   float pointShadowPolyFactor = 2.0f;
   float pointShadowPolyUnits = 4.0f;
+  // Diffuse alpha below this is discarded during shadow passes so cutout
+  // meshes (foliage, fences) cast matching-shape shadows. 0 = no cutout.
+  float shadowAlphaCutoff = 0.5f;
 
   // Shading
   ShadingMode shadingMode = ShadingMode::Phong;

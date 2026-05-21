@@ -141,16 +141,18 @@ void shadowsSection(GraphicsSettings& s) {
     s.pointShadowMapSize = pointSizes[pointIdx];
   }
 
-  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f, 200.0f);
+  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f,
+                     1000.0f);
   ImGui::SliderFloat("Dir back distance", &s.dirShadowBackDistance, 10.0f,
-                     400.0f);
-  ImGui::SliderFloat("Dir far plane", &s.dirShadowFarPlane, 50.0f, 1000.0f);
+                     1500.0f);
+  ImGui::SliderFloat("Dir far plane", &s.dirShadowFarPlane, 50.0f, 4000.0f);
   ImGui::SliderFloat("Dir bias factor", &s.dirShadowPolyFactor, 0.0f, 10.0f);
   ImGui::SliderFloat("Dir bias units", &s.dirShadowPolyUnits, 0.0f, 20.0f);
   ImGui::SliderFloat("Point far plane", &s.pointShadowFarPlane, 5.0f, 200.0f);
   ImGui::SliderFloat("Point bias factor", &s.pointShadowPolyFactor, 0.0f,
                      10.0f);
   ImGui::SliderFloat("Point bias units", &s.pointShadowPolyUnits, 0.0f, 20.0f);
+  ImGui::SliderFloat("Alpha cutoff", &s.shadowAlphaCutoff, 0.0f, 1.0f);
   ImGui::EndDisabled();
 }
 
