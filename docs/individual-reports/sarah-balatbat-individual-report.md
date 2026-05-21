@@ -4,7 +4,8 @@ title: Sarah Balatbat — Individual Report
 permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
-[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/week1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/week2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/week3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/week4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/week5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/week6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/week7' | relative_url}})
+
 
 <!-- Sarah's template 
 ## Week X
@@ -21,7 +22,73 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 ### Individual Morale
 -->
 
-## Week 6
+
+## [Week 7](#week7)
+### Goals
+
+- [x] Create reference sheets for existing concept art
+  - [x] Gurf
+  - [x] Goose
+  - [x] Mouse
+- [x] Continue modeling
+  - [x] Gurf
+- [ ] Create decryption puzzle symbols
+- [ ] Watch UV unwrapping and texturing tutorials
+
+### Achieved
+
+- Finalized sketches
+  - Mouse -- loosely based on a low poly mouse model reference from [week 5]({{ '/project-spec/sarah-balatbat-individual-report/week5' | relative_url}})
+    - More boxy head shape
+    - Hands at normal midline but body "hunched" back
+    - More realistic side profile
+    <img src="{{ '/assets/week7/sarah/mouse-sketch.jpg' | relative_url }}" alt="more realistic mouse design sketch">
+  - Goose
+    - Remastered last sketch with closer attention to details: almost circular head, egg-shaped body, "winglets" instead of hands
+    - Noted: chest feathers to be included in the texture, not on the mesh
+    <img src="{{ '/assets/week7/sarah/goose-sketch.jpg' | relative_url }}" alt="cleaned goose design sketch">
+
+
+- Reference sheets made
+  - Gurf -- based on rotund cat references from [week 5]({{ '/project-spec/sarah-balatbat-individual-report/week5' | relative_url}})
+    <img src="{{ '/assets/week7/sarah/gurf-ref.png' | relative_url }}" alt="gurf model reference sheet">
+  - Mouse
+    <img src="{{ '/assets/week7/sarah/mouse-ref.png' | relative_url }}" alt="mouse model reference sheet">
+  - Goose
+    <img src="{{ '/assets/week7/sarah/goose-a-ref.png' | relative_url }}" alt="goose version A model reference sheet">
+  
+- Finished modeling Gurf
+  - Rotund version A -- based on more realistic fat cat shape, didn't end up liking the front view
+  <img src="{{ '/assets/week7/sarah/gurf-orange-front.png' | relative_url }}" alt="rotund gurf model front view">
+  <img src="{{ '/assets/week7/sarah/gurf-orange-side.png' | relative_url }}" alt="rotund gurf model side view">
+  - Chonky version B -- based on the original design
+  <img src="{{ '/assets/week7/sarah/gurf-fatter-front.png' | relative_url }}" alt="original chonky gurf model front view">
+  <img src="{{ '/assets/week7/sarah/gurf-fatter-side.png' | relative_url }}" alt="original chonky gurf model side view">
+
+
+### Progress Evaluation
+
+I now have two out of four models done. I did nearly all of this in the past night, and I am happy to have made Gurf's model. It's technically not done since it's not textured yet, but something playable matters first before aesthetics. I wish I could've done better with spacing this out this past week but alas, another rush done the night before the team meeting.
+
+### Upcoming Goals
+
+- [ ] Continue modeling
+  - [ ] Mouse
+  - [ ] Goose
+- [ ] Create decryption puzzle symbols
+- [ ] Watch UV unwrapping and texturing tutorials
+
+### Lessons Learned
+
+- I really don't need to be pixel perfect with my reference sheets, the point is they're for reference and I don't even always follow them all the way through for the model
+- It is never a good idea to do a week's worth of work in a night
+- If something takes more than 30mins to accomplish or see significant progress on, I need to take a break and rethink whatever that was I was doing (I tried to make the turntable thing work again and that probably took an hour with no results)
+
+### Individual Morale
+
+Happy for Gurf being a model now, I look forward to texturing him. I'm really, really tired. I have been working at this since roughly 8:30pm and it is now 6:51am (granted there were some other things I was doing as well, but this was still a significant amount of time of work). I am once again procrastinating on CSE 123, and I have accepted I cannot win all CSE classes if I want to have fun. CSE 123 will just have to take the hit, since this project is what I care about. I'm also working on another game, so my attention can get split sometimes.
+
+## [Week 6](#week6)
 ### Goals
 
 - [x] Create rig for base model
@@ -88,7 +155,7 @@ I think this was the greatest amount of progress I've done at a given week. It s
 
 I feel like every single week I am constantly behind. I still look forward to making Gurf very soon, but I also get intimidated by all the things I don't know how to do yet. Though, it's not like I haven't learned a lot in the process of this project. Blender is a lot to learn, and I think I am going at an alright pace if not for the fact we have about 3 weeks left til the demo. I also had to get an emergency root canal, so I've been having to deal with pain (physically, financially, and emotionally) this past week. With that going on, I guess my progress was not bad. I just wish I am not having to deal with it. But uhh, I guess I'm proud of that little turnaround gif even though it took much longer than it should've. Everything is a learning opportunity, I guess.
 
-## Week 5
+## [Week 5](#week5)
 ### Goals
 
 - [ ] Create reference sheets for existing concept art
@@ -149,7 +216,7 @@ Didn't really get to work on things until the night before report deadline, whic
 
 CSE 123 midterm was a beast to study for, and thankfully light itself. I feel like I would've been doing so much more per week if not for this class I need for my requirements. I still feel like I'm behind relative to the rest of the team, but I'm trying to remind myself this is more of a proof of concept than a polished end product. I still would like to get as far as I can, at the very least with my beloved Gurf. Idk, I'm on roughly 8 hours sleep in the past 48 or so hours. I also forgot we needed server maintenance tonight :D
 
-## Week 4
+## [Week 4](#week4)
 ### Goals
 
 - [x] Create concept art for other MVPs
@@ -210,7 +277,7 @@ Designed in little pockets of time I had. Got sick so I can't really be mad at m
 
 Being sick sucked. CSE 123 continues to be a heavy stressor, especially with midterm season being up on us. I still feel discouraged that I'm not making as much things in the time that I have as other teammates, but I think I just gotta buckle up and do it.
 
-## Week 3
+## [Week 3](#week3)
 ### Goals
 
 - [ ] Continue tutorial for rigging lesson
@@ -265,7 +332,7 @@ Progress went slower than I hoped due to other coursework (again). Also experien
 
 Still holding onto the motivation of being able to play my character. Got sick so that's frustrating, can't really avoid that when it's transmitted within the household. Other courses also stressing me out (like CSE 123) and getting in the way of development. I get worried I won't be able to do enough with the time and energy that I have. I feel like I'm lagging behind compared to everyone else on the team. Hopefully changes next week.
 
-## Week 2
+## [Week 2](#week2)
 ### Goals
 
 - [x] Solidify game design details
@@ -323,7 +390,7 @@ I'm mainly motivated by getting to play a character I designed in a story I help
 
 I'm somewhat excited to see what we'll end up with. I prefer to err towards less and simpler things to implement because I worry we'll go too far out of scope, but the tech team having things running and the fun we might be able to have gives me some hope.
 
-## Week 1
+## [Week 1](#week1)
 ### What we did
 
 Brainstormed core mechanics with the team and narrowed down to three game concepts. Maintained focus on keeping scope manageable given the 10-week timeline. Initial project setup on github. 
