@@ -11,6 +11,7 @@
 #include "shared/components.h"
 
 enum class CollisionShape {
+  None,  // visual-only marker
   Box,   // post-orientation AABB; cheap, works for procedural assets
   Mesh,  // triangle mesh; mesh-backed assets only
 };
@@ -37,6 +38,8 @@ void spawnStaticEntities(ServerGame& game,
       game.registry.template emplace<shared::RenderInfo>(
           entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
     }
+
+    if (d.collision == CollisionShape::None) continue;
 
     JPH::ShapeRefC shape;
     if (d.collision == CollisionShape::Mesh) {
