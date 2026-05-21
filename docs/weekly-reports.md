@@ -59,10 +59,12 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 - Coming week: finish up the full landscape, wrap up asset work, and collaborate more closely with the game logic team for full game integration.
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
   <img src="{{ '/assets/week7/rebecca/1.jpg' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week7/rebecca/2.jpg' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week7/rebecca/3.jpg' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week7/rebecca/4.jpg' | relative_url }}" alt="Note">
+ 
 </div>
 
 
