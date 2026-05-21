@@ -161,6 +161,17 @@ void antialiasingSection(GraphicsSettings& s) {
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
 }
 
+void colorRestorationSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Color Restoration")) return;
+  ImGui::Checkbox("Enabled", &s.colorRestorationEnabled);
+  ImGui::BeginDisabled(!s.colorRestorationEnabled);
+  ImGui::SliderFloat("Outside strength", &s.colorRestorationStrength, 0.0f,
+                     1.0f);
+  ImGui::SliderFloat("Edge width (world)", &s.colorRestorationEdgeWidth, 0.0f,
+                     20.0f);
+  ImGui::EndDisabled();
+}
+
 void pixelationSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Pixelation")) return;
   // 1 = native; >=2 renders the 3D scene at fb/N and upscales with NEAREST.
@@ -213,6 +224,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   shadowsSection(s);
   antialiasingSection(s);
   pixelationSection(s);
+  colorRestorationSection(s);
 
   ImGui::Separator();
   if (ImGui::Button("Reset to Default")) {

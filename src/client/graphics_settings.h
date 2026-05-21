@@ -42,6 +42,15 @@ struct GraphicsSettings {
   // GL_NEAREST in the present pass for a chunky-pixel look. 1 = off.
   int pixelationScale = 1;
 
+  // Color restoration: desaturate fragments outside the local player's
+  // shared::ColorBoundingBox in the tonemap pass. The server grows the box
+  // as sections are completed, so "restored color" tracks game progress.
+  bool colorRestorationEnabled = false;
+  // 0 = no effect, 1 = full grayscale outside the box.
+  float colorRestorationStrength = 1.0f;
+  // Soft edge in world units to avoid a hard color/gray boundary.
+  float colorRestorationEdgeWidth = 1.0f;
+
   // Shadows
   bool shadowsEnabled = true;
   // Map sizes — changing triggers FBO/texture reallocation.

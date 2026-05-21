@@ -1383,10 +1383,38 @@ void Graphics::render(ClientGame& game) {
       glActiveTexture(GL_TEXTURE1);
       glBindTexture(GL_TEXTURE_2D, finalBloomColor);
       tonemapShader->setInt("bloomColor", 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, gPosition);
+      tonemapShader->setInt("gPosition", 2);
       tonemapShader->setFloat("exposure", settings.exposure);
       tonemapShader->setFloat(
           "bloomStrength",
           settings.bloomEnabled ? settings.bloomStrength : 0.0f);
+
+      // Color restoration: pull the box from the local player's replicated
+      // ColorBoundingBox. Strength=0 short-circuits the shader's effect path.
+      float restorationStrength = 0.0f;
+      glm::vec3 restoreMin(0.0f);
+      glm::vec3 restoreMax(0.0f);
+      if (settings.colorRestorationEnabled) {
+        auto selfIt = game.renderEntityMap.find(game.renderEntityId);
+        if (selfIt != game.renderEntityMap.end() &&
+            game.renderRegistry.valid(selfIt->second) &&
+            game.renderRegistry.all_of<shared::ColorBoundingBox>(
+                selfIt->second)) {
+          const auto& b = game.renderRegistry.get<shared::ColorBoundingBox>(
+              selfIt->second);
+          restoreMin = glm::vec3(b.minX, b.minY, b.minZ);
+          restoreMax = glm::vec3(b.maxX, b.maxY, b.maxZ);
+          restorationStrength = settings.colorRestorationStrength;
+        }
+      }
+      tonemapShader->setFloat("colorRestorationStrength", restorationStrength);
+      tonemapShader->setFloat("colorRestorationEdgeWidth",
+                              settings.colorRestorationEdgeWidth);
+      tonemapShader->setVec3("colorRestorationMin", restoreMin);
+      tonemapShader->setVec3("colorRestorationMax", restoreMax);
+
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
