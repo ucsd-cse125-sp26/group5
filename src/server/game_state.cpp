@@ -264,14 +264,14 @@ void initWorldEntities(ServerGame& game) {
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     // Match the overworld anchor shift above: spawn ~50 up and ~25 east.
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, "cube",
+        game, overworldEntity, "playerbase",
         glm::vec3(startX + 25.0f, 0.0f, 50.0f), glm::vec3(1.0f));
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
-    spawnPlayerAvatar<shared::MazeTag>(game, mazeEntity, "bear",
+    spawnPlayerAvatar<shared::MazeTag>(game, mazeEntity, "dog",
                                        glm::vec3(startX, 0.0f, 0.0f),
-                                       glm::vec3(0.5f));
+                                       glm::vec3(1.0f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);

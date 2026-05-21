@@ -4,11 +4,13 @@
 #include <stb_image.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -491,6 +493,38 @@ Model* loadModel(const std::string& filename) {
     std::fprintf(stderr,
                  "loadModel: '%s' has %d bones; shader caps at MAX_BONES=%d\n",
                  filename.c_str(), model->boneCount, MAX_BONES);
+  }
+  // Cache the neck bone name for later "look pitch" overrides. Prefer any
+  // bone whose name contains "neck"; fall back to "head" so models without
+  // a separate neck joint still get *some* head-tilt response.
+  auto containsCI = [](const std::string& name, std::string_view needle) {
+    for (size_t i = 0; i + needle.size() <= name.size(); ++i) {
+      bool match = true;
+      for (size_t j = 0; j < needle.size(); ++j) {
+        char a = static_cast<char>(std::tolower(name[i + j]));
+        char b = static_cast<char>(std::tolower(needle[j]));
+        if (a != b) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return true;
+    }
+    return false;
+  };
+  for (const auto& [name, info] : model->boneInfoMap) {
+    if (containsCI(name, "neck")) {
+      model->neckBoneName = name;
+      break;
+    }
+  }
+  if (model->neckBoneName.empty()) {
+    for (const auto& [name, info] : model->boneInfoMap) {
+      if (containsCI(name, "head")) {
+        model->neckBoneName = name;
+        break;
+      }
+    }
   }
   return model;
 }

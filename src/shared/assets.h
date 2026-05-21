@@ -70,6 +70,22 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = nullptr},
+    // Player avatars — Y-up→Z-up + 180° yaw composed: q = X90 * Y180 so the
+    // model faces the same direction as the player entity.
+    {.name = "playerbase",
+     .filename = "assets/playerbase/base-1.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
+    {.name = "dog",
+     .filename = "assets/dog/dog-rigged-orange-backup.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
 };
 
 inline constexpr std::size_t ASSET_COUNT = sizeof(ASSETS) / sizeof(ASSETS[0]);
