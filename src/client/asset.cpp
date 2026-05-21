@@ -3,6 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
@@ -33,6 +34,7 @@ static inline glm::mat4 mat4_cast(const aiMatrix4x4& m) {
 
 MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
                           const aiScene* scene);
+static GLuint defaultFlatNormalTexture();
 
 static Mesh buildMesh(std::vector<Vertex> vertices,
                       const std::vector<GLuint>& indices,
@@ -64,6 +66,12 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glEnableVertexAttribArray(3);
   glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, smoothedNormal));
+  glEnableVertexAttribArray(4);
+  glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, tangent));
+  glEnableVertexAttribArray(5);
+  glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, bitangent));
   glBindVertexArray(0);
 
   Mesh m;
@@ -74,6 +82,15 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   m.ebo = ebo;
   m.index_count = static_cast<GLuint>(indices.size());
   return m;
+}
+
+// Pick any unit vector perpendicular to N. Used when Assimp didn't generate
+// tangents (e.g. mesh has no UVs); the value is arbitrary because the
+// fallback flat normal map keeps TBN * (0,0,1) == N regardless of T/B.
+static inline glm::vec3 anyPerpendicular(const glm::vec3& n) {
+  glm::vec3 a = std::abs(n.x) < 0.9f ? glm::vec3(1.0f, 0.0f, 0.0f)
+                                     : glm::vec3(0.0f, 1.0f, 0.0f);
+  return glm::normalize(glm::cross(n, a));
 }
 
 static Mesh uploadMeshFromAi(const aiMesh* mesh) {
@@ -88,6 +105,13 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh) {
     vertex.texture_coordinates = mesh->mTextureCoords[0]
                                      ? vec2_cast(mesh->mTextureCoords[0][j])
                                      : glm::vec2(0.0f);
+    if (mesh->mTangents && mesh->mBitangents) {
+      vertex.tangent = vec3_cast(mesh->mTangents[j]);
+      vertex.bitangent = vec3_cast(mesh->mBitangents[j]);
+    } else {
+      vertex.tangent = anyPerpendicular(vertex.normal);
+      vertex.bitangent = glm::cross(vertex.normal, vertex.tangent);
+    }
     vertices.push_back(vertex);
   }
 
@@ -113,6 +137,17 @@ static std::vector<Material> buildMaterials(const aiScene* scene) {
     result.diffuse = loadMaterial(aimat, aiTextureType_DIFFUSE, scene);
     result.specular = loadMaterial(aimat, aiTextureType_SPECULAR, scene);
     result.emissive = loadMaterial(aimat, aiTextureType_EMISSIVE, scene);
+    // .obj exports normals under aiTextureType_HEIGHT; everything else uses
+    // _NORMALS. Fall through to the shared flat default when neither exists
+    // so the fragment shader can sample unconditionally.
+    if (aimat->GetTextureCount(aiTextureType_NORMALS) > 0) {
+      result.normal = loadMaterial(aimat, aiTextureType_NORMALS, scene);
+    } else if (aimat->GetTextureCount(aiTextureType_HEIGHT) > 0) {
+      result.normal = loadMaterial(aimat, aiTextureType_HEIGHT, scene);
+    } else {
+      result.normal = MaterialSlot{.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                                   .texture = defaultFlatNormalTexture()};
+    }
     // glTF reports shininess=0 (it uses roughness, not Phong). Treat 0 as
     // "absent" so pow(_, 0)=1 doesn't pin specular at max and blow out the
     // surface to white.
@@ -233,7 +268,8 @@ Model* loadModel(const std::string& filename) {
   // assimp call links on Windows.
   const std::string fullPath = (exeDir() / filename).string();
   shared::ParsedModel parsed;
-  if (!parsed.load(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs)) {
+  if (!parsed.load(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs |
+                                 aiProcess_CalcTangentSpace)) {
     std::cout << "ERROR::ASSIMP::" << parsed.lastError() << '\n';
     return nullptr;
   }
@@ -254,6 +290,23 @@ Model* loadModel(const std::string& filename) {
   });
 
   return model;
+}
+
+// 1x1 linear texture that decodes to tangent-space (0,0,1) — the identity
+// normal. Materials without a normal map bind this so TBN * sample == N and
+// nothing branches in the fragment shader.
+static GLuint defaultFlatNormalTexture() {
+  static GLuint id = 0;
+  if (id != 0) return id;
+  const uint8_t pixel[4] = {128, 128, 255, 255};
+  glGenTextures(1, &id);
+  glBindTexture(GL_TEXTURE_2D, id);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               pixel);
+  GPU_MEM_TEX2D("ModelTextures", GL_RGBA8, 1, 1);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  return id;
 }
 
 static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
@@ -318,11 +371,17 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
     auto base = static_cast<GLuint>(vertices.size());
     float u = (f + 0.5f) / 6.0f;
     glm::vec2 uv(u, 0.5f);
+    // Arbitrary perpendicular pair — cubes bind the flat-default normal map,
+    // so TBN * (0,0,1) == N regardless of which T/B we pick.
+    const glm::vec3 t = anyPerpendicular(faces[f].normal);
+    const glm::vec3 b = glm::cross(faces[f].normal, t);
     for (auto corner : faces[f].corners) {
       vertices.push_back({.position = corner,
                           .normal = faces[f].normal,
                           .texture_coordinates = uv,
-                          .smoothedNormal = glm::normalize(corner)});
+                          .smoothedNormal = glm::normalize(corner),
+                          .tangent = t,
+                          .bitangent = b});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -355,6 +414,8 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
       .constant = glm::vec3(1.0f),
       .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
                                   spec.emissive[2], spec.emissive[3])};
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -471,12 +532,16 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
       uv[2] = {(47.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
       uv[3] = {(47.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
     }
+    const glm::vec3 t = anyPerpendicular(faces[f].normal);
+    const glm::vec3 b = glm::cross(faces[f].normal, t);
     for (int i = 0; i < 4; i++) {
       vertices.push_back(
           {.position = faces[f].corners[i],
            .normal = faces[f].normal,
            .texture_coordinates = uv[i],
-           .smoothedNormal = glm::normalize(faces[f].corners[i])});
+           .smoothedNormal = glm::normalize(faces[f].corners[i]),
+           .tangent = t,
+           .bitangent = b});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -513,6 +578,12 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   glEnableVertexAttribArray(3);
   glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, smoothedNormal));
+  glEnableVertexAttribArray(4);
+  glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, tangent));
+  glEnableVertexAttribArray(5);
+  glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, bitangent));
 
   glBindVertexArray(0);
 
@@ -535,6 +606,8 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
       .constant = glm::vec3(1.0f),
       .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
                                   spec.emissive[2], spec.emissive[3])};
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
@@ -568,6 +641,10 @@ void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
   glActiveTexture(GL_TEXTURE3);
   glBindTexture(GL_TEXTURE_2D, material.emissive.texture);
   shader.setInt("material.emissive", 3);
+
+  glActiveTexture(GL_TEXTURE4);
+  glBindTexture(GL_TEXTURE_2D, material.normal.texture);
+  shader.setInt("material.normal", 4);
 
   shader.setFloat("material.shininess", material.shininess);
 
