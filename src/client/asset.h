@@ -18,6 +18,8 @@ struct Vertex {
   // cube factories so corner vertices share one direction and the expanded
   // hull stays gap-free at large thicknesses.
   glm::vec3 smoothedNormal;
+  glm::vec3 tangent;
+  glm::vec3 bitangent;
 };
 
 struct MaterialSlot {
@@ -30,6 +32,7 @@ struct Material {
   MaterialSlot diffuse;
   MaterialSlot specular;
   MaterialSlot emissive;
+  MaterialSlot normal;
   float shininess = 32.0f;
 };
 

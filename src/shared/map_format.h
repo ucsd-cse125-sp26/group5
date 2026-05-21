@@ -10,6 +10,7 @@ inline constexpr const char* MAP_MODEL_PREFIX = "map:";
 // Client and server must agree — divergent flags produce divergent vertex
 // ordering and break any cross-process mesh-identity comparison.
 inline constexpr unsigned int MAP_LOAD_FLAGS =
-    aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_FlipUVs;
+    aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
+    aiProcess_FlipUVs | aiProcess_CalcTangentSpace;
 
 }  // namespace shared

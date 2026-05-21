@@ -1,6 +1,7 @@
 #version 410 core
 in vec3 worldPos;
 in vec3 worldNormal;
+in vec3 worldTangent;
 in vec2 vTexCoords;
 
 // gPosition: .rgb world pos, .a=1 sentinel ("real geometry, not sky").
@@ -17,6 +18,7 @@ struct Material {
   sampler2D diffuse;
   sampler2D specular;
   sampler2D emissive;
+  sampler2D normal;
   float shininess;
 };
 uniform Material material;
@@ -43,8 +45,19 @@ vec3 quantizeRGB(vec3 c) {
 void main() {
   vec4 diffuse = texture(material.diffuse, vTexCoords);
   if (diffuse.a < 0.5) discard;
+
+  // Gram-Schmidt re-orthogonalize T against N to absorb interpolation drift,
+  // then derive B by cross to fix handedness regardless of attribute sign.
+  vec3 N = normalize(worldNormal);
+  vec3 T = normalize(worldTangent - dot(worldTangent, N) * N);
+  vec3 B = cross(N, T);
+  mat3 TBN = mat3(T, B, N);
+
+  vec3 tn = texture(material.normal, vTexCoords).rgb * 2.0 - 1.0;
+  vec3 norm = normalize(TBN * tn);
+
   gPosition = vec4(worldPos, 1.0);
-  gNormal = vec4(normalize(worldNormal), material.shininess);
+  gNormal = vec4(norm, material.shininess);
   gAlbedo = vec4(quantizeRGB(diffuse.rgb), 1.0);
   gSpecular = vec4(quantizeRGB(texture(material.specular, vTexCoords).rgb), 1.0);
   gEmissive = vec4(quantizeRGB(texture(material.emissive, vTexCoords).rgb), 1.0);
