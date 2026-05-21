@@ -119,7 +119,7 @@ The barrier branch was handed off to Leon and Phillip for integration with the f
 
 #### Progress Evaluation
 
-The audio system went from nothing to a usable runtime over these three weeks. Most of the debugging time ended up going into SoLoud setup issues (init arguments, attenuation ranges, listener configuration) rather than gameplay-side logic.
+The audio system went from nothing to a usable runtime over 1.5ish weeks. Also met the goals since week 4. Most of the debugging time ended up going into SoLoud setup issues (init arguments, attenuation ranges, listener configuration) rather than gameplay-side logic.
 
 The footstep and landing systems also took some iteration to get grounded detection behaving consistently. A larger movement refactor using `CharacterVirtual` was scoped out but deferred for now, so the current grounded detection still uses a raycast-based approach.
 
