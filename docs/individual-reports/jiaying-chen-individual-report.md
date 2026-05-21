@@ -5,6 +5,31 @@ permalink: /project-spec/jiaying-chen-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 7 
+1. What were your concrete goals for the week?
+I wanted to figure out how scattering work, also potentially work on putting actual objects onto the map. 
+2. What goals were you able to accomplish?
+I was able to: 
+- Figured out how scattering works; 
+- Talked with game logic people about how maps can get integrated; 
+- Finished skybox integration for some reason 
+- Started working on putting things on the rest of the map 
+
+3. If the week went differently than you had planned, what were the reasons? 
+- I wasn't able ot finishe what I really wanted to do, to finish the entire putting things on landscape action. That is because i got caught up on a lot of things. I might just have to rely on caffiene for the next few days... 
+
+4. What are your specific goals for the next week?
+This timne? Really get things onto the model. I have already started it so that should be fine. 
+Finish a lil standing board for the game logic people so they can use it. Any game object that's needed for me to 3D model. 
+
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Unfortunately unable to work more on the project the past week. But I will make more effort. 
+
+6. What is your individual morale (which might be different from the overall group morale)?
+Tired. But that's because I wrote this at 12 am. 
+
+---
+
 ## Week 6
 1. What were your concrete goals for the week?
 I had a forward plan of trying to put as much assets onto the map as possible; I was able to do a portion of it, but what got in my way was the way randomizing object is set up. it is quite painful in some way. 
