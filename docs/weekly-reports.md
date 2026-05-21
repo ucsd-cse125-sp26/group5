@@ -48,14 +48,17 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
+
 ## Week 7 Group Report
 
 ## Modeling
+
 **Rebecca**
+
 - Worked with Jacob to resolve two issues:
   - Scatter logic: decided duplicate meshes are acceptable without grouping.
   - Toon shading, landscape baking, and lighting.
-- Finished all 4 skyboxes and gave to jacob to use. 
+- Finished all 4 skyboxes and gave to jacob to use.
 - Coming week: finish up the full landscape, wrap up asset work, and collaborate more closely with the game logic team for full game integration.
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -64,40 +67,57 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
   <img src="{{ '/assets/week7/rebecca/2.jpg' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week7/rebecca/3.jpg' | relative_url }}" alt="Note">
   <img src="{{ '/assets/week7/rebecca/4.jpg' | relative_url }}" alt="Note">
- 
+
 </div>
 
-
 **Sarah**
+
 - Attempting to model Gurf, but no progress yet due to CSE 123 workload.
 - Board model still needs to be completed.
 
 ## Rendering
+
 **Jacob**
+
 - Baked the food assets; also fixed baking for the cookie.
 - Variety of rendering changes completed and in progress:
   - Not yet started: normal maps, texture toon shading.
   - In progress: animation and player model integration (potentially with head movement). Toon shading deferred.
 - Implemented code to shift the time of day and light source based on the player's position on the map.
 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
+  <img src="{{ '/assets/week7/j/a.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/j/b.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/j/c.jpg' | relative_url }}" alt="Note">
+
+</div>
+
 ## Network
+
 **Tim**
+
 - Before the meeting: finished and merged all major outstanding PRs.
 - Currently working on the screen overlay system; PR not yet opened but targeting this Wednesday and Thursday.
 
 ## Game Logic: Minigames / Puzzles
+
 **Leon**
+
 - All 4 players can now control the maze and complete it; upon completion the maze exits correctly.
 - Fragment entity renders as a cube placeholder for now.
 - Maze trigger region PR is in — players can activate it.
 - Next step: integrate fragments into the maze. Needs a blocker for the next region to be set up (likely Philip's task).
 
 **Philip**
+
 - Started fragment logic: when a fragment spawns, one of the 4 players must pick it up, completing that section and triggering color restoration.
 - Linking fragment completion to maze completion is the remaining piece; after that the barrier work passes to Alain.
 
 ## Physics / Audio
+
 **Alain**
+
 - Sound system finished; needs refactoring and cleanup to make loading `.np4` files easier. Still needs to source actual audio assets.
 - Barrier system implemented: a server-side entity that can be toggled on and off via debug mode. Just needs placement coordinates. Will coordinate with Philip this week.
 - Will also work with Rebecca to get the fence models in place as visual barriers.
