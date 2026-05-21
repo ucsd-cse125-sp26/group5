@@ -38,6 +38,12 @@ struct DirLight {
 };
 uniform DirLight dirLight;
 
+// Cross-mode outlines, same as in fragment_lighting_deferred.glsl.
+uniform int outlineCross;
+uniform vec3 outlineColor;
+uniform float outlineDepthThreshold;
+uniform float outlineNormalThreshold;
+
 struct PointLight {
   vec3 position;
   float constant;
@@ -123,6 +129,32 @@ float celSpecFactor(vec3 N, vec3 H, float shininess) {
                     celSpecularThreshold + eps, specRaw);
 }
 
+// Cross-shaped 4-tap probe on gNormal + gPosition. Returns 1 along
+// silhouettes, creases, and depth jumps; 0 on smooth surfaces.
+float OutlineStrength(vec3 worldPos, vec3 norm) {
+  vec2 texel = 1.0 / vec2(textureSize(gNormal, 0));
+  vec2 offsets[4] = vec2[](
+    vec2( texel.x, 0.0), vec2(-texel.x, 0.0),
+    vec2(0.0,  texel.y), vec2(0.0, -texel.y)
+  );
+  float refDepth = length(camera.viewPos - worldPos);
+  float normalDiff = 0.0;
+  float depthDiff = 0.0;
+  float skyHit = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    vec2 uv = vUV + offsets[i];
+    vec4 pN = texture(gPosition, uv);
+    if (pN.a == 0.0) { skyHit = 1.0; continue; }
+    vec3 nN = normalize(texture(gNormal, uv).rgb);
+    normalDiff = max(normalDiff, 1.0 - max(dot(norm, nN), 0.0));
+    depthDiff = max(depthDiff, abs(refDepth - length(camera.viewPos - pN.rgb)));
+  }
+  // Match Sobel's relative depth semantics: edge when Δd > threshold * d.
+  float normEdge = step(outlineNormalThreshold, normalDiff);
+  float depthEdge = step(outlineDepthThreshold * refDepth, depthDiff);
+  return clamp(max(max(normEdge, depthEdge), skyHit), 0.0, 1.0);
+}
+
 void main() {
   vec4 posSample = texture(gPosition, vUV);
   if (posSample.a == 0.0) discard;
@@ -171,6 +203,11 @@ void main() {
   }
 
   result += emissive;
+
+  if (outlineCross != 0) {
+    result = mix(result, outlineColor, OutlineStrength(worldPos, norm));
+  }
+
   FragColor = vec4(result, 1.0);
 
   float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));

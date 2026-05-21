@@ -11,9 +11,14 @@ enum class ShadingMode {
 
 enum class OutlineMode {
   None,
-  Hull,
+  // Post-process Sobel: 3x3 luma + gNormal/gPosition probe in its own pass.
+  // Most modular but reads the g-buffer one more time.
   Sobel,
-  Both,
+  // 4-tap normal+depth probe folded into the deferred lighting pass.
+  // Cheaper than Sobel and shares the gNormal/gPosition fetches already
+  // happening in lighting, at the cost of coupling outline detection to
+  // whichever lighting shader is active.
+  Cross,
 };
 
 struct GraphicsSettings {
@@ -75,6 +80,11 @@ struct GraphicsSettings {
   // 0 = no quantization, otherwise per-channel level count applied to the
   // material textures (albedo/specular/emissive) at G-buffer time.
   int textureQuantizeLevels = 0;
+  // 0 = off, otherwise the size of a k-means palette built once from sampled
+  // diffuse-texture pixels. When > 0, the G-buffer pass snaps albedo to the
+  // nearest palette entry (linear-RGB nearest neighbour). Capped at
+  // shared::kMaxPaletteColors.
+  int paletteQuantizeColors = 0;
   // 0 = off, otherwise levels for HSV-V quantization of the final tonemapped
   // color in the present shader (after FXAA so band edges stay sharp).
   int postQuantizeLevels = 0;
@@ -86,14 +96,11 @@ struct GraphicsSettings {
   bool celUseRampTexture = false;
   std::string celRampPath = "";          // empty → procedural
 
-  // Outlines
+  // Outlines (post-process Sobel only)
   OutlineMode outlineMode = OutlineMode::None;
   glm::vec3 outlineColor{0.0f};
-  // Inverted hull
-  float outlineThickness = 0.02f;
-  bool outlineScreenSpace = true;
-  // Post-process Sobel — depth threshold is relative (Δd / d), normal
-  // threshold is sum of 4 neighbor (1 - dot(n, nNeighbor)).
+  // Depth threshold is relative (Δd / d), normal threshold is sum of 4
+  // neighbor (1 - dot(n, nNeighbor)).
   float outlineSobelWidth = 1.0f;
   float outlineDepthThreshold = 0.05f;
   float outlineNormalThreshold = 0.5f;

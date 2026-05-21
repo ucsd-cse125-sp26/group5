@@ -3,10 +3,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -21,6 +23,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
+#include "shared/shader_constants.h"
 #include "shared/util.h"
 
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
@@ -63,9 +66,6 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, texture_coordinates));
-  glEnableVertexAttribArray(3);
-  glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                        (void*)offsetof(Vertex, smoothedNormal));
   glEnableVertexAttribArray(4);
   glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, tangent));
@@ -101,7 +101,6 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh) {
     vertex.position = vec3_cast(mesh->mVertices[j]);
     vertex.normal = mesh->mNormals ? vec3_cast(mesh->mNormals[j])
                                    : glm::vec3(0.0f, 0.0f, 1.0f);
-    vertex.smoothedNormal = vertex.normal;
     vertex.texture_coordinates = mesh->mTextureCoords[0]
                                      ? vec2_cast(mesh->mTextureCoords[0][j])
                                      : glm::vec2(0.0f);
@@ -159,6 +158,132 @@ static std::vector<Material> buildMaterials(const aiScene* scene) {
     out.push_back(result);
   }
   return out;
+}
+
+// Cheap sRGB->linear approximation. Exact piecewise formula isn't worth the
+// branch — palette cluster centers don't need perceptual precision.
+static inline float srgbToLinear(float c) {
+  return c <= 0.04045f ? c / 12.92f
+                       : std::pow((c + 0.055f) / 1.055f, 2.4f);
+}
+
+// Top-down RGBA8 pixel grid kept on the CPU just long enough for a model
+// load to walk its triangles and collect area-weighted samples. Released
+// once the corresponding loadModel / loadMapModels call returns.
+struct CpuDiffuse {
+  std::vector<uint8_t> rgba;   // w*h*4 bytes in source channel order
+  int w = 0;
+  int h = 0;
+  bool isBGRA = false;
+  glm::vec3 constant{1.0f};    // used when hasTexture is false
+  bool hasTexture = false;
+};
+
+// Decode the material's first diffuse texture into a CpuDiffuse. Mirrors
+// loadMaterial's decode paths (embedded/compressed/disk) but writes to a
+// CPU buffer instead of uploading. Falls back to AI_MATKEY_COLOR_DIFFUSE
+// (or white) when the material has no diffuse texture.
+static CpuDiffuse decodeDiffuse(const aiMaterial* mat, const aiScene* scene) {
+  CpuDiffuse out;
+  if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+    aiString path;
+    mat->GetTexture(aiTextureType_DIFFUSE, 0, &path);
+    int channels = 0;
+    uint8_t* pixels = nullptr;
+    bool ownedByStb = false;
+    if (auto embedded = scene->GetEmbeddedTexture(path.C_Str())) {
+      if (embedded->mHeight == 0) {
+        pixels =
+            stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData),
+                                  embedded->mWidth, &out.w, &out.h, &channels,
+                                  4);
+        ownedByStb = pixels != nullptr;
+      } else {
+        out.w = embedded->mWidth;
+        out.h = embedded->mHeight;
+        out.isBGRA = true;
+        pixels = reinterpret_cast<uint8_t*>(embedded->pcData);
+      }
+    } else {
+      std::filesystem::path full = exeDir() / path.C_Str();
+      pixels =
+          stbi_load(full.string().c_str(), &out.w, &out.h, &channels, 4);
+      ownedByStb = pixels != nullptr;
+    }
+    if (pixels && out.w > 0 && out.h > 0) {
+      out.rgba.assign(pixels, pixels + static_cast<size_t>(out.w) * out.h * 4);
+      out.hasTexture = true;
+    }
+    if (ownedByStb) stbi_image_free(pixels);
+    return out;
+  }
+  aiColor4D color(1.0f, 1.0f, 1.0f, 1.0f);
+  mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+  out.constant = glm::vec3(srgbToLinear(color.r), srgbToLinear(color.g),
+                           srgbToLinear(color.b));
+  return out;
+}
+
+// Wrapped nearest-pixel sample. Matches the GPU path: aiProcess_FlipUVs is
+// on, so the mesh's UVs already use the OpenGL convention where (0,0) is
+// the bottom-left of the storage; index pixel rows top-down with `pyTex =
+// (1 - frac(v)) * h` to mirror that.
+static bool sampleDiffuseAt(const CpuDiffuse& d, glm::vec2 uv,
+                            glm::vec3& outColor) {
+  if (!d.hasTexture) {
+    outColor = d.constant;
+    return true;
+  }
+  if (d.w <= 0 || d.h <= 0 || d.rgba.empty()) return false;
+  float fu = uv.x - std::floor(uv.x);
+  float fv = uv.y - std::floor(uv.y);
+  int px = std::min(d.w - 1, std::max(0, static_cast<int>(fu * d.w)));
+  int py = std::min(d.h - 1, std::max(0, static_cast<int>(fv * d.h)));
+  size_t idx = (static_cast<size_t>(py) * d.w + px) * 4;
+  const uint8_t* p = d.rgba.data() + idx;
+  if (p[3] < 8) return false;  // alpha cutout — skip transparent texels
+  outColor = glm::vec3(srgbToLinear(p[d.isBGRA ? 2 : 0] / 255.0f),
+                       srgbToLinear(p[1] / 255.0f),
+                       srgbToLinear(p[d.isBGRA ? 0 : 2] / 255.0f));
+  return true;
+}
+
+// Walk every triangle in `mesh`, sample its diffuse at four UVs (centroid +
+// three vertices), and push one DiffuseSample per opaque hit weighted by
+// area/4. Triangles without UVs use the material's constant color.
+static void collectMeshSamples(const aiMesh* mesh, const CpuDiffuse& diffuse,
+                               std::vector<DiffuseSample>& out) {
+  if (!mesh || mesh->mNumFaces == 0) return;
+  const bool hasUV = mesh->mTextureCoords[0] != nullptr;
+  for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
+    const aiFace& face = mesh->mFaces[f];
+    if (face.mNumIndices != 3) continue;
+    unsigned i0 = face.mIndices[0];
+    unsigned i1 = face.mIndices[1];
+    unsigned i2 = face.mIndices[2];
+    glm::vec3 p0 = vec3_cast(mesh->mVertices[i0]);
+    glm::vec3 p1 = vec3_cast(mesh->mVertices[i1]);
+    glm::vec3 p2 = vec3_cast(mesh->mVertices[i2]);
+    float area = 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
+    if (area <= 0.0f) continue;
+    float perSampleWeight = area * 0.25f;
+
+    glm::vec2 uv[4];
+    if (hasUV) {
+      uv[0] = vec2_cast(mesh->mTextureCoords[0][i0]);
+      uv[1] = vec2_cast(mesh->mTextureCoords[0][i1]);
+      uv[2] = vec2_cast(mesh->mTextureCoords[0][i2]);
+      uv[3] = (uv[0] + uv[1] + uv[2]) / 3.0f;
+    } else {
+      for (auto& v : uv) v = glm::vec2(0.0f);
+    }
+    for (int s = 0; s < 4; ++s) {
+      glm::vec3 c;
+      if (sampleDiffuseAt(diffuse, uv[s], c)) {
+        out.push_back({c, perSampleWeight});
+      }
+    }
+  }
 }
 
 MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
@@ -278,8 +403,21 @@ Model* loadModel(const std::string& filename) {
   auto* model = new Model();
   model->materials = buildMaterials(scene);
 
+  // CPU-side diffuse pixmaps used only here to collect area-weighted
+  // samples; released as `pixmaps` goes out of scope.
+  std::vector<CpuDiffuse> pixmaps;
+  pixmaps.reserve(scene->mNumMaterials);
+  for (unsigned i = 0; i < scene->mNumMaterials; ++i) {
+    pixmaps.push_back(decodeDiffuse(scene->mMaterials[i], scene));
+  }
+
   for (unsigned i = 0; i < scene->mNumMeshes; ++i) {
-    model->meshes.push_back(uploadMeshFromAi(scene->mMeshes[i]));
+    const aiMesh* aiM = scene->mMeshes[i];
+    model->meshes.push_back(uploadMeshFromAi(aiM));
+    if (aiM->mMaterialIndex < pixmaps.size()) {
+      collectMeshSamples(aiM, pixmaps[aiM->mMaterialIndex],
+                         model->diffuseSamples);
+    }
   }
 
   parsed.forEachMeshNode([&](const aiNode& node, const aiMatrix4x4& world) {
@@ -379,7 +517,6 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
       vertices.push_back({.position = corner,
                           .normal = faces[f].normal,
                           .texture_coordinates = uv,
-                          .smoothedNormal = glm::normalize(corner),
                           .tangent = t,
                           .bitangent = b});
     }
@@ -539,7 +676,6 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
           {.position = faces[f].corners[i],
            .normal = faces[f].normal,
            .texture_coordinates = uv[i],
-           .smoothedNormal = glm::normalize(faces[f].corners[i]),
            .tangent = t,
            .bitangent = b});
     }
@@ -575,9 +711,6 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   glEnableVertexAttribArray(2);
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, texture_coordinates));
-  glEnableVertexAttribArray(3);
-  glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                        (void*)offsetof(Vertex, smoothedNormal));
   glEnableVertexAttribArray(4);
   glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, tangent));
@@ -655,6 +788,15 @@ void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
 
 void Draw(const Shader& shader, const Model& model,
           const glm::mat4& transform) {
+  // Per-model palette uniform — paletteSize == 0 short-circuits the
+  // quantizer in fragment_gbuffer.glsl. Setting these on shaders that
+  // don't declare the uniforms (shadow/outline) is a cached -1 no-op.
+  const int paletteSize = static_cast<int>(model.palette.size());
+  shader.setInt("paletteSize", paletteSize);
+  if (paletteSize > 0) {
+    shader.setVec3Array("palette", paletteSize,
+                        reinterpret_cast<const float*>(model.palette.data()));
+  }
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
@@ -664,6 +806,51 @@ void Draw(const Shader& shader, const Model& model,
     shader.setMat3("normalMatrix", normalMatrix);
     Draw(shader, mesh, material);
   }
+}
+
+void buildModelPalette(Model& model, int colors) {
+  model.palette.clear();
+  if (colors <= 0 || model.diffuseSamples.empty()) return;
+
+  const int maxColors = shared::kMaxPaletteColors;
+  const int k = std::min(
+      colors, std::min(maxColors, static_cast<int>(model.diffuseSamples.size())));
+
+  // Deterministic strided seeds — spreads initial centroids without a PRNG.
+  std::vector<glm::vec3> centroids(k);
+  const size_t stride = std::max<size_t>(1, model.diffuseSamples.size() / k);
+  for (int i = 0; i < k; ++i) {
+    centroids[i] =
+        model.diffuseSamples[(static_cast<size_t>(i) * stride) %
+                             model.diffuseSamples.size()]
+            .color;
+  }
+
+  std::vector<glm::vec3> sums(k);
+  std::vector<float> weights(k);
+  constexpr int kIterations = 12;
+  for (int iter = 0; iter < kIterations; ++iter) {
+    std::fill(sums.begin(), sums.end(), glm::vec3(0.0f));
+    std::fill(weights.begin(), weights.end(), 0.0f);
+    for (const auto& s : model.diffuseSamples) {
+      int best = 0;
+      float bestD = std::numeric_limits<float>::infinity();
+      for (int i = 0; i < k; ++i) {
+        glm::vec3 d = s.color - centroids[i];
+        float dist = glm::dot(d, d);
+        if (dist < bestD) {
+          bestD = dist;
+          best = i;
+        }
+      }
+      sums[best] += s.color * s.weight;
+      weights[best] += s.weight;
+    }
+    for (int i = 0; i < k; ++i) {
+      if (weights[i] > 0.0f) centroids[i] = sums[i] / weights[i];
+    }
+  }
+  model.palette = std::move(centroids);
 }
 
 static GLuint loadCubemap(const std::string& directory) {
@@ -751,6 +938,15 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
 
   std::vector<Material> materials = buildMaterials(scene);
 
+  // Diffuse pixmaps shared across all sub-models — kept alive for the
+  // duration of this load only; each per-node Model below collects its own
+  // weighted samples against them.
+  std::vector<CpuDiffuse> pixmaps;
+  pixmaps.reserve(scene->mNumMaterials);
+  for (unsigned i = 0; i < scene->mNumMaterials; ++i) {
+    pixmaps.push_back(decodeDiffuse(scene->mMaterials[i], scene));
+  }
+
   // glTF instancing: nodes can reuse the same aiMesh — share GL handles.
   std::unordered_map<unsigned, Mesh> meshTable;
   auto getMesh = [&](unsigned sceneMeshIndex) -> const Mesh& {
@@ -768,11 +964,17 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
     auto* model = new Model();
     model->materials = materials;
     for (unsigned i = 0; i < node.mNumMeshes; ++i) {
-      model->meshes.push_back(getMesh(node.mMeshes[i]));
+      unsigned sceneMeshIndex = node.mMeshes[i];
+      model->meshes.push_back(getMesh(sceneMeshIndex));
       // Local transform stays identity; node world transform lives on the
       // server entity's Position + RenderInfo.scale.
       model->mesh_instances.emplace_back(
           static_cast<unsigned>(model->meshes.size() - 1), glm::mat4(1.0f));
+      const aiMesh* aiM = scene->mMeshes[sceneMeshIndex];
+      if (aiM->mMaterialIndex < pixmaps.size()) {
+        collectMeshSamples(aiM, pixmaps[aiM->mMaterialIndex],
+                           model->diffuseSamples);
+      }
     }
     out.emplace_back(std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
                      model);

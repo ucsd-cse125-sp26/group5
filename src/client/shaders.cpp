@@ -18,6 +18,7 @@ static std::string buildShaderConstantsBlock() {
   s << "#define K_POINT_SHADOW_LAYERS " << shared::kPointShadowLayers << "\n";
   s << "#define K_POINT_SHADOW_NEAR " << shared::kPointShadowNear << "\n";
   s << "#define K_POINT_SHADOW_FAR " << shared::kPointShadowFar << "\n";
+  s << "#define K_MAX_PALETTE_COLORS " << shared::kMaxPaletteColors << "\n";
   return s.str();
 }
 
