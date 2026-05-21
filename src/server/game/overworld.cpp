@@ -66,7 +66,7 @@ void ProcessFragmentPickups(ServerGame& game) {
       float distSqr = (dx * dx) + (dy * dy) + (dz * dz);
 
       if (distSqr <= PICKUP_RADIUS_SQR &&
-          (playerInput.keys_newly_pressed & KEY_INTERACT)) {
+        (playerInput.keys_newly_pressed & KEY_PICKUP)) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
 

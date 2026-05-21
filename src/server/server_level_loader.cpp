@@ -89,33 +89,30 @@ void loadLevel(ServerGame& game) {
 
   // door entities for each season
   auto [winterDoorID, winterDoor] = new_entity(game);
-  // Temporary position values
   game.registry.emplace<shared::Position>(winterDoor, 100.0f, 100.0f, 100.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::SectionDoorComponent>(
       winterDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      winterSectionID, 0.0f, -10.0f);
+      winterSectionID); // removed extraneous floats
   game.registry.emplace<shared::OverworldTag>(winterDoor);
 
   auto [fallDoorID, fallDoor] = new_entity(game);
-  // Temporary position values
   game.registry.emplace<shared::Position>(fallDoor, 110.0f, 100.0f, 100.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::SectionDoorComponent>(
       fallDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      fallSectionID, 0.0f, -10.0f);
+      fallSectionID); // removed extraneous floats
   game.registry.emplace<shared::OverworldTag>(fallDoor);
 
   auto [summerDoorID, summerDoor] = new_entity(game);
-  // Temporary position values
   game.registry.emplace<shared::Position>(summerDoor, 120.0f, 100.0f, 100.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::SectionDoorComponent>(
       summerDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      summerSectionID, 0.0f, -10.0f);
+      summerSectionID); // removed extraneous floats
   game.registry.emplace<shared::OverworldTag>(summerDoor);
 
   auto [winterFragmentID, winterFragment] = new_entity(game);
