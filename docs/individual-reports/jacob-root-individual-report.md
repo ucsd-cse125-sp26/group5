@@ -8,7 +8,7 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
-### Week 6 (May 14)
+### Week 7 (May 21)
 
 🚨🚨🚨I updated the weekly report AGAIN, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
 
