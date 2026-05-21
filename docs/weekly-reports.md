@@ -63,10 +63,10 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
 
-  <img src="{{ '/assets/week7/rebecca/1.jpg' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week7/rebecca/2.jpg' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week7/rebecca/3.jpg' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week7/rebecca/4.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/rebecca/1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/rebecca/2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/rebecca/3.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/rebecca/4.png' | relative_url }}" alt="Note">
 
 </div>
 
@@ -87,9 +87,9 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
 
-  <img src="{{ '/assets/week7/j/a.jpg' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week7/j/b.jpg' | relative_url }}" alt="Note">
-  <img src="{{ '/assets/week7/j/c.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/j/a.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/j/b.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week7/j/c.png' | relative_url }}" alt="Note">
 
 </div>
 
