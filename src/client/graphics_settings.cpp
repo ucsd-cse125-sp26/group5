@@ -28,7 +28,7 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.fxaaEnabled = true;
       s.dirShadowMapSize = 4096;
       s.pointShadowMapSize = 2048;
-      s.dirShadowHalfExtent = 80.0f;
+      s.dirShadowHalfExtent = 500.0f;
       break;
     case GraphicsPreset::Performance:
       s.ssaoEnabled = false;
@@ -37,7 +37,7 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.bloomBlurIterations = 4;
       s.dirShadowMapSize = 1024;
       s.pointShadowMapSize = 512;
-      s.dirShadowHalfExtent = 60.0f;
+      s.dirShadowHalfExtent = 300.0f;
       break;
     case GraphicsPreset::CelShaded:
       s.shadingMode = ShadingMode::Cel;
