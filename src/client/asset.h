@@ -82,6 +82,10 @@ struct Model {
   // Kept alive so AnimationLibrary can re-read clip channels from aiScene
   // without re-parsing the file. shared_ptr because the library borrows it.
   std::shared_ptr<shared::ParsedModel> parsed;
+  // First-class hook for a "look pitch" override — case-insensitive scan
+  // over the skeleton picks the first node whose name contains "neck", with
+  // "head" as a fallback. Empty when neither exists.
+  std::string neckBoneName;
 };
 
 struct Skybox {

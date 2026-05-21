@@ -122,6 +122,7 @@ enum ComponentIds : ComponentTypeId {
   CID_DIRECTIONALLIGHT = 8,
   CID_COLORBOUNDINGBOX = 9,
   CID_ANIMATIONSTATE = 10,
+  CID_MAZESPIRITGRID = 11,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
@@ -135,6 +136,10 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
   reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
   reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);
+  // Replicated so the client can identify the maze spirit cube to attach
+  // the first-person camera to (avoids fingerprinting by mesh+scale, which
+  // collides with overworld decoration cubes that happen to share a scale).
+  reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
   return reg;
 }
 

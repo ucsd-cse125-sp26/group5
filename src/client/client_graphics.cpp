@@ -229,22 +229,18 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const auto& selfRender =
       game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
-  // Maze mode: all clients use first-person cameras attached to the shared
-  // spirit cube.
-  // Each player's join slot picks one side, so all windows move together when
-  // the cube moves.
-  if (selfRender.modelName == "bear") {
+  // Maze mode: detected by the replicated MazeSpiritGrid component, which
+  // only exists on the maze world's spirit cube. Gating on modelName or a
+  // mesh+scale fingerprint was unsafe — KEY_SWAP_MODEL flips the avatar's
+  // mesh, and overworld decoration cubes can share the spirit cube's
+  // scale.
+  {
     entt::entity spirit = entt::null;
     auto spiritView =
-        game.renderRegistry.view<shared::Position, shared::RenderInfo>();
+        game.renderRegistry.view<shared::Position, shared::MazeSpiritGrid>();
     for (auto ent : spiritView) {
-      const auto& ri = spiritView.get<shared::RenderInfo>(ent);
-      if (ri.modelName == "cube" && std::abs(ri.sx - 0.8f) < 0.0001f &&
-          std::abs(ri.sy - 0.8f) < 0.0001f &&
-          std::abs(ri.sz - 0.8f) < 0.0001f) {
-        spirit = ent;
-        break;
-      }
+      spirit = ent;
+      break;
     }
     if (spirit != entt::null) {
       const auto& sp = game.renderRegistry.get<shared::Position>(spirit);
@@ -384,6 +380,21 @@ static void updateAnimators(Graphics& gfx, ClientGame& game, float dt) {
     if (clip && clip != animator.current()) {
       animator.play(clip);
     }
+
+    // Look-pitch override on the neck bone. The override post-multiplies in
+    // the bone's local space so the rest of the chain (head, hat, etc.)
+    // inherits the rotation through the recursive walk. Pitch is negated
+    // because the dog rig's neck-local X axis points opposite the camera's
+    // pitch convention.
+    animator.clearBoneOverrides();
+    if (!modelAsset->neckBoneName.empty()) {
+      if (auto* cam = reg.try_get<shared::Camera>(ent)) {
+        glm::mat4 pitchM =
+            glm::rotate(glm::mat4(1.0f), -cam->pitch, glm::vec3(1, 0, 0));
+        animator.setBoneOverride(modelAsset->neckBoneName, pitchM);
+      }
+    }
+
     animator.update(dt);
   }
   // Drop animator entries for entities that were destroyed this frame.
