@@ -209,6 +209,20 @@ void initWorldEntities(ServerGame& game) {
                                  .collision = CollisionShape::Mesh},
             });
 
+  // Skinned demo: dancing vampire. No physics body — the DAE is large and
+  // a collision proxy isn't useful for a decorative animation test.
+  {
+    auto [vampireId, vampire] = new_entity(game);
+    (void)vampireId;
+    game.registry.emplace<shared::Position>(vampire, 5.0f, 0.0f, 0.0f, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(vampire, "vampire", 1.0f, 1.0f,
+                                              1.0f);
+    game.registry.emplace<shared::AnimationState>(vampire, std::string{}, 0u,
+                                                  true);
+    game.registry.emplace<shared::OverworldTag>(vampire);
+  }
+
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(

@@ -2,12 +2,20 @@
 
 #include <glad/gl.h>
 
+#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/quaternion_float.hpp"
 #include "shared/assets.h"
+#include "shared/mesh_loader.h"
+
+// Skinning caps. Vertex slot count must match MAX_BONE_INFLUENCE, and the
+// vertex shaders' uniform array length must match MAX_BONES.
+inline constexpr int MAX_BONE_INFLUENCE = 4;
+inline constexpr int MAX_BONES = 100;
 
 struct Vertex {
   glm::vec3 position;
@@ -15,6 +23,16 @@ struct Vertex {
   glm::vec2 texture_coordinates;
   glm::vec3 tangent;
   glm::vec3 bitangent;
+  // -1 means "unused slot"; the shader skips any boneIDs[i] < 0. Default
+  // value-init to 0 is also harmless because cubes/etc. don't enable
+  // skinning, so the shader never reads these.
+  int boneIDs[MAX_BONE_INFLUENCE] = {-1, -1, -1, -1};
+  float weights[MAX_BONE_INFLUENCE] = {0.0f, 0.0f, 0.0f, 0.0f};
+};
+
+struct BoneInfo {
+  int id = -1;
+  glm::mat4 offset{1.0f};
 };
 
 struct MaterialSlot {
@@ -56,6 +74,14 @@ struct Model {
   std::vector<DiffuseSample> diffuseSamples;
   // Current k-means centroids; empty when palette quantization is disabled.
   std::vector<glm::vec3> palette;
+
+  // Skeleton — empty for non-skinned models. Populated by loadModel only.
+  bool skinned = false;
+  std::unordered_map<std::string, BoneInfo> boneInfoMap;
+  int boneCount = 0;
+  // Kept alive so AnimationLibrary can re-read clip channels from aiScene
+  // without re-parsing the file. shared_ptr because the library borrows it.
+  std::shared_ptr<shared::ParsedModel> parsed;
 };
 
 struct Skybox {
@@ -72,6 +98,10 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot);
 Skybox loadSkybox(const std::string& directory);
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
+// Skinned variant. `bones` points to `count` mat4 entries; pass count==0 to
+// fall back to the non-skinned path (sets useSkinning=0 in the shader).
+void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
+          const glm::mat4* bones, int count);
 
 // One Model per mesh-bearing glTF node, keyed by MAP_MODEL_PREFIX + name.
 // Local mesh transforms are identity; node world transform lives on the

@@ -1,11 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include <entt/entt.hpp>
+
 #include "asset.h"
+#include "client/animation.h"
 #include "client/client_game.h"
 #include "client/graphics_settings.h"
 #include "client/shaders.h"
@@ -126,6 +130,15 @@ struct Graphics {
   // Tracks the active palette size so a change can trigger per-model
   // k-means rebuilds. The palette itself lives on each Model.
   int lastPaletteColors = 0;
+
+  // Skeletal animation. AnimationLibrary is built lazily once per skinned
+  // model; Animator state lives per entity and is garbage-collected when
+  // the entity disappears from the registry.
+  std::unordered_map<std::string, std::unique_ptr<AnimationLibrary>>
+      animationLibraries;
+  std::unordered_map<entt::entity, Animator> animators;
+  // glfwGetTime() at the previous render() call; 0 on first frame.
+  double lastFrameTime = 0.0;
 
   bool fullscreen = false;
   int windowedX = 0;

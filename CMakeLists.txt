@@ -90,6 +90,7 @@ target_sources(client PRIVATE
     src/client/client_graphics.cpp
     src/client/shaders.cpp
     src/client/asset.cpp
+    src/client/animation.cpp
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
 )
