@@ -592,6 +592,15 @@ void Graphics::resizeBuffers(int width, int height) {
   glViewport(0, 0, fbWidth, fbHeight);
   // Projection is rebuilt every frame in render() from settings.
 
+  // All offscreen FBOs render here; only the final present pass blits to the
+  // full framebuffer (with GL_NEAREST when scale > 1 for chunky pixels).
+  const int scale = std::max(1, settings.pixelationScale);
+  renderWidth = std::max(1, fbWidth / scale);
+  renderHeight = std::max(1, fbHeight / scale);
+  lastPixelationScale = scale;
+  const int rw = renderWidth;
+  const int rh = renderHeight;
+
   // Same texture names get reallocated to the new dimensions, so reset the
   // categories before re-adding their byte sizes below.
   GPU_MEM_CLEAR("GBuffer");
@@ -614,7 +623,7 @@ void Graphics::resizeBuffers(int width, int height) {
   auto allocColor = [&](GLuint tex, GLint internalFmt, GLenum fmt,
                         GLenum type) {
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, fbWidth, fbHeight, 0, fmt, type,
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, rw, rh, 0, fmt, type,
                  nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -628,16 +637,15 @@ void Graphics::resizeBuffers(int width, int height) {
   allocColor(gAlbedo, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gSpecular, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gEmissive, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-  GPU_MEM_TEX2D("GBuffer", GL_RGBA32F, fbWidth, fbHeight);
-  GPU_MEM_TEX2D("GBuffer", GL_RGBA16F, fbWidth, fbHeight);
-  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
-  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
-  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA32F, rw, rh);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA16F, rw, rh);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, rw, rh);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, rw, rh);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, rw, rh);
 
   glBindRenderbuffer(GL_RENDERBUFFER, gBufferDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
-                        fbHeight);
-  GPU_MEM_RENDERBUFFER("GBuffer", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, rw, rh);
+  GPU_MEM_RENDERBUFFER("GBuffer", GL_DEPTH32F_STENCIL8, rw, rh);
 
   glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -669,7 +677,7 @@ void Graphics::resizeBuffers(int width, int height) {
 
   auto allocHDR = [&](GLuint tex) {
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, fbWidth, fbHeight, 0, GL_RGBA,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, rw, rh, 0, GL_RGBA,
                  GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -678,13 +686,12 @@ void Graphics::resizeBuffers(int width, int height) {
   };
   allocHDR(litColor);
   allocHDR(brightColor);
-  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
-  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, rw, rh);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, rw, rh);
 
   glBindRenderbuffer(GL_RENDERBUFFER, litDepth);
-  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
-                        fbHeight);
-  GPU_MEM_RENDERBUFFER("LitHDR", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, rw, rh);
+  GPU_MEM_RENDERBUFFER("LitHDR", GL_DEPTH32F_STENCIL8, rw, rh);
 
   glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -701,7 +708,7 @@ void Graphics::resizeBuffers(int width, int height) {
     if (!pingFBO[i]) glGenFramebuffers(1, &pingFBO[i]);
     if (!pingColor[i]) glGenTextures(1, &pingColor[i]);
     allocHDR(pingColor[i]);
-    GPU_MEM_TEX2D("PingPong", GL_RGBA16F, fbWidth, fbHeight);
+    GPU_MEM_TEX2D("PingPong", GL_RGBA16F, rw, rh);
     glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[i]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                            pingColor[i], 0);
@@ -714,9 +721,9 @@ void Graphics::resizeBuffers(int width, int height) {
     if (!fbo) glGenFramebuffers(1, &fbo);
     if (!tex) glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, fbWidth, fbHeight, 0, GL_RED,
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, rw, rh, 0, GL_RED,
                  GL_FLOAT, nullptr);
-    GPU_MEM_TEX2D("SSAO", GL_R16F, fbWidth, fbHeight);
+    GPU_MEM_TEX2D("SSAO", GL_R16F, rw, rh);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -735,14 +742,19 @@ void Graphics::resizeBuffers(int width, int height) {
   allocSsao(ssaoFBO, ssaoColor);
   allocSsao(ssaoBlurFBO, ssaoBlurColor);
 
+  // Final upscale filter: NEAREST when pixelating (chunky pixels), LINEAR
+  // otherwise. FXAA's neighbor-sampling lands on texel centers either way so
+  // it keeps working under NEAREST.
+  const GLint upscaleFilter = scale > 1 ? GL_NEAREST : GL_LINEAR;
+
   if (!ldrFBO) glGenFramebuffers(1, &ldrFBO);
   if (!ldrColor) glGenTextures(1, &ldrColor);
   glBindTexture(GL_TEXTURE_2D, ldrColor);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, nullptr);
-  GPU_MEM_TEX2D("LDR", GL_RGBA8, fbWidth, fbHeight);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  GPU_MEM_TEX2D("LDR", GL_RGBA8, rw, rh);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, upscaleFilter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, upscaleFilter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
@@ -757,11 +769,11 @@ void Graphics::resizeBuffers(int width, int height) {
   if (!sobelFBO) glGenFramebuffers(1, &sobelFBO);
   if (!sobelColor) glGenTextures(1, &sobelColor);
   glBindTexture(GL_TEXTURE_2D, sobelColor);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, nullptr);
-  GPU_MEM_TEX2D("Outline", GL_RGBA8, fbWidth, fbHeight);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  GPU_MEM_TEX2D("Outline", GL_RGBA8, rw, rh);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, upscaleFilter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, upscaleFilter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glBindFramebuffer(GL_FRAMEBUFFER, sobelFBO);
@@ -1042,6 +1054,9 @@ void Graphics::render(ClientGame& game) {
     allocatePointShadowMaps(settings.pointShadowMapSize);
     lastPointShadowSize = settings.pointShadowMapSize;
   }
+  if (std::max(1, settings.pixelationScale) != lastPixelationScale) {
+    resizeBuffers(fbWidth, fbHeight);
+  }
   if (settings.shadowsEnabled != prevShadowsEnabled) {
     if (!settings.shadowsEnabled) clearShadowMaps();
     prevShadowsEnabled = settings.shadowsEnabled;
@@ -1131,7 +1146,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("GBuffer");
     GPU_PROFILE_SCOPE("GBuffer");
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     // gPosition.a = 0 marks "no geometry written" so the skybox can take
@@ -1148,7 +1163,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("SSAO");
     GPU_PROFILE_SCOPE("SSAO");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT);
     ssaoShader->use();
@@ -1166,15 +1181,16 @@ void Graphics::render(ClientGame& game) {
     ssaoShader->setInt("kernelSize", settings.ssaoKernelSize);
     ssaoShader->setFloat("radius", settings.ssaoRadius);
     ssaoShader->setFloat("bias", settings.ssaoBias);
-    ssaoShader->setVec2("noiseScale", static_cast<float>(fbWidth) / 4.0f,
-                        static_cast<float>(fbHeight) / 4.0f);
+    ssaoShader->setVec2("noiseScale",
+                        static_cast<float>(renderWidth) / 4.0f,
+                        static_cast<float>(renderHeight) / 4.0f);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
   } else if (!settings.ssaoEnabled) {
     // Clear blurred SSAO to 1.0 so the lighting pass reads "no occlusion".
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
   }
@@ -1183,7 +1199,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("SSAOBlur");
     GPU_PROFILE_SCOPE("SSAOBlur");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT);
     ssaoBlurShader->use();
@@ -1201,7 +1217,7 @@ void Graphics::render(ClientGame& game) {
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum litDrawBufs[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, litDrawBufs);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -1269,12 +1285,13 @@ void Graphics::render(ClientGame& game) {
     GPU_PROFILE_SCOPE("Skybox");
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, litFBO);
-    glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight,
+    glBlitFramebuffer(0, 0, renderWidth, renderHeight,
+                      0, 0, renderWidth, renderHeight,
                       GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum skyDrawBufs[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1, skyDrawBufs);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glEnable(GL_DEPTH_TEST);
     auto* sceneInfo = currentScene(game);
     if (sceneInfo) {
@@ -1296,7 +1313,7 @@ void Graphics::render(ClientGame& game) {
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum hullDrawBufs[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1, hullDrawBufs);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_FALSE);
@@ -1330,7 +1347,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("Bloom");
     GPU_PROFILE_SCOPE("Bloom");
     glDisable(GL_DEPTH_TEST);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     blurShader->use();
     bool horizontal = true;
     bool firstIter = true;
@@ -1355,7 +1372,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("Tonemap");
     GPU_PROFILE_SCOPE("Tonemap");
     glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT);
     if (tonemapShader && tonemapShader->valid()) {
@@ -1383,7 +1400,7 @@ void Graphics::render(ClientGame& game) {
     SIMPLE_PROFILE_SCOPE("OutlineSobel");
     GPU_PROFILE_SCOPE("OutlineSobel");
     glBindFramebuffer(GL_FRAMEBUFFER, sobelFBO);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glViewport(0, 0, renderWidth, renderHeight);
     glDisable(GL_DEPTH_TEST);
     outlineSobelShader->use();
     glActiveTexture(GL_TEXTURE0);

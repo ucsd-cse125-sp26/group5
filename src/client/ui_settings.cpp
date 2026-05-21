@@ -161,6 +161,20 @@ void antialiasingSection(GraphicsSettings& s) {
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
 }
 
+void pixelationSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Pixelation")) return;
+  // 1 = native; >=2 renders the 3D scene at fb/N and upscales with NEAREST.
+  const int scales[] = {1, 2, 3, 4, 6, 8};
+  const char* labels[] = {"Off", "2x", "3x", "4x", "6x", "8x"};
+  int idx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(scales); ++i) {
+    if (scales[i] == s.pixelationScale) idx = i;
+  }
+  if (ImGui::Combo("Scale", &idx, labels, IM_ARRAYSIZE(labels))) {
+    s.pixelationScale = scales[idx];
+  }
+}
+
 }  // namespace
 
 void drawSettingsUI(GraphicsSettings& s, bool& open) {
@@ -198,6 +212,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   ssaoSection(s);
   shadowsSection(s);
   antialiasingSection(s);
+  pixelationSection(s);
 
   ImGui::Separator();
   if (ImGui::Button("Reset to Default")) {

@@ -38,6 +38,10 @@ struct GraphicsSettings {
   // FXAA
   bool fxaaEnabled = true;
 
+  // Pixelation: render the entire 3D scene at fb/scale, then upscale with
+  // GL_NEAREST in the present pass for a chunky-pixel look. 1 = off.
+  int pixelationScale = 1;
+
   // Shadows
   bool shadowsEnabled = true;
   // Map sizes — changing triggers FBO/texture reallocation.
