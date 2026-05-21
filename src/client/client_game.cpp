@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 
 #include "client/spsc_queue.h"
@@ -10,6 +11,43 @@
 #include "shared/components.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
+
+namespace {
+
+void removeSyncedComponent(entt::registry& registry, entt::entity entity,
+                           shared::ComponentTypeId cid) {
+  switch (cid) {
+    case shared::CID_POSITION:
+      registry.remove<shared::Position>(entity);
+      break;
+    case shared::CID_ENTITY:
+      registry.remove<shared::Entity>(entity);
+      break;
+    case shared::CID_RENDERINFO:
+      registry.remove<shared::RenderInfo>(entity);
+      break;
+    case shared::CID_CAMERA:
+      registry.remove<shared::Camera>(entity);
+      break;
+    case shared::CID_VELOCITY:
+      registry.remove<shared::Velocity>(entity);
+      break;
+    case shared::CID_POINTLIGHT:
+      registry.remove<shared::PointLight>(entity);
+      break;
+    case shared::CID_SCENE:
+      registry.remove<shared::Scene>(entity);
+      break;
+    case shared::CID_DIRECTIONALLIGHT:
+      registry.remove<shared::DirectionalLight>(entity);
+      break;
+    case shared::CID_OVERWORLD_MAZE_PUZZLE:
+      registry.remove<shared::OverworldMazePuzzleState>(entity);
+      break;
+  }
+}
+
+}  // namespace
 
 // ── Component deserialization helper ─────────────────────
 //
@@ -103,6 +141,33 @@ void registerClientHandlers(ClientNetwork& network) {
 
           auto it = game.networkEntityMap.find(entityId);
           if (it != game.networkEntityMap.end()) {
+            size_t entityStart = offset;
+            uint16_t compCount;
+            std::memcpy(&compCount, data + offset, sizeof(uint16_t));
+            offset += sizeof(uint16_t);
+
+            bool
+                present[static_cast<size_t>(shared::CID_OVERWORLD_MAZE_PUZZLE) +
+                        1] = {};
+            for (uint16_t c = 0; c < compCount; c++) {
+              shared::ComponentTypeId cid;
+              std::memcpy(&cid, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              uint16_t dataSize;
+              std::memcpy(&dataSize, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              if (cid < std::size(present)) present[cid] = true;
+              offset += dataSize;
+            }
+
+            auto entity = it->second;
+            for (auto cid : game.componentRegistry.syncedIds()) {
+              if (cid < std::size(present) && !present[cid]) {
+                removeSyncedComponent(game.networkRegistry, entity, cid);
+              }
+            }
+
+            offset = entityStart;
             deserializeComponents(game, it->second, data, offset, len);
           } else {
             // Entity not known — skip its components

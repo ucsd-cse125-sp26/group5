@@ -1,5 +1,7 @@
 #include "server/game/overworld.h"
 
+#include <cstdio>
+
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "shared/components.h"
@@ -64,9 +66,8 @@ void ProcessFragmentPickups(ServerGame& game) {
       float dy = fragPos.y - playerPos.y;
       float dz = fragPos.z - playerPos.z;
       float distSqr = (dx * dx) + (dy * dy) + (dz * dz);
-
       if (distSqr <= PICKUP_RADIUS_SQR &&
-        (playerInput.keys_newly_pressed & KEY_PICKUP)) {
+          (playerInput.keys_newly_pressed & KEY_PICKUP)) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
 

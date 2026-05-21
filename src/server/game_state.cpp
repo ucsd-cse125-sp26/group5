@@ -443,6 +443,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     return;
   }
 
+  tickOverworldGameLogic(game, dt);
+
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {
     game.overworldMazeTriggerArmed = true;
@@ -458,8 +460,6 @@ void OverworldState::update(ServerGame& game, float dt) {
       return;
     }
   }
-
-  movement_system(game, dt, StateType::OVERWORLD);
   render_model_change(game, dt);
 
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);

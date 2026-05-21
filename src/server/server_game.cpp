@@ -309,7 +309,10 @@ void registerServerHandlers(ServerNetwork& network) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
-        if (it == game.active_players.end()) return;
+        if (it == game.active_players.end()) {
+          std::printf("[Server] INPUT dropped: sender not in active_players\n");
+          return;
+        }
 
         entt::entity ent = entt::null;
         auto state = game.gameStateManager.currentState();
@@ -318,7 +321,11 @@ void registerServerHandlers(ServerNetwork& network) {
         } else if (state && state->getStateType() == StateType::MAZE) {
           ent = it->second.maze_avatar;
         }
-        if (ent == entt::null) return;
+        if (ent == entt::null) {
+          std::printf(
+              "[Server] INPUT dropped: no active avatar for current state\n");
+          return;
+        }
 
         auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
         playerInput.keys = pkt.keys;
