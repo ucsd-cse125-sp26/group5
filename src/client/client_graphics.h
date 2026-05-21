@@ -44,7 +44,6 @@ struct Graphics {
   std::optional<Shader> gbufferShader;
   std::optional<Shader> lightingShader;
   std::optional<Shader> lightingCelShader;
-  std::optional<Shader> outlineHullShader;
   std::optional<Shader> outlineSobelShader;
   std::optional<Shader> skyboxShader;
   std::optional<Shader> presentShader;
@@ -123,6 +122,10 @@ struct Graphics {
   int renderWidth = 0;
   int renderHeight = 0;
   int lastPixelationScale = 1;
+
+  // Tracks the active palette size so a change can trigger per-model
+  // k-means rebuilds. The palette itself lives on each Model.
+  int lastPaletteColors = 0;
 
   bool fullscreen = false;
   int windowedX = 0;

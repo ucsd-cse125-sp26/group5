@@ -13,11 +13,6 @@ struct Vertex {
   glm::vec3 position;
   glm::vec3 normal;
   glm::vec2 texture_coordinates;
-  // Per-vertex averaged normal used only by the inverted-hull outline pass.
-  // Equal to `normal` for artist-authored meshes; computed in the procedural
-  // cube factories so corner vertices share one direction and the expanded
-  // hull stays gap-free at large thicknesses.
-  glm::vec3 smoothedNormal;
   glm::vec3 tangent;
   glm::vec3 bitangent;
 };
@@ -42,11 +37,25 @@ struct Mesh {
   GLuint vao, vbo, ebo, index_count;
 };
 
+// One linear-RGB sample drawn at a triangle's UV (centroid or vertex),
+// weighted by the triangle's mesh-local surface area / 4. The k-means
+// builder uses these so large triangles influence the model's palette
+// proportionally more than small ones.
+struct DiffuseSample {
+  glm::vec3 color;
+  float weight;
+};
+
 struct Model {
   std::vector<Mesh> meshes;
   std::vector<Material> materials;
   std::vector<std::pair<unsigned int, glm::mat4>> mesh_instances;
   glm::quat orientation{1.0f, 0.0f, 0.0f, 0.0f};
+  // Retained so the palette can be rebuilt at runtime when the user changes
+  // paletteQuantizeColors. Populated by loadModel / loadMapModels.
+  std::vector<DiffuseSample> diffuseSamples;
+  // Current k-means centroids; empty when palette quantization is disabled.
+  std::vector<glm::vec3> palette;
 };
 
 struct Skybox {
@@ -69,3 +78,8 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
 // server-spawned entity's Position + RenderInfo.scale.
 std::vector<std::pair<std::string, Model*>> loadMapModels(
     const std::string& filename);
+
+// Run weighted k-means on model.diffuseSamples and store the resulting
+// centroids in model.palette. colors <= 0, an empty sample buffer, or a
+// total weight of zero leave model.palette empty.
+void buildModelPalette(Model& model, int colors);

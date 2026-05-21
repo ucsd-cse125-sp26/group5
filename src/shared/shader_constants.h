@@ -13,4 +13,8 @@ inline constexpr int kPointShadowLayers = kMaxPointLights * 6;
 inline constexpr float kPointShadowNear = 0.1f;
 inline constexpr float kPointShadowFar = 50.0f;
 
+// Upper bound on the palette uniform array length in fragment_gbuffer.glsl.
+// Setting `paletteQuantizeColors` may be any value in [0, kMaxPaletteColors].
+inline constexpr int kMaxPaletteColors = 64;
+
 }  // namespace shared

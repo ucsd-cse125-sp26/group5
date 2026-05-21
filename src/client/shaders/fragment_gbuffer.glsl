@@ -26,6 +26,12 @@ uniform Material material;
 // 0 = off; >=2 posterizes each RGB channel to N evenly-spaced levels.
 uniform int textureQuantizeLevels;
 
+// Palette quantization (CPU-built via k-means over sampled diffuse pixels).
+// paletteSize == 0 → off; otherwise the gbuffer pass snaps the sampled
+// albedo to the closest palette entry (linear-space Euclidean nearest).
+uniform int paletteSize;
+uniform vec3 palette[K_MAX_PALETTE_COLORS];
+
 vec3 quantizeRGB(vec3 c) {
   if (textureQuantizeLevels < 2) return c;
   // Quantize the HSV value (max channel) and rescale all channels by the
@@ -40,6 +46,25 @@ vec3 quantizeRGB(vec3 c) {
   // whole image upward in brightness.
   float qv = clamp(round(v * (L - 1.0)) / max(L - 1.0, 1.0), 0.0, 1.0);
   return c * (qv / v);
+}
+
+// Linear-RGB nearest-neighbour lookup against the global palette. Only the
+// albedo is quantized this way — specular/emissive stay on the uniform
+// brightness quantizer above so masks/glow don't snap to weird palette
+// entries derived purely from diffuse pixels.
+vec3 paletteSnap(vec3 c) {
+  if (paletteSize <= 0) return c;
+  vec3 best = palette[0];
+  float bestD = dot(c - best, c - best);
+  for (int i = 1; i < paletteSize; ++i) {
+    vec3 p = palette[i];
+    float d = dot(c - p, c - p);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
 }
 
 void main() {
@@ -58,7 +83,7 @@ void main() {
 
   gPosition = vec4(worldPos, 1.0);
   gNormal = vec4(norm, material.shininess);
-  gAlbedo = vec4(quantizeRGB(diffuse.rgb), 1.0);
+  gAlbedo = vec4(paletteSnap(quantizeRGB(diffuse.rgb)), 1.0);
   gSpecular = vec4(quantizeRGB(texture(material.specular, vTexCoords).rgb), 1.0);
   gEmissive = vec4(quantizeRGB(texture(material.emissive, vTexCoords).rgb), 1.0);
 }

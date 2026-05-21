@@ -32,6 +32,14 @@ struct DirLight {
 };
 uniform DirLight dirLight;
 
+// Cross-mode outlines (folded into the lighting pass rather than a separate
+// post-process). 0 = off. Thresholds are shared with the Sobel mode so the
+// outline tab in the settings UI tunes both.
+uniform int outlineCross;
+uniform vec3 outlineColor;
+uniform float outlineDepthThreshold;
+uniform float outlineNormalThreshold;
+
 struct PointLight {
   vec3 position;
   float constant;
@@ -95,6 +103,33 @@ float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,
   return 1.0 - visibility / 20.0;
 }
 
+// Cross-shaped 4-tap probe on gNormal + gPosition. Returns 1 along
+// silhouettes (sky-adjacent), creases (normal jump > normalThreshold), and
+// depth discontinuities (Δd > depthThreshold). 0 on smooth surfaces.
+float OutlineStrength(vec3 worldPos, vec3 norm) {
+  vec2 texel = 1.0 / vec2(textureSize(gNormal, 0));
+  vec2 offsets[4] = vec2[](
+    vec2( texel.x, 0.0), vec2(-texel.x, 0.0),
+    vec2(0.0,  texel.y), vec2(0.0, -texel.y)
+  );
+  float refDepth = length(camera.viewPos - worldPos);
+  float normalDiff = 0.0;
+  float depthDiff = 0.0;
+  float skyHit = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    vec2 uv = vUV + offsets[i];
+    vec4 pN = texture(gPosition, uv);
+    if (pN.a == 0.0) { skyHit = 1.0; continue; }
+    vec3 nN = normalize(texture(gNormal, uv).rgb);
+    normalDiff = max(normalDiff, 1.0 - max(dot(norm, nN), 0.0));
+    depthDiff = max(depthDiff, abs(refDepth - length(camera.viewPos - pN.rgb)));
+  }
+  // Match Sobel's relative depth semantics: edge when Δd > threshold * d.
+  float normEdge = step(outlineNormalThreshold, normalDiff);
+  float depthEdge = step(outlineDepthThreshold * refDepth, depthDiff);
+  return clamp(max(max(normEdge, depthEdge), skyHit), 0.0, 1.0);
+}
+
 void main() {
   vec4 posSample = texture(gPosition, vUV);
   // a==0 = sky/unwritten; let the skybox pass own this fragment.
@@ -145,6 +180,11 @@ void main() {
   }
 
   result += emissive;
+
+  if (outlineCross != 0) {
+    result = mix(result, outlineColor, OutlineStrength(worldPos, norm));
+  }
+
   FragColor = vec4(result, 1.0);
 
   // Soft-knee bright-pass for bloom.

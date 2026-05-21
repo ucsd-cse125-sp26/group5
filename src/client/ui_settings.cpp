@@ -31,6 +31,19 @@ void shadingSection(GraphicsSettings& s) {
   // final lit color including shading and shadows, not just the source.
   ImGui::SliderInt("Post quantize", &s.postQuantizeLevels, 0, 32,
                    s.postQuantizeLevels < 2 ? "off" : "%d levels");
+  // Scene-color palette: k-means over sampled diffuse pixels. Albedo is
+  // snapped to the nearest palette entry at G-buffer time so models that
+  // aren't authored with flat colors still light like they are.
+  const int paletteOptions[] = {0, 8, 16, 32, 64};
+  const char* paletteLabels[] = {"Off", "8", "16", "32", "64"};
+  int paletteIdx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(paletteOptions); ++i) {
+    if (paletteOptions[i] == s.paletteQuantizeColors) paletteIdx = i;
+  }
+  if (ImGui::Combo("Palette quantize", &paletteIdx, paletteLabels,
+                   IM_ARRAYSIZE(paletteLabels))) {
+    s.paletteQuantizeColors = paletteOptions[paletteIdx];
+  }
   ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
   ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");
@@ -54,25 +67,21 @@ void shadingSection(GraphicsSettings& s) {
 
 void outlinesSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Outlines")) return;
-  const char* modes[] = {"None", "Hull", "Sobel", "Both"};
+  const char* modes[] = {"None", "Sobel", "Cross"};
   int mode = static_cast<int>(s.outlineMode);
   if (ImGui::Combo("Outline mode", &mode, modes, IM_ARRAYSIZE(modes))) {
     s.outlineMode = static_cast<OutlineMode>(mode);
   }
   ImGui::ColorEdit3("Outline color", &s.outlineColor.x);
 
-  const bool hullActive = s.outlineMode == OutlineMode::Hull ||
-                          s.outlineMode == OutlineMode::Both;
-  ImGui::BeginDisabled(!hullActive);
-  ImGui::SliderFloat("Hull thickness", &s.outlineThickness, 0.0f, 0.2f,
-                     "%.4f");
-  ImGui::Checkbox("Screen-constant", &s.outlineScreenSpace);
-  ImGui::EndDisabled();
-
-  const bool sobelActive = s.outlineMode == OutlineMode::Sobel ||
-                           s.outlineMode == OutlineMode::Both;
+  const bool sobelActive = s.outlineMode == OutlineMode::Sobel;
+  const bool crossActive = s.outlineMode == OutlineMode::Cross;
   ImGui::BeginDisabled(!sobelActive);
   ImGui::SliderFloat("Sobel width", &s.outlineSobelWidth, 0.5f, 5.0f);
+  ImGui::EndDisabled();
+  // Both modes interpret this as a relative threshold (Δd / d) and a
+  // 1 - dot(n, n') normal jump, so the same slider value works across modes.
+  ImGui::BeginDisabled(!sobelActive && !crossActive);
   ImGui::SliderFloat("Depth threshold", &s.outlineDepthThreshold, 0.0f, 0.5f,
                      "%.4f");
   ImGui::SliderFloat("Normal threshold", &s.outlineNormalThreshold, 0.0f, 4.0f,

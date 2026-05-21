@@ -5,9 +5,11 @@
 
 #include "client_graphics.h"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <string>
 #include <vector>
@@ -348,22 +350,21 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
 
 static void renderEntities(const Shader& shader, ClientGame& game,
                            std::unordered_map<std::string, Model*>& models,
-                           bool forShadowPass = false,
-                           bool forOutlinePass = false) {
+                           bool forShadowPass = false) {
   auto view = game.renderRegistry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     auto& p = view.get<shared::Position>(ent);
     auto& renderInfo = view.get<shared::RenderInfo>(ent);
     auto& entity = view.get<shared::Entity>(ent);
-    // Light markers shouldn't shadow themselves, and shouldn't get outlined.
-    if (forShadowPass || forOutlinePass) {
+    // Light markers shouldn't shadow themselves.
+    if (forShadowPass) {
       if (game.renderRegistry
               .any_of<shared::PointLight, shared::DirectionalLight>(ent))
         continue;
     }
     // Self entity is rendered in shadow passes (cast own shadow) but skipped
-    // in the main pass and outline pass (don't draw inside FP camera).
+    // in the main pass (don't draw inside FP camera).
     if (!forShadowPass) {
       if (entity.id == game.renderEntityId) continue;
     }
@@ -441,8 +442,6 @@ bool Graphics::load(int width, int height) {
                          "shaders/fragment_lighting_deferred.glsl");
   lightingCelShader.emplace("shaders/vertex_present.glsl",
                             "shaders/fragment_lighting_cel.glsl");
-  outlineHullShader.emplace("shaders/vertex_outline_hull.glsl",
-                            "shaders/fragment_outline_hull.glsl");
   outlineSobelShader.emplace("shaders/vertex_present.glsl",
                              "shaders/fragment_outline_sobel.glsl");
   skyboxShader.emplace("shaders/vertex_skybox.glsl",
@@ -468,11 +467,11 @@ bool Graphics::load(int width, int height) {
   // the previous program — at startup there is no previous program, so
   // fail fast instead of starting with a black window.
   const std::optional<Shader>* required[] = {
-      &gbufferShader,      &lightingShader,    &lightingCelShader,
-      &outlineHullShader,  &outlineSobelShader, &skyboxShader,
-      &presentShader,      &blurShader,        &tonemapShader,
-      &ssaoShader,         &ssaoBlurShader,    &shadowDirShader,
-      &shadowPointShader,  &debugOverlay,
+      &gbufferShader,     &lightingShader,     &lightingCelShader,
+      &outlineSobelShader, &skyboxShader,      &presentShader,
+      &blurShader,        &tonemapShader,      &ssaoShader,
+      &ssaoBlurShader,    &shadowDirShader,    &shadowPointShader,
+      &debugOverlay,
   };
   for (const auto* s : required) {
     if (!*s || !(*s)->valid()) {
@@ -788,7 +787,7 @@ void Graphics::resizeBuffers(int width, int height) {
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
   for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
-                  &outlineHullShader, &outlineSobelShader, &ssaoShader}) {
+                  &outlineSobelShader, &ssaoShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -812,10 +811,6 @@ void Graphics::reloadShaders() {
       {.slot = lightingCelShader,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_lighting_cel.glsl",
-       .geom = ""},
-      {.slot = outlineHullShader,
-       .vert = "shaders/vertex_outline_hull.glsl",
-       .frag = "shaders/fragment_outline_hull.glsl",
        .geom = ""},
       {.slot = outlineSobelShader,
        .vert = "shaders/vertex_present.glsl",
@@ -1057,6 +1052,14 @@ void Graphics::render(ClientGame& game) {
   if (std::max(1, settings.pixelationScale) != lastPixelationScale) {
     resizeBuffers(fbWidth, fbHeight);
   }
+  if (settings.paletteQuantizeColors != lastPaletteColors) {
+    const int colors =
+        std::min(settings.paletteQuantizeColors, shared::kMaxPaletteColors);
+    for (auto& [name, m] : models) {
+      if (m) buildModelPalette(*m, colors);
+    }
+    lastPaletteColors = settings.paletteQuantizeColors;
+  }
   if (settings.shadowsEnabled != prevShadowsEnabled) {
     if (!settings.shadowsEnabled) clearShadowMaps();
     prevShadowsEnabled = settings.shadowsEnabled;
@@ -1156,6 +1159,7 @@ void Graphics::render(ClientGame& game) {
     gbufferShader->use();
     gbufferShader->setInt("textureQuantizeLevels",
                           settings.textureQuantizeLevels);
+    // paletteSize + palette uniforms are bound per Model inside Draw().
     renderEntities(*gbufferShader, game, models);
   }
 
@@ -1272,6 +1276,15 @@ void Graphics::render(ClientGame& game) {
       }
       uploadDirectionalLight(*lighting, game, settings);
       uploadPointLights(*lighting, lights, numLights);
+      const bool cross = settings.outlineMode == OutlineMode::Cross;
+      lighting->setInt("outlineCross", cross ? 1 : 0);
+      if (cross) {
+        lighting->setVec3("outlineColor", settings.outlineColor);
+        lighting->setFloat("outlineDepthThreshold",
+                           settings.outlineDepthThreshold);
+        lighting->setFloat("outlineNormalThreshold",
+                           settings.outlineNormalThreshold);
+      }
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -1301,43 +1314,6 @@ void Graphics::render(ClientGame& game) {
         drawSkybox(*skyboxShader, it->second, *camera, projection);
       }
     }
-  }
-
-  // Inverted-hull outlines: backfaces expanded along world normals, written
-  // to litFBO so tonemap treats them as scene color.
-  if ((settings.outlineMode == OutlineMode::Hull ||
-       settings.outlineMode == OutlineMode::Both) &&
-      outlineHullShader && outlineHullShader->valid()) {
-    SIMPLE_PROFILE_SCOPE("OutlineHull");
-    GPU_PROFILE_SCOPE("OutlineHull");
-    glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
-    GLenum hullDrawBufs[] = {GL_COLOR_ATTACHMENT0};
-    glDrawBuffers(1, hullDrawBufs);
-    glViewport(0, 0, renderWidth, renderHeight);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_FALSE);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
-    // Bias hull depth slightly toward the far plane. In screen-space mode the
-    // expansion leaves clip.z untouched, so an expanded side face's front
-    // edge shares its NDC.z with the neighboring front face — without this
-    // bias, LEQUAL paints the outline color over the visible face wherever
-    // those depths tie at face borders.
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(1.0f, 4.0f);
-    outlineHullShader->use();
-    outlineHullShader->setFloat("outlineThickness", settings.outlineThickness);
-    outlineHullShader->setInt("outlineScreenSpace",
-                              settings.outlineScreenSpace ? 1 : 0);
-    outlineHullShader->setVec3("outlineColor", settings.outlineColor);
-    renderEntities(*outlineHullShader, game, models,
-                   /*forShadowPass=*/false,
-                   /*forOutlinePass=*/true);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glCullFace(GL_BACK);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
   }
 
   GLuint finalBloomColor = brightColor;
@@ -1422,8 +1398,7 @@ void Graphics::render(ClientGame& game) {
   }
 
   GLuint finalLDR = ldrColor;
-  if ((settings.outlineMode == OutlineMode::Sobel ||
-       settings.outlineMode == OutlineMode::Both) &&
+  if (settings.outlineMode == OutlineMode::Sobel &&
       outlineSobelShader && outlineSobelShader->valid()) {
     SIMPLE_PROFILE_SCOPE("OutlineSobel");
     GPU_PROFILE_SCOPE("OutlineSobel");
