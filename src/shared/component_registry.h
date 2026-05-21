@@ -121,6 +121,7 @@ enum ComponentIds : ComponentTypeId {
   CID_SCENE = 7,
   CID_DIRECTIONALLIGHT = 8,
   CID_COLORBOUNDINGBOX = 9,
+  CID_ANIMATIONSTATE = 10,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
@@ -133,6 +134,7 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
   reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
+  reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);
   return reg;
 }
 

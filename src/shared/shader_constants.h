@@ -17,4 +17,8 @@ inline constexpr float kPointShadowFar = 50.0f;
 // Setting `paletteQuantizeColors` may be any value in [0, kMaxPaletteColors].
 inline constexpr int kMaxPaletteColors = 64;
 
+// Mirrors MAX_BONES from client/asset.h — kept here so the gbuffer + shadow
+// vertex shaders can declare `finalBonesMatrices[K_MAX_BONES]` consistently.
+inline constexpr int kMaxBones = 100;
+
 }  // namespace shared

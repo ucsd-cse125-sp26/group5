@@ -72,6 +72,16 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glEnableVertexAttribArray(5);
   glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, bitangent));
+  // Bone IDs are integers; using glVertexAttribIPointer keeps them as ivec4
+  // in the shader instead of casting through floats. Locations 6/7 sit after
+  // tangent/bitangent so older non-skinned shaders don't need to know about
+  // them — they simply leave attribute arrays 6/7 disabled.
+  glEnableVertexAttribArray(6);
+  glVertexAttribIPointer(6, MAX_BONE_INFLUENCE, GL_INT, sizeof(Vertex),
+                         (void*)offsetof(Vertex, boneIDs));
+  glEnableVertexAttribArray(7);
+  glVertexAttribPointer(7, MAX_BONE_INFLUENCE, GL_FLOAT, GL_FALSE,
+                        sizeof(Vertex), (void*)offsetof(Vertex, weights));
   glBindVertexArray(0);
 
   Mesh m;
@@ -93,7 +103,49 @@ static inline glm::vec3 anyPerpendicular(const glm::vec3& n) {
   return glm::normalize(glm::cross(n, a));
 }
 
-static Mesh uploadMeshFromAi(const aiMesh* mesh) {
+static void addBoneInfluence(Vertex& v, int boneID, float weight) {
+  for (int i = 0; i < MAX_BONE_INFLUENCE; ++i) {
+    if (v.boneIDs[i] < 0) {
+      v.boneIDs[i] = boneID;
+      v.weights[i] = weight;
+      return;
+    }
+  }
+  // aiProcess_LimitBoneWeights clamps to MAX_BONE_INFLUENCE upstream; if we
+  // still see overflow here, the file ships more influences than we support.
+}
+
+// Walks the mesh's bone list, assigns IDs into model->boneInfoMap, and
+// writes the influences back into vertices. `model` must be non-null.
+static void extractBoneWeights(const aiMesh* mesh,
+                               std::vector<Vertex>& vertices, Model* model) {
+  for (unsigned i = 0; i < mesh->mNumBones; ++i) {
+    const aiBone* bone = mesh->mBones[i];
+    std::string name = bone->mName.C_Str();
+    int boneID;
+    auto it = model->boneInfoMap.find(name);
+    if (it == model->boneInfoMap.end()) {
+      BoneInfo info;
+      info.id = model->boneCount;
+      info.offset = mat4_cast(bone->mOffsetMatrix);
+      model->boneInfoMap[name] = info;
+      boneID = model->boneCount++;
+    } else {
+      boneID = it->second.id;
+    }
+    for (unsigned w = 0; w < bone->mNumWeights; ++w) {
+      const aiVertexWeight& vw = bone->mWeights[w];
+      if (vw.mVertexId < vertices.size()) {
+        addBoneInfluence(vertices[vw.mVertexId], boneID, vw.mWeight);
+      }
+    }
+  }
+}
+
+// `model == nullptr` for paths that can't be skinned (map sub-models share a
+// VAO across nodes, so we skip bone extraction even if the source mesh has
+// bones — they'd alias across sub-models otherwise).
+static Mesh uploadMeshFromAi(const aiMesh* mesh, Model* model = nullptr) {
   std::vector<Vertex> vertices;
   vertices.reserve(mesh->mNumVertices);
   for (unsigned int j = 0; j < mesh->mNumVertices; j++) {
@@ -112,6 +164,10 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh) {
       vertex.bitangent = glm::cross(vertex.normal, vertex.tangent);
     }
     vertices.push_back(vertex);
+  }
+
+  if (model && mesh->mNumBones > 0) {
+    extractBoneWeights(mesh, vertices, model);
   }
 
   std::vector<GLuint> indices;
@@ -390,15 +446,17 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
 
 Model* loadModel(const std::string& filename) {
   // MinGW's path::string_type is wstring; convert explicitly so the
-  // assimp call links on Windows.
+  // assimp call links on Windows. Held by shared_ptr so AnimationLibrary
+  // can re-read clips from the aiScene long after this function returns.
   const std::string fullPath = (exeDir() / filename).string();
-  shared::ParsedModel parsed;
-  if (!parsed.load(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs |
-                                 aiProcess_CalcTangentSpace)) {
-    std::cout << "ERROR::ASSIMP::" << parsed.lastError() << '\n';
+  auto parsed = std::make_shared<shared::ParsedModel>();
+  if (!parsed->load(fullPath, aiProcess_Triangulate | aiProcess_FlipUVs |
+                                  aiProcess_CalcTangentSpace |
+                                  aiProcess_LimitBoneWeights)) {
+    std::cout << "ERROR::ASSIMP::" << parsed->lastError() << '\n';
     return nullptr;
   }
-  const aiScene* scene = parsed.scene();
+  const aiScene* scene = parsed->scene();
 
   auto* model = new Model();
   model->materials = buildMaterials(scene);
@@ -413,20 +471,27 @@ Model* loadModel(const std::string& filename) {
 
   for (unsigned i = 0; i < scene->mNumMeshes; ++i) {
     const aiMesh* aiM = scene->mMeshes[i];
-    model->meshes.push_back(uploadMeshFromAi(aiM));
+    model->meshes.push_back(uploadMeshFromAi(aiM, model));
     if (aiM->mMaterialIndex < pixmaps.size()) {
       collectMeshSamples(aiM, pixmaps[aiM->mMaterialIndex],
                          model->diffuseSamples);
     }
   }
 
-  parsed.forEachMeshNode([&](const aiNode& node, const aiMatrix4x4& world) {
+  parsed->forEachMeshNode([&](const aiNode& node, const aiMatrix4x4& world) {
     glm::mat4 m = mat4_cast(world);
     for (unsigned i = 0; i < node.mNumMeshes; ++i) {
       model->mesh_instances.emplace_back(node.mMeshes[i], m);
     }
   });
 
+  model->skinned = model->boneCount > 0 && scene->mNumAnimations > 0;
+  model->parsed = std::move(parsed);
+  if (model->boneCount > MAX_BONES) {
+    std::fprintf(stderr,
+                 "loadModel: '%s' has %d bones; shader caps at MAX_BONES=%d\n",
+                 filename.c_str(), model->boneCount, MAX_BONES);
+  }
   return model;
 }
 
@@ -717,6 +782,12 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   glEnableVertexAttribArray(5);
   glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void*)offsetof(Vertex, bitangent));
+  glEnableVertexAttribArray(6);
+  glVertexAttribIPointer(6, MAX_BONE_INFLUENCE, GL_INT, sizeof(Vertex),
+                         (void*)offsetof(Vertex, boneIDs));
+  glEnableVertexAttribArray(7);
+  glVertexAttribPointer(7, MAX_BONE_INFLUENCE, GL_FLOAT, GL_FALSE,
+                        sizeof(Vertex), (void*)offsetof(Vertex, weights));
 
   glBindVertexArray(0);
 
@@ -788,6 +859,11 @@ void Draw(const Shader& shader, const Mesh& mesh, const Material& material) {
 
 void Draw(const Shader& shader, const Model& model,
           const glm::mat4& transform) {
+  Draw(shader, model, transform, nullptr, 0);
+}
+
+void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
+          const glm::mat4* bones, int count) {
   // Per-model palette uniform — paletteSize == 0 short-circuits the
   // quantizer in fragment_gbuffer.glsl. Setting these on shaders that
   // don't declare the uniforms (shadow/outline) is a cached -1 no-op.
@@ -797,10 +873,24 @@ void Draw(const Shader& shader, const Model& model,
     shader.setVec3Array("palette", paletteSize,
                         reinterpret_cast<const float*>(model.palette.data()));
   }
+
+  // useSkinning gates the bone path in the vertex shader. We only upload
+  // the matrices when actually used; non-skinned draws pay one setInt and
+  // skip the (up to) 6.4 KB matrix upload entirely.
+  const bool useSkinning = bones != nullptr && count > 0 && model.skinned;
+  shader.setInt("useSkinning", useSkinning ? 1 : 0);
+  if (useSkinning) {
+    shader.setMat4Array("finalBonesMatrices", count,
+                        reinterpret_cast<const float*>(bones));
+  }
+
   for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
     const Mesh& mesh = model.meshes[meshIdx];
     const Material& material = model.materials[mesh.materialIndex];
-    glm::mat4 final = transform * instanceTransform;
+    // For skinned models the bone palette already places vertices in model
+    // space; applying the per-mesh node transform on top double-applies the
+    // skeleton's root scale/rotation.
+    glm::mat4 final = useSkinning ? transform : transform * instanceTransform;
     glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
     shader.setMat4("model", final);
     shader.setMat3("normalMatrix", normalMatrix);

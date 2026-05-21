@@ -348,7 +348,56 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
   glDepthFunc(GL_LESS);
 }
 
-static void renderEntities(const Shader& shader, ClientGame& game,
+// Advances every entity's Animator and drops cache entries for entities
+// that no longer exist or no longer reference a skinned model.
+static void updateAnimators(Graphics& gfx, ClientGame& game, float dt) {
+  auto& reg = game.renderRegistry;
+  auto view = reg.view<shared::Entity, shared::RenderInfo>();
+  for (auto ent : view) {
+    auto& renderInfo = view.get<shared::RenderInfo>(ent);
+    auto modelIt = gfx.models.find(renderInfo.modelName);
+    if (modelIt == gfx.models.end() || !modelIt->second ||
+        !modelIt->second->skinned) {
+      gfx.animators.erase(ent);
+      continue;
+    }
+    Model* modelAsset = modelIt->second;
+
+    auto libIt = gfx.animationLibraries.find(renderInfo.modelName);
+    if (libIt == gfx.animationLibraries.end()) {
+      libIt = gfx.animationLibraries
+                  .emplace(renderInfo.modelName,
+                           std::make_unique<AnimationLibrary>(modelAsset))
+                  .first;
+    }
+    if (libIt->second->empty()) {
+      gfx.animators.erase(ent);
+      continue;
+    }
+
+    std::string clipName;
+    if (auto* state = reg.try_get<shared::AnimationState>(ent)) {
+      clipName = state->clipName;
+    }
+    auto& animator = gfx.animators[ent];
+    Animation* clip = libIt->second->find(clipName);
+    if (clip && clip != animator.current()) {
+      animator.play(clip);
+    }
+    animator.update(dt);
+  }
+  // Drop animator entries for entities that were destroyed this frame.
+  for (auto it = gfx.animators.begin(); it != gfx.animators.end();) {
+    if (!reg.valid(it->first)) {
+      it = gfx.animators.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+static void renderEntities(const Shader& shader, Graphics& gfx,
+                           ClientGame& game,
                            std::unordered_map<std::string, Model*>& models,
                            bool forShadowPass = false) {
   auto view = game.renderRegistry
@@ -388,7 +437,20 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     model = model * glm::mat4_cast(rotation) *
             glm::mat4_cast(modelAsset->orientation);
 
-    Draw(shader, *modelAsset, model);
+    // Skinned path: hand the Animator's bone palette through to Draw, but
+    // only as many matrices as this model actually uses. Cuts uniform
+    // bandwidth from MAX_BONES*64B to boneCount*64B.
+    const glm::mat4* bones = nullptr;
+    int boneCount = 0;
+    if (modelAsset->skinned) {
+      auto animIt = gfx.animators.find(ent);
+      if (animIt != gfx.animators.end()) {
+        const auto& palette = animIt->second.finalBoneMatrices();
+        bones = palette.data();
+        boneCount = std::min(modelAsset->boneCount, MAX_BONES);
+      }
+    }
+    Draw(shader, *modelAsset, model, bones, boneCount);
   }
 }
 
@@ -1065,6 +1127,15 @@ void Graphics::render(ClientGame& game) {
     prevShadowsEnabled = settings.shadowsEnabled;
   }
 
+  // Advance per-entity animators using real wallclock dt (independent of the
+  // server tick). Only animated, skinned entities pay any work here.
+  const double now = glfwGetTime();
+  const float dt = lastFrameTime == 0.0
+                       ? 0.0f
+                       : static_cast<float>(now - lastFrameTime);
+  lastFrameTime = now;
+  updateAnimators(*this, game, dt);
+
   projection = glm::perspective(
       glm::radians(settings.fovDegrees),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight),
@@ -1104,7 +1175,8 @@ void Graphics::render(ClientGame& game) {
     shadowDirShader->use();
     shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
     shadowDirShader->setFloat("alphaCutoff", settings.shadowAlphaCutoff);
-    renderEntities(*shadowDirShader, game, models, /*forShadowPass=*/true);
+    renderEntities(*shadowDirShader, *this, game, models,
+                   /*forShadowPass=*/true);
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
@@ -1138,7 +1210,7 @@ void Graphics::render(ClientGame& game) {
                                   pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
         shadowPointShader->setMat4("lightSpaceMatrix", pointMats[slot * 6 + f]);
-        renderEntities(*shadowPointShader, game, models,
+        renderEntities(*shadowPointShader, *this, game, models,
                        /*forShadowPass=*/true);
       }
     }
@@ -1160,7 +1232,7 @@ void Graphics::render(ClientGame& game) {
     gbufferShader->setInt("textureQuantizeLevels",
                           settings.textureQuantizeLevels);
     // paletteSize + palette uniforms are bound per Model inside Draw().
-    renderEntities(*gbufferShader, game, models);
+    renderEntities(*gbufferShader, *this, game, models);
   }
 
   if (settings.ssaoEnabled && ssaoShader && ssaoShader->valid()) {

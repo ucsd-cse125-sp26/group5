@@ -61,6 +61,15 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.70710678f,
      .qz = 0.70710678f,
      .cubeSpec = nullptr},
+    // DAE export is Y-up; rotate +90° about X so the vampire stands upright
+    // in the game's Z-up world. Skinned mesh — Animator will drive it.
+    {.name = "vampire",
+     .filename = "assets/vampire/dancing_vampire.dae",
+     .qw = 0.70710678f,
+     .qx = 0.70710678f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = nullptr},
 };
 
 inline constexpr std::size_t ASSET_COUNT = sizeof(ASSETS) / sizeof(ASSETS[0]);
