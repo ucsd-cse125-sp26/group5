@@ -55,8 +55,16 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 - Worked with Jacob to resolve two issues:
   - Scatter logic: decided duplicate meshes are acceptable without grouping.
   - Toon shading, landscape baking, and lighting.
-- Finished all 4 skyboxes.
+- Finished all 4 skyboxes and gave to jacob to use. 
 - Coming week: finish up the full landscape, wrap up asset work, and collaborate more closely with the game logic team for full game integration.
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week6/rebecca/1.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/2.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/3.jpg' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week6/rebecca/4.jpg' | relative_url }}" alt="Note">
+</div>
+
 
 **Sarah**
 - Attempting to model Gurf, but no progress yet due to CSE 123 workload.
