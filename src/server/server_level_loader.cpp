@@ -26,8 +26,8 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::PuzzleComponent>(puzzleTengram);
 
   // entity holding game progress for each season
-  // Shared memory spirit for maze grid (logic only; minimal rendering if
-  // synced later).
+  // Shared memory spirit: visible green piece players move through the maze
+  // toward the orange goal marker.
   auto [spiritNumericId, spiritEnt] = new_entity(game);
   (void)spiritNumericId;
   game.registry.emplace<shared::MazeSpiritGrid>(
@@ -35,11 +35,11 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::Position>(spiritEnt, 0.0f, 0.0f, 0.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(spiritEnt, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(spiritEnt, "cube", 0.8f, 0.8f,
+  game.registry.emplace<shared::RenderInfo>(spiritEnt, "start_cube", 0.8f, 0.8f,
                                             0.8f);
   game.registry.emplace<shared::MazeTag>(spiritEnt);
   JPH::BodyID spiritBody = game.physics.createPlayerBody(
-      "cube", glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+      "start_cube", glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
       glm::vec3(0.8f));
   game.registry.emplace<shared::PhysicsBody>(
       spiritEnt, spiritBody.GetIndexAndSequenceNumber());

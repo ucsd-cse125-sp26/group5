@@ -25,6 +25,16 @@ std::optional<CameraState> computeCamera(const ClientGame& game);
 enum class DebugChannel {
   Off,
   DirShadowMap,
+  GPosition,
+  GNormal,
+  GAlbedo,
+  GSpecular,
+  GEmissive,
+  Ssao,
+  SsaoBlur,
+  LitColor,
+  BrightColor,
+  LdrColor,
   Count,
 };
 

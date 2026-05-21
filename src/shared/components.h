@@ -156,4 +156,11 @@ struct FragmentComponent {
   SectionSeasonMap season;
   bool isPickedUp;
 };
+
+// Overworld mini-board puzzle (four players, shared green piece).
+struct OverworldMazePuzzleState {
+  bool active = false;
+};
+
+struct OverworldMazePiece {};
 }  // namespace shared
