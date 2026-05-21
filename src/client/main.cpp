@@ -41,15 +41,22 @@ int main() {
   InputKeys prevKeys = 0;
 
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
-  while (!glfwWindowShouldClose(graphics.window)) {
-    SIMPLE_PROFILE_FRAME_START();
 
+  float lastTime = (float)glfwGetTime();
+
+  while (!glfwWindowShouldClose(graphics.window)) {
+    // add dt calculation at top of loop
+    float currentTime = (float)glfwGetTime();
+    float dt = currentTime - lastTime;
+    lastTime = currentTime;
+
+    SIMPLE_PROFILE_FRAME_START();
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
-      std::scoped_lock lock(game.snapshotMutex);
-      syncToRender(game);
-      game.snapshotDirty.store(false, std::memory_order_release);
+        std::scoped_lock lock(game.snapshotMutex);
+        syncToRender(game);
+        game.snapshotDirty.store(false, std::memory_order_release);
     }
-    // get listener position from camera entity
+
     float lx = 0, ly = 0, lz = 0;
     float fwdX = 0, fwdY = 1, fwdZ = 0;
     auto camView = game.renderRegistry.view<shared::Position, shared::Camera>();
@@ -58,14 +65,14 @@ int main() {
         lx = pos.x; ly = pos.y; lz = pos.z;
         break;
     }
+
     game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
-    updateSoundEmitters(game, lx, ly, lz);
-    printf("Listener pos: %.1f %.1f %.1f\n", lx, ly, lz);
+    updateSoundEmitters(game, lx, ly, lz, dt);  // pass dt
 
     graphics.render(game);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");
-      game.audio.update();
+      game.audio.update(dt);
     }
     graphics.swap();
     glfwPollEvents();

@@ -39,4 +39,4 @@ void processInput(GLFWwindow* window,
                   InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
 void updateSoundEmitters(ClientGame& game,
-                          float listenerX, float listenerY, float listenerZ);
+                          float listenerX, float listenerY, float listenerZ, float dt);

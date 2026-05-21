@@ -90,6 +90,7 @@ class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
 
  private:
   JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
+
 };
 
 class ObjectVsBroadPhaseLayerFilterImpl
@@ -141,10 +142,11 @@ class PhysicsEngine {
     return physicsSystem.GetBodyInterface();
   }
 
-  void destroyBody(uint32_t bodyId) {
-    JPH::BodyID joltId(bodyId);
-    getBodyInterface().RemoveBody(joltId);
-    getBodyInterface().DestroyBody(joltId);
+  void destroyBody(uint32_t bodyId)   {
+      JPH::BodyID joltId(bodyId);
+      bodyFootOffset_.erase(joltId.GetIndexAndSequenceNumber());
+      getBodyInterface().RemoveBody(joltId);
+      getBodyInterface().DestroyBody(joltId);
   }
 
   // Dynamic player body. Rotation DOFs are locked; rotation is driven by
@@ -152,7 +154,7 @@ class PhysicsEngine {
   JPH::BodyID createPlayerBody(const std::string& modelName,
                                const glm::vec3& pos, const glm::quat& rot,
                                const glm::vec3& scale);
-
+  bool isBodyGrounded(JPH::BodyID bodyId, float checkDistance = 0.2f);
   // Asset orientation is baked into the shape so the body's rotation can
   // stay equal to the entity's rotation. `centerOffsetMask` is multiplied
   // per-axis with the AABB's local-space center before baking — use (0,0,1)
@@ -191,6 +193,7 @@ class PhysicsEngine {
                             const glm::quat& rot, const glm::vec3& scale);
 
  private:
+  std::unordered_map<uint32_t, float> bodyFootOffset_; 
   struct BoxExtents {
     glm::vec3 center;
     glm::vec3 halfExtents;
