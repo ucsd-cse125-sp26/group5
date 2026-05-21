@@ -17,6 +17,7 @@
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "shared/gpu_mem_profiler.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
 #include "shared/util.h"
@@ -45,9 +46,11 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
                vertices.data(), GL_STATIC_DRAW);
+  GPU_MEM_ADD("ModelGeometry", vertices.size() * sizeof(Vertex));
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
                indices.data(), GL_STATIC_DRAW);
+  GPU_MEM_ADD("ModelGeometry", indices.size() * sizeof(GLuint));
 
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
@@ -161,6 +164,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, pixelOrder,
                    GL_UNSIGNED_BYTE, pixels);
       glGenerateMipmap(GL_TEXTURE_2D);
+      GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
     } else {
       std::fprintf(stderr,
                    "loadMaterial: failed to decode texture \"%s\" "
@@ -169,6 +173,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       uint8_t magenta[4] = {255, 0, 255, 255};
       glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA,
                    GL_UNSIGNED_BYTE, magenta);
+      GPU_MEM_TEX2D("ModelTextures", internal, 1, 1);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
@@ -212,6 +217,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
   glBindTexture(GL_TEXTURE_2D, id);
   glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pixel);
+  GPU_MEM_TEX2D("ModelTextures", internal, 1, 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -253,6 +259,7 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   glBindTexture(GL_TEXTURE_2D, id);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pixel);
+  GPU_MEM_TEX2D("ModelTextures", GL_RGBA8, 1, 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   return id;
@@ -325,6 +332,7 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, 6, 1, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, spec.palette);
+  GPU_MEM_TEX2D("ModelTextures", GL_SRGB8_ALPHA8, 6, 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -333,8 +341,10 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   Material material;
   material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
   material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
-  material.specular = {.constant = glm::vec3(1.0f),
-                       .texture = makeSolidTexture(255, 255, 255, 255)};
+  // Match the Assimp path's "missing = black" convention; white here pins
+  // specular to max on every surface and blooms blow out the frame.
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {
       .constant = glm::vec3(1.0f),
       .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
@@ -579,12 +589,14 @@ static GLuint loadCubemap(const std::string& directory) {
     if (data) {
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8,
                    width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, width, height);
       stbi_image_free(data);
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, 1, 1,
                    0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
+      GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, 1, 1);
     }
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -626,6 +638,7 @@ Skybox loadSkybox(const std::string& directory) {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
                GL_STATIC_DRAW);
+  GPU_MEM_ADD("SkyboxGeometry", sizeof(skyboxVertices));
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
   glBindVertexArray(0);

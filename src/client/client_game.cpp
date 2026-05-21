@@ -130,7 +130,30 @@ void syncToRender(ClientGame& game) {
 
 // ── Input ────────────────────────────────────────────────
 
-void processInput(GLFWwindow* window,
+bool isOverworldMazePuzzleActive(const ClientGame& game) {
+  auto view = game.renderRegistry.view<shared::OverworldMazePuzzleState>();
+  for (auto ent : view) {
+    if (view.get<shared::OverworldMazePuzzleState>(ent).active) return true;
+  }
+  return false;
+}
+
+bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
+  if (!isOverworldMazePuzzleActive(game)) return false;
+
+  auto it = game.renderEntityMap.find(game.renderEntityId);
+  if (it == game.renderEntityMap.end() ||
+      !game.renderRegistry.valid(it->second)) {
+    return false;
+  }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
+    return false;
+  }
+  return game.renderRegistry.get<shared::RenderInfo>(it->second).modelName ==
+         "cube";
+}
+
+void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys) {
   InputKeys keys = 0;
@@ -145,17 +168,41 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
-  if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) keys |= KEY_ENTER_MAZE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
   if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
 
-  // Maze spirit (2D grid); sent to server while in maze mode.
-  if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) keys |= KEY_SPIRIT_UP;
-  if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) keys |= KEY_SPIRIT_DOWN;
-  if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) keys |= KEY_SPIRIT_LEFT;
-  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-    keys |= KEY_SPIRIT_RIGHT;
-  if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) keys |= KEY_MAZE_COLLECT;
+  // Overworld preview board: each client controls one direction on the shared
+  // green piece (slot 1=up, 2=down, 3=left, 4=right).
+  if (isLocalOverworldMazePuzzleControl(game)) {
+    auto it = game.renderEntityMap.find(game.renderEntityId);
+    uint8_t slot = 1;
+    if (it != game.renderEntityMap.end() &&
+        game.renderRegistry.valid(it->second) &&
+        game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
+      slot = game.renderRegistry.get<shared::RenderInfo>(it->second).playerSlot;
+      if (slot < 1 || slot > 4) slot = 1;
+    }
+    switch (slot) {
+      case 1:
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_UP;
+        break;
+      case 2:
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_DOWN;
+        break;
+      case 3:
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_LEFT;
+        break;
+      case 4:
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_RIGHT;
+        break;
+      default:
+        break;
+    }
+  }
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
