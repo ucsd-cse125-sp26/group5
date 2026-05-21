@@ -4,7 +4,7 @@ title: Sarah Balatbat — Individual Report
 permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
-[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/week1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/week2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/week3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/week4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/week5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/week6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/week7' | relative_url}})
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week7' | relative_url}})
 
 
 <!-- Sarah's template 
