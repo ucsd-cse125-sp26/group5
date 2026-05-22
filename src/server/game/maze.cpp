@@ -11,8 +11,10 @@
 
 #include "server/game/maze_spirit_control.h"
 #include "server/server_game.h"
+#include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/net/packet_utils.h"
 
 namespace {
 
@@ -239,6 +241,20 @@ void CollectMazeFragment(ServerGame& game) {
   }
   printf(
       "[GameLogic] CollectMazeFragment: winter done, sections completed++\n");
+
+  // Reveal the winter fragment now that the puzzle is solved.
+  auto fragView =
+      game.registry.view<shared::FragmentComponent, shared::OverworldTag>();
+  for (auto fragEnt : fragView) {
+    if (game.registry.get<shared::FragmentComponent>(fragEnt).season !=
+        shared::SectionSeasonMap::WINTER)
+      continue;
+    if (!game.registry.all_of<shared::RenderInfo>(fragEnt)) {
+      game.registry.emplace<shared::RenderInfo>(fragEnt, "light_cube", 1.0f,
+                                                1.0f, 1.0f);
+    }
+    break;
+  }
 }
 
 bool HasUnlockedWinterSection(const ServerGame& game) {
