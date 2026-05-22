@@ -94,7 +94,7 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::SectionDoorComponent>(
       winterDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      winterSectionID);      
+      winterSectionID);
   game.registry.emplace<shared::OverworldTag>(winterDoor);
 
   auto [fallDoorID, fallDoor] = new_entity(game);
@@ -103,7 +103,7 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::SectionDoorComponent>(
       fallDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      fallSectionID);          
+      fallSectionID);
   game.registry.emplace<shared::OverworldTag>(fallDoor);
 
   auto [summerDoorID, summerDoor] = new_entity(game);
@@ -112,11 +112,11 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::SectionDoorComponent>(
       summerDoor, shared::DoorState::CLOSED,
       static_cast<uint8_t>(4),  // required players to open
-      summerSectionID);         
+      summerSectionID);
   game.registry.emplace<shared::OverworldTag>(summerDoor);
 
   auto [winterFragmentID, winterFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(winterFragment, 65.0f, 80.0f, 0.0f,
+  game.registry.emplace<shared::Position>(winterFragment, 65.0f, 80.0f, 10.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   // RenderInfo is intentionally omitted: the winter fragment is invisible until
   // CollectMazeFragment adds it when the maze puzzle is solved.

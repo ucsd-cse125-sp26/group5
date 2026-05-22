@@ -2,11 +2,11 @@
 
 #include <cstdio>
 
+#include "server/game/maze.h"
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "shared/components.h"
 #include "shared/input.h"
-#include "server/game/maze.h"
 
 namespace {
 
@@ -78,11 +78,11 @@ void ProcessFragmentPickups(ServerGame& game) {
         if (fragment.season == shared::SectionSeasonMap::WINTER) {
           CollectMazeFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::FALL) {
-          //CollectFallFragment(game);
+          // CollectFallFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
-          //CollectSummerFragment(game);
+          // CollectSummerFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
-          //CollectSpringFragment(game);
+          // CollectSpringFragment(game);
         }
 
         bool shouldRestore = false;
