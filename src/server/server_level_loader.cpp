@@ -125,7 +125,7 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(winterFragment);
 
   auto [fallFragmentID, fallFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(fallFragment, 130.0f, 65.0f, 100.0f,
+  game.registry.emplace<shared::Position>(fallFragment, 130.0f, 65.0f, 22.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   // for testing, fragments will be light cubes
   game.registry.emplace<shared::RenderInfo>(fallFragment, "light_cube", 0.5f);
@@ -134,7 +134,7 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(fallFragment);
 
   auto [summerFragmentID, summerFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f, 100.0f,
+  game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f, 45.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   // for testing, fragments will be light cubes
   game.registry.emplace<shared::RenderInfo>(summerFragment, "light_cube", 0.5f);
@@ -143,7 +143,7 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(summerFragment);
 
   auto [springFragmentID, springFragment] = new_entity(game);
-  game.registry.emplace<shared::Position>(springFragment, -65.0f, 0.0f, 100.0f,
+  game.registry.emplace<shared::Position>(springFragment, -65.0f, 0.0f, 70.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   // for testing, fragments will be light cubes
   game.registry.emplace<shared::RenderInfo>(springFragment, "light_cube", 0.5f);
