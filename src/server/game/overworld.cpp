@@ -6,6 +6,7 @@
 #include "server/server_memory_system.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "server/game/maze.h"
 
 namespace {
 
@@ -55,6 +56,8 @@ void ProcessFragmentPickups(ServerGame& game) {
     auto& fragment = fragmentView.get<shared::FragmentComponent>(fragEntity);
     if (fragment.isPickedUp) continue;
 
+    if (!game.registry.all_of<shared::RenderInfo>(fragEntity)) continue;
+
     const auto& fragPos = fragmentView.get<shared::Position>(fragEntity);
 
     for (auto playerEntity : playerView) {
@@ -71,13 +74,15 @@ void ProcessFragmentPickups(ServerGame& game) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
 
-        auto sectionView = game.registry.view<shared::SectionController>();
-        for (auto secEntity : sectionView) {
-          auto& section = sectionView.get<shared::SectionController>(secEntity);
-          if (section.type == fragment.season) {
-            section.completed = true;
-            break;
-          }
+        // Delegate section completion to the appropriate puzzle collector.
+        if (fragment.season == shared::SectionSeasonMap::WINTER) {
+          CollectMazeFragment(game);
+        } else if (fragment.season == shared::SectionSeasonMap::FALL) {
+          //CollectFallFragment(game);
+        } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
+          //CollectSummerFragment(game);
+        } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
+          //CollectSpringFragment(game);
         }
 
         bool shouldRestore = false;
