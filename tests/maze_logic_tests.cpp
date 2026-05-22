@@ -160,14 +160,14 @@ TEST(HubLogic, GatherAndOpenDoorAfterWinterDone) {
   makePlayer(0.0f, 1.0f);
   makePlayer(1.0f, 1.0f);
 
-  GatherAtExitSwitch(game, switchEnt, -0.5f, -0.5f, 1.5f, 1.5f, 4u);
+  GatherAtExitSwitch(game, switchEnt, -0.5f, -0.5f, 1.5f, 1.5f, 4u, shared::SectionSeasonMap::WINTER);
   EXPECT_TRUE(game.registry.get<shared::SwitchComponent>(switchEnt).switchOn);
 
   auto [gsId, gsEnt] = new_entity(game);
   game.registry.emplace<shared::GameSection>(
       gsEnt, shared::SectionSeasonMap::WINTER, static_cast<uint8_t>(1));
 
-  OpenSectionDoor(game, doorEnt, switchEnt, fallEnt);
+  OpenSectionDoor(game, doorEnt, switchEnt, fallEnt, shared::SectionSeasonMap::WINTER, shared::SectionSeasonMap::FALL);
 
   EXPECT_EQ(game.registry.get<shared::SectionDoorComponent>(doorEnt).state,
             shared::DoorState::OPEN);
