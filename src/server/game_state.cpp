@@ -335,18 +335,22 @@ void initWorldEntities(ServerGame& game) {
   // Section barriers — TODO: replace positions/sizes once you have map coords
   spawnSectionBarrier<shared::OverworldTag>(game,
       /*sectionID=*/0,
-      /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
-      /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
-  // spawnSectionBarrier<shared::OverworldTag>(game,
-  //     /*sectionID=*/1,
-  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
-  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
-  // spawnSectionBarrier<shared::OverworldTag>(game,
-  //     /*sectionID=*/2,
-  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
-  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+      /*season=*/shared::SectionSeasonMap::WINTER,
+      /*pos=*/glm::vec3(90.0f, 52.5f, 20.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 52.5f, 10.0f));
+  spawnSectionBarrier<shared::OverworldTag>(game,
+      /*sectionID=*/1,
+      /*season=*/shared::SectionSeasonMap::FALL,
+      /*pos=*/glm::vec3(122.5f, -10.0f, 42.0f),
+      /*halfExtents=*/glm::vec3(47.5f, 1.0f, 10.0f));
+  spawnSectionBarrier<shared::OverworldTag>(game,
+      /*sectionID=*/2,
+      /*season=*/shared::SectionSeasonMap::SUMMER,
+      /*pos=*/glm::vec3(15.0f, -52.5f, 70.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 52.5f, 18.0f));
   // spawnSectionBarrier<shared::OverworldTag>(game,
   //     /*sectionID=*/3,
+  //     /*season=*/shared::SectionSeasonMap::SPRING,
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
@@ -481,31 +485,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
   render_model_change(game, dt);
 
-  // Check SectionControllers — if completed, flag their barriers for removal
-  auto sectionView = game.registry.view<shared::SectionController>();
-  for (auto ent : sectionView) {
-      auto& sc = game.registry.get<shared::SectionController>(ent);
-      if (!sc.completed) continue;
-      auto barrierView = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
-      for (auto barrier : barrierView) {
-          auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
-          if (tag.sectionID == sc.puzzleID) {
-              if (!game.registry.all_of<shared::SectionBarrierPendingRemoval>(barrier)) {
-                  game.registry.emplace<shared::SectionBarrierPendingRemoval>(barrier);
-              }
-          }
-      }
-  }
-
-  // Destroy barriers flagged for removal
-  auto pendingView = game.registry.view<shared::SectionBarrierPendingRemoval,
-                                         shared::PhysicsBody,
-                                         shared::OverworldTag>();
-  for (auto barrier : pendingView) {
-      auto& phys = pendingView.get<shared::PhysicsBody>(barrier);
-      game.physics.destroyBody(phys.bodyId);
-      game.registry.destroy(barrier);
-  }
+  auto inputView = game.registry.view<shared::PlayerInput>();
 
   // DEBUG: press B to complete section 0
   for (auto ent : inputView) {
