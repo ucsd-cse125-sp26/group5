@@ -236,13 +236,11 @@ void processInput(GLFWwindow* window, const ClientGame& game,
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
-<<<<<<< HEAD
-  if (debugMode) {
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) keys |= KEY_DEBUG_COMPLETE_SECTION;  // DEBUG: complete section 0
-    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) keys |= KEY_DEBUG_TOGGLE_BARRIERS; // DEBUG: toggle barrier visibility
-  }
-=======
   if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
+  if (debugMode) {
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS) keys |= KEY_DEBUG_COMPLETE_SECTION;
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) keys |= KEY_DEBUG_TOGGLE_BARRIERS;
+  }
 
   // Overworld preview board: each client controls one direction on the shared
   // green piece (slot 1=up, 2=down, 3=left, 4=right).
@@ -276,8 +274,6 @@ void processInput(GLFWwindow* window, const ClientGame& game,
         break;
     }
   }
-
->>>>>>> main
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
   float mouseDx = 0.0f, mouseDy = 0.0f;

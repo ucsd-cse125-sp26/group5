@@ -27,6 +27,7 @@ struct StaticEntityDesc {
 template <typename WorldTag>
 entt::entity spawnSectionBarrier(ServerGame& game,
                                   uint8_t sectionID,
+                                  shared::SectionSeasonMap season,
                                   const glm::vec3& pos,
                                   const glm::vec3& halfExtents) {
     auto [id, entity] = new_entity(game);
@@ -37,7 +38,7 @@ entt::entity spawnSectionBarrier(ServerGame& game,
         rot.w, rot.x, rot.y, rot.z);
     game.registry.template emplace<WorldTag>(entity);
     game.registry.template emplace<shared::SectionBarrierTag>(
-        entity, sectionID, halfExtents);
+        entity, sectionID, halfExtents, season);
 
     // start visible by default for debugging
     game.registry.template emplace<shared::RenderInfo>(

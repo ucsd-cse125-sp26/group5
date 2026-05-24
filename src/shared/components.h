@@ -155,8 +155,9 @@ struct SwitchComponent {
 
 // Tag component — marks this entity as a section barrier
 struct SectionBarrierTag {
-    uint8_t sectionID;  // matches SectionController's puzzleID
-    glm::vec3 halfExtents; 
+    uint8_t sectionID;      // matches SectionController's puzzleID
+    glm::vec3 halfExtents;
+    SectionSeasonMap season;
 };
 
 // Flag component — added to a barrier when it should be torn down
