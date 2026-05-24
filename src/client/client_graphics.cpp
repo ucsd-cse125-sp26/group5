@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "client/asset.h"
+#include "client/client_game.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -20,7 +22,10 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/gpu_mem_profiler.h"
+#include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
+#include "shared/maze_preview.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 
@@ -209,10 +214,27 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
           selfIt->second)) {
     return std::nullopt;
   }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(selfIt->second)) {
+    return std::nullopt;
+  }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
+  const auto& selfRender =
+      game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
+
+  // During the preview-board puzzle only; after exit, normal FPS view
+  // immediately.
+  if (selfRender.modelName == "cube" && isOverworldMazePuzzleActive(game)) {
+    const glm::vec3 target(shared::maze_preview::kLookAtX,
+                           shared::maze_preview::kLookAtY,
+                           shared::maze_preview::kLookAtZ);
+    glm::mat4 view = glm::lookAt(pos, target, worldUp);
+    return CameraState{.position = pos, .view = view};
+  }
+
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
@@ -223,7 +245,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
   glm::vec3 forward = yawRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
-  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
   glm::mat4 view = glm::lookAt(pos, pos + forward, worldUp);
   return CameraState{.position = pos, .view = view};
 }
@@ -297,9 +318,18 @@ static void renderEntities(const Shader& shader, ClientGame& game,
     } else {
       if (entity.id == game.renderEntityId) continue;
     }
-    auto it = models.find(renderInfo.modelName);
-    if (it == models.end() || !it->second) continue;
-    Model* modelAsset = it->second;
+    std::string modelKey = renderInfo.modelName;
+    if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
+        renderInfo.modelName == "cube") {
+      modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+    }
+    auto it = models.find(modelKey);
+    Model* modelAsset = it != models.end() ? it->second : nullptr;
+    if (!modelAsset) {
+      auto fallbackIt = models.find(renderInfo.modelName);
+      modelAsset = fallbackIt != models.end() ? fallbackIt->second : nullptr;
+    }
+    if (!modelAsset) continue;
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     auto model = glm::identity<glm::mat4>();
     model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
@@ -400,6 +430,8 @@ bool Graphics::load(int width, int height) {
   glBindTexture(GL_TEXTURE_2D, dirShadowMap);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, kDirShadowMapSize,
                kDirShadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  GPU_MEM_TEX2D("ShadowDir", GL_DEPTH_COMPONENT24, kDirShadowMapSize,
+                kDirShadowMapSize);
   // LINEAR + COMPARE_REF_TO_TEXTURE → 2×2 hardware PCF per tap.
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -430,6 +462,8 @@ bool Graphics::load(int width, int height) {
   glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT24,
                kPointShadowSize, kPointShadowSize, kPointShadowLayers, 0,
                GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  GPU_MEM_TEX3D("ShadowPoint", GL_DEPTH_COMPONENT24, kPointShadowSize,
+                kPointShadowSize, kPointShadowLayers);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S,
@@ -460,6 +494,7 @@ bool Graphics::load(int width, int height) {
   glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
   glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraUBOData), nullptr,
                GL_DYNAMIC_DRAW);
+  GPU_MEM_ADD("UBO", sizeof(CameraUBOData));
   glBindBufferBase(GL_UNIFORM_BUFFER, kCameraUBOBinding, cameraUBO);
   for (auto* s : {&*gbufferShader, &*lightingShader, &*ssaoShader}) {
     bindCameraBlock(s->id());
@@ -493,6 +528,7 @@ bool Graphics::load(int width, int height) {
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT,
                  noise.data());
+    GPU_MEM_TEX2D("SSAONoise", GL_RGB16F, 4, 4);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -511,6 +547,16 @@ bool Graphics::load(int width, int height) {
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
     printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+  }
+
+  for (uint8_t s = 1; s <= 4; s++) {
+    std::string name = "cube_slot" + std::to_string(s);
+    Model* m = makePlayerSlotCubeModel(shared::CUBE_RAINBOW, s);
+    if (m) {
+      m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[name] = m;
+      printf("Loaded asset: %s (player join order)\n", name.c_str());
+    }
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
@@ -546,6 +592,14 @@ void Graphics::resizeBuffers(int width, int height) {
       glm::radians(45.0f),
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight), 0.1f, 500.0f);
 
+  // Same texture names get reallocated to the new dimensions, so reset the
+  // categories before re-adding their byte sizes below.
+  GPU_MEM_CLEAR("GBuffer");
+  GPU_MEM_CLEAR("LitHDR");
+  GPU_MEM_CLEAR("PingPong");
+  GPU_MEM_CLEAR("SSAO");
+  GPU_MEM_CLEAR("LDR");
+
   // gPosition: full FP32 — half-float quantizes distant world-space neighbors
   // to the same value, breaking SSAO. Normal fits in RGBA16F; albedo,
   // specular, and emissive fit in RGBA8.
@@ -574,10 +628,16 @@ void Graphics::resizeBuffers(int width, int height) {
   allocColor(gAlbedo, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gSpecular, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
   allocColor(gEmissive, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA32F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA16F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("GBuffer", GL_RGBA8, fbWidth, fbHeight);
 
   glBindRenderbuffer(GL_RENDERBUFFER, gBufferDepth);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
+  GPU_MEM_RENDERBUFFER("GBuffer", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -618,10 +678,13 @@ void Graphics::resizeBuffers(int width, int height) {
   };
   allocHDR(litColor);
   allocHDR(brightColor);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
+  GPU_MEM_TEX2D("LitHDR", GL_RGBA16F, fbWidth, fbHeight);
 
   glBindRenderbuffer(GL_RENDERBUFFER, litDepth);
   glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH32F_STENCIL8, fbWidth,
                         fbHeight);
+  GPU_MEM_RENDERBUFFER("LitHDR", GL_DEPTH32F_STENCIL8, fbWidth, fbHeight);
 
   glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
@@ -638,6 +701,7 @@ void Graphics::resizeBuffers(int width, int height) {
     if (!pingFBO[i]) glGenFramebuffers(1, &pingFBO[i]);
     if (!pingColor[i]) glGenTextures(1, &pingColor[i]);
     allocHDR(pingColor[i]);
+    GPU_MEM_TEX2D("PingPong", GL_RGBA16F, fbWidth, fbHeight);
     glBindFramebuffer(GL_FRAMEBUFFER, pingFBO[i]);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                            pingColor[i], 0);
@@ -652,6 +716,7 @@ void Graphics::resizeBuffers(int width, int height) {
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, fbWidth, fbHeight, 0, GL_RED,
                  GL_FLOAT, nullptr);
+    GPU_MEM_TEX2D("SSAO", GL_R16F, fbWidth, fbHeight);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -675,6 +740,7 @@ void Graphics::resizeBuffers(int width, int height) {
   glBindTexture(GL_TEXTURE_2D, ldrColor);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fbWidth, fbHeight, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, nullptr);
+  GPU_MEM_TEX2D("LDR", GL_RGBA8, fbWidth, fbHeight);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -794,6 +860,36 @@ void Graphics::cycleDebugChannel() {
     case DebugChannel::DirShadowMap:
       name = "DirShadowMap";
       break;
+    case DebugChannel::GPosition:
+      name = "GPosition";
+      break;
+    case DebugChannel::GNormal:
+      name = "GNormal";
+      break;
+    case DebugChannel::GAlbedo:
+      name = "GAlbedo";
+      break;
+    case DebugChannel::GSpecular:
+      name = "GSpecular";
+      break;
+    case DebugChannel::GEmissive:
+      name = "GEmissive";
+      break;
+    case DebugChannel::Ssao:
+      name = "SSAO";
+      break;
+    case DebugChannel::SsaoBlur:
+      name = "SSAOBlur";
+      break;
+    case DebugChannel::LitColor:
+      name = "LitColor";
+      break;
+    case DebugChannel::BrightColor:
+      name = "BrightColor";
+      break;
+    case DebugChannel::LdrColor:
+      name = "LdrColor";
+      break;
     case DebugChannel::Count:
       break;
   }
@@ -817,10 +913,53 @@ void Graphics::drawDebugOverlay() {
   if (debugChannel == DebugChannel::Off) return;
   if (!debugOverlay || !debugOverlay->valid() || !fullscreenVAO) return;
 
+  // mode: 0=direct rgb, 1=normal-vis, 2=HDR tonemap, 3=single R as gray.
   GLuint texToShow = 0;
+  int mode = 0;
   switch (debugChannel) {
     case DebugChannel::DirShadowMap:
       texToShow = dirShadowMap;
+      mode = 3;
+      break;
+    case DebugChannel::GPosition:
+      texToShow = gPosition;
+      mode = 2;
+      break;
+    case DebugChannel::GNormal:
+      texToShow = gNormal;
+      mode = 1;
+      break;
+    case DebugChannel::GAlbedo:
+      texToShow = gAlbedo;
+      mode = 0;
+      break;
+    case DebugChannel::GSpecular:
+      texToShow = gSpecular;
+      mode = 0;
+      break;
+    case DebugChannel::GEmissive:
+      texToShow = gEmissive;
+      mode = 0;
+      break;
+    case DebugChannel::Ssao:
+      texToShow = ssaoColor;
+      mode = 3;
+      break;
+    case DebugChannel::SsaoBlur:
+      texToShow = ssaoBlurColor;
+      mode = 3;
+      break;
+    case DebugChannel::LitColor:
+      texToShow = litColor;
+      mode = 2;
+      break;
+    case DebugChannel::BrightColor:
+      texToShow = brightColor;
+      mode = 2;
+      break;
+    case DebugChannel::LdrColor:
+      texToShow = ldrColor;
+      mode = 0;
       break;
     case DebugChannel::Off:
     case DebugChannel::Count:
@@ -846,6 +985,7 @@ void Graphics::drawDebugOverlay() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
   }
   debugOverlay->setInt("src", 0);
+  debugOverlay->setInt("mode", mode);
   glBindVertexArray(fullscreenVAO);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindVertexArray(0);
@@ -858,6 +998,7 @@ void Graphics::drawDebugOverlay() {
 
 void Graphics::render(ClientGame& game) {
   SIMPLE_PROFILE_SCOPE("Render");
+  GPU_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
 
@@ -881,6 +1022,7 @@ void Graphics::render(ClientGame& game) {
   }
   if (shadowDirShader && shadowDirShader->valid()) {
     SIMPLE_PROFILE_SCOPE("ShadowDir");
+    GPU_PROFILE_SCOPE("ShadowDir");
     glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
     glViewport(0, 0, kDirShadowMapSize, kDirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
@@ -895,13 +1037,16 @@ void Graphics::render(ClientGame& game) {
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
-  // Multi-pass point shadows: one draw per cubemap face per active light.
-  // Avoids the geometry shader, which macOS must emulate via Metal.
+  // Point shadows: one depth pass per active light × 6 cube faces. Each
+  // iteration rebinds the FBO depth attachment to a single cubemap-array
+  // layer. Avoids the geometry-shader expansion that dominated GPU time
+  // when this was a single layered draw.
   glm::mat4 pointMats[kPointShadowLayers];
   glm::vec3 pointPositions[kMaxPointLights];
   computePointShadowMatrices(lights, numLights, pointMats, pointPositions);
-  if (shadowPointShader && shadowPointShader->valid()) {
+  if (shadowPointShader && shadowPointShader->valid() && numLights > 0) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
+    GPU_PROFILE_SCOPE("ShadowPoint");
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
     glViewport(0, 0, kPointShadowSize, kPointShadowSize);
     glEnable(GL_DEPTH_TEST);
@@ -912,13 +1057,12 @@ void Graphics::render(ClientGame& game) {
     for (int i = 0; i < numLights; ++i) {
       int slot = lights[i].shadowIdx;
       if (slot < 0 || slot >= kMaxPointLights) continue;
-      shadowPointShader->setVec3("lightPosition", pointPositions[slot]);
-      for (int face = 0; face < 6; ++face) {
-        int layer = slot * 6 + face;
+      shadowPointShader->setVec3("lightPos", lights[i].position);
+      for (int f = 0; f < 6; ++f) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                  pointShadowMaps, 0, layer);
+                                  pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
-        shadowPointShader->setMat4("shadowMatrix", pointMats[layer]);
+        shadowPointShader->setMat4("lightSpaceMatrix", pointMats[slot * 6 + f]);
         renderEntities(*shadowPointShader, game, models,
                        /*forShadowPass=*/true);
       }
@@ -928,6 +1072,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("GBuffer");
+    GPU_PROFILE_SCOPE("GBuffer");
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glEnable(GL_DEPTH_TEST);
@@ -942,6 +1087,7 @@ void Graphics::render(ClientGame& game) {
 
   if (ssaoShader && ssaoShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAO");
+    GPU_PROFILE_SCOPE("SSAO");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -970,6 +1116,7 @@ void Graphics::render(ClientGame& game) {
 
   if (ssaoBlurShader && ssaoBlurShader->valid()) {
     SIMPLE_PROFILE_SCOPE("SSAOBlur");
+    GPU_PROFILE_SCOPE("SSAOBlur");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -985,6 +1132,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Lighting");
+    GPU_PROFILE_SCOPE("Lighting");
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum litDrawBufs[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
     glDrawBuffers(2, litDrawBufs);
@@ -1031,6 +1179,7 @@ void Graphics::render(ClientGame& game) {
   // scene geometry. Skybox writes litColor only (no bloom).
   {
     SIMPLE_PROFILE_SCOPE("Skybox");
+    GPU_PROFILE_SCOPE("Skybox");
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, litFBO);
     glBlitFramebuffer(0, 0, fbWidth, fbHeight, 0, 0, fbWidth, fbHeight,
@@ -1053,6 +1202,7 @@ void Graphics::render(ClientGame& game) {
   GLuint finalBloomColor = brightColor;
   if (blurShader && blurShader->valid() && bloomBlurIterations > 0) {
     SIMPLE_PROFILE_SCOPE("Bloom");
+    GPU_PROFILE_SCOPE("Bloom");
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, fbWidth, fbHeight);
     blurShader->use();
@@ -1077,6 +1227,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Tonemap");
+    GPU_PROFILE_SCOPE("Tonemap");
     glBindFramebuffer(GL_FRAMEBUFFER, ldrFBO);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);
@@ -1099,6 +1250,7 @@ void Graphics::render(ClientGame& game) {
 
   {
     SIMPLE_PROFILE_SCOPE("Present");
+    GPU_PROFILE_SCOPE("Present");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, fbWidth, fbHeight);
     glDisable(GL_DEPTH_TEST);

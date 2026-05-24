@@ -4,6 +4,12 @@
 #include <memory>
 #include <vector>
 
+#include "game/maze.h"
+#include "game/maze_camera.h"
+#include "game/maze_generation.h"
+#include "game/maze_trigger.h"
+#include "game/overworld.h"
+#include "game/overworld_maze_puzzle.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
@@ -129,6 +135,24 @@ static void removePhysicsBodies(ServerGame& game) {
 
 namespace {
 
+constexpr int kGeneratedMazeWidth = 8;
+constexpr int kGeneratedMazeHeight = 8;
+constexpr uint32_t kGeneratedMazeSeed = 12505;
+constexpr float kMazeTileSpacing = 1.5f;
+
+struct GeneratedMazeData {
+  maze::MazeLayout layout;
+  maze::MazeTileGrid tileGrid;
+};
+
+GeneratedMazeData buildGeneratedMazeData() {
+  GeneratedMazeData data;
+  data.layout = maze::GenerateMazeLayout(
+      kGeneratedMazeWidth, kGeneratedMazeHeight, kGeneratedMazeSeed);
+  data.tileGrid = maze::ConvertToTileGrid(data.layout);
+  return data;
+}
+
 template <typename Tag>
 void spawnDemoLight(ServerGame& game, const char* sceneName) {
   auto [eid, ent] = new_entity(game);
@@ -157,18 +181,121 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::ColorBoundingBox>(entity);
+  {
+    auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
+    box.minX = 40.0f;
+    box.minY = 25.0f;
+    box.minZ = -500.0f;
+    box.maxX = 90.0f;
+    box.maxY = 55.0f;
+    box.maxZ = 500.0f;
+  }
   JPH::BodyID bodyId = game.physics.createPlayerBody(
       modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), scale);
   game.registry.emplace<shared::PhysicsBody>(
       entity, bodyId.GetIndexAndSequenceNumber());
 }
 
+std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
+  const GeneratedMazeData data = buildGeneratedMazeData();
+
+  std::vector<StaticEntityDesc> entities;
+  entities.push_back(StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                      .modelName = "cube",
+                                      .scale = glm::vec3(100.0f)});
+
+  for (int y = 0; y < data.tileGrid.height; ++y) {
+    for (int x = 0; x < data.tileGrid.width; ++x) {
+      if (data.tileGrid.Tile(x, y) != maze::MazeTile::Wall) continue;
+
+      entities.push_back(StaticEntityDesc{
+          .position = glm::vec3(
+              (static_cast<float>(x) - 1.0f) * kMazeTileSpacing,
+              (static_cast<float>(y) - 1.0f) * kMazeTileSpacing, 0.75f),
+          .modelName = "cube",
+          .scale = glm::vec3(0.7f, 0.7f, 1.5f),
+      });
+    }
+  }
+
+  const int goalTileX = data.layout.goalX * 2 + 1;
+  const int goalTileY = data.layout.goalY * 2 + 1;
+  entities.push_back(StaticEntityDesc{
+      .position = glm::vec3(
+          (static_cast<float>(goalTileX) - 1.0f) * kMazeTileSpacing,
+          (static_cast<float>(goalTileY) - 1.0f) * kMazeTileSpacing, 0.9f),
+      .modelName = "goal_cube",
+      .scale = glm::vec3(0.7f, 0.7f, 0.7f),
+      .collision = CollisionShape::None,
+  });
+
+  return entities;
+}
+
+std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
+  const GeneratedMazeData data = buildGeneratedMazeData();
+  constexpr glm::vec3 kPreviewCenter =
+      glm::vec3(shared::maze_preview::kCenterX, shared::maze_preview::kCenterY,
+                shared::maze_preview::kCenterZ);
+  constexpr float kPreviewTileSpacing = 0.18f;
+  constexpr float kFloorDepthOffset = -0.20f;
+  // Walls protrude along board normal (+Y) so they read as white barriers.
+  constexpr float kWallDepthOffset = -0.04f;
+  constexpr glm::vec3 kFloorScale = glm::vec3(0.18f, 0.02f, 0.18f);
+  constexpr glm::vec3 kWallScale = glm::vec3(0.18f, 0.30f, 0.18f);
+  constexpr float kMarkerDepthOffset = -0.30f;
+  constexpr glm::vec3 kGoalMarkerScale = glm::vec3(0.28f, 0.16f, 0.28f);
+
+  const float xOffset = (static_cast<float>(data.tileGrid.width) - 1.0f) * 0.5f;
+  const float yOffset =
+      (static_cast<float>(data.tileGrid.height) - 1.0f) * 0.5f;
+
+  auto previewPosition = [&](int x, int y, float yOffsetFromBoard) {
+    return glm::vec3(kPreviewCenter.x + (static_cast<float>(x) - xOffset) *
+                                            kPreviewTileSpacing,
+                     kPreviewCenter.y + yOffsetFromBoard,
+                     kPreviewCenter.z + (yOffset - static_cast<float>(y)) *
+                                            kPreviewTileSpacing);
+  };
+
+  std::vector<StaticEntityDesc> entities;
+
+  for (int y = 0; y < data.tileGrid.height; ++y) {
+    for (int x = 0; x < data.tileGrid.width; ++x) {
+      const bool isWall = data.tileGrid.Tile(x, y) == maze::MazeTile::Wall;
+
+      if (isWall) {
+        entities.push_back(StaticEntityDesc{
+            .position = previewPosition(x, y, kWallDepthOffset),
+            .modelName = "light_cube",
+            .scale = kWallScale,
+        });
+      } else {
+        entities.push_back(StaticEntityDesc{
+            .position = previewPosition(x, y, kFloorDepthOffset),
+            .modelName = "cube",
+            .scale = kFloorScale,
+        });
+      }
+    }
+  }
+
+  const int goalTileX = data.layout.goalX * 2 + 1;
+  const int goalTileY = data.layout.goalY * 2 + 1;
+  entities.push_back(StaticEntityDesc{
+      .position = previewPosition(goalTileX, goalTileY, kMarkerDepthOffset),
+      .modelName = "goal_cube",
+      .scale = kGoalMarkerScale,
+      .collision = CollisionShape::None,
+  });
+
+  return entities;
+}
+
 }  // namespace
 
 void initWorldEntities(ServerGame& game) {
-  // --- Game progression entities (untagged: persist across state changes) ---
-  loadLevel(game);
-
   // --- Overworld ---
   spawnDemoLight<shared::OverworldTag>(game, "sunny");
   loadMap<shared::OverworldTag>(game,
@@ -199,6 +326,11 @@ void initWorldEntities(ServerGame& game) {
                                  .scale = glm::vec3(0.5f),
                                  .collision = CollisionShape::Mesh},
             });
+  spawnStaticEntities<shared::OverworldTag>(
+      game, buildOverworldMazePreviewEntities());
+  spawnStaticEntities<shared::OverworldTag>(
+      game, maze_trigger::buildMazeTriggerMarkerEntities());
+  overworld_maze_puzzle::initOverworldMazePuzzleController(game);
 
   // Section barriers — TODO: replace positions/sizes once you have map coords
   spawnSectionBarrier<shared::OverworldTag>(game,
@@ -221,52 +353,24 @@ void initWorldEntities(ServerGame& game) {
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
-  spawnStaticEntities<shared::MazeTag>(
-      game, {
-                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(100.0f)},
-                StaticEntityDesc{.position = glm::vec3(3.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.1f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(-3.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.1f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(0.0f, 5.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.2f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(0.0f, -5.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.2f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(6.0f, 6.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.15f),
-                                 .collision = CollisionShape::Mesh},
-                StaticEntityDesc{.position = glm::vec3(-6.0f, -6.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.15f),
-                                 .collision = CollisionShape::Mesh},
-            });
+  spawnStaticEntities<shared::MazeTag>(game, buildGeneratedMazeEntities());
 
   // --- Pool slots ---
   for (int i = 0; i < 4; i++) {
-    float startX = i * 10.0f;  // Hardcode spread out to prevent overlap
+    const auto slot = static_cast<uint8_t>(i + 1);
     PlayerAvatars slots;
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
-    spawnPlayerAvatar<shared::OverworldTag>(game, overworldEntity, "cube",
-                                            glm::vec3(startX, 0.0f, 0.0f),
-                                            glm::vec3(1.0f));
+    spawnPlayerAvatar<shared::OverworldTag>(
+        game, overworldEntity, "cube",
+        maze_trigger::overworldSpawnPosition(slot), glm::vec3(1.0f));
+    game.registry.get<shared::RenderInfo>(overworldEntity).playerSlot = slot;
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
-    spawnPlayerAvatar<shared::MazeTag>(game, mazeEntity, "bear",
-                                       glm::vec3(startX, 0.0f, 0.0f),
-                                       glm::vec3(0.5f));
+    spawnPlayerAvatar<shared::MazeTag>(
+        game, mazeEntity, "bear", maze_trigger::overworldSpawnPosition(slot),
+        glm::vec3(0.5f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
@@ -309,12 +413,27 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
 
 void OverworldState::onEnter(ServerGame& game) {
   addPhysicsBodies<shared::OverworldTag>(game);
+  for (auto& [peer, slots] : game.active_players) {
+    (void)peer;
+    uint8_t slot = 1;
+    if (game.registry.valid(slots.overworld_avatar) &&
+        game.registry.all_of<shared::RenderInfo>(slots.overworld_avatar)) {
+      slot = game.registry.get<shared::RenderInfo>(slots.overworld_avatar)
+                 .playerSlot;
+      if (slot < 1 || slot > 4) slot = 1;
+    }
+    maze_trigger::placeOverworldAvatarInTrigger(game, slots.overworld_avatar,
+                                                slot);
+  }
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
 }
 
 void OverworldState::onExit(ServerGame& game) {
   printf("[State] Exiting Overworld\n");
+  if (overworld_maze_puzzle::isPuzzleActive(game)) {
+    overworld_maze_puzzle::endPuzzle(game);
+  }
   removePhysicsBodies<shared::OverworldTag>(game);
   clearTaggedPlayerControls<shared::OverworldTag>(game);
   despawnTaggedEntities<shared::OverworldTag>(game);
@@ -332,18 +451,34 @@ std::vector<entt::entity> OverworldState::getStateEntities(
 void OverworldState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
 
-  // Press 1 → enter maze
-  auto inputView =
-      game.registry.view<shared::PlayerInput, shared::OverworldTag>();
-  for (auto ent : inputView) {
-    auto& input = game.registry.get<shared::PlayerInput>(ent);
-    if (input.keys_newly_pressed & KEY_ENTER_MAZE) {
-      game.gameStateManager.requestStateChange(std::make_unique<MazeState>());
+  if (overworld_maze_puzzle::isPuzzleActive(game)) {
+    overworld_maze_puzzle::updatePuzzle(game, dt);
+    render_model_change(game, dt);
+
+    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
+    if (lightId != kInvalidEntityId)
+      hardcoded_spinning_light(game.registry, dt, lightId);
+    scene_cycle_system(game.registry, StateType::OVERWORLD);
+    return;
+  }
+
+  tickOverworldGameLogic(game, dt);
+
+  const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
+  if (!allInTrigger) {
+    game.overworldMazeTriggerArmed = true;
+    game.overworldMazeFocusTimer = 0.0f;
+  } else if (game.overworldMazeTriggerArmed) {
+    maze_camera::snapOverworldAvatarsFaceMazePreview(game);
+    game.overworldMazeFocusTimer += dt;
+    if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds &&
+        maze_camera::allOverworldAvatarsFacingMazePreview(game)) {
+      game.overworldMazeTriggerArmed = false;
+      game.overworldMazeFocusTimer = 0.0f;
+      overworld_maze_puzzle::beginPuzzle(game);
       return;
     }
   }
-
-  movement_system(game, dt, StateType::OVERWORLD);
   render_model_change(game, dt);
 
   // Check SectionControllers — if completed, flag their barriers for removal
@@ -443,11 +578,33 @@ void OverworldState::update(ServerGame& game, float dt) {
 
 void MazeState::onEnter(ServerGame& game) {
   addPhysicsBodies<shared::MazeTag>(game);
+  ResetMazeSpiritSpawn(game);
+
+  auto& bodyInterface = game.physics.getBodyInterface();
+  auto mazeInputBodies =
+      game.registry
+          .view<shared::MazeTag, shared::PhysicsBody, shared::PlayerInput>();
+  for (auto ent : mazeInputBodies) {
+    if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) continue;
+    auto& pb = game.registry.get<shared::PhysicsBody>(ent);
+    JPH::BodyID id(pb.bodyId);
+    if (bodyInterface.IsAdded(id)) {
+      bodyInterface.SetLinearVelocity(id, JPH::Vec3::sZero());
+    }
+  }
+
   enterStateHelper<shared::MazeTag, &PlayerAvatars::maze_avatar>(game, "Maze");
+  EnterMazePuzzle(game);
+  if (HasUnlockedWinterSection(game)) {
+    ClaimPadsForActivePlayers(game, GetWinterPuzzleNumericId(game));
+  }
 }
 
 void MazeState::onExit(ServerGame& game) {
   printf("[State] Exiting Maze\n");
+  game.overworldMazeTriggerArmed = false;
+  game.overworldMazeFocusTimer = 0.0f;
+  ExitMazePuzzle(game);
   removePhysicsBodies<shared::MazeTag>(game);
   clearTaggedPlayerControls<shared::MazeTag>(game);
   despawnTaggedEntities<shared::MazeTag>(game);
@@ -463,6 +620,7 @@ std::vector<entt::entity> MazeState::getStateEntities(ServerGame& game) const {
 
 void MazeState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
+  TickMazeExploration(game, dt);
 
   // Press Q → back to overworld
   auto inputView = game.registry.view<shared::PlayerInput, shared::MazeTag>();
@@ -475,7 +633,8 @@ void MazeState::update(ServerGame& game, float dt) {
     }
   }
 
-  movement_system(game, dt, StateType::MAZE);
+  // Maze uses shared-cube arrow logic; keep per-player WASD movement disabled
+  // here.
   render_model_change(game, dt);
 
   uint32_t lightId = findLightEntityId<shared::MazeTag>(game);

@@ -8,6 +8,56 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
+### Week 7 (May 21)
+
+🚨🚨🚨I updated the weekly report AGAIN, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
+
+1. What were your concrete goals for the week?
+
+- merge anims
+- head motion for characters
+- integrate grayscale with phillip pr
+- finish toon shading
+- fix distance shadows
+- loading screen/start menu
+- windows misc testing, windows perf testing
+- perf improvements
+- skyboxes for rebecca
+- map object season tags (maybe)
+- map object instancing (maybe)
+- shadow alpha
+- debug menu
+- code cleanup
+
+1. What goals were you able to accomplish?
+
+- head motion for characters
+- integrate grayscale with phillip pr
+- finish toon shading
+- fix distance shadows
+- loading screen/start menu
+- shadow alpha
+- graphics settings
+
+1. If the week went differently than you had planned, what were the reasons?
+
+I got around as much as I expected to get done done. Unfortunately this led gui to get delayed another week.
+
+1. What are your specific goals for the next week?
+
+- merge rendering megapr
+- skybox stuff
+- windows misc testing, windows perf testing
+- demo box testing
+- helping integrate puzzles and stuff
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+cel/toon shading
+
+1. What is your individual morale (which might be different from the overall group morale)?
+idk, I realized I don't evaluate morale I just make something up or use this slot to air grievances about CSE 123. I currently have no new substantive grievances regarding the class.
+
 ### Week 6 (May 14)
 
 🚨🚨🚨I updated the weekly report with some new images, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨

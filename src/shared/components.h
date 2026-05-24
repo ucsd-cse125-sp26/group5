@@ -22,7 +22,20 @@ struct Velocity {
 
 struct RenderInfo {
   std::string modelName;
-  float sx, sy, sz;
+  float sx = 1.0f;
+  float sy = 1.0f;
+  float sz = 1.0f;
+  // 1-4 = join order for player avatars (shown on cube top); 0 = no slot label.
+  uint8_t playerSlot = 0;
+};
+
+struct ColorBoundingBox {
+  float minX = 0.0f;
+  float minY = 0.0f;
+  float minZ = 0.0f;
+  float maxX = 0.0f;
+  float maxY = 0.0f;
+  float maxZ = 0.0f;
 };
 
 struct Camera {
@@ -93,6 +106,21 @@ struct PuzzleComponent {
   uint32_t puzzleTimeLimitMs = 0;
 };
 
+enum class MazeDirection : uint8_t { NONE = 0, UP, DOWN, LEFT, RIGHT };
+
+struct MazeSpiritGrid {
+  int8_t gx = 0;
+  int8_t gy = 0;
+};
+
+struct MazePadBinding {
+  MazeDirection pad = MazeDirection::NONE;
+};
+
+struct MazeUIState {
+  bool open = false;
+};
+
 struct TimeComponent {
   uint32_t elapsedTimeMs = 0;
   uint32_t timeLimitMs = 0;
@@ -117,10 +145,6 @@ struct SectionDoorComponent {
   DoorState state = DoorState::CLOSED;
   uint8_t requiredPlayers = 4;
   uint32_t sectionID = 0;  // the section this door is linked to
-
-  // track the physical animation
-  float currentZ = 0.0f;
-  float targetOpenZ = -10.0f;  // where the door should end up
 };
 
 struct SwitchComponent {
@@ -141,4 +165,15 @@ struct SectionBarrierPendingRemoval {};
 
 struct SectionBarrierVisible {};  // tag — present = has RenderInfo, absent = invisible
 
+struct FragmentComponent {
+  SectionSeasonMap season;
+  bool isPickedUp;
+};
+
+// Overworld mini-board puzzle (four players, shared green piece).
+struct OverworldMazePuzzleState {
+  bool active = false;
+};
+
+struct OverworldMazePiece {};
 }  // namespace shared

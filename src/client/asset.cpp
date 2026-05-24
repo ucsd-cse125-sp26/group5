@@ -17,6 +17,7 @@
 #include "glm/ext/vector_float2.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "shared/gpu_mem_profiler.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
 #include "shared/util.h"
@@ -45,9 +46,11 @@ static Mesh buildMesh(std::vector<Vertex> vertices,
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
                vertices.data(), GL_STATIC_DRAW);
+  GPU_MEM_ADD("ModelGeometry", vertices.size() * sizeof(Vertex));
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
                indices.data(), GL_STATIC_DRAW);
+  GPU_MEM_ADD("ModelGeometry", indices.size() * sizeof(GLuint));
 
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
@@ -161,6 +164,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, pixelOrder,
                    GL_UNSIGNED_BYTE, pixels);
       glGenerateMipmap(GL_TEXTURE_2D);
+      GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
     } else {
       std::fprintf(stderr,
                    "loadMaterial: failed to decode texture \"%s\" "
@@ -169,6 +173,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
       uint8_t magenta[4] = {255, 0, 255, 255};
       glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA,
                    GL_UNSIGNED_BYTE, magenta);
+      GPU_MEM_TEX2D("ModelTextures", internal, 1, 1);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
@@ -212,6 +217,7 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
   glBindTexture(GL_TEXTURE_2D, id);
   glTexImage2D(GL_TEXTURE_2D, 0, internal, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pixel);
+  GPU_MEM_TEX2D("ModelTextures", internal, 1, 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -253,6 +259,7 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   glBindTexture(GL_TEXTURE_2D, id);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pixel);
+  GPU_MEM_TEX2D("ModelTextures", GL_RGBA8, 1, 1);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   return id;
@@ -325,6 +332,180 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   glBindTexture(GL_TEXTURE_2D, diffuseTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, 6, 1, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, spec.palette);
+  GPU_MEM_TEX2D("ModelTextures", GL_SRGB8_ALPHA8, 6, 1);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  auto* model = new Model();
+
+  Material material;
+  material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  // Match the Assimp path's "missing = black" convention; white here pins
+  // specular to max on every surface and blooms blow out the frame.
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {
+      .constant = glm::vec3(1.0f),
+      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
+                                  spec.emissive[2], spec.emissive[3])};
+  material.shininess = 32.0f;
+  model->materials.push_back(material);
+
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+
+  return model;
+}
+
+Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
+  if (slot < 1 || slot > 4) return nullptr;
+
+  struct Face {
+    glm::vec3 normal;
+    glm::vec3 corners[4];
+  };
+  const Face faces[6] = {
+      {.normal = {0, 0, -1},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f}}},
+      {.normal = {0, 0, 1},
+       .corners = {{-0.5f, -0.5f, 0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f}}},
+      {.normal = {-1, 0, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {-0.5f, 0.5f, -0.5f},
+                   {-0.5f, 0.5f, 0.5f},
+                   {-0.5f, -0.5f, 0.5f}}},
+      {.normal = {1, 0, 0},
+       .corners = {{0.5f, -0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {0.5f, -0.5f, 0.5f}}},
+      {.normal = {0, -1, 0},
+       .corners = {{-0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, -0.5f},
+                   {0.5f, -0.5f, 0.5f},
+                   {-0.5f, -0.5f, 0.5f}}},
+      {.normal = {0, 1, 0},
+       .corners = {{-0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, -0.5f},
+                   {0.5f, 0.5f, 0.5f},
+                   {-0.5f, 0.5f, 0.5f}}},
+  };
+
+  static const uint8_t kPatterns[4][5][3] = {
+      {{0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}},
+      {{1, 1, 1}, {0, 0, 1}, {1, 1, 1}, {1, 0, 0}, {1, 1, 1}},
+      {{1, 1, 1}, {0, 0, 1}, {1, 1, 1}, {0, 0, 1}, {1, 1, 1}},
+      {{1, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 0, 1}, {0, 0, 1}},
+  };
+
+  std::vector<uint8_t> pixels(48 * 8 * 4, 0);
+  auto setPx = [&](int x, int y, const uint8_t rgba[4]) {
+    int o = (y * 48 + x) * 4;
+    pixels[static_cast<size_t>(o)] = rgba[0];
+    pixels[static_cast<size_t>(o + 1)] = rgba[1];
+    pixels[static_cast<size_t>(o + 2)] = rgba[2];
+    pixels[static_cast<size_t>(o + 3)] = rgba[3];
+  };
+
+  for (int f = 0; f < 5; f++) {
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        setPx(f * 8 + x, y, spec.palette[f]);
+      }
+    }
+  }
+  for (int y = 0; y < 8; y++) {
+    for (int x = 0; x < 8; x++) {
+      setPx(40 + x, y, spec.palette[5]);
+    }
+  }
+
+  const uint8_t* top = spec.palette[5];
+  const bool topBright = top[0] > 160 && top[1] > 160 && top[2] > 160;
+  const auto dr = static_cast<uint8_t>(topBright ? 30 : 250);
+  const auto dg = static_cast<uint8_t>(topBright ? 30 : 250);
+  const auto db = static_cast<uint8_t>(topBright ? 30 : 250);
+  const uint8_t digitRgba[4] = {dr, dg, db, 255};
+  const auto di = static_cast<uint8_t>(slot - 1);
+  for (int dy = 0; dy < 5; dy++) {
+    for (int dx = 0; dx < 3; dx++) {
+      if (kPatterns[di][static_cast<size_t>(dy)][static_cast<size_t>(dx)] !=
+          0) {
+        const int ty = 6 - dy;
+        setPx(40 + 2 + dx, ty, digitRgba);
+      }
+    }
+  }
+
+  std::vector<Vertex> vertices;
+  vertices.reserve(24);
+  std::vector<GLuint> indices;
+  indices.reserve(36);
+  for (int f = 0; f < 6; f++) {
+    auto base = static_cast<GLuint>(vertices.size());
+    glm::vec2 uv[4];
+    if (f < 5) {
+      const float u = (static_cast<float>(f * 8 + 4) + 0.5f) / 48.0f;
+      const float v = (4.0f + 0.5f) / 8.0f;
+      for (auto& i : uv) i = {u, v};
+    } else {
+      uv[0] = {(40.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
+      uv[1] = {(47.0f + 0.5f) / 48.0f, (7.0f + 0.5f) / 8.0f};
+      uv[2] = {(47.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
+      uv[3] = {(40.0f + 0.5f) / 48.0f, (0.5f) / 8.0f};
+    }
+    for (int i = 0; i < 4; i++) {
+      vertices.push_back({.position = faces[f].corners[i],
+                          .normal = faces[f].normal,
+                          .texture_coordinates = uv[i]});
+    }
+    indices.push_back(base + 0);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 0);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
+  }
+
+  GLuint vao, vbo, ebo;
+  glGenVertexArrays(1, &vao);
+  glGenBuffers(1, &vbo);
+  glGenBuffers(1, &ebo);
+
+  glBindVertexArray(vao);
+
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
+               vertices.data(), GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
+               indices.data(), GL_STATIC_DRAW);
+
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, position));
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, normal));
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void*)offsetof(Vertex, texture_coordinates));
+
+  glBindVertexArray(0);
+
+  GLuint diffuseTex;
+  glGenTextures(1, &diffuseTex);
+  glBindTexture(GL_TEXTURE_2D, diffuseTex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 48, 8, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               pixels.data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -342,7 +523,15 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   material.shininess = 32.0f;
   model->materials.push_back(material);
 
-  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  Mesh mesh;
+  mesh.vertices = std::move(vertices);
+  mesh.materialIndex = 0;
+  mesh.vao = vao;
+  mesh.vbo = vbo;
+  mesh.ebo = ebo;
+  mesh.index_count = static_cast<GLuint>(indices.size());
+  model->meshes.push_back(std::move(mesh));
+
   model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
 
   return model;
@@ -400,12 +589,14 @@ static GLuint loadCubemap(const std::string& directory) {
     if (data) {
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8,
                    width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, width, height);
       stbi_image_free(data);
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
       unsigned char pink[] = {255, 0, 255, 255};
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8, 1, 1,
                    0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
+      GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, 1, 1);
     }
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -447,6 +638,7 @@ Skybox loadSkybox(const std::string& directory) {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices,
                GL_STATIC_DRAW);
+  GPU_MEM_ADD("SkyboxGeometry", sizeof(skyboxVertices));
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
   glBindVertexArray(0);
