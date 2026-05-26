@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 
 #include "client/spsc_queue.h"
@@ -10,6 +11,43 @@
 #include "shared/components.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
+
+namespace {
+
+void removeSyncedComponent(entt::registry& registry, entt::entity entity,
+                           shared::ComponentTypeId cid) {
+  switch (cid) {
+    case shared::CID_POSITION:
+      registry.remove<shared::Position>(entity);
+      break;
+    case shared::CID_ENTITY:
+      registry.remove<shared::Entity>(entity);
+      break;
+    case shared::CID_RENDERINFO:
+      registry.remove<shared::RenderInfo>(entity);
+      break;
+    case shared::CID_CAMERA:
+      registry.remove<shared::Camera>(entity);
+      break;
+    case shared::CID_VELOCITY:
+      registry.remove<shared::Velocity>(entity);
+      break;
+    case shared::CID_POINTLIGHT:
+      registry.remove<shared::PointLight>(entity);
+      break;
+    case shared::CID_SCENE:
+      registry.remove<shared::Scene>(entity);
+      break;
+    case shared::CID_DIRECTIONALLIGHT:
+      registry.remove<shared::DirectionalLight>(entity);
+      break;
+    case shared::CID_OVERWORLD_MAZE_PUZZLE:
+      registry.remove<shared::OverworldMazePuzzleState>(entity);
+      break;
+  }
+}
+
+}  // namespace
 
 // ── Component deserialization helper ─────────────────────
 //
@@ -103,6 +141,33 @@ void registerClientHandlers(ClientNetwork& network) {
 
           auto it = game.networkEntityMap.find(entityId);
           if (it != game.networkEntityMap.end()) {
+            size_t entityStart = offset;
+            uint16_t compCount;
+            std::memcpy(&compCount, data + offset, sizeof(uint16_t));
+            offset += sizeof(uint16_t);
+
+            bool
+                present[static_cast<size_t>(shared::CID_OVERWORLD_MAZE_PUZZLE) +
+                        1] = {};
+            for (uint16_t c = 0; c < compCount; c++) {
+              shared::ComponentTypeId cid;
+              std::memcpy(&cid, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              uint16_t dataSize;
+              std::memcpy(&dataSize, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              if (cid < std::size(present)) present[cid] = true;
+              offset += dataSize;
+            }
+
+            auto entity = it->second;
+            for (auto cid : game.componentRegistry.syncedIds()) {
+              if (cid < std::size(present) && !present[cid]) {
+                removeSyncedComponent(game.networkRegistry, entity, cid);
+              }
+            }
+
+            offset = entityStart;
             deserializeComponents(game, it->second, data, offset, len);
           } else {
             // Entity not known — skip its components
@@ -130,7 +195,30 @@ void syncToRender(ClientGame& game) {
 
 // ── Input ────────────────────────────────────────────────
 
-void processInput(GLFWwindow* window,
+bool isOverworldMazePuzzleActive(const ClientGame& game) {
+  auto view = game.renderRegistry.view<shared::OverworldMazePuzzleState>();
+  for (auto ent : view) {
+    if (view.get<shared::OverworldMazePuzzleState>(ent).active) return true;
+  }
+  return false;
+}
+
+bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
+  if (!isOverworldMazePuzzleActive(game)) return false;
+
+  auto it = game.renderEntityMap.find(game.renderEntityId);
+  if (it == game.renderEntityMap.end() ||
+      !game.renderRegistry.valid(it->second)) {
+    return false;
+  }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
+    return false;
+  }
+  return game.renderRegistry.get<shared::RenderInfo>(it->second).modelName ==
+         "cube";
+}
+
+void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys) {
   InputKeys keys = 0;
@@ -145,16 +233,41 @@ void processInput(GLFWwindow* window,
   if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
   if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
-  if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) keys |= KEY_ENTER_MAZE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
 
-  // Maze spirit (2D grid); sent to server while in maze mode.
-  if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) keys |= KEY_SPIRIT_UP;
-  if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) keys |= KEY_SPIRIT_DOWN;
-  if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) keys |= KEY_SPIRIT_LEFT;
-  if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-    keys |= KEY_SPIRIT_RIGHT;
-  if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) keys |= KEY_MAZE_COLLECT;
+  // Overworld preview board: each client controls one direction on the shared
+  // green piece (slot 1=up, 2=down, 3=left, 4=right).
+  if (isLocalOverworldMazePuzzleControl(game)) {
+    auto it = game.renderEntityMap.find(game.renderEntityId);
+    uint8_t slot = 1;
+    if (it != game.renderEntityMap.end() &&
+        game.renderRegistry.valid(it->second) &&
+        game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
+      slot = game.renderRegistry.get<shared::RenderInfo>(it->second).playerSlot;
+      if (slot < 1 || slot > 4) slot = 1;
+    }
+    switch (slot) {
+      case 1:
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_UP;
+        break;
+      case 2:
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_DOWN;
+        break;
+      case 3:
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_LEFT;
+        break;
+      case 4:
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+          keys |= KEY_SPIRIT_RIGHT;
+        break;
+      default:
+        break;
+    }
+  }
 
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;

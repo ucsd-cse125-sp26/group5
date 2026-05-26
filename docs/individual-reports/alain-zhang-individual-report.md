@@ -8,6 +8,146 @@ permalink: /project-spec/alain-zhang-individual-report/
 
 ## Weekly Notes
 
+### Week 5 + 6 + 7
+
+#### Goals
+
+- [x] Design and implement a full client-side audio engine using SoLoud
+- [x] Implement 3D positional audio with distance attenuation
+- [x] Implement entity-based sound emitters with layered sounds
+- [x] Implement proximity-based sound fading (no hard cuts)
+- [x] Implement global non-positional background music per game state
+- [x] Sync global music state to newly-connected clients
+- [x] Implement one-shot positional and non-positional sound events via server packets
+- [x] Implement footstep sounds with random variant selection and pitch variation
+- [x] Implement landing sound detection via ECS `Grounded` component backed by Jolt physics raycast
+- [x] Add `SoundEmitter`, `SoundLayer`, `Grounded` components to shared ECS
+- [x] Add `STATE_CHANGE` and `SOUND_EVENT` packets to the network protocol
+- [x] Raise SoLoud voice limit to 32
+- [x] Design and implement section barrier system for gating map progression
+- [x] Add `SectionBarrierTag`, `SectionBarrierVisible`, `SectionBarrierPendingRemoval` components
+- [x] Wire barrier removal to `SectionController::completed` flag
+- [x] Add debug tooling for toggling barrier visibility and collision independently
+
+#### Achieved
+
+**Audio Engine (`AudioEngine` class — `audio_engine.h` / `audio_engine.cpp`)**
+
+Built a client-side audio engine on top of SoLoud. The engine is owned by `ClientGame` and updated from the client render loop. The general setup is that the server decides what sounds should exist or play, and the client reacts to ECS state or network packets.
+
+Features implemented:
+
+- **3D positional audio**: sounds are played via `play3d` with the listener position updated each frame from the camera entity's `Position` component. SoLoud handles distance attenuation via `INVERSE_DISTANCE` rolloff with configurable min/max distances (`5.0f` to `1000.0f`). The listener up-vector is explicitly set to Z-up to match the engine coordinate system.
+
+- **Entity sound emitter system**: entities carry a `SoundEmitter` component (up to 4 `SoundLayer`s each) serialized from the server. Each frame, `updateSoundEmitters` in `client_game.cpp` iterates all entities with `SoundEmitter` + `Position` and calls `AudioEngine::updateEmitter`. Layers support three trigger types: `ALWAYS`, `PROXIMITY`, and `ON_EVENT`. Each layer also has a `SoundPlayMode`: `POSITIONAL` (3D via `play3d`) or `AMBIENT` (non-positional via `play`).
+
+- **Proximity fading**: sounds fade smoothly instead of abruptly stopping/restarting. Layers start at volume 0 and lerp toward a target volume each frame using `layer.fadeSpeed * dt`. For `PROXIMITY` layers, volume fades based on listener distance. This lets ambient loops keep running silently in the background and fade back in immediately when the player returns.
+
+- **Global background music per state**: `playGlobalLoop` / `stopGlobalLoop` / `stopAllGlobalLoops` manage looping non-positional background music. On state changes (`STATE_CHANGE` packet), the client swaps music accordingly. Newly connected clients also receive the current state so the correct music starts immediately on join.
+
+- **One-shot sound events**: `SOUND_EVENT` packets were extended with `pitch` and `positional` fields. The client dispatches either positional playback (`playSound`) or flat playback (`playNonPositionalSound`). This replaced several older sound packet variants with a single packet type.
+
+- **Voice limit**: increased SoLoud's active voice count from 16 to 32 to avoid sounds being dropped when many ambient emitters and player sounds are active simultaneously.
+
+- **Master volume API**: added `setMasterVolume` / `getMasterVolume` wrappers around SoLoud global volume controls.
+
+**ECS Components (`shared/components.h`)**
+
+Added three new shared components for audio:
+
+- `SoundLayer` — per-layer sound config: `soundId`, `trigger` (`ALWAYS` / `PROXIMITY` / `ON_EVENT`), `playMode` (`POSITIONAL` / `AMBIENT`), `volume`, `proximityRange`, `fadeSpeed`
+- `SoundEmitter` — holds up to 4 `SoundLayer`s with a `layerCount`; serialized from server to client through the existing component registry
+- `Grounded` — stores `isGrounded` and `wasGrounded`, updated each tick through a Jolt downward raycast. Used for landing sound detection.
+
+Added three new shared components for the barrier system:
+
+- `SectionBarrierTag` — marks an entity as a section barrier and stores `sectionID` plus `halfExtents`
+- `SectionBarrierVisible` — tag component indicating the barrier currently has `RenderInfo`
+- `SectionBarrierPendingRemoval` — tag component added when a barrier should be removed
+
+**Network Protocol (`shared/protocol.h`)**
+
+- Added `STATE_CHANGE` packet type and `StateChangePacket` struct with a `GameStateType` field (`OVERWORLD` / `MAZE`)
+- Extended `SoundEventPacket` with `pitch` and `positional` fields, consolidating one-shot sound playback into a single packet type
+
+**Server-side sound logic (`server_game.cpp`, `game_state.cpp`)**
+
+- **Footsteps**: `movement_system_for_world` tracks a per-entity `footstepTimer`. While moving and grounded, the timer increments. Every `0.4` seconds a `SOUND_EVENT` packet is broadcast with:
+  - a random footstep variant
+  - a random pitch between `0.9` and `1.1`
+  - positional playback enabled
+
+  The timer resets when movement stops so footsteps resume immediately once movement starts again.
+
+- **Landing**: `update_grounded_system` runs after each `physics.step()` call. It raycasts downward using Jolt physics and updates the `Grounded` component. `movement_system_for_world` checks for the `wasGrounded=false -> isGrounded=true` transition and broadcasts a landing sound event.
+
+- **State music**: `OverworldState::onEnter` and `MazeState::onEnter` broadcast `StateChangePacket`s to connected clients. `onConnect` also sends the current state to newly joining players.
+
+- **Entity ambient emitters**: static entities in `initWorldEntities` can define `soundLayers` in `StaticEntityDesc`. These are serialized as `SoundEmitter` components and picked up automatically by the client audio system.
+
+**Section Barrier System (`scene.h`, `game_state.cpp`, `shared/components.h`)**
+
+Implemented a section barrier system to gate progression between puzzle sections. Each barrier is an `OverworldTag` entity with a static Jolt box body and a `SectionBarrierTag` identifying which section it belongs to. Barriers are spawned in `initWorldEntities` alongside other static overworld entities.
+
+Barrier removal is component-driven: during `OverworldState::update`, completed `SectionController`s mark matching barriers with `SectionBarrierPendingRemoval`. A second pass removes the physics body and destroys the entity. Once fragment collection is connected up, progression only needs to set `SectionController::completed = true`.
+
+Visibility toggling uses a despawn + respawn approach because `UPDATE_ENTITY` currently supports adding/replacing components but not removing them. I also added a removal pass to `cloneRegistry` so stale components don't persist across respawns.
+
+**Debug Tooling for Barriers**
+
+Two debug keys were added behind the existing F2 debug toggle:
+
+- **N** — toggles barrier visibility by adding/removing `RenderInfo` and `SectionBarrierVisible`. Collision is unchanged.
+- **B** — toggles barrier collision by calling `RemoveBody` / `AddBody`. Visibility is unchanged.
+
+The two toggles are independent, so barriers can be:
+- visible + solid
+- invisible + solid
+- visible + passable
+- invisible + passable
+
+The barrier branch was handed off to Leon and Phillip for integration with the finalized map layout and puzzle progression logic.
+
+**Debugging / Issues Resolved**
+
+- SoLoud init was failing with `INVALID_PARAMETER` after passing `AUTO` enum values as numeric arguments to the 5-argument `init()` overload. Fixed by switching to the no-argument `init()` and setting the voice count separately.
+- 3D attenuation initially appeared broken because `set3dMinMaxDistance` was configured with an extremely small falloff range (`3.0f` to `5.0f`). Increasing it to (`5.0f`, `1000.0f`) fixed the issue.
+- The listener up-vector (`set3dListenerUp`) was missing, which caused incorrect 3D attenuation behavior.
+- `update_grounded_system` was running on inactive maze avatars whose physics bodies had not been added to the Jolt world. This caused incorrect landing sounds during state transitions. Fixed by early-returning when `!bodyInterface.IsAdded(bodyId)`.
+- `cloneRegistry` was not removing components during the clone pass, so stale `RenderInfo` components persisted after barrier respawns. Added a removal pass before cloning synced components.
+- B and N debug keys initially were not firing because the client binary had not been rebuilt after updating `input.h`.
+
+#### Progress Evaluation
+
+The audio system went from nothing to a usable runtime over 1.5ish weeks. Also met the goals since week 4. Most of the debugging time ended up going into SoLoud setup issues (init arguments, attenuation ranges, listener configuration) rather than gameplay-side logic.
+
+The footstep and landing systems also took some iteration to get grounded detection behaving consistently. A larger movement refactor using `CharacterVirtual` was scoped out but deferred for now, so the current grounded detection still uses a raycast-based approach.
+
+The barrier system also ended up touching networking synchronization more than expected because of component removal edge cases.
+
+#### Upcoming Goals
+
+- [ ] Wire `SOUND_EVENT` puzzle broadcasts into actual puzzle/switch/door logic when those systems exist
+- [ ] Add section ambient marker entities once map layout is finalised and audio files are available
+- [ ] Investigate `CharacterVirtual` as a replacement for the current rigid body player movement
+- [ ] Provide actual audio assets for footsteps, landing, section ambience, and puzzle events (currently using placeholder `oof.mp3`)
+- [ ] Leon/Phillip to determine real barrier positions and half-extents from the finalised map
+- [ ] Wire `SectionController::completed = true` to fragment collection in the puzzle flow
+
+#### Lessons Learned
+
+SoLoud's 3D audio setup requires all listener vectors (position, forward, up) to be configured correctly or attenuation behaves incorrectly. Distance attenuation settings also need to match the actual scale of the game world or sounds end up effectively static.
+
+Consolidating multiple sound packet types into a single `SOUND_EVENT` packet simplified the networking logic a lot.
+
+The ECS `Grounded` component also ended up being useful because multiple systems (footsteps, landing sounds, future animation work) can all share the same grounded state instead of querying physics independently.
+
+For the barrier system, the despawn/respawn approach works for now but exposed a limitation in the current `UPDATE_ENTITY` protocol since components cannot be explicitly removed yet.
+
+#### Individual Morale
+
+[2/10] — Audio was more annoying than I had thought. Also haven't started the 123 PA but I believe in Jacob who believes in me... meaning I believe I can do it all in one day.
+
 ### Week 4
  
 #### Goals

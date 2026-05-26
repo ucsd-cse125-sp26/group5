@@ -154,10 +154,6 @@ struct SectionDoorComponent {
   DoorState state = DoorState::CLOSED;
   uint8_t requiredPlayers = 4;
   uint32_t sectionID = 0;  // the section this door is linked to
-
-  // track the physical animation
-  float currentZ = 0.0f;
-  float targetOpenZ = -10.0f;  // where the door should end up
 };
 
 struct SwitchComponent {
@@ -170,4 +166,11 @@ struct FragmentComponent {
   SectionSeasonMap season;
   bool isPickedUp;
 };
+
+// Overworld mini-board puzzle (four players, shared green piece).
+struct OverworldMazePuzzleState {
+  bool active = false;
+};
+
+struct OverworldMazePiece {};
 }  // namespace shared

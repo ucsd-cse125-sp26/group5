@@ -81,10 +81,66 @@ class ComponentRegistry {
   std::vector<ComponentTypeId> syncedIds_;
 };
 
+enum ComponentIds : ComponentTypeId {
+  CID_POSITION = 1,
+  CID_ENTITY = 2,
+  CID_RENDERINFO = 3,
+  CID_CAMERA = 4,
+  CID_VELOCITY = 5,
+  CID_POINTLIGHT = 6,
+  CID_SCENE = 7,
+  CID_DIRECTIONALLIGHT = 8,
+  CID_OVERWORLD_MAZE_PUZZLE = 9,
+  CID_COLORBOUNDINGBOX = 10,
+  CID_ANIMATIONSTATE = 11,
+  CID_MAZESPIRITGRID = 12,
+};
+
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
                           const std::map<uint32_t, entt::entity>& srcMap,
                           entt::registry& dst,
                           std::map<uint32_t, entt::entity>& dstMap) {
+  auto removeSyncedComponent = [&](entt::entity entity, ComponentTypeId id) {
+    switch (id) {
+      case CID_POSITION:
+        dst.remove<Position>(entity);
+        break;
+      case CID_ENTITY:
+        dst.remove<Entity>(entity);
+        break;
+      case CID_RENDERINFO:
+        dst.remove<RenderInfo>(entity);
+        break;
+      case CID_CAMERA:
+        dst.remove<Camera>(entity);
+        break;
+      case CID_VELOCITY:
+        dst.remove<Velocity>(entity);
+        break;
+      case CID_POINTLIGHT:
+        dst.remove<PointLight>(entity);
+        break;
+      case CID_SCENE:
+        dst.remove<Scene>(entity);
+        break;
+      case CID_DIRECTIONALLIGHT:
+        dst.remove<DirectionalLight>(entity);
+        break;
+      case CID_OVERWORLD_MAZE_PUZZLE:
+        dst.remove<OverworldMazePuzzleState>(entity);
+        break;
+      case CID_COLORBOUNDINGBOX:
+        dst.remove<ColorBoundingBox>(entity);
+        break;
+      case CID_ANIMATIONSTATE:
+        dst.remove<AnimationState>(entity);
+        break;
+      case CID_MAZESPIRITGRID:
+        dst.remove<MazeSpiritGrid>(entity);
+        break;
+    }
+  };
+
   // delete old entities in dst
   for (auto it = dstMap.begin(); it != dstMap.end();) {
     if (srcMap.find(it->first) == srcMap.end()) {
@@ -107,23 +163,62 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
     auto dstEntity = dstMap[entityId];
     for (auto id : compReg.syncedIds()) {
       auto meta = compReg.find(id);
+      if (!meta) continue;
+      if (id == CID_POSITION && !src.all_of<Position>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_ENTITY && !src.all_of<Entity>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_RENDERINFO && !src.all_of<RenderInfo>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_CAMERA && !src.all_of<Camera>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_VELOCITY && !src.all_of<Velocity>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_POINTLIGHT && !src.all_of<PointLight>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_SCENE && !src.all_of<Scene>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_DIRECTIONALLIGHT &&
+          !src.all_of<DirectionalLight>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_OVERWORLD_MAZE_PUZZLE &&
+          !src.all_of<OverworldMazePuzzleState>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_COLORBOUNDINGBOX &&
+          !src.all_of<ColorBoundingBox>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_ANIMATIONSTATE && !src.all_of<AnimationState>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_MAZESPIRITGRID && !src.all_of<MazeSpiritGrid>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
       meta->clone(src, srcEntity, dst, dstEntity);
     }
   }
 }
-enum ComponentIds : ComponentTypeId {
-  CID_POSITION = 1,
-  CID_ENTITY = 2,
-  CID_RENDERINFO = 3,
-  CID_CAMERA = 4,
-  CID_VELOCITY = 5,
-  CID_POINTLIGHT = 6,
-  CID_SCENE = 7,
-  CID_DIRECTIONALLIGHT = 8,
-  CID_COLORBOUNDINGBOX = 9,
-  CID_ANIMATIONSTATE = 10,
-  CID_MAZESPIRITGRID = 11,
-};
 
 inline ComponentRegistry createDefaultRegistry() {
   ComponentRegistry reg;
@@ -134,6 +229,7 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<PointLight>(CID_POINTLIGHT);
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
+  reg.registerComponent<OverworldMazePuzzleState>(CID_OVERWORLD_MAZE_PUZZLE);
   reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
   reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);
   // Replicated so the client can identify the maze spirit cube to attach
