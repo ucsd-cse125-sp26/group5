@@ -105,6 +105,34 @@ static inline glm::vec3 anyPerpendicular(const glm::vec3& n) {
   return glm::normalize(glm::cross(n, a));
 }
 
+// AABB sphere over every mesh_instance's transformed vertex positions in the
+// model's pre-orientation frame. Skinned models pad to absorb deformation;
+// callers treat radius == 0 as "do not cull".
+static void computeModelBounds(Model& model) {
+  glm::vec3 lo(std::numeric_limits<float>::max());
+  glm::vec3 hi(std::numeric_limits<float>::lowest());
+  bool any = false;
+  for (const auto& [meshIdx, instanceTransform] : model.mesh_instances) {
+    if (meshIdx >= model.meshes.size()) continue;
+    for (const auto& v : model.meshes[meshIdx].vertices) {
+      glm::vec3 p = glm::vec3(instanceTransform * glm::vec4(v.position, 1.0f));
+      lo = glm::min(lo, p);
+      hi = glm::max(hi, p);
+      any = true;
+    }
+  }
+  if (!any) {
+    model.localBoundsCenter = glm::vec3(0.0f);
+    model.localBoundsRadius = 0.0f;
+    return;
+  }
+  model.localBoundsCenter = 0.5f * (lo + hi);
+  model.localBoundsRadius = glm::length(0.5f * (hi - lo));
+  // Skinning can move vertices outside the bind-pose AABB; pad so we never
+  // wrongly cull a deformed limb out of a shadow map.
+  if (model.skinned) model.localBoundsRadius *= 1.5f;
+}
+
 static void addBoneInfluence(Vertex& v, int boneID, float weight) {
   for (int i = 0; i < MAX_BONE_INFLUENCE; ++i) {
     if (v.boneIDs[i] < 0) {
@@ -137,6 +165,9 @@ static void extractBoneWeights(const aiMesh* mesh,
     }
     for (unsigned w = 0; w < bone->mNumWeights; ++w) {
       const aiVertexWeight& vw = bone->mWeights[w];
+      // Assimp can emit zero-weight entries; treating them as influences
+      // would consume an influence slot and evict real weights.
+      if (vw.mWeight == 0.0f) continue;
       if (vw.mVertexId < vertices.size()) {
         addBoneInfluence(vertices[vw.mVertexId], boneID, vw.mWeight);
       }
@@ -221,19 +252,18 @@ static std::vector<Material> buildMaterials(const aiScene* scene) {
 // Cheap sRGB->linear approximation. Exact piecewise formula isn't worth the
 // branch — palette cluster centers don't need perceptual precision.
 static inline float srgbToLinear(float c) {
-  return c <= 0.04045f ? c / 12.92f
-                       : std::pow((c + 0.055f) / 1.055f, 2.4f);
+  return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
 }
 
 // Top-down RGBA8 pixel grid kept on the CPU just long enough for a model
 // load to walk its triangles and collect area-weighted samples. Released
 // once the corresponding loadModel / loadMapModels call returns.
 struct CpuDiffuse {
-  std::vector<uint8_t> rgba;   // w*h*4 bytes in source channel order
+  std::vector<uint8_t> rgba;  // w*h*4 bytes in source channel order
   int w = 0;
   int h = 0;
   bool isBGRA = false;
-  glm::vec3 constant{1.0f};    // used when hasTexture is false
+  glm::vec3 constant{1.0f};  // used when hasTexture is false
   bool hasTexture = false;
 };
 
@@ -251,10 +281,9 @@ static CpuDiffuse decodeDiffuse(const aiMaterial* mat, const aiScene* scene) {
     bool ownedByStb = false;
     if (auto embedded = scene->GetEmbeddedTexture(path.C_Str())) {
       if (embedded->mHeight == 0) {
-        pixels =
-            stbi_load_from_memory(reinterpret_cast<uint8_t*>(embedded->pcData),
-                                  embedded->mWidth, &out.w, &out.h, &channels,
-                                  4);
+        pixels = stbi_load_from_memory(
+            reinterpret_cast<uint8_t*>(embedded->pcData), embedded->mWidth,
+            &out.w, &out.h, &channels, 4);
         ownedByStb = pixels != nullptr;
       } else {
         out.w = embedded->mWidth;
@@ -264,8 +293,7 @@ static CpuDiffuse decodeDiffuse(const aiMaterial* mat, const aiScene* scene) {
       }
     } else {
       std::filesystem::path full = exeDir() / path.C_Str();
-      pixels =
-          stbi_load(full.string().c_str(), &out.w, &out.h, &channels, 4);
+      pixels = stbi_load(full.string().c_str(), &out.w, &out.h, &channels, 4);
       ownedByStb = pixels != nullptr;
     }
     if (pixels && out.w > 0 && out.h > 0) {
@@ -335,9 +363,9 @@ static void collectMeshSamples(const aiMesh* mesh, const CpuDiffuse& diffuse,
     } else {
       for (auto& v : uv) v = glm::vec2(0.0f);
     }
-    for (int s = 0; s < 4; ++s) {
+    for (auto s : uv) {
       glm::vec3 c;
-      if (sampleDiffuseAt(diffuse, uv[s], c)) {
+      if (sampleDiffuseAt(diffuse, s, c)) {
         out.push_back({c, perSampleWeight});
       }
     }
@@ -425,9 +453,13 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     default:
       break;
   }
-  uint8_t pixel[4] = {
-      static_cast<uint8_t>(color.r * 255), static_cast<uint8_t>(color.g * 255),
-      static_cast<uint8_t>(color.b * 255), static_cast<uint8_t>(color.a * 255)};
+  // Clamp before the u8 cast: some exporters report AI_MATKEY_COLOR_* values
+  // outside [0,1] (HDR or negative), which would wrap on cast.
+  auto to_u8 = [](float v) {
+    return static_cast<uint8_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f);
+  };
+  uint8_t pixel[4] = {to_u8(color.r), to_u8(color.g), to_u8(color.b),
+                      to_u8(color.a)};
 
   // Same sRGB convention as the texture path so constant and texture
   // fallbacks stay gamma-consistent.
@@ -526,6 +558,7 @@ Model* loadModel(const std::string& filename) {
       }
     }
   }
+  computeModelBounds(*model);
   return model;
 }
 
@@ -657,6 +690,7 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
 
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
   model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  computeModelBounds(*model);
 
   return model;
 }
@@ -771,12 +805,11 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
     const glm::vec3 t = anyPerpendicular(faces[f].normal);
     const glm::vec3 b = glm::cross(faces[f].normal, t);
     for (int i = 0; i < 4; i++) {
-      vertices.push_back(
-          {.position = faces[f].corners[i],
-           .normal = faces[f].normal,
-           .texture_coordinates = uv[i],
-           .tangent = t,
-           .bitangent = b});
+      vertices.push_back({.position = faces[f].corners[i],
+                          .normal = faces[f].normal,
+                          .texture_coordinates = uv[i],
+                          .tangent = t,
+                          .bitangent = b});
     }
     indices.push_back(base + 0);
     indices.push_back(base + 1);
@@ -859,6 +892,7 @@ Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   model->meshes.push_back(std::move(mesh));
 
   model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  computeModelBounds(*model);
 
   return model;
 }
@@ -938,24 +972,24 @@ void buildModelPalette(Model& model, int colors) {
 
   const int maxColors = shared::kMaxPaletteColors;
   const int k = std::min(
-      colors, std::min(maxColors, static_cast<int>(model.diffuseSamples.size())));
+      {colors, maxColors, static_cast<int>(model.diffuseSamples.size())});
 
   // Deterministic strided seeds — spreads initial centroids without a PRNG.
   std::vector<glm::vec3> centroids(k);
   const size_t stride = std::max<size_t>(1, model.diffuseSamples.size() / k);
   for (int i = 0; i < k; ++i) {
-    centroids[i] =
-        model.diffuseSamples[(static_cast<size_t>(i) * stride) %
-                             model.diffuseSamples.size()]
-            .color;
+    centroids[i] = model
+                       .diffuseSamples[(static_cast<size_t>(i) * stride) %
+                                       model.diffuseSamples.size()]
+                       .color;
   }
 
   std::vector<glm::vec3> sums(k);
   std::vector<float> weights(k);
   constexpr int kIterations = 12;
   for (int iter = 0; iter < kIterations; ++iter) {
-    std::fill(sums.begin(), sums.end(), glm::vec3(0.0f));
-    std::fill(weights.begin(), weights.end(), 0.0f);
+    std::ranges::fill(sums, glm::vec3(0.0f));
+    std::ranges::fill(weights, 0.0f);
     for (const auto& s : model.diffuseSamples) {
       int best = 0;
       float bestD = std::numeric_limits<float>::infinity();
@@ -1100,6 +1134,7 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
                            model->diffuseSamples);
       }
     }
+    computeModelBounds(*model);
     out.emplace_back(std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
                      model);
   });

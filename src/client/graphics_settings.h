@@ -60,7 +60,7 @@ struct GraphicsSettings {
   bool shadowsEnabled = true;
   // Map sizes — changing triggers FBO/texture reallocation.
   int dirShadowMapSize = 2048;
-  int pointShadowMapSize = 1024;
+  int pointShadowMapSize = 512;
   // Directional ortho frustum + depth range.
   float dirShadowHalfExtent = 400.0f;
   float dirShadowBackDistance = 600.0f;
@@ -89,12 +89,12 @@ struct GraphicsSettings {
   // color in the present shader (after FXAA so band edges stay sharp).
   int postQuantizeLevels = 0;
   int celBands = 4;
-  float celBandEpsilon = 0.02f;          // 0 = hard, ~0.1 = soft
+  float celBandEpsilon = 0.02f;  // 0 = hard, ~0.1 = soft
   bool celHalfLambert = true;
   float celSpecularThreshold = 0.5f;
   float celSpecularEpsilon = 0.05f;
   bool celUseRampTexture = false;
-  std::string celRampPath = "";          // empty → procedural
+  std::string celRampPath = "";  // empty → procedural
 
   // Outlines (post-process Sobel only)
   OutlineMode outlineMode = OutlineMode::None;

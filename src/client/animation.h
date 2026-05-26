@@ -29,7 +29,7 @@ struct KeyScale {
 
 class Bone {
  public:
-  Bone(const std::string& name, int id, const aiNodeAnim* channel);
+  Bone(std::string name, int id, const aiNodeAnim* channel);
 
   void update(float animationTime);
   const glm::mat4& localTransform() const { return localTransform_; }

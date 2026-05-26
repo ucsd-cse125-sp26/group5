@@ -10,7 +10,8 @@ namespace {
 int currentPresetIndex = 0;
 
 void cameraSection(GraphicsSettings& s) {
-  if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) return;
+  if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+    return;
   ImGui::SliderFloat("FOV", &s.fovDegrees, 30.0f, 120.0f, "%.1f deg");
   ImGui::DragFloat("Near", &s.nearPlane, 0.01f, 0.01f, 10.0f, "%.3f");
   ImGui::DragFloat("Far", &s.farPlane, 1.0f, 10.0f, 2000.0f, "%.1f");
@@ -54,12 +55,18 @@ void shadingSection(GraphicsSettings& s) {
   ImGui::Checkbox("Use ramp texture", &s.celUseRampTexture);
   ImGui::BeginDisabled(!s.celUseRampTexture);
   static char rampPathBuf[256] = "";
-  if (rampPathBuf[0] == '\0' && !s.celRampPath.empty()) {
-    std::snprintf(rampPathBuf, sizeof(rampPathBuf), "%s", s.celRampPath.c_str());
+  // Resync from settings only when the value changed externally (e.g. preset
+  // load); otherwise we would clobber what the user is typing each frame.
+  static std::string rampPathLastApplied;
+  if (s.celRampPath != rampPathLastApplied) {
+    std::snprintf(rampPathBuf, sizeof(rampPathBuf), "%s",
+                  s.celRampPath.c_str());
+    rampPathLastApplied = s.celRampPath;
   }
   if (ImGui::InputText("Ramp PNG path", rampPathBuf, sizeof(rampPathBuf),
-                        ImGuiInputTextFlags_EnterReturnsTrue)) {
+                       ImGuiInputTextFlags_EnterReturnsTrue)) {
     s.celRampPath = rampPathBuf;
+    rampPathLastApplied = s.celRampPath;
   }
   ImGui::EndDisabled();
   ImGui::EndDisabled();
@@ -150,8 +157,7 @@ void shadowsSection(GraphicsSettings& s) {
     s.pointShadowMapSize = pointSizes[pointIdx];
   }
 
-  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f,
-                     1000.0f);
+  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f, 1000.0f);
   ImGui::SliderFloat("Dir back distance", &s.dirShadowBackDistance, 10.0f,
                      1500.0f);
   ImGui::SliderFloat("Dir far plane", &s.dirShadowFarPlane, 50.0f, 4000.0f);
@@ -205,7 +211,8 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   }
 
   const int kPresetCount = static_cast<int>(GraphicsPreset::Count);
-  const char* preview = presetName(static_cast<GraphicsPreset>(currentPresetIndex));
+  const char* preview =
+      presetName(static_cast<GraphicsPreset>(currentPresetIndex));
   if (ImGui::BeginCombo("Preset", preview)) {
     for (int i = 0; i < kPresetCount; ++i) {
       bool selected = (currentPresetIndex == i);

@@ -8,6 +8,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <utility>
 
 #include "shared/mesh_loader.h"
 
@@ -23,8 +24,8 @@ inline glm::mat4 toGlm(const aiMatrix4x4& m) {
 
 // ─── Bone ──────────────────────────────────────────────────────────────────
 
-Bone::Bone(const std::string& name, int id, const aiNodeAnim* channel)
-    : name_(name), id_(id) {
+Bone::Bone(std::string name, int id, const aiNodeAnim* channel)
+    : name_(std::move(name)), id_(id) {
   positions_.reserve(channel->mNumPositionKeys);
   for (unsigned i = 0; i < channel->mNumPositionKeys; ++i) {
     positions_.push_back({toGlm(channel->mPositionKeys[i].mValue),
@@ -75,7 +76,7 @@ int Bone::scaleIndex(float t) const {
 }
 
 glm::mat4 Bone::interpolatePosition(float t) const {
-  if (positions_.empty()) return glm::mat4(1.0f);
+  if (positions_.empty()) return {1.0f};
   if (positions_.size() == 1)
     return glm::translate(glm::mat4(1.0f), positions_[0].position);
   int p0 = positionIndex(t);
@@ -86,7 +87,7 @@ glm::mat4 Bone::interpolatePosition(float t) const {
 }
 
 glm::mat4 Bone::interpolateRotation(float t) const {
-  if (rotations_.empty()) return glm::mat4(1.0f);
+  if (rotations_.empty()) return {1.0f};
   if (rotations_.size() == 1)
     return glm::mat4_cast(glm::normalize(rotations_[0].orientation));
   int p0 = rotationIndex(t);
@@ -98,9 +99,8 @@ glm::mat4 Bone::interpolateRotation(float t) const {
 }
 
 glm::mat4 Bone::interpolateScale(float t) const {
-  if (scales_.empty()) return glm::mat4(1.0f);
-  if (scales_.size() == 1)
-    return glm::scale(glm::mat4(1.0f), scales_[0].scale);
+  if (scales_.empty()) return {1.0f};
+  if (scales_.size() == 1) return glm::scale(glm::mat4(1.0f), scales_[0].scale);
   int p0 = scaleIndex(t);
   int p1 = std::min<int>(p0 + 1, static_cast<int>(scales_.size()) - 1);
   float f = scaleFactor(scales_[p0].timeStamp, scales_[p1].timeStamp, t);
@@ -151,8 +151,8 @@ void Animation::readMissingBones(const aiAnimation* anim, Model* model) {
 }
 
 Bone* Animation::findBone(const std::string& name) {
-  auto it = std::find_if(bones_.begin(), bones_.end(),
-                         [&](const Bone& b) { return b.name() == name; });
+  auto it = std::ranges::find_if(
+      bones_, [&](const Bone& b) { return b.name() == name; });
   return it == bones_.end() ? nullptr : &*it;
 }
 
