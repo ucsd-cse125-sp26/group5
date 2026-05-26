@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <random>
 
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
@@ -11,10 +12,9 @@
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/net/packet_utils.h"
 #include "shared/simple_profiler.h"
 #include "shared/sound_constants.h"
-#include "shared/net/packet_utils.h"
-#include <random>
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
 namespace {
@@ -125,17 +125,17 @@ static void movement_system_for_world(ServerGame& game, float dt) {
 
     // ── Landing detection (ECS-driven via Grounded component) ──
     if (game.registry.all_of<shared::Grounded>(entity)) {
-        auto& g = game.registry.get<shared::Grounded>(entity);
-        if (!g.wasGrounded && g.isGrounded) {
-            shared::SoundEventPacket pkt;
-            pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
-            pkt.x = position.x;
-            pkt.y = position.y;
-            pkt.z = position.z;
-            pkt.volume = 0.7f;
-            pkt.positional = true;
-            net::broadcastPacket(game.network->getHost(), pkt);
-        }
+      auto& g = game.registry.get<shared::Grounded>(entity);
+      if (!g.wasGrounded && g.isGrounded) {
+        shared::SoundEventPacket pkt;
+        pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
+        pkt.x = position.x;
+        pkt.y = position.y;
+        pkt.z = position.z;
+        pkt.volume = 0.7f;
+        pkt.positional = true;
+        net::broadcastPacket(game.network->getHost(), pkt);
+      }
     }
 
     // ── Footsteps ──
@@ -150,8 +150,8 @@ static void movement_system_for_world(ServerGame& game, float dt) {
       if (timer >= footstepInterval) {
         timer = 0.0f;
         std::uniform_int_distribution<int> variantDist(0, 3);
-        uint32_t soundId = static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1)
-                          + variantDist(footstepRng);
+        uint32_t soundId = static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1) +
+                           variantDist(footstepRng);
         std::uniform_real_distribution<float> pitchDist(0.9f, 1.1f);
         shared::SoundEventPacket pkt;
         pkt.soundId = soundId;
@@ -163,8 +163,7 @@ static void movement_system_for_world(ServerGame& game, float dt) {
         pkt.positional = true;
         net::broadcastPacket(game.network->getHost(), pkt);
       }
-    } 
-    else {
+    } else {
       footstepTimers[eid] = 0.0f;
     }
   }
@@ -352,22 +351,23 @@ void scene_cycle_system(entt::registry& registry, StateType stateType) {
 }
 
 void update_grounded_system(ServerGame& game) {
-    auto view = game.registry.view<shared::Grounded, shared::PhysicsBody>();
-    for (auto entity : view) {
-        auto& grounded = view.get<shared::Grounded>(entity);
-        auto& pb = view.get<shared::PhysicsBody>(entity);
-        JPH::BodyID bodyId(pb.bodyId);
-        
-        if (!game.physics.getBodyInterface().IsAdded(bodyId)) {
-            // Body is inactive — keep both fields in sync so no edge fires on re-activation
-            grounded.wasGrounded = false;
-            grounded.isGrounded = false;
-            continue;
-        }
-        
-        grounded.wasGrounded = grounded.isGrounded;
-        grounded.isGrounded = game.physics.isBodyGrounded(bodyId);
+  auto view = game.registry.view<shared::Grounded, shared::PhysicsBody>();
+  for (auto entity : view) {
+    auto& grounded = view.get<shared::Grounded>(entity);
+    auto& pb = view.get<shared::PhysicsBody>(entity);
+    JPH::BodyID bodyId(pb.bodyId);
+
+    if (!game.physics.getBodyInterface().IsAdded(bodyId)) {
+      // Body is inactive — keep both fields in sync so no edge fires on
+      // re-activation
+      grounded.wasGrounded = false;
+      grounded.isGrounded = false;
+      continue;
     }
+
+    grounded.wasGrounded = grounded.isGrounded;
+    grounded.isGrounded = game.physics.isBodyGrounded(bodyId);
+  }
 }
 
 std::tuple<uint32_t, entt::entity> new_entity(ServerGame& g) {

@@ -90,7 +90,6 @@ class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
 
  private:
   JPH::BroadPhaseLayer mObjectToBroadPhase[Layers::NUM_LAYERS];
-
 };
 
 class ObjectVsBroadPhaseLayerFilterImpl
@@ -142,11 +141,11 @@ class PhysicsEngine {
     return physicsSystem.GetBodyInterface();
   }
 
-  void destroyBody(uint32_t bodyId)   {
-      JPH::BodyID joltId(bodyId);
-      bodyFootOffset_.erase(joltId.GetIndexAndSequenceNumber());
-      getBodyInterface().RemoveBody(joltId);
-      getBodyInterface().DestroyBody(joltId);
+  void destroyBody(uint32_t bodyId) {
+    JPH::BodyID joltId(bodyId);
+    bodyFootOffset_.erase(joltId.GetIndexAndSequenceNumber());
+    getBodyInterface().RemoveBody(joltId);
+    getBodyInterface().DestroyBody(joltId);
   }
 
   // Dynamic player body. Rotation DOFs are locked; rotation is driven by
@@ -200,7 +199,7 @@ class PhysicsEngine {
                             const glm::quat& rot, const glm::vec3& scale);
 
  private:
-  std::unordered_map<uint32_t, float> bodyFootOffset_; 
+  std::unordered_map<uint32_t, float> bodyFootOffset_;
   struct BoxExtents {
     glm::vec3 center;
     glm::vec3 halfExtents;

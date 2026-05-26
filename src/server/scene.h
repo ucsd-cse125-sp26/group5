@@ -62,14 +62,14 @@ void spawnStaticEntities(ServerGame& game,
     game.registry.template emplace<shared::PhysicsBody>(
         entity, bodyId.GetIndexAndSequenceNumber());
     if (!d.soundLayers.empty()) {
-        shared::SoundEmitter emitter;
-        emitter.layerCount = static_cast<uint8_t>(
-            std::min(d.soundLayers.size(),
-                    static_cast<size_t>(shared::SoundEmitter::MAX_LAYERS)));
-        for (uint8_t i = 0; i < emitter.layerCount; i++) {
-            emitter.layers[i] = d.soundLayers[i];
-        }
-        game.registry.template emplace<shared::SoundEmitter>(entity, emitter);
+      shared::SoundEmitter emitter;
+      emitter.layerCount = static_cast<uint8_t>(
+          std::min(d.soundLayers.size(),
+                   static_cast<size_t>(shared::SoundEmitter::MAX_LAYERS)));
+      for (uint8_t i = 0; i < emitter.layerCount; i++) {
+        emitter.layers[i] = d.soundLayers[i];
+      }
+      game.registry.template emplace<shared::SoundEmitter>(entity, emitter);
     }
   }
 }

@@ -17,13 +17,13 @@ enum class PacketType : uint8_t {
 };
 
 enum class GameStateType : uint8_t {
-    OVERWORLD,
-    MAZE,
+  OVERWORLD,
+  MAZE,
 };
 
 struct StateChangePacket {
-    PacketType type = PacketType::STATE_CHANGE;
-    GameStateType state;
+  PacketType type = PacketType::STATE_CHANGE;
+  GameStateType state;
 };
 
 struct AssignPacket {
@@ -44,11 +44,11 @@ struct InputPacket {
 };
 
 struct SoundEventPacket {
-    PacketType type = PacketType::SOUND_EVENT;
-    uint32_t soundId;
-    float x, y, z;
-    float volume = 1.0f;
-    float pitch = 1.0f;
-    bool positional = true;
+  PacketType type = PacketType::SOUND_EVENT;
+  uint32_t soundId;
+  float x, y, z;
+  float volume = 1.0f;
+  float pitch = 1.0f;
+  bool positional = true;
 };
 }  // namespace shared

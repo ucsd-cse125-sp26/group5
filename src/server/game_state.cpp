@@ -20,8 +20,8 @@
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
-#include "shared/util.h"
 #include "shared/sound_constants.h"
+#include "shared/util.h"
 // ── GameStateManager ─────────────────────────────────────
 
 void GameStateManager::changeState(ServerGame& game,
@@ -115,11 +115,12 @@ static void addPhysicsBodies(ServerGame& game) {
     if (!bodyInterface.IsAdded(bodyId)) {
       bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
     }
-    // Prime wasGrounded=true so the first grounded tick doesn't look like a landing
+    // Prime wasGrounded=true so the first grounded tick doesn't look like a
+    // landing
     if (game.registry.all_of<shared::Grounded>(ent)) {
-        auto& g = game.registry.get<shared::Grounded>(ent);
-        g.wasGrounded = true;
-        g.isGrounded = true;
+      auto& g = game.registry.get<shared::Grounded>(ent);
+      g.wasGrounded = true;
+      g.isGrounded = true;
     }
   }
 }
@@ -187,7 +188,7 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
-  game.registry.emplace<shared::Grounded>(entity);  
+  game.registry.emplace<shared::Grounded>(entity);
   game.registry.emplace<shared::ColorBoundingBox>(entity);
   {
     auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
@@ -308,70 +309,76 @@ void initWorldEntities(ServerGame& game) {
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
-      game, {
-                // 100³ floor cube; top surface lands on z=0.
-                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(100.0f)},
-                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
-                                 .modelName = "cube"},
-                StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(1.5f)},
-                StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(0.8f)},
-                StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(2.0f)},
-                StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Box,
-                                 .soundLayers = {
-                                    shared::SoundLayer{
-                                        .soundId = static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
-                                        .trigger = shared::SoundTriggerType::ALWAYS,
-                                        .volume = 0.5f
-                                    },}},
-                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Mesh},
-                // ADD YOUR SECTION SOUND MARKERS HERE FOR LEON AND PHILLIP
-                // Section 1 (Winter) — invisible marker entity at section center
-                // StaticEntityDesc{
-                //     .position = glm::vec3(50.0f, 0.0f, 0.0f),
-                //     .modelName = "cube",  // use any model, doesn't matter — could even be tiny/hidden
-                //     .scale = glm::vec3(0.01f),  // tiny so it's invisible
-                //     .soundLayers = {
-                //         shared::SoundLayer{
-                //             .soundId = static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
-                //             .trigger = shared::SoundTriggerType::PROXIMITY,
-                //             .playMode = shared::SoundPlayMode::AMBIENT,
-                //             .volume = 0.5f,
-                //             .proximityRange = 30.0f,
-                //             .fadeSpeed = 1.5f,
-                //         },
-                //     }
-                // },
-                // // Section 2 (Fall)
-                // StaticEntityDesc{
-                //     .position = glm::vec3(-50.0f, 0.0f, 0.0f),
-                //     .modelName = "cube",
-                //     .scale = glm::vec3(0.01f),
-                //     .soundLayers = {
-                //         shared::SoundLayer{
-                //             .soundId = static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
-                //             .trigger = shared::SoundTriggerType::PROXIMITY,
-                //             .playMode = shared::SoundPlayMode::AMBIENT,
-                //             .volume = 0.5f,
-                //             .proximityRange = 30.0f,
-                //             .fadeSpeed = 1.5f,
-                //         },
-                //     }
-                // },
-            });
+      game,
+      {
+          // 100³ floor cube; top surface lands on z=0.
+          StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(100.0f)},
+          StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
+                           .modelName = "cube"},
+          StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(1.5f)},
+          StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(0.8f)},
+          StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(2.0f)},
+          StaticEntityDesc{
+              .position = glm::vec3(10.0f, 0.0f, 0.0f),
+              .modelName = "bear",
+              .scale = glm::vec3(0.5f),
+              .collision = CollisionShape::Box,
+              .soundLayers =
+                  {
+                      shared::SoundLayer{
+                          .soundId = static_cast<uint32_t>(
+                              shared::SoundId::AMBIENT_HUM),
+                          .trigger = shared::SoundTriggerType::ALWAYS,
+                          .volume = 0.5f},
+                  }},
+          StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
+                           .modelName = "bear",
+                           .scale = glm::vec3(0.5f),
+                           .collision = CollisionShape::Mesh},
+          // ADD YOUR SECTION SOUND MARKERS HERE FOR LEON AND PHILLIP
+          // Section 1 (Winter) — invisible marker entity at section center
+          // StaticEntityDesc{
+          //     .position = glm::vec3(50.0f, 0.0f, 0.0f),
+          //     .modelName = "cube",  // use any model, doesn't matter — could
+          //     even be tiny/hidden .scale = glm::vec3(0.01f),  // tiny so it's
+          //     invisible .soundLayers = {
+          //         shared::SoundLayer{
+          //             .soundId =
+          //             static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
+          //             .trigger = shared::SoundTriggerType::PROXIMITY,
+          //             .playMode = shared::SoundPlayMode::AMBIENT,
+          //             .volume = 0.5f,
+          //             .proximityRange = 30.0f,
+          //             .fadeSpeed = 1.5f,
+          //         },
+          //     }
+          // },
+          // // Section 2 (Fall)
+          // StaticEntityDesc{
+          //     .position = glm::vec3(-50.0f, 0.0f, 0.0f),
+          //     .modelName = "cube",
+          //     .scale = glm::vec3(0.01f),
+          //     .soundLayers = {
+          //         shared::SoundLayer{
+          //             .soundId =
+          //             static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
+          //             .trigger = shared::SoundTriggerType::PROXIMITY,
+          //             .playMode = shared::SoundPlayMode::AMBIENT,
+          //             .volume = 0.5f,
+          //             .proximityRange = 30.0f,
+          //             .fadeSpeed = 1.5f,
+          //         },
+          //     }
+          // },
+      });
   spawnStaticEntities<shared::OverworldTag>(
       game, buildOverworldMazePreviewEntities());
   spawnStaticEntities<shared::OverworldTag>(
@@ -442,7 +449,7 @@ void OverworldState::onEnter(ServerGame& game) {
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::OVERWORLD;
   net::broadcastPacket(game.network->getHost(), pkt);
-    
+
   addPhysicsBodies<shared::OverworldTag>(game);
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;

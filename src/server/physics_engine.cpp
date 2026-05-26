@@ -1,5 +1,7 @@
 #include "physics_engine.h"
 
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -11,8 +13,6 @@
 
 #include "shared/assets.h"
 #include "shared/mesh_loader.h"
-#include <Jolt/Physics/Collision/RayCast.h>
-#include <Jolt/Physics/Collision/CastResult.h>
 
 JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
                                             const glm::vec3& pos,
@@ -22,17 +22,18 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
   JPH::ShapeRefC shape = playerShapeForAsset(modelName, scale);
 
   // Compute foot offset: distance from body origin down to shape bottom.
-  // boxShapeForAsset with Z-only mask offsets box center up by center.z*scale.z,
-  // so body origin is center.z*scale.z below the box center, meaning
-  // bottom of box relative to origin = center.z*scale.z - halfExtents.z*scale.z
-  // = (center.z - halfExtents.z) * scale.z
-  // The foot is at body_pos.z + that value (negative = below origin).
-  const BoxExtents& ext = assetBoxCache_.count(modelName) 
-      ? assetBoxCache_.at(modelName) 
-      : BoxExtents{glm::vec3(0), glm::vec3(0.5f)};
+  // boxShapeForAsset with Z-only mask offsets box center up by
+  // center.z*scale.z, so body origin is center.z*scale.z below the box center,
+  // meaning bottom of box relative to origin = center.z*scale.z -
+  // halfExtents.z*scale.z = (center.z - halfExtents.z) * scale.z The foot is at
+  // body_pos.z + that value (negative = below origin).
+  const BoxExtents& ext =
+      assetBoxCache_.count(modelName)
+          ? assetBoxCache_.at(modelName)
+          : BoxExtents{.center = glm::vec3(0), .halfExtents = glm::vec3(0.5f)};
   float footOffset = (ext.center.z - ext.halfExtents.z) * scale.z;
-  // footOffset is negative (below origin), so dist from origin to foot = -footOffset
-
+  // footOffset is negative (below origin), so dist from origin to foot =
+  // -footOffset
 
   JPH::Quat joltRot(rot.x, rot.y, rot.z, rot.w);
   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
@@ -365,24 +366,25 @@ JPH::ShapeRefC PhysicsEngine::playerShapeForAsset(const std::string& modelName,
   return boxShapeForAsset(modelName, scale, glm::vec3(0.0f, 0.0f, 1.0f));
 }
 
-
 bool PhysicsEngine::isBodyGrounded(JPH::BodyID bodyId, float checkDistance) {
-    auto& bodyInterface = getBodyInterface();
-    if (!bodyInterface.IsAdded(bodyId)) return false;
+  auto& bodyInterface = getBodyInterface();
+  if (!bodyInterface.IsAdded(bodyId)) return false;
 
-    // GetTransformedShape gives us the shape with the body's current world transform,
-    // then GetWorldSpaceBounds accounts for RotatedTranslatedShape, ScaledShape, etc.
-    JPH::TransformedShape ts = bodyInterface.GetTransformedShape(bodyId);
-    JPH::AABox bounds = ts.GetWorldSpaceBounds();
+  // GetTransformedShape gives us the shape with the body's current world
+  // transform, then GetWorldSpaceBounds accounts for RotatedTranslatedShape,
+  // ScaledShape, etc.
+  JPH::TransformedShape ts = bodyInterface.GetTransformedShape(bodyId);
+  JPH::AABox bounds = ts.GetWorldSpaceBounds();
 
-    // Ray starts just inside the shape bottom, travels checkDistance down
-    JPH::RVec3 rayOrigin(bounds.GetCenter().GetX(), bounds.GetCenter().GetY(), bounds.mMin.GetZ() + 0.01f);
-    JPH::Vec3 down(0.0f, 0.0f, -1.0f);
-    JPH::RRayCast ray{rayOrigin, down * (checkDistance + 0.01f)};
+  // Ray starts just inside the shape bottom, travels checkDistance down
+  JPH::RVec3 rayOrigin(bounds.GetCenter().GetX(), bounds.GetCenter().GetY(),
+                       bounds.mMin.GetZ() + 0.01f);
+  JPH::Vec3 down(0.0f, 0.0f, -1.0f);
+  JPH::RRayCast ray{rayOrigin, down * (checkDistance + 0.01f)};
 
-    JPH::RayCastResult result;
-    return physicsSystem.GetNarrowPhaseQuery().CastRay(
-        ray, result,
-        JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING),
-        JPH::SpecifiedObjectLayerFilter(Layers::NON_MOVING));
+  JPH::RayCastResult result;
+  return physicsSystem.GetNarrowPhaseQuery().CastRay(
+      ray, result,
+      JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING),
+      JPH::SpecifiedObjectLayerFilter(Layers::NON_MOVING));
 }

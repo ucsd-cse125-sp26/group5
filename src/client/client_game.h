@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 #include <map>
 #include <mutex>
+
 #include "audio_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
@@ -41,5 +42,5 @@ void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
-void updateSoundEmitters(ClientGame& game,
-                          float listenerX, float listenerY, float listenerZ, float dt);
+void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
+                         float listenerZ, float dt);
