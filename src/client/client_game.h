@@ -37,6 +37,5 @@ void registerClientHandlers(ClientNetwork& network);
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys,
-                  bool debugMode);
+                  InputKeys& prevKeys, bool debugMode);
 void printEntityPositions(const ClientGame& game);

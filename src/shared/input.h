@@ -24,4 +24,4 @@ constexpr InputKeys KEY_SPIRIT_RIGHT = 1 << 16;
 constexpr InputKeys KEY_MAZE_COLLECT = 1 << 17;
 constexpr InputKeys KEY_PICKUP = 1 << 18;
 constexpr InputKeys KEY_DEBUG_COMPLETE_SECTION = 1 << 19;
-constexpr InputKeys KEY_DEBUG_TOGGLE_BARRIERS  = 1 << 20;
+constexpr InputKeys KEY_DEBUG_TOGGLE_BARRIERS = 1 << 20;

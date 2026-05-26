@@ -333,17 +333,20 @@ void initWorldEntities(ServerGame& game) {
   overworld_maze_puzzle::initOverworldMazePuzzleController(game);
 
   // Section barriers — TODO: replace positions/sizes once you have map coords
-  spawnSectionBarrier<shared::OverworldTag>(game,
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
       /*sectionID=*/0,
       /*season=*/shared::SectionSeasonMap::WINTER,
       /*pos=*/glm::vec3(90.0f, 47.5f, 0.0f),
       /*halfExtents=*/glm::vec3(1.0f, 58.0f, 100.0f));
-  spawnSectionBarrier<shared::OverworldTag>(game,
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
       /*sectionID=*/1,
       /*season=*/shared::SectionSeasonMap::FALL,
       /*pos=*/glm::vec3(92.5f, -10.0f, 0.0f),
       /*halfExtents=*/glm::vec3(82.0f, 1.0f, 100.0f));
-  spawnSectionBarrier<shared::OverworldTag>(game,
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
       /*sectionID=*/2,
       /*season=*/shared::SectionSeasonMap::SUMMER,
       /*pos=*/glm::vec3(10.0f, 0.0f, 0.0f),
@@ -356,17 +359,17 @@ void initWorldEntities(ServerGame& game) {
   // add more per section as needed
 
   // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
-  spawnInvisibleWall<shared::OverworldTag>(game,
-      glm::vec3(1.0f, 103.0f, 0.0f),   // north  (Y=105 + buffer)
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(1.0f, 103.0f, 0.0f),  // north  (Y=105 + buffer)
       glm::vec3(172.0f, 1.0f, 150.0f));
-  spawnInvisibleWall<shared::OverworldTag>(game,
-      glm::vec3(1.0f, -105.0f, 0.0f),   // south  (Y=-105 - buffer)
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(1.0f, -105.0f, 0.0f),  // south  (Y=-105 - buffer)
       glm::vec3(172.0f, 1.0f, 150.0f));
-  spawnInvisibleWall<shared::OverworldTag>(game,
-      glm::vec3(170.0f, 1.0f, 0.0f),  // east   (X=171 + buffer)
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(170.0f, 1.0f, 0.0f),  // east   (X=171 + buffer)
       glm::vec3(1.0f, 106.0f, 150.0f));
-  spawnInvisibleWall<shared::OverworldTag>(game,
-      glm::vec3(-170.0f, 1.0f, 0.0f), // west   (X=-169 - buffer)
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(-170.0f, 1.0f, 0.0f),  // west   (X=-169 - buffer)
       glm::vec3(1.0f, 106.0f, 150.0f));
 
   // --- Maze ---
@@ -503,64 +506,63 @@ void OverworldState::update(ServerGame& game, float dt) {
 
   // DEBUG: press B to complete section 0
   for (auto ent : inputView) {
-      auto& input = game.registry.get<shared::PlayerInput>(ent);
-      if (input.keys_newly_pressed & KEY_DEBUG_COMPLETE_SECTION) {
-          auto barrierView2 = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
-          for (auto barrier : barrierView2) {
-              auto& phys = game.registry.get<shared::PhysicsBody>(barrier);
-              JPH::BodyID bodyId(phys.bodyId);
-              auto& bodyInterface = game.physics.getBodyInterface();
-              if (bodyInterface.IsAdded(bodyId)) {
-                  bodyInterface.RemoveBody(bodyId);
-                  printf("DEBUG: removed collision body\n");
-              } else {
-                  bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
-                  printf("DEBUG: re-added collision body\n");
-              }
-          }
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_COMPLETE_SECTION) {
+      auto barrierView2 =
+          game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+      for (auto barrier : barrierView2) {
+        auto& phys = game.registry.get<shared::PhysicsBody>(barrier);
+        JPH::BodyID bodyId(phys.bodyId);
+        auto& bodyInterface = game.physics.getBodyInterface();
+        if (bodyInterface.IsAdded(bodyId)) {
+          bodyInterface.RemoveBody(bodyId);
+          printf("DEBUG: removed collision body\n");
+        } else {
+          bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+          printf("DEBUG: re-added collision body\n");
+        }
       }
+    }
   }
 
-// DEBUG: press N to toggle barrier visibility
+  // DEBUG: press N to toggle barrier visibility
   for (auto ent : inputView) {
-      auto& input = game.registry.get<shared::PlayerInput>(ent);
-      if (input.keys_newly_pressed & KEY_DEBUG_TOGGLE_BARRIERS) {
-          auto barrierView = game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
-          printf("DEBUG: toggling %zu barriers\n", barrierView.size_hint());
-          for (auto barrier : barrierView) {
-              auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
-              uint32_t eid = game.registry.get<shared::Entity>(barrier).id;
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_TOGGLE_BARRIERS) {
+      auto barrierView =
+          game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+      printf("DEBUG: toggling %zu barriers\n", barrierView.size_hint());
+      for (auto barrier : barrierView) {
+        auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
+        uint32_t eid = game.registry.get<shared::Entity>(barrier).id;
 
-              if (game.registry.all_of<shared::SectionBarrierVisible>(barrier)) {
-                  // hide: remove RenderInfo, tell client to despawn+respawn without it
-                  game.registry.remove<shared::RenderInfo>(barrier);
-                  game.registry.remove<shared::SectionBarrierVisible>(barrier);
-              } else {
-                  // show: add RenderInfo back
-                  game.registry.emplace<shared::RenderInfo>(
-                      barrier, "cube",
-                      tag.halfExtents.x * 2.0f,
-                      tag.halfExtents.y * 2.0f,
-                      tag.halfExtents.z * 2.0f);
-                  game.registry.emplace<shared::SectionBarrierVisible>(barrier);
-              }
+        if (game.registry.all_of<shared::SectionBarrierVisible>(barrier)) {
+          // hide: remove RenderInfo, tell client to despawn+respawn without it
+          game.registry.remove<shared::RenderInfo>(barrier);
+          game.registry.remove<shared::SectionBarrierVisible>(barrier);
+        } else {
+          // show: add RenderInfo back
+          game.registry.emplace<shared::RenderInfo>(
+              barrier, "cube", tag.halfExtents.x * 2.0f,
+              tag.halfExtents.y * 2.0f, tag.halfExtents.z * 2.0f);
+          game.registry.emplace<shared::SectionBarrierVisible>(barrier);
+        }
 
-              // despawn then respawn so client gets fresh component list
-              shared::DespawnPacket despawn;
-              despawn.type = shared::PacketType::DESPAWN_ENTITY;
-              despawn.entityId = eid;
-              net::broadcastPacket(game.network->getHost(), despawn);
+        // despawn then respawn so client gets fresh component list
+        shared::DespawnPacket despawn;
+        despawn.type = shared::PacketType::DESPAWN_ENTITY;
+        despawn.entityId = eid;
+        net::broadcastPacket(game.network->getHost(), despawn);
 
-              std::vector<entt::entity> toRespawn = {barrier};
-              auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                           shared::PacketType::SPAWN_ENTITY,
-                                           toRespawn, false);
-              net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
-          }
-          break;
+        std::vector<entt::entity> toRespawn = {barrier};
+        auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                     shared::PacketType::SPAWN_ENTITY,
+                                     toRespawn, false);
+        net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
       }
+      break;
+    }
   }
-
 
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
   if (lightId != kInvalidEntityId)
