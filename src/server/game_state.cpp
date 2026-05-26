@@ -336,24 +336,38 @@ void initWorldEntities(ServerGame& game) {
   spawnSectionBarrier<shared::OverworldTag>(game,
       /*sectionID=*/0,
       /*season=*/shared::SectionSeasonMap::WINTER,
-      /*pos=*/glm::vec3(90.0f, 52.5f, 20.0f),
-      /*halfExtents=*/glm::vec3(1.0f, 52.5f, 10.0f));
+      /*pos=*/glm::vec3(90.0f, 47.5f, 0.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 58.0f, 100.0f));
   spawnSectionBarrier<shared::OverworldTag>(game,
       /*sectionID=*/1,
       /*season=*/shared::SectionSeasonMap::FALL,
-      /*pos=*/glm::vec3(122.5f, -10.0f, 42.0f),
-      /*halfExtents=*/glm::vec3(47.5f, 1.0f, 10.0f));
+      /*pos=*/glm::vec3(92.5f, -10.0f, 0.0f),
+      /*halfExtents=*/glm::vec3(82.0f, 1.0f, 100.0f));
   spawnSectionBarrier<shared::OverworldTag>(game,
       /*sectionID=*/2,
       /*season=*/shared::SectionSeasonMap::SUMMER,
-      /*pos=*/glm::vec3(15.0f, -52.5f, 70.0f),
-      /*halfExtents=*/glm::vec3(1.0f, 52.5f, 18.0f));
+      /*pos=*/glm::vec3(10.0f, 0.0f, 0.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 105.0f, 100.0f));
   // spawnSectionBarrier<shared::OverworldTag>(game,
   //     /*sectionID=*/3,
   //     /*season=*/shared::SectionSeasonMap::SPRING,
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
+
+  // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
+  spawnInvisibleWall<shared::OverworldTag>(game,
+      glm::vec3(1.0f, 103.0f, 0.0f),   // north  (Y=105 + buffer)
+      glm::vec3(172.0f, 1.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(game,
+      glm::vec3(1.0f, -105.0f, 0.0f),   // south  (Y=-105 - buffer)
+      glm::vec3(172.0f, 1.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(game,
+      glm::vec3(170.0f, 1.0f, 0.0f),  // east   (X=171 + buffer)
+      glm::vec3(1.0f, 106.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(game,
+      glm::vec3(-170.0f, 1.0f, 0.0f), // west   (X=-169 - buffer)
+      glm::vec3(1.0f, 106.0f, 150.0f));
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
