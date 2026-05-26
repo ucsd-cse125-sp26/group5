@@ -19,6 +19,7 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
+#include "client/client_game.h"
 #include "client/ui_settings.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -33,6 +34,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
+#include "shared/maze_preview.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 #include "shared/util.h"
@@ -229,11 +231,15 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const auto& selfRender =
       game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
+  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
+
   // Maze mode: detected by the replicated MazeSpiritGrid component, which
   // only exists on the maze world's spirit cube. Gating on modelName or a
   // mesh+scale fingerprint was unsafe — KEY_SWAP_MODEL flips the avatar's
   // mesh, and overworld decoration cubes can share the spirit cube's
-  // scale.
+  // scale. This branch wins over the preview-puzzle case below because
+  // MazeSpiritGrid is only ever present in the MAZE state.
   {
     entt::entity spirit = entt::null;
     auto spiritView =
@@ -263,14 +269,24 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
           break;
       }
 
-      glm::vec3 pos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
-      glm::mat4 view =
-          glm::lookAt(pos, pos + side, glm::vec3(0.0f, 0.0f, 1.0f));
-      return CameraState{.position = pos, .view = view};
+      glm::vec3 spiritPos = glm::vec3(sp.x, sp.y, sp.z + 0.6f) + side * 0.55f;
+      glm::mat4 view = glm::lookAt(spiritPos, spiritPos + side, worldUp);
+      return CameraState{.position = spiritPos, .view = view};
     }
   }
 
-  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  // During the preview-board puzzle only; after exit, normal FPS view
+  // immediately. Branch switched the overworld avatar from "cube" to
+  // "playerbase", so the puzzle-active gate alone is the right filter —
+  // the spirit-grid case above already preempts the maze state.
+  if (isOverworldMazePuzzleActive(game)) {
+    const glm::vec3 target(shared::maze_preview::kLookAtX,
+                           shared::maze_preview::kLookAtY,
+                           shared::maze_preview::kLookAtZ);
+    glm::mat4 view = glm::lookAt(pos, target, worldUp);
+    return CameraState{.position = pos, .view = view};
+  }
+
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
@@ -281,7 +297,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   glm::quat pitchRot = glm::angleAxis(cam.pitch, glm::vec3(1.0f, 0.0f, 0.0f));
   glm::vec3 forward = yawRot * pitchRot * glm::vec3(0.0f, 1.0f, 0.0f);
 
-  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
   glm::mat4 view = glm::lookAt(pos, pos + forward, worldUp);
   return CameraState{.position = pos, .view = view};
 }

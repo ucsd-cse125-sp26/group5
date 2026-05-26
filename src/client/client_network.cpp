@@ -102,4 +102,7 @@ void ClientNetwork::drainInputQueue(
   while (inputQueue.tryPop(pkt)) {
     send(pkt);
   }
+  if (client_) {
+    enet_host_flush(client_);
+  }
 }

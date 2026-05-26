@@ -9,9 +9,12 @@
 #include <utility>
 #include <vector>
 
+#include "server/game/maze_spirit_control.h"
 #include "server/server_game.h"
+#include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/net/packet_utils.h"
 
 namespace {
 
@@ -238,6 +241,20 @@ void CollectMazeFragment(ServerGame& game) {
   }
   printf(
       "[GameLogic] CollectMazeFragment: winter done, sections completed++\n");
+
+  // Reveal the winter fragment now that the puzzle is solved.
+  auto fragView =
+      game.registry.view<shared::FragmentComponent, shared::OverworldTag>();
+  for (auto fragEnt : fragView) {
+    if (game.registry.get<shared::FragmentComponent>(fragEnt).season !=
+        shared::SectionSeasonMap::WINTER)
+      continue;
+    if (!game.registry.all_of<shared::RenderInfo>(fragEnt)) {
+      game.registry.emplace<shared::RenderInfo>(fragEnt, "light_cube", 1.0f,
+                                                1.0f, 1.0f);
+    }
+    break;
+  }
 }
 
 bool HasUnlockedWinterSection(const ServerGame& game) {
@@ -285,11 +302,7 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
 void TickMazeExploration(ServerGame& game, float dt) {
   (void)dt;
 
-  entt::entity spirit = entt::null;
-  for (auto e : game.registry.view<shared::MazeSpiritGrid, shared::MazeTag>()) {
-    spirit = e;
-    break;
-  }
+  const entt::entity spirit = maze_spirit_control::findSharedSpirit(game);
   if (spirit == entt::null) return;
 
   auto inputView = game.registry.view<shared::PlayerInput, shared::MazeTag>();
@@ -316,40 +329,9 @@ void TickMazeExploration(ServerGame& game, float dt) {
     return;
   }
 
-  float sx = 0.f;
-  float sy = 0.f;
-  for (auto ent : inputView) {
-    const auto& in = game.registry.get<shared::PlayerInput>(ent);
-    if ((in.keys & KEY_SPIRIT_UP) == 0) continue;
-    if (!game.registry.all_of<shared::RenderInfo>(ent)) continue;
-    uint8_t slot = game.registry.get<shared::RenderInfo>(ent).playerSlot;
-    if (slot < 1 || slot > 4) slot = 1;
-    float fx = 0.f;
-    float fy = 0.f;
-    mazeFacingFromJoinSlot(slot, fx, fy);
-    sx += fx;
-    sy += fy;
-  }
-
-  // Same horizontal speed as overworld movement_system (capsule players).
-  constexpr float kSpeed = 10.0f;
-  float vx = 0.f;
-  float vy = 0.f;
-  const float len = std::sqrt(sx * sx + sy * sy);
-  if (len > 1e-5f) {
-    vx = (sx / len) * kSpeed;
-    vy = (sy / len) * kSpeed;
-  }
-
-  JPH::Vec3 curVel = bodyInterface.GetLinearVelocity(spiritBody);
-  bodyInterface.SetLinearVelocity(spiritBody, JPH::Vec3(vx, vy, curVel.GetZ()));
-
-  if (game.registry.all_of<shared::Velocity>(spirit)) {
-    auto& vel = game.registry.get<shared::Velocity>(spirit);
-    vel.dx = vx;
-    vel.dy = vy;
-    vel.dz = curVel.GetZ();
-  }
+  const maze_spirit_control::SpiritDrive drive =
+      maze_spirit_control::collectSpiritDriveFromPlayers(game);
+  maze_spirit_control::applySpiritDriveVelocity(game, spirit, drive);
 }
 
 void ResetMazeSpiritSpawn(ServerGame& game) {
