@@ -11,6 +11,8 @@
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
+#include "shared/gpu_mem_profiler.h"
+#include "shared/gpu_profiler.h"
 #include "shared/hello.h"
 #include "shared/simple_profiler.h"
 
@@ -49,6 +51,8 @@ int main() {
     float currentTime = (float)glfwGetTime();
     float dt = currentTime - lastTime;
     lastTime = currentTime;
+    SIMPLE_PROFILE_FRAME_START();
+    GPU_PROFILE_FRAME_BEGIN();
 
     SIMPLE_PROFILE_FRAME_START();
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
@@ -75,6 +79,8 @@ int main() {
       game.audio.update(dt);
     }
     graphics.swap();
+    GPU_PROFILE_FRAME_END();
+    GPU_MEM_FRAME_END();
     glfwPollEvents();
     graphics.processDebugKeys();
 
@@ -88,7 +94,7 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, game.inputQueue, prevKeys);
+    processInput(graphics.window, game, game.inputQueue, prevKeys);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 

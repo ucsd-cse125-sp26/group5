@@ -155,6 +155,13 @@ class PhysicsEngine {
                                const glm::vec3& pos, const glm::quat& rot,
                                const glm::vec3& scale);
   bool isBodyGrounded(JPH::BodyID bodyId, float checkDistance = 0.2f);
+
+  // Shared maze piece on the overworld preview board: no gravity, slides on XZ.
+  JPH::BodyID createMazeBoardPieceBody(const std::string& modelName,
+                                       const glm::vec3& pos,
+                                       const glm::quat& rot,
+                                       const glm::vec3& scale);
+
   // Asset orientation is baked into the shape so the body's rotation can
   // stay equal to the entity's rotation. `centerOffsetMask` is multiplied
   // per-axis with the AABB's local-space center before baking — use (0,0,1)
