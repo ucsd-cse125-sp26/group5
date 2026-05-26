@@ -43,9 +43,13 @@ void main() {
       skinnedNormal += (boneM3 * normal) * weights[i];
       skinnedTangent += (boneM3 * tangent) * weights[i];
     }
-    localPos = skinnedPos;
-    localNormal = skinnedNormal;
-    localTangent = skinnedTangent;
+    // Unweighted vertices on a skinned mesh would otherwise collapse to the
+    // origin; keep them in bind pose.
+    if (skinnedPos.w > 0.0) {
+      localPos = skinnedPos;
+      localNormal = skinnedNormal;
+      localTangent = skinnedTangent;
+    }
   }
   vec4 world = model * localPos;
   gl_Position = camera.projection * camera.view * world;

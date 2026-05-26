@@ -5,6 +5,8 @@
 
 #include "client_graphics.h"
 
+#include <stb_image.h>  // implementation lives in asset.cpp
+
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -14,6 +16,8 @@
 #include <string>
 #include <vector>
 
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
 #include "client/ui_settings.h"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -23,6 +27,7 @@
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "imgui.h"
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/gpu_mem_profiler.h"
@@ -31,11 +36,6 @@
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 #include "shared/util.h"
-
-#include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_opengl3.h"
-#include <stb_image.h>  // implementation lives in asset.cpp
 
 // Skybox images are Y-up; the game is Z-up.
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
@@ -407,10 +407,44 @@ static void updateAnimators(Graphics& gfx, ClientGame& game, float dt) {
   }
 }
 
+// Sphere-vs-frustum culler used by the per-face point-shadow loop. `planes`
+// are extracted from the light-face view-projection (Gribb-Hartmann,
+// normalized). A sphere is "outside" iff its signed distance to any plane is
+// less than -radius.
+struct ShadowCuller {
+  glm::vec4 planes[6];
+  bool reject(glm::vec3 c, float r) const {
+    for (auto plane : planes) {
+      if (glm::dot(glm::vec3(plane), c) + plane.w < -r) return true;
+    }
+    return false;
+  }
+};
+
+static void extractFrustumPlanes(const glm::mat4& vp, glm::vec4 out[6]) {
+  // glm matrices are column-major: row i = (vp[0][i], vp[1][i], vp[2][i],
+  // vp[3][i]).
+  glm::vec4 r0(vp[0][0], vp[1][0], vp[2][0], vp[3][0]);
+  glm::vec4 r1(vp[0][1], vp[1][1], vp[2][1], vp[3][1]);
+  glm::vec4 r2(vp[0][2], vp[1][2], vp[2][2], vp[3][2]);
+  glm::vec4 r3(vp[0][3], vp[1][3], vp[2][3], vp[3][3]);
+  out[0] = r3 + r0;  // left
+  out[1] = r3 - r0;  // right
+  out[2] = r3 + r1;  // bottom
+  out[3] = r3 - r1;  // top
+  out[4] = r3 + r2;  // near
+  out[5] = r3 - r2;  // far
+  for (int i = 0; i < 6; ++i) {
+    float len = glm::length(glm::vec3(out[i]));
+    if (len > 1e-6f) out[i] /= len;
+  }
+}
+
 static void renderEntities(const Shader& shader, Graphics& gfx,
                            ClientGame& game,
                            std::unordered_map<std::string, Model*>& models,
-                           bool forShadowPass = false) {
+                           bool forShadowPass = false,
+                           const ShadowCuller* culler = nullptr) {
   auto view = game.renderRegistry
                   .view<shared::Entity, shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
@@ -440,11 +474,25 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       modelAsset = fallbackIt != models.end() ? fallbackIt->second : nullptr;
     }
     if (!modelAsset) continue;
+
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
+    glm::vec3 scale(renderInfo.sx, renderInfo.sy, renderInfo.sz);
+    glm::vec3 pos(p.x, p.y, p.z);
+
+    // Cheap sphere reject before composing the model matrix or touching GL.
+    if (culler && modelAsset->localBoundsRadius > 0.0f) {
+      glm::vec3 localCenter =
+          modelAsset->orientation * modelAsset->localBoundsCenter;
+      glm::vec3 worldCenter = pos + rotation * (scale * localCenter);
+      float maxScale =
+          std::max({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
+      float worldRadius = modelAsset->localBoundsRadius * maxScale;
+      if (culler->reject(worldCenter, worldRadius)) continue;
+    }
+
     auto model = glm::identity<glm::mat4>();
-    model = glm::translate(model, glm::vec3(p.x, p.y, p.z));
-    model = glm::scale(model,
-                       glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
+    model = glm::translate(model, pos);
+    model = glm::scale(model, scale);
     model = model * glm::mat4_cast(rotation) *
             glm::mat4_cast(modelAsset->orientation);
 
@@ -546,10 +594,9 @@ bool Graphics::load(int width, int height) {
   // the previous program — at startup there is no previous program, so
   // fail fast instead of starting with a black window.
   const std::optional<Shader>* required[] = {
-      &gbufferShader,     &lightingShader,     &lightingCelShader,
-      &outlineSobelShader, &skyboxShader,      &presentShader,
-      &blurShader,        &tonemapShader,      &ssaoShader,
-      &ssaoBlurShader,    &shadowDirShader,    &shadowPointShader,
+      &gbufferShader, &lightingShader, &lightingCelShader, &outlineSobelShader,
+      &skyboxShader,  &presentShader,  &blurShader,        &tonemapShader,
+      &ssaoShader,    &ssaoBlurShader, &shadowDirShader,   &shadowPointShader,
       &debugOverlay,
   };
   for (const auto* s : required) {
@@ -708,8 +755,7 @@ void Graphics::resizeBuffers(int width, int height) {
   auto allocColor = [&](GLuint tex, GLint internalFmt, GLenum fmt,
                         GLenum type) {
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, rw, rh, 0, fmt, type,
-                 nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFmt, rw, rh, 0, fmt, type, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -762,8 +808,8 @@ void Graphics::resizeBuffers(int width, int height) {
 
   auto allocHDR = [&](GLuint tex) {
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, rw, rh, 0, GL_RGBA,
-                 GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, rw, rh, 0, GL_RGBA, GL_FLOAT,
+                 nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -806,8 +852,8 @@ void Graphics::resizeBuffers(int width, int height) {
     if (!fbo) glGenFramebuffers(1, &fbo);
     if (!tex) glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, rw, rh, 0, GL_RED,
-                 GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, rw, rh, 0, GL_RED, GL_FLOAT,
+                 nullptr);
     GPU_MEM_TEX2D("SSAO", GL_R16F, rw, rh);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -835,8 +881,8 @@ void Graphics::resizeBuffers(int width, int height) {
   if (!ldrFBO) glGenFramebuffers(1, &ldrFBO);
   if (!ldrColor) glGenTextures(1, &ldrColor);
   glBindTexture(GL_TEXTURE_2D, ldrColor);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA,
-               GL_UNSIGNED_BYTE, nullptr);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               nullptr);
   GPU_MEM_TEX2D("LDR", GL_RGBA8, rw, rh);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, upscaleFilter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, upscaleFilter);
@@ -854,8 +900,8 @@ void Graphics::resizeBuffers(int width, int height) {
   if (!sobelFBO) glGenFramebuffers(1, &sobelFBO);
   if (!sobelColor) glGenTextures(1, &sobelColor);
   glBindTexture(GL_TEXTURE_2D, sobelColor);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA,
-               GL_UNSIGNED_BYTE, nullptr);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               nullptr);
   GPU_MEM_TEX2D("Outline", GL_RGBA8, rw, rh);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, upscaleFilter);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, upscaleFilter);
@@ -1154,9 +1200,8 @@ void Graphics::render(ClientGame& game) {
   // Advance per-entity animators using real wallclock dt (independent of the
   // server tick). Only animated, skinned entities pay any work here.
   const double now = glfwGetTime();
-  const float dt = lastFrameTime == 0.0
-                       ? 0.0f
-                       : static_cast<float>(now - lastFrameTime);
+  const float dt =
+      lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
   lastFrameTime = now;
   updateAnimators(*this, game, dt);
 
@@ -1233,9 +1278,12 @@ void Graphics::render(ClientGame& game) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                   pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
-        shadowPointShader->setMat4("lightSpaceMatrix", pointMats[slot * 6 + f]);
+        const glm::mat4& vp = pointMats[slot * 6 + f];
+        shadowPointShader->setMat4("lightSpaceMatrix", vp);
+        ShadowCuller culler;
+        extractFrustumPlanes(vp, culler.planes);
         renderEntities(*shadowPointShader, *this, game, models,
-                       /*forShadowPass=*/true);
+                       /*forShadowPass=*/true, &culler);
       }
     }
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1281,8 +1329,7 @@ void Graphics::render(ClientGame& game) {
     ssaoShader->setInt("kernelSize", settings.ssaoKernelSize);
     ssaoShader->setFloat("radius", settings.ssaoRadius);
     ssaoShader->setFloat("bias", settings.ssaoBias);
-    ssaoShader->setVec2("noiseScale",
-                        static_cast<float>(renderWidth) / 4.0f,
+    ssaoShader->setVec2("noiseScale", static_cast<float>(renderWidth) / 4.0f,
                         static_cast<float>(renderHeight) / 4.0f);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -1293,6 +1340,9 @@ void Graphics::render(ClientGame& game) {
     glViewport(0, 0, renderWidth, renderHeight);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
+    // Restore so a future pass that forgets to set its own clearColor before
+    // glClear doesn't inherit white.
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
   }
 
   if (settings.ssaoEnabled && ssaoBlurShader && ssaoBlurShader->valid()) {
@@ -1329,9 +1379,9 @@ void Graphics::render(ClientGame& game) {
     if (lighting && lighting->valid()) {
       if (useCel) ensureCelRampLoaded();
       lighting->use();
-      lighting->setFloat(
-          "bloomThreshold",
-          settings.bloomEnabled ? settings.bloomThreshold : 1e9f);
+      lighting->setFloat("bloomThreshold", settings.bloomEnabled
+                                               ? settings.bloomThreshold
+                                               : 1e9f);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, gPosition);
       lighting->setInt("gPosition", 0);
@@ -1367,8 +1417,12 @@ void Graphics::render(ClientGame& game) {
         lighting->setFloat("celSpecularThreshold",
                            settings.celSpecularThreshold);
         lighting->setFloat("celSpecularEpsilon", settings.celSpecularEpsilon);
-        lighting->setInt("useRampTexture",
-                         (settings.celUseRampTexture && celRampTexture) ? 1 : 0);
+        // Gate on the path being non-empty: ensureCelRampLoaded() always
+        // allocates a 1x1 white fallback, so a non-zero celRampTexture is not
+        // sufficient — sampling white would force diffuse factor to 1.0.
+        const bool rampOk = settings.celUseRampTexture &&
+                            !settings.celRampPath.empty() && celRampTexture;
+        lighting->setInt("useRampTexture", rampOk ? 1 : 0);
       }
       uploadDirectionalLight(*lighting, game, settings);
       uploadPointLights(*lighting, lights, numLights);
@@ -1394,9 +1448,8 @@ void Graphics::render(ClientGame& game) {
     GPU_PROFILE_SCOPE("Skybox");
     glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, litFBO);
-    glBlitFramebuffer(0, 0, renderWidth, renderHeight,
-                      0, 0, renderWidth, renderHeight,
-                      GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, renderWidth, renderHeight, 0, 0, renderWidth,
+                      renderHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, litFBO);
     GLenum skyDrawBufs[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1, skyDrawBufs);
@@ -1459,9 +1512,9 @@ void Graphics::render(ClientGame& game) {
       glBindTexture(GL_TEXTURE_2D, gPosition);
       tonemapShader->setInt("gPosition", 2);
       tonemapShader->setFloat("exposure", settings.exposure);
-      tonemapShader->setFloat(
-          "bloomStrength",
-          settings.bloomEnabled ? settings.bloomStrength : 0.0f);
+      tonemapShader->setFloat("bloomStrength", settings.bloomEnabled
+                                                   ? settings.bloomStrength
+                                                   : 0.0f);
 
       // Color restoration: pull the box from the local player's replicated
       // ColorBoundingBox. Strength=0 short-circuits the shader's effect path.
@@ -1474,8 +1527,8 @@ void Graphics::render(ClientGame& game) {
             game.renderRegistry.valid(selfIt->second) &&
             game.renderRegistry.all_of<shared::ColorBoundingBox>(
                 selfIt->second)) {
-          const auto& b = game.renderRegistry.get<shared::ColorBoundingBox>(
-              selfIt->second);
+          const auto& b =
+              game.renderRegistry.get<shared::ColorBoundingBox>(selfIt->second);
           restoreMin = glm::vec3(b.minX, b.minY, b.minZ);
           restoreMax = glm::vec3(b.maxX, b.maxY, b.maxZ);
           restorationStrength = settings.colorRestorationStrength;
@@ -1494,8 +1547,8 @@ void Graphics::render(ClientGame& game) {
   }
 
   GLuint finalLDR = ldrColor;
-  if (settings.outlineMode == OutlineMode::Sobel &&
-      outlineSobelShader && outlineSobelShader->valid()) {
+  if (settings.outlineMode == OutlineMode::Sobel && outlineSobelShader &&
+      outlineSobelShader->valid()) {
     SIMPLE_PROFILE_SCOPE("OutlineSobel");
     GPU_PROFILE_SCOPE("OutlineSobel");
     glBindFramebuffer(GL_FRAMEBUFFER, sobelFBO);
@@ -1511,11 +1564,12 @@ void Graphics::render(ClientGame& game) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gPosition);
     outlineSobelShader->setInt("gPosition", 2);
-    outlineSobelShader->setFloat("outlineSobelWidth", settings.outlineSobelWidth);
+    outlineSobelShader->setFloat("outlineSobelWidth",
+                                 settings.outlineSobelWidth);
     outlineSobelShader->setFloat("outlineDepthThreshold",
-                                  settings.outlineDepthThreshold);
+                                 settings.outlineDepthThreshold);
     outlineSobelShader->setFloat("outlineNormalThreshold",
-                                  settings.outlineNormalThreshold);
+                                 settings.outlineNormalThreshold);
     outlineSobelShader->setVec3("outlineColor", settings.outlineColor);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -1613,12 +1667,13 @@ void Graphics::allocatePointShadowMaps(int size) {
                   GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_MODE,
                   GL_COMPARE_REF_TO_TEXTURE);
-  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC,
+                  GL_LEQUAL);
   glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
   // Bind layer 0 first so the FBO is complete; the render loop rebinds each
   // layer as it draws.
-  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, pointShadowMaps,
-                            0, 0);
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            pointShadowMaps, 0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -1668,8 +1723,7 @@ void Graphics::ensureCelRampLoaded() {
         std::filesystem::path(exeDir()) / settings.celRampPath;
     int w = 0, h = 0, ch = 0;
     stbi_set_flip_vertically_on_load(false);
-    unsigned char* pixels =
-        stbi_load(path.string().c_str(), &w, &h, &ch, 3);
+    unsigned char* pixels = stbi_load(path.string().c_str(), &w, &h, &ch, 3);
     if (pixels && w > 0 && h > 0) {
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE,
                    pixels);
@@ -1752,15 +1806,15 @@ void Graphics::initLoadingScreen() {
   verts.reserve(6 * 4 * 6);
   std::vector<GLuint> idx;
   idx.reserve(36);
-  for (int f = 0; f < 6; ++f) {
+  for (const auto& face : faces) {
     const auto base = static_cast<GLuint>(verts.size() / 6);
-    for (int c = 0; c < 4; ++c) {
-      verts.push_back(faces[f].corners[c].x);
-      verts.push_back(faces[f].corners[c].y);
-      verts.push_back(faces[f].corners[c].z);
-      verts.push_back(faces[f].normal.x);
-      verts.push_back(faces[f].normal.y);
-      verts.push_back(faces[f].normal.z);
+    for (auto corner : face.corners) {
+      verts.push_back(corner.x);
+      verts.push_back(corner.y);
+      verts.push_back(corner.z);
+      verts.push_back(face.normal.x);
+      verts.push_back(face.normal.y);
+      verts.push_back(face.normal.z);
     }
     idx.push_back(base + 0);
     idx.push_back(base + 1);
@@ -1780,11 +1834,11 @@ void Graphics::initLoadingScreen() {
                verts.data(), GL_STATIC_DRAW);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, loadingCubeEBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-               static_cast<GLsizeiptr>(idx.size() * sizeof(GLuint)),
-               idx.data(), GL_STATIC_DRAW);
+               static_cast<GLsizeiptr>(idx.size() * sizeof(GLuint)), idx.data(),
+               GL_STATIC_DRAW);
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                        (void*)0);
+                        (void*)nullptr);
   glEnableVertexAttribArray(1);
   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
                         (void*)(3 * sizeof(float)));
@@ -1820,12 +1874,12 @@ void Graphics::renderLoadingFrame(const std::string& status) {
   glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  const float aspect = static_cast<float>(fbWidth) /
-                       static_cast<float>(std::max(1, fbHeight));
-  const float t = static_cast<float>(glfwGetTime() - loadingStartTime);
+  const float aspect =
+      static_cast<float>(fbWidth) / static_cast<float>(std::max(1, fbHeight));
+  const auto t = static_cast<float>(glfwGetTime() - loadingStartTime);
   glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
-  glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f),
-                               glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f),
+                               glm::vec3(0.0f, 1.0f, 0.0f));
   glm::mat4 model = glm::rotate(glm::mat4(1.0f), t * 1.2f,
                                 glm::normalize(glm::vec3(0.3f, 1.0f, 0.2f)));
   glm::mat4 mvp = proj * view * model;
@@ -1835,8 +1889,7 @@ void Graphics::renderLoadingFrame(const std::string& status) {
   loadingShader->setMat4("mvp", mvp);
   loadingShader->setMat3("normalMatrix", normalMatrix);
   glBindVertexArray(loadingCubeVAO);
-  glDrawElements(GL_TRIANGLES, loadingCubeIndexCount, GL_UNSIGNED_INT,
-                 nullptr);
+  glDrawElements(GL_TRIANGLES, loadingCubeIndexCount, GL_UNSIGNED_INT, nullptr);
   glBindVertexArray(0);
 
   if (ImGui::GetCurrentContext()) {
@@ -1848,12 +1901,10 @@ void Graphics::renderLoadingFrame(const std::string& status) {
     ImGui::SetNextWindowPos(ImVec2(pad, io.DisplaySize.y - pad),
                             ImGuiCond_Always, ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowBgAlpha(0.55f);
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
-                              ImGuiWindowFlags_NoMove |
-                              ImGuiWindowFlags_NoNav |
-                              ImGuiWindowFlags_NoFocusOnAppearing |
-                              ImGuiWindowFlags_NoInputs |
-                              ImGuiWindowFlags_AlwaysAutoResize;
+    ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize;
     if (ImGui::Begin("##LoadingStatus", nullptr, flags)) {
       ImGui::TextUnformatted("Loading...");
       ImGui::Separator();

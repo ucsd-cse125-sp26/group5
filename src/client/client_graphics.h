@@ -1,12 +1,11 @@
 #pragma once
 
+#include <entt/entt.hpp>
 #include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <entt/entt.hpp>
 
 #include "asset.h"
 #include "client/animation.h"

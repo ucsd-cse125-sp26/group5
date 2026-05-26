@@ -86,6 +86,13 @@ struct Model {
   // over the skeleton picks the first node whose name contains "neck", with
   // "head" as a fallback. Empty when neither exists.
   std::string neckBoneName;
+
+  // Local-space bounding sphere covering all mesh_instances' transformed
+  // vertices. Computed once at model construction; used by shadow culling.
+  // Radius == 0 means "bounds unknown / empty mesh" — callers should treat
+  // that as "do not cull".
+  glm::vec3 localBoundsCenter{0.0f};
+  float localBoundsRadius = 0.0f;
 };
 
 struct Skybox {

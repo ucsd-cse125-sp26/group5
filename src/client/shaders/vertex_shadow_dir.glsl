@@ -20,7 +20,8 @@ void main() {
       if (b < 0 || b >= K_MAX_BONES) continue;
       skinned += (finalBonesMatrices[b] * vec4(position, 1.0)) * weights[i];
     }
-    localPos = skinned;
+    // Bind-pose fallback for unweighted vertices (otherwise origin collapse).
+    if (skinned.w > 0.0) localPos = skinned;
   }
   vTexCoords = texCoords;
   gl_Position = lightSpaceMatrix * model * localPos;

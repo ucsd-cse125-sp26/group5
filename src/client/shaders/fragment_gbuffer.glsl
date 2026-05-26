@@ -85,5 +85,7 @@ void main() {
   gNormal = vec4(norm, material.shininess);
   gAlbedo = vec4(paletteSnap(quantizeRGB(diffuse.rgb)), 1.0);
   gSpecular = vec4(quantizeRGB(texture(material.specular, vTexCoords).rgb), 1.0);
-  gEmissive = vec4(quantizeRGB(texture(material.emissive, vTexCoords).rgb), 1.0);
+  // Skip the brightness quantizer for emissive: dim glows (e.g. 0.05) round
+  // to 0 under any reasonable level count and the surface goes dark.
+  gEmissive = vec4(texture(material.emissive, vTexCoords).rgb, 1.0);
 }
