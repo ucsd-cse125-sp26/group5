@@ -39,20 +39,39 @@ entt::entity spawnSectionBarrier(ServerGame& game,
     game.registry.template emplace<WorldTag>(entity);
     game.registry.template emplace<shared::SectionBarrierTag>(
         entity, sectionID, halfExtents, season);
-
-    // start visible by default for debugging
-    game.registry.template emplace<shared::RenderInfo>(
-        entity, "cube",
-        halfExtents.x * 2.0f,
-        halfExtents.y * 2.0f,
-        halfExtents.z * 2.0f);
-    game.registry.template emplace<shared::SectionBarrierVisible>(entity);
+    // renderInfo makes the barriers visible
+    // game.registry.template emplace<shared::RenderInfo>(
+    //     entity, "cube",
+    //     halfExtents.x * 2.0f,
+    //     halfExtents.y * 2.0f,
+    //     halfExtents.z * 2.0f);
 
     JPH::BodyID bodyId = game.physics.createBoxBody(halfExtents, pos, rot);
     game.registry.template emplace<shared::PhysicsBody>(
         entity, bodyId.GetIndexAndSequenceNumber());
 
     return entity;
+}
+
+template <typename WorldTag>
+void spawnInvisibleWall(ServerGame& game,
+                        const glm::vec3& pos,
+                        const glm::vec3& halfExtents) {
+    auto [id, entity] = new_entity(game);
+    glm::quat rot{1.0f, 0.0f, 0.0f, 0.0f};
+    game.registry.template emplace<shared::Position>(
+        entity, pos.x, pos.y, pos.z,
+        rot.w, rot.x, rot.y, rot.z);
+    game.registry.template emplace<WorldTag>(entity);
+    // renderInfo makes the barriers visible
+    // game.registry.template emplace<shared::RenderInfo>(
+    //     entity, "cube",
+    //     halfExtents.x * 2.0f,
+    //     halfExtents.y * 2.0f,
+    //     halfExtents.z * 2.0f);
+    JPH::BodyID bodyId = game.physics.createBoxBody(halfExtents, pos, rot);
+    game.registry.template emplace<shared::PhysicsBody>(
+        entity, bodyId.GetIndexAndSequenceNumber());
 }
 
 template <typename WorldTag>
