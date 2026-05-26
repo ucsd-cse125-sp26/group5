@@ -107,6 +107,7 @@ target_compile_definitions(soloud PUBLIC
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
     MA_NO_RUNTIME_LINKING
+    MA_NO_JACK  
 )
 if(APPLE)
     target_link_libraries(soloud PUBLIC
@@ -115,10 +116,14 @@ if(APPLE)
         "-framework AudioToolbox"
         "-framework AudioUnit"
     )
+
 elseif(UNIX)
-    find_package(ALSA REQUIRED)
-    target_link_libraries(soloud PUBLIC ALSA::ALSA)
+    find_package(ALSA QUIET)
+    if(ALSA_FOUND)
+        target_link_libraries(soloud PUBLIC ALSA::ALSA)
+    endif()
 endif()
+
 if(WIN32)
     target_compile_definitions(soloud PUBLIC NOMINMAX)
 endif()
