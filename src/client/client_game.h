@@ -34,7 +34,10 @@ struct ClientGame {
 
 void syncToRender(ClientGame& game);
 void registerClientHandlers(ClientNetwork& network);
-void processInput(GLFWwindow* window,
+[[nodiscard]] bool isOverworldMazePuzzleActive(const ClientGame& game);
+[[nodiscard]] bool isLocalOverworldMazePuzzleControl(const ClientGame& game);
+
+void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);

@@ -1,7 +1,9 @@
 #pragma once
 #include <enet/enet.h>
 
+#include <cstdint>
 #include <entt/entt.hpp>
+#include <glm/glm.hpp>
 #include <map>
 #include <vector>
 
@@ -46,8 +48,39 @@ struct ServerGame {
   std::map<ENetPeer*, PlayerAvatars> active_players;
   std::vector<PlayerAvatars> unused_player_slots;
   uint32_t nextEntityId = 0;
+  // Next display index for clients (1–4) in connection order.
+  uint8_t nextPlayerJoinSlot = 1;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
+  // Overworld maze trigger: when false, all players must leave the trigger
+  // region once before another auto-enter (avoids instant re-entry after Q).
+  bool overworldMazeTriggerArmed = true;
+  // Accumulates while four players stand in the trigger facing the preview.
+  float overworldMazeFocusTimer = 0.0f;
+
+  // Overworld preview-board puzzle (no MazeState).
+  bool overworldMazePuzzleActive = false;
+  entt::entity overworldMazePuzzleController = entt::null;
+  entt::entity overworldMazePieceEntity = entt::null;
+  glm::vec3 overworldMazePreviewGoal{0.0f};
+  float overworldMazePreviewBoardY = 0.0f;
+  float overworldMazePreviewMinX = 0.0f;
+  float overworldMazePreviewMaxX = 0.0f;
+  float overworldMazePreviewMinZ = 0.0f;
+  float overworldMazePreviewMaxZ = 0.0f;
+  // Generated maze tiles for preview-board collision (0=wall, 1=floor).
+  int overworldMazeGridWidth = 0;
+  int overworldMazeGridHeight = 0;
+  std::vector<uint8_t> overworldMazeGridTiles;
+  float overworldMazeGridCenterX = 0.0f;
+  float overworldMazeGridCenterZ = 0.0f;
+  float overworldMazeGridXOffset = 0.0f;
+  float overworldMazeGridYOffset = 0.0f;
+  float overworldMazeLastValidX = 0.0f;
+  float overworldMazeLastValidZ = 0.0f;
+  int overworldMazeGoalTileX = 0;
+  int overworldMazeGoalTileY = 0;
+  bool overworldMazeReachGoalPending = false;
 };
 
 // Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,

@@ -257,21 +257,38 @@ void hardcoded_spinning_light(entt::registry& registry, float dt,
     auto& pos = view.get<shared::Position>(entity);
     auto& light = view.get<shared::PointLight>(entity);
 
-    pos.x = radius * std::cos(angle);
-    pos.y = radius * std::sin(angle);
-    pos.z = height;
+    // Maze board is roughly [0,14] x [0,14]: keep a bright lamp over the
+    // center instead of orbiting the overworld origin (which leaves the maze in
+    // shadow).
+    if (registry.all_of<shared::MazeTag>(entity)) {
+      pos.x = 7.0f;
+      pos.y = 7.0f;
+      pos.z = 10.0f;
+      pos.qw = 1.0f;
+      pos.qx = 0.0f;
+      pos.qy = 0.0f;
+      pos.qz = 0.0f;
+      light.px = pos.x;
+      light.py = pos.y;
+      light.pz = pos.z;
+    } else {
+      pos.x = radius * std::cos(angle);
+      pos.y = radius * std::sin(angle);
+      pos.z = height;
 
-    glm::vec3 p(pos.x, pos.y, pos.z);
-    glm::vec3 dir = glm::normalize(-p);
-    glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
-    pos.qw = q.w;
-    pos.qx = q.x;
-    pos.qy = q.y;
-    pos.qz = q.z;
+      // Orient the cube to face the origin
+      glm::vec3 p(pos.x, pos.y, pos.z);
+      glm::vec3 dir = glm::normalize(-p);
+      glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
+      pos.qw = q.w;
+      pos.qx = q.x;
+      pos.qy = q.y;
+      pos.qz = q.z;
 
-    light.px = pos.x;
-    light.py = pos.y;
-    light.pz = pos.z;
+      light.px = pos.x;
+      light.py = pos.y;
+      light.pz = pos.z;
+    }
 
     if (brighten) {
       light.diffuseR *= kHeldKeyScaleFactor;
@@ -368,7 +385,10 @@ void registerServerHandlers(ServerNetwork& network) {
         shared::InputPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
-        if (it == game.active_players.end()) return;
+        if (it == game.active_players.end()) {
+          std::printf("[Server] INPUT dropped: sender not in active_players\n");
+          return;
+        }
 
         entt::entity ent = entt::null;
         auto state = game.gameStateManager.currentState();
@@ -377,7 +397,11 @@ void registerServerHandlers(ServerNetwork& network) {
         } else if (state && state->getStateType() == StateType::MAZE) {
           ent = it->second.maze_avatar;
         }
-        if (ent == entt::null) return;
+        if (ent == entt::null) {
+          std::printf(
+              "[Server] INPUT dropped: no active avatar for current state\n");
+          return;
+        }
 
         auto& playerInput = game.registry.get<shared::PlayerInput>(ent);
         playerInput.keys = pkt.keys;
