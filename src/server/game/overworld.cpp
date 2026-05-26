@@ -104,8 +104,9 @@ void ProcessFragmentPickups(ServerGame& game) {
 
         // Permanently remove barriers for this season.
         std::vector<entt::entity> barriersToRemove;
-        auto barrierView = game.registry.view<shared::SectionBarrierTag,
-                                              shared::OverworldTag>();
+        auto barrierView =
+            game.registry
+                .view<shared::SectionBarrierTag, shared::OverworldTag>();
         for (auto barrier : barrierView) {
           if (barrierView.get<shared::SectionBarrierTag>(barrier).season ==
               fragment.season) {
@@ -118,7 +119,8 @@ void ProcessFragmentPickups(ServerGame& game) {
           pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
           net::broadcastPacket(game.network->getHost(), pkt);
 
-          game.registry.destroy(barrier);  // on_destroy<PhysicsBody> hook cleans up the body
+          game.registry.destroy(
+              barrier);  // on_destroy<PhysicsBody> hook cleans up the body
         }
 
         break;
