@@ -85,36 +85,36 @@ struct PhysicsBody {
 
 // Sound stuff
 enum class SoundPlayMode : uint8_t {
-    POSITIONAL,
-    AMBIENT,
+  POSITIONAL,
+  AMBIENT,
 };
 
 enum class SoundTriggerType : uint8_t {
-    ALWAYS,      // loop forever while entity exists
-    PROXIMITY,   // loop while player within range
-    ON_EVENT,    // one-shot via SoundEventPacket
+  ALWAYS,     // loop forever while entity exists
+  PROXIMITY,  // loop while player within range
+  ON_EVENT,   // one-shot via SoundEventPacket
 };
 
 struct SoundLayer {
-    uint32_t soundId = 0;
-    SoundTriggerType trigger = SoundTriggerType::ALWAYS;
-    SoundPlayMode playMode = SoundPlayMode::POSITIONAL; 
-    float volume = 1.0f;
-    float proximityRange = 10.0f;
-    float fadeSpeed = 2.0f;
+  uint32_t soundId = 0;
+  SoundTriggerType trigger = SoundTriggerType::ALWAYS;
+  SoundPlayMode playMode = SoundPlayMode::POSITIONAL;
+  float volume = 1.0f;
+  float proximityRange = 10.0f;
+  float fadeSpeed = 2.0f;
 };
 
 // shared/components.h
 struct SoundEmitter {
-    static constexpr uint8_t MAX_LAYERS = 4;
-    SoundLayer layers[MAX_LAYERS];
-    uint8_t layerCount = 0;
+  static constexpr uint8_t MAX_LAYERS = 4;
+  SoundLayer layers[MAX_LAYERS];
+  uint8_t layerCount = 0;
 };
 
 // Sound detection for landing
 struct Grounded {
-    bool isGrounded = false;
-    bool wasGrounded = false;  // last frame's value, for edge detection
+  bool isGrounded = false;
+  bool wasGrounded = false;  // last frame's value, for edge detection
 };
 
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };

@@ -44,11 +44,11 @@ int main() {
 
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
 
-  float lastTime = (float)glfwGetTime();
+  auto lastTime = (float)glfwGetTime();
 
   while (!glfwWindowShouldClose(graphics.window)) {
     // add dt calculation at top of loop
-    float currentTime = (float)glfwGetTime();
+    auto currentTime = (float)glfwGetTime();
     float dt = currentTime - lastTime;
     lastTime = currentTime;
     SIMPLE_PROFILE_FRAME_START();
@@ -56,18 +56,20 @@ int main() {
 
     SIMPLE_PROFILE_FRAME_START();
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
-        std::scoped_lock lock(game.snapshotMutex);
-        syncToRender(game);
-        game.snapshotDirty.store(false, std::memory_order_release);
+      std::scoped_lock lock(game.snapshotMutex);
+      syncToRender(game);
+      game.snapshotDirty.store(false, std::memory_order_release);
     }
 
     float lx = 0, ly = 0, lz = 0;
     float fwdX = 0, fwdY = 1, fwdZ = 0;
     auto camView = game.renderRegistry.view<shared::Position, shared::Camera>();
     for (auto ent : camView) {
-        auto& pos = camView.get<shared::Position>(ent);
-        lx = pos.x; ly = pos.y; lz = pos.z;
-        break;
+      auto& pos = camView.get<shared::Position>(ent);
+      lx = pos.x;
+      ly = pos.y;
+      lz = pos.z;
+      break;
     }
 
     game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);

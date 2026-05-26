@@ -187,32 +187,33 @@ void registerClientHandlers(ClientNetwork& network) {
         }
       });
 
-  network.dispatcher().on(shared::PacketType::SOUND_EVENT,
-    [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+  network.dispatcher().on(
+      shared::PacketType::SOUND_EVENT,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::SoundEventPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         if (pkt.positional) {
-            game.audio.playSound(pkt.soundId, pkt.x, pkt.y, pkt.z,
-                                  pkt.volume, pkt.pitch);
+          game.audio.playSound(pkt.soundId, pkt.x, pkt.y, pkt.z, pkt.volume,
+                               pkt.pitch);
         } else {
-            game.audio.playNonPositionalSound(pkt.soundId, pkt.volume,
-                                                pkt.pitch);
+          game.audio.playNonPositionalSound(pkt.soundId, pkt.volume, pkt.pitch);
         }
-    });
+      });
 
-  network.dispatcher().on(shared::PacketType::STATE_CHANGE,
-    [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+  network.dispatcher().on(
+      shared::PacketType::STATE_CHANGE,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.audio.stopAllGlobalLoops();
         if (pkt.state == shared::GameStateType::OVERWORLD) {
-            game.audio.playGlobalLoop(
-                static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::MAZE) {
-            game.audio.playGlobalLoop(
-                static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         }
-    });
+      });
 }
 
 void syncToRender(ClientGame& game) {
@@ -341,21 +342,18 @@ void printEntityPositions(const ClientGame& game) {
 }
 
 // Sound
-void updateSoundEmitters(ClientGame& game,
-                          float listenerX, float listenerY, float listenerZ,
-                          float dt) {
-    SIMPLE_PROFILE_SCOPE("Sound Emitters");
-    auto view = game.renderRegistry.view<shared::Entity,
-                                         shared::Position,
-                                         shared::SoundEmitter>();
-    for (auto ent : view) {
-        auto& entity = view.get<shared::Entity>(ent);
-        auto& pos = view.get<shared::Position>(ent);
-        auto& emitter = view.get<shared::SoundEmitter>(ent);
+void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
+                         float listenerZ, float dt) {
+  SIMPLE_PROFILE_SCOPE("Sound Emitters");
+  auto view =
+      game.renderRegistry
+          .view<shared::Entity, shared::Position, shared::SoundEmitter>();
+  for (auto ent : view) {
+    auto& entity = view.get<shared::Entity>(ent);
+    auto& pos = view.get<shared::Position>(ent);
+    auto& emitter = view.get<shared::SoundEmitter>(ent);
 
-        game.audio.updateEmitter(entity.id, emitter,
-                                  pos.x, pos.y, pos.z,
-                                  listenerX, listenerY, listenerZ,
-                                  dt);
-    }
+    game.audio.updateEmitter(entity.id, emitter, pos.x, pos.y, pos.z, listenerX,
+                             listenerY, listenerZ, dt);
+  }
 }

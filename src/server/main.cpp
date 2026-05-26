@@ -99,10 +99,9 @@ int main() {
     net::sendPacket(peer, assignPkt);
     shared::StateChangePacket statePkt;
     if (currentState->getStateType() == StateType::OVERWORLD) {
-        statePkt.state = shared::GameStateType::OVERWORLD;
-    } 
-    else {
-        statePkt.state = shared::GameStateType::MAZE;
+      statePkt.state = shared::GameStateType::OVERWORLD;
+    } else {
+      statePkt.state = shared::GameStateType::MAZE;
     }
     net::sendPacket(peer, statePkt);
   };
@@ -162,7 +161,6 @@ int main() {
     previousTime = currentTime;
     accumulator += dt;
     while (accumulator >= fixedDt) {
-
       game.physics.step(fixedDt);
       update_grounded_system(game);
 
