@@ -108,12 +108,17 @@ target_compile_definitions(soloud PUBLIC
     #MA_DEBUG_OUTPUT
     MA_NO_RUNTIME_LINKING
 )
-target_link_libraries(soloud PUBLIC
-    "-framework CoreFoundation"
-    "-framework CoreAudio"
-    "-framework AudioToolbox"
-    "-framework AudioUnit"
-)
+if(APPLE)
+    target_link_libraries(soloud PUBLIC
+        "-framework CoreFoundation"
+        "-framework CoreAudio"
+        "-framework AudioToolbox"
+        "-framework AudioUnit"
+    )
+elseif(UNIX)
+    find_package(ALSA REQUIRED)
+    target_link_libraries(soloud PUBLIC ALSA::ALSA)
+endif()
 if(WIN32)
     target_compile_definitions(soloud PUBLIC NOMINMAX)
 endif()
