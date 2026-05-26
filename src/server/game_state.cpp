@@ -366,9 +366,9 @@ void initWorldEntities(ServerGame& game) {
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
-    spawnPlayerAvatar<shared::MazeTag>(game, mazeEntity, "dog",
-                                       maze_trigger::overworldSpawnPosition(slot),
-                                       glm::vec3(1.0f));
+    spawnPlayerAvatar<shared::MazeTag>(
+        game, mazeEntity, "dog", maze_trigger::overworldSpawnPosition(slot),
+        glm::vec3(1.0f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
