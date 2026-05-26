@@ -108,6 +108,7 @@ target_compile_definitions(soloud PUBLIC
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
     MA_NO_RUNTIME_LINKING
+    MA_NO_JACK
 )
 
 if(UNIX AND NOT APPLE)
@@ -137,10 +138,12 @@ endif()
 if(WIN32)
     target_compile_definitions(soloud PUBLIC NOMINMAX)
 endif()
+
 target_include_directories(imgui PUBLIC
     lib/imgui
     lib/imgui/backends
 )
+
 target_link_libraries(imgui PUBLIC glfw glad_gl_core_41)
 
 add_executable(client)
