@@ -107,6 +107,7 @@ target_compile_definitions(soloud PUBLIC
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
     MA_NO_RUNTIME_LINKING 
+    MA_NO_JACK
 )
 if(APPLE)
     target_link_libraries(soloud PUBLIC
