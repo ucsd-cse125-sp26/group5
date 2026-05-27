@@ -40,7 +40,7 @@ void registerClientHandlers(ClientNetwork& network);
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys, bool debugMode);
+                  InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
 void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
                          float listenerZ, float dt);
