@@ -2,12 +2,17 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace shared::profiler {
 
+// frame_stats is touched by both the render thread (Graphics::render scopes)
+// and the network thread (ClientNetwork::poll, deserializeComponents). A
+// concurrent operator[] + clear() walks freed bucket nodes and SIGSEGVs.
+inline std::mutex frame_stats_mutex;
 inline std::unordered_map<std::string, double> frame_stats;
 inline std::chrono::time_point<std::chrono::high_resolution_clock> frame_start;
 
@@ -19,6 +24,7 @@ class ScopeTimer {
   ~ScopeTimer() {
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = end - start_;
+    std::scoped_lock lock(frame_stats_mutex);
     frame_stats[name_] += elapsed.count();
   }
 
@@ -44,14 +50,20 @@ inline void end_frame(const char* context = "Frame") {
 
   // Print stats every 60 frames
   if (frame_count % 60 == 0) {
+    // Snapshot under lock so the network thread can keep accumulating into
+    // the map while we sort/print without it.
+    std::vector<std::pair<std::string, double>> stats;
+    {
+      std::scoped_lock lock(frame_stats_mutex);
+      stats.assign(frame_stats.begin(), frame_stats.end());
+      frame_stats.clear();
+    }
     std::cout
         << "\n=== [ " << context
         << " ] Profiling Stats (Average per Frame over last 60 Frames) ===\n";
     double average_frame_time = cumulative_frame_time / 60.0;
     std::cout << "Avg Frame Time: " << average_frame_time << " ms\n";
 
-    std::vector<std::pair<std::string, double>> stats(frame_stats.begin(),
-                                                      frame_stats.end());
     std::ranges::sort(stats, [](const auto& a, const auto& b) {
       return a.second > b.second;
     });
@@ -66,8 +78,6 @@ inline void end_frame(const char* context = "Frame") {
     }
     std::cout << "========================================================\n";
 
-    // Reset accumulation for the next 60 frames
-    frame_stats.clear();
     cumulative_frame_time = 0.0;
   }
 }
