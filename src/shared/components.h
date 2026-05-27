@@ -96,28 +96,28 @@ enum class SoundTriggerType : uint8_t {
 };
 
 struct SoundLayer {
-    uint32_t soundId = 0;
-    SoundTriggerType trigger = SoundTriggerType::ALWAYS;
-    SoundPlayMode playMode = SoundPlayMode::POSITIONAL;
-    float volume = 1.0f;
-    float proximityRange = 10.0f;
-    float fadeSpeed = 2.0f;
+  uint32_t soundId = 0;
+  SoundTriggerType trigger = SoundTriggerType::ALWAYS;
+  SoundPlayMode playMode = SoundPlayMode::POSITIONAL;
+  float volume = 1.0f;
+  float proximityRange = 10.0f;
+  float fadeSpeed = 2.0f;
 
-    constexpr static auto serialize(auto& archive, auto& self) {
-        return archive(self.soundId, self.trigger, self.playMode,
-                       self.volume, self.proximityRange, self.fadeSpeed);
-    }
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.soundId, self.trigger, self.playMode, self.volume,
+                   self.proximityRange, self.fadeSpeed);
+  }
 };
 
 // shared/components.h
 struct SoundEmitter {
-    static constexpr uint8_t MAX_LAYERS = 4;
-    SoundLayer layers[MAX_LAYERS];
-    uint8_t layerCount = 0;
+  static constexpr uint8_t MAX_LAYERS = 4;
+  SoundLayer layers[MAX_LAYERS];
+  uint8_t layerCount = 0;
 
-    constexpr static auto serialize(auto& archive, auto& self) {
-        return archive(self.layers, self.layerCount);
-    }
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.layers, self.layerCount);
+  }
 };
 
 // Sound detection for landing
