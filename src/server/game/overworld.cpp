@@ -5,8 +5,11 @@
 #include "server/game/maze.h"
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
+#include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/net/packet_utils.h"
+#include "shared/protocol.h"
 
 namespace {
 
@@ -98,6 +101,28 @@ void ProcessFragmentPickups(ServerGame& game) {
         if (shouldRestore) {
           colorizeSection(game, fragment.season);
         }
+
+        // Permanently remove barriers for this season.
+        std::vector<entt::entity> barriersToRemove;
+        auto barrierView =
+            game.registry
+                .view<shared::SectionBarrierTag, shared::OverworldTag>();
+        for (auto barrier : barrierView) {
+          if (barrierView.get<shared::SectionBarrierTag>(barrier).season ==
+              fragment.season) {
+            barriersToRemove.push_back(barrier);
+          }
+        }
+        for (auto barrier : barriersToRemove) {
+          shared::DespawnPacket pkt;
+          pkt.type = shared::PacketType::DESPAWN_ENTITY;
+          pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
+          net::broadcastPacket(game.network->getHost(), pkt);
+
+          game.registry.destroy(
+              barrier);  // on_destroy<PhysicsBody> hook cleans up the body
+        }
+
         break;
       }
     }

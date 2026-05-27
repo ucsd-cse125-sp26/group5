@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <glm/vec3.hpp>
 #include <string>
 
 #include "input.h"
@@ -204,6 +205,20 @@ struct SwitchComponent {
       0;  // what entity this switch is linked to (door, puzzle, etc)
   bool switchOn = false;
 };
+
+// Tag component — marks this entity as a section barrier
+struct SectionBarrierTag {
+  uint8_t sectionID;  // matches SectionController's puzzleID
+  glm::vec3 halfExtents;
+  SectionSeasonMap season;
+};
+
+// Flag component — added to a barrier when it should be torn down
+// OverworldState::update sees this and calls destroyBody
+struct SectionBarrierPendingRemoval {};
+
+struct SectionBarrierVisible {
+};  // tag — present = has RenderInfo, absent = invisible
 
 struct FragmentComponent {
   SectionSeasonMap season;
