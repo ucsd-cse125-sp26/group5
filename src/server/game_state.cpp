@@ -305,7 +305,7 @@ std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
 
 void initWorldEntities(ServerGame& game) {
   // --- Overworld ---
-  spawnDemoLight<shared::OverworldTag>(game, "sunny");
+  spawnDemoLight<shared::OverworldTag>(game, "noon");
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
