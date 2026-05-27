@@ -19,6 +19,16 @@ struct Velocity {
   float dx, dy, dz;
 };
 
+// Picks which animation clip a model should be playing. Empty clipName
+// falls back to the first clip in the model's AnimationLibrary. The client
+// drives playhead time off its own frame dt; startTickMs is reserved for a
+// later authoritative-sync pass but currently unused.
+struct AnimationState {
+  std::string clipName;
+  uint32_t startTickMs = 0;
+  bool loop = true;
+};
+
 struct RenderInfo {
   std::string modelName;
   float sx = 1.0f;
