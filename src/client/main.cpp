@@ -114,7 +114,8 @@ int main() {
     processInput(graphics.window, game, game.inputQueue, prevKeys,
                  graphics.debugChannel != DebugChannel::Off);
     if (!graphics.settingsMenuOpen) {
-      processInput(graphics.window, game, game.inputQueue, prevKeys);
+      processInput(graphics.window, game, game.inputQueue, prevKeys,
+                   graphics.debugChannel != DebugChannel::Off);
     }
     SIMPLE_PROFILE_FRAME_END("Client");
   }
