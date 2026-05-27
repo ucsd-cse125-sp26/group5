@@ -5,12 +5,20 @@
 
 namespace shared {
 
-inline constexpr int kMaxPointLights = 4;  // shadow-casting cap
+inline constexpr int kMaxPointLights = 2;  // shadow-casting cap
 inline constexpr int kMaxLightingShaderLights = 32;
 inline constexpr int kPointShadowLayers = kMaxPointLights * 6;
 
 // Linear-depth range; writer and reader must agree.
 inline constexpr float kPointShadowNear = 0.1f;
 inline constexpr float kPointShadowFar = 50.0f;
+
+// Upper bound on the palette uniform array length in fragment_gbuffer.glsl.
+// Setting `paletteQuantizeColors` may be any value in [0, kMaxPaletteColors].
+inline constexpr int kMaxPaletteColors = 64;
+
+// Mirrors MAX_BONES from client/asset.h — kept here so the gbuffer + shadow
+// vertex shaders can declare `finalBonesMatrices[K_MAX_BONES]` consistently.
+inline constexpr int kMaxBones = 100;
 
 }  // namespace shared

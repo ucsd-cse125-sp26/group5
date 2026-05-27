@@ -93,6 +93,10 @@ enum ComponentIds : ComponentTypeId {
   CID_SCENE = 7,
   CID_DIRECTIONALLIGHT = 8,
   CID_OVERWORLD_MAZE_PUZZLE = 9,
+  CID_COLORBOUNDINGBOX = 10,
+  CID_ANIMATIONSTATE = 11,
+  CID_MAZESPIRITGRID = 12,
+  CID_SOUNDEMITTER = 13,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -127,6 +131,18 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_OVERWORLD_MAZE_PUZZLE:
         dst.remove<OverworldMazePuzzleState>(entity);
+        break;
+      case CID_SOUNDEMITTER:
+        dst.remove<SoundEmitter>(entity);
+        break;
+      case CID_COLORBOUNDINGBOX:
+        dst.remove<ColorBoundingBox>(entity);
+        break;
+      case CID_ANIMATIONSTATE:
+        dst.remove<AnimationState>(entity);
+        break;
+      case CID_MAZESPIRITGRID:
+        dst.remove<MazeSpiritGrid>(entity);
         break;
     }
   };
@@ -192,6 +208,23 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         removeSyncedComponent(dstEntity, id);
         continue;
       }
+      if (id == CID_SOUNDEMITTER && !src.all_of<SoundEmitter>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_COLORBOUNDINGBOX &&
+          !src.all_of<ColorBoundingBox>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_ANIMATIONSTATE && !src.all_of<AnimationState>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
+      if (id == CID_MAZESPIRITGRID && !src.all_of<MazeSpiritGrid>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
       meta->clone(src, srcEntity, dst, dstEntity);
     }
   }
@@ -206,7 +239,14 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<PointLight>(CID_POINTLIGHT);
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
+  reg.registerComponent<SoundEmitter>(CID_SOUNDEMITTER);
   reg.registerComponent<OverworldMazePuzzleState>(CID_OVERWORLD_MAZE_PUZZLE);
+  reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
+  reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);
+  // Replicated so the client can identify the maze spirit cube to attach
+  // the first-person camera to (avoids fingerprinting by mesh+scale, which
+  // collides with overworld decoration cubes that happen to share a scale).
+  reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
   return reg;
 }
 

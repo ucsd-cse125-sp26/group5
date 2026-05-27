@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <random>
 
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
@@ -11,8 +12,9 @@
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/net/packet_utils.h"
 #include "shared/simple_profiler.h"
-
+#include "shared/sound_constants.h"
 constexpr float kHeldKeyScaleFactor = 1.1f;
 
 namespace {
@@ -29,6 +31,8 @@ void initServerGame(ServerGame& game) {
       .connect<&onPhysicsBodyDestroyed>(game.physics);
 }
 
+static std::unordered_map<uint32_t, float> footstepTimers;
+static std::mt19937 footstepRng(42);
 // Process input on tick
 void input_tick(entt::registry& registry) {
   SIMPLE_PROFILE_SCOPE("Input Tick");
@@ -106,10 +110,62 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    if (input.keys_newly_pressed & KEY_JUMP) verticalVel = 10.0f;
+    if (input.keys_newly_pressed & KEY_JUMP) {
+      verticalVel = 10.0f;
+      shared::SoundEventPacket pkt;
+      pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
+      pkt.x = position.x;
+      pkt.y = position.y;
+      pkt.z = position.z;
+      net::broadcastPacket(game.network->getHost(), pkt);
+    }
 
     bodyInterface.SetLinearVelocity(
         bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+
+    // ── Landing detection (ECS-driven via Grounded component) ──
+    if (game.registry.all_of<shared::Grounded>(entity)) {
+      auto& g = game.registry.get<shared::Grounded>(entity);
+      if (!g.wasGrounded && g.isGrounded) {
+        shared::SoundEventPacket pkt;
+        pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
+        pkt.x = position.x;
+        pkt.y = position.y;
+        pkt.z = position.z;
+        pkt.volume = 0.7f;
+        pkt.positional = true;
+        net::broadcastPacket(game.network->getHost(), pkt);
+      }
+    }
+
+    // ── Footsteps ──
+    bool isMoving = (fwdInput != 0.0f || strafeInput != 0.0f);
+    bool isGrounded = std::abs(verticalVel) < 0.5f;
+    uint32_t eid = game.registry.get<shared::Entity>(entity).id;
+
+    if (isMoving && isGrounded) {
+      float& timer = footstepTimers[eid];
+      timer += dt;
+      const float footstepInterval = 0.4f;
+      if (timer >= footstepInterval) {
+        timer = 0.0f;
+        std::uniform_int_distribution<int> variantDist(0, 3);
+        uint32_t soundId = static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1) +
+                           variantDist(footstepRng);
+        std::uniform_real_distribution<float> pitchDist(0.9f, 1.1f);
+        shared::SoundEventPacket pkt;
+        pkt.soundId = soundId;
+        pkt.x = position.x;
+        pkt.y = position.y;
+        pkt.z = position.z;
+        pkt.volume = 0.6f;
+        pkt.pitch = pitchDist(footstepRng);
+        pkt.positional = true;
+        net::broadcastPacket(game.network->getHost(), pkt);
+      }
+    } else {
+      footstepTimers[eid] = 0.0f;
+    }
   }
 }
 
@@ -141,7 +197,8 @@ void render_model_change(ServerGame& game, float dt) {
     auto& pb = view.get<shared::PhysicsBody>(entity);
     bool shapeDirty = false;
     if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
-      renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+      renderInfo.modelName =
+          renderInfo.modelName == "playerbase" ? "dog" : "playerbase";
       shapeDirty = true;
     }
     if (input.keys & KEY_MODEL_BIGGER) {
@@ -291,6 +348,26 @@ void scene_cycle_system(entt::registry& registry, StateType stateType) {
     case StateType::MAZE:
       scene_cycle_system_for_world<shared::MazeTag>(registry);
       break;
+  }
+}
+
+void update_grounded_system(ServerGame& game) {
+  auto view = game.registry.view<shared::Grounded, shared::PhysicsBody>();
+  for (auto entity : view) {
+    auto& grounded = view.get<shared::Grounded>(entity);
+    auto& pb = view.get<shared::PhysicsBody>(entity);
+    JPH::BodyID bodyId(pb.bodyId);
+
+    if (!game.physics.getBodyInterface().IsAdded(bodyId)) {
+      // Body is inactive — keep both fields in sync so no edge fires on
+      // re-activation
+      grounded.wasGrounded = false;
+      grounded.isGrounded = false;
+      continue;
+    }
+
+    grounded.wasGrounded = grounded.isGrounded;
+    grounded.isGrounded = game.physics.isBodyGrounded(bodyId);
   }
 }
 
