@@ -26,6 +26,7 @@ struct ComponentMeta {
   SerializeFn serialize;
   DeserializeFn deserialize;
   CloneFn clone;
+  std::function<void(entt::registry&, entt::entity)> remove;
 };
 
 class ComponentRegistry {
@@ -58,7 +59,8 @@ class ComponentRegistry {
           if (!src.all_of<T>(srcEnt)) return;
           auto& srcComp = src.get<T>(srcEnt);
           dst.emplace_or_replace<T>(dstEnt, srcComp);
-        }};
+        },
+        [](entt::registry& r, entt::entity e) { r.remove<T>(e); }};
     syncedIds_.push_back(id);
   }
 

@@ -93,7 +93,7 @@ void registerClientHandlers(ClientNetwork& network) {
         uint16_t entityCount;
         std::memcpy(&entityCount, data + offset, sizeof(uint16_t));
         offset += sizeof(uint16_t);
-
+        printf("CLIENT: spawn %u entities\n", entityCount);
         for (uint16_t i = 0; i < entityCount; i++) {
           uint32_t entityId;
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
@@ -119,6 +119,7 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
+        printf("CLIENT: despawn entity %u\n", pkt.entityId);
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
           game.audio.stopAllForEntity(pkt.entityId);
@@ -250,7 +251,7 @@ bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys) {
+                  InputKeys& prevKeys, bool debugMode) {
   InputKeys keys = 0;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
@@ -265,6 +266,12 @@ void processInput(GLFWwindow* window, const ClientGame& game,
   if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
   if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
   if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
+  if (debugMode) {
+    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+      keys |= KEY_DEBUG_COMPLETE_SECTION;
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
+      keys |= KEY_DEBUG_TOGGLE_BARRIERS;
+  }
 
   // Overworld preview board: each client controls one direction on the shared
   // green piece (slot 1=up, 2=down, 3=left, 4=right).
@@ -298,7 +305,6 @@ void processInput(GLFWwindow* window, const ClientGame& game,
         break;
     }
   }
-
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
   float mouseDx = 0.0f, mouseDy = 0.0f;

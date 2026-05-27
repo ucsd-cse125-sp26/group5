@@ -111,6 +111,8 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
+    processInput(graphics.window, game, game.inputQueue, prevKeys,
+                 graphics.debugChannel != DebugChannel::Off);
     if (!graphics.settingsMenuOpen) {
       processInput(graphics.window, game, game.inputQueue, prevKeys);
     }
