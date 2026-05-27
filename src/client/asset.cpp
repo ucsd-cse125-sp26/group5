@@ -366,7 +366,7 @@ static void collectMeshSamples(const aiMesh* mesh, const CpuDiffuse& diffuse,
     for (auto s : uv) {
       glm::vec3 c;
       if (sampleDiffuseAt(diffuse, s, c)) {
-        out.push_back({c, perSampleWeight});
+        out.push_back({.color = c, .weight = perSampleWeight});
       }
     }
   }

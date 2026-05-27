@@ -207,12 +207,13 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         continue;
       }
       if (id == CID_SOUNDEMITTER && !src.all_of<SoundEmitter>(srcEntity)) {
-          removeSyncedComponent(dstEntity, id);
-          continue;
+        removeSyncedComponent(dstEntity, id);
+        continue;
       }
-      if (id == CID_COLORBOUNDINGBOX && !src.all_of<ColorBoundingBox>(srcEntity)) {
-          removeSyncedComponent(dstEntity, id);
-          continue;
+      if (id == CID_COLORBOUNDINGBOX &&
+          !src.all_of<ColorBoundingBox>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
       }
       if (id == CID_ANIMATIONSTATE && !src.all_of<AnimationState>(srcEntity)) {
         removeSyncedComponent(dstEntity, id);
