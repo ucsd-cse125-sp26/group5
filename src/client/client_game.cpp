@@ -242,11 +242,7 @@ bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
       !game.renderRegistry.valid(it->second)) {
     return false;
   }
-  if (!game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
-    return false;
-  }
-  return game.renderRegistry.get<shared::RenderInfo>(it->second).modelName ==
-         "cube";
+  return game.renderRegistry.all_of<shared::RenderInfo>(it->second);
 }
 
 void processInput(GLFWwindow* window, const ClientGame& game,
