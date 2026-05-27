@@ -5,6 +5,7 @@
 #include <map>
 #include <mutex>
 
+#include "audio_engine.h"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
 #include "spsc_queue.h"
@@ -28,6 +29,8 @@ struct ClientGame {
   std::atomic<bool> running = true;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
+
+  AudioEngine audio;
 };
 
 void syncToRender(ClientGame& game);
@@ -39,3 +42,5 @@ void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys);
 void printEntityPositions(const ClientGame& game);
+void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
+                         float listenerZ, float dt);

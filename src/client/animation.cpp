@@ -28,18 +28,21 @@ Bone::Bone(std::string name, int id, const aiNodeAnim* channel)
     : name_(std::move(name)), id_(id) {
   positions_.reserve(channel->mNumPositionKeys);
   for (unsigned i = 0; i < channel->mNumPositionKeys; ++i) {
-    positions_.push_back({toGlm(channel->mPositionKeys[i].mValue),
-                          static_cast<float>(channel->mPositionKeys[i].mTime)});
+    positions_.push_back(
+        {.position = toGlm(channel->mPositionKeys[i].mValue),
+         .timeStamp = static_cast<float>(channel->mPositionKeys[i].mTime)});
   }
   rotations_.reserve(channel->mNumRotationKeys);
   for (unsigned i = 0; i < channel->mNumRotationKeys; ++i) {
-    rotations_.push_back({toGlm(channel->mRotationKeys[i].mValue),
-                          static_cast<float>(channel->mRotationKeys[i].mTime)});
+    rotations_.push_back(
+        {.orientation = toGlm(channel->mRotationKeys[i].mValue),
+         .timeStamp = static_cast<float>(channel->mRotationKeys[i].mTime)});
   }
   scales_.reserve(channel->mNumScalingKeys);
   for (unsigned i = 0; i < channel->mNumScalingKeys; ++i) {
-    scales_.push_back({toGlm(channel->mScalingKeys[i].mValue),
-                       static_cast<float>(channel->mScalingKeys[i].mTime)});
+    scales_.push_back(
+        {.scale = toGlm(channel->mScalingKeys[i].mValue),
+         .timeStamp = static_cast<float>(channel->mScalingKeys[i].mTime)});
   }
 }
 

@@ -94,6 +94,7 @@ enum ComponentIds : ComponentTypeId {
   CID_COLORBOUNDINGBOX = 10,
   CID_ANIMATIONSTATE = 11,
   CID_MAZESPIRITGRID = 12,
+  CID_SOUNDEMITTER = 13,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -128,6 +129,9 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_OVERWORLD_MAZE_PUZZLE:
         dst.remove<OverworldMazePuzzleState>(entity);
+        break;
+      case CID_SOUNDEMITTER:
+        dst.remove<SoundEmitter>(entity);
         break;
       case CID_COLORBOUNDINGBOX:
         dst.remove<ColorBoundingBox>(entity);
@@ -202,6 +206,10 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         removeSyncedComponent(dstEntity, id);
         continue;
       }
+      if (id == CID_SOUNDEMITTER && !src.all_of<SoundEmitter>(srcEntity)) {
+        removeSyncedComponent(dstEntity, id);
+        continue;
+      }
       if (id == CID_COLORBOUNDINGBOX &&
           !src.all_of<ColorBoundingBox>(srcEntity)) {
         removeSyncedComponent(dstEntity, id);
@@ -229,6 +237,7 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<PointLight>(CID_POINTLIGHT);
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
+  reg.registerComponent<SoundEmitter>(CID_SOUNDEMITTER);
   reg.registerComponent<OverworldMazePuzzleState>(CID_OVERWORLD_MAZE_PUZZLE);
   reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
   reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);

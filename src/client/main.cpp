@@ -37,20 +37,50 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  if (!game.audio.init()) {
+    return EXIT_FAILURE;
+  }
+
   InputKeys prevKeys = 0;
 
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
+
+  auto lastTime = (float)glfwGetTime();
+
   while (!glfwWindowShouldClose(graphics.window)) {
+    // add dt calculation at top of loop
+    auto currentTime = (float)glfwGetTime();
+    float dt = currentTime - lastTime;
+    lastTime = currentTime;
     SIMPLE_PROFILE_FRAME_START();
     GPU_PROFILE_FRAME_BEGIN();
 
+    SIMPLE_PROFILE_FRAME_START();
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::scoped_lock lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
     }
 
+    float lx = 0, ly = 0, lz = 0;
+    float fwdX = 0, fwdY = 1, fwdZ = 0;
+    auto camView = game.renderRegistry.view<shared::Position, shared::Camera>();
+    for (auto ent : camView) {
+      auto& pos = camView.get<shared::Position>(ent);
+      lx = pos.x;
+      ly = pos.y;
+      lz = pos.z;
+      break;
+    }
+
+    game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
+    updateSoundEmitters(game, lx, ly, lz, dt);  // pass dt
+
     graphics.render(game);
+    {
+      SIMPLE_PROFILE_SCOPE("Audio Update");
+      game.audio.update(dt);
+    }
     graphics.swap();
     GPU_PROFILE_FRAME_END();
     GPU_MEM_FRAME_END();
@@ -89,6 +119,7 @@ int main() {
 
   game.running.store(false, std::memory_order_release);
   networkThread.join();
+  game.audio.shutdown();
   return 0;
 }
 
