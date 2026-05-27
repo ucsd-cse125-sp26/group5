@@ -197,7 +197,8 @@ void render_model_change(ServerGame& game, float dt) {
     auto& pb = view.get<shared::PhysicsBody>(entity);
     bool shapeDirty = false;
     if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
-      renderInfo.modelName = renderInfo.modelName == "cube" ? "bear" : "cube";
+      renderInfo.modelName =
+          renderInfo.modelName == "playerbase" ? "dog" : "playerbase";
       shapeDirty = true;
     }
     if (input.keys & KEY_MODEL_BIGGER) {
