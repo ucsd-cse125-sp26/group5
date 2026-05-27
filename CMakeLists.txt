@@ -155,6 +155,9 @@ target_sources(client PRIVATE
     src/client/shaders.cpp
     src/client/asset.cpp
     src/client/audio_engine.cpp
+    src/client/animation.cpp
+    src/client/graphics_settings.cpp
+    src/client/ui_settings.cpp
 )
 target_link_libraries(client PRIVATE shared 
     glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud

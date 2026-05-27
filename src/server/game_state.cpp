@@ -385,6 +385,20 @@ void initWorldEntities(ServerGame& game) {
       game, maze_trigger::buildMazeTriggerMarkerEntities());
   overworld_maze_puzzle::initOverworldMazePuzzleController(game);
 
+  // Skinned demo: dancing vampire. No physics body — the DAE is large and
+  // a collision proxy isn't useful for a decorative animation test.
+  {
+    auto [vampireId, vampire] = new_entity(game);
+    (void)vampireId;
+    game.registry.emplace<shared::Position>(vampire, 5.0f, 0.0f, 0.0f, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(vampire, "vampire", 1.0f, 1.0f,
+                                              1.0f);
+    game.registry.emplace<shared::AnimationState>(vampire, std::string{}, 0u,
+                                                  true);
+    game.registry.emplace<shared::OverworldTag>(vampire);
+  }
+
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(game, buildGeneratedMazeEntities());
@@ -396,15 +410,18 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, "cube",
+        game, overworldEntity, "playerbase",
         maze_trigger::overworldSpawnPosition(slot), glm::vec3(1.0f));
+    // playerSlot is consumed by maze_trigger::placeOverworldAvatarInTrigger
+    // and OverworldState::onEnter even though the playerbase mesh doesn't
+    // use the slot-rainbow texture path the way "cube" did.
     game.registry.get<shared::RenderInfo>(overworldEntity).playerSlot = slot;
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
     spawnPlayerAvatar<shared::MazeTag>(
-        game, mazeEntity, "bear", maze_trigger::overworldSpawnPosition(slot),
-        glm::vec3(0.5f));
+        game, mazeEntity, "dog", maze_trigger::overworldSpawnPosition(slot),
+        glm::vec3(1.0f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
