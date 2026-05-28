@@ -46,7 +46,7 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Progress Evaluation
 
-Due to (again) CSE 123, I didn't get to do as much as I hoped. I think all of us are quite behind on our goals now, as we haven't playtested as far as I'm aware. I still have two more models to do, and I'm somewhat worried I won't be able to get them done in time for the demo.
+Due to (again) CSE 123, I didn't get to do as much as I hoped. I think all of us are quite behind on our goals now, as we haven't playtested as far as I'm aware. I still have two more models to do, and I'm somewhat worried I won't be able to get them done in time for the demo. The demo is already next week Friday, time flew way too fast.
 
 ### Upcoming Goals
 
