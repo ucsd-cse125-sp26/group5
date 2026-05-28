@@ -52,7 +52,6 @@ bool loadMap(ServerGame& game, const std::string& path,
 
   unsigned meshEntities = 0;
   unsigned pointLights = 0;
-  unsigned dirLights = 0;
   unsigned skippedLights = 0;
 
   parsed.forEachMeshNode([&](const aiNode& node, const aiMatrix4x4& world) {
@@ -114,16 +113,8 @@ bool loadMap(ServerGame& game, const std::string& path,
           color.b, color.r, color.g, color.b);
       ++pointLights;
     } else if (light->mType == aiLightSource_DIRECTIONAL) {
-      // glTF directional light points along node-local -Z.
-      glm::vec3 worldDir = rot * glm::vec3(0.0f, 0.0f, -1.0f);
-      auto [id, entity] = new_entity(game);
-      tag(entity);
-      game.registry.emplace<shared::DirectionalLight>(
-          entity, worldDir.x, worldDir.y, worldDir.z,
-          // ambient / diffuse / specular
-          color.r * 0.1f, color.g * 0.1f, color.b * 0.1f, color.r, color.g,
-          color.b, color.r, color.g, color.b);
-      ++dirLights;
+      // Directional lighting comes from the scene's SceneInfo, not the map.
+      ++skippedLights;
     } else {
       printf("loadMap: unsupported light type %d on node \"%s\", skipping\n",
              static_cast<int>(light->mType), light->mName.C_Str());
@@ -132,8 +123,8 @@ bool loadMap(ServerGame& game, const std::string& path,
   }
 
   printf(
-      "loadMap: \"%s\" — spawned %u mesh entities, %u point lights, "
-      "%u directional lights (%u skipped)\n",
-      path.c_str(), meshEntities, pointLights, dirLights, skippedLights);
+      "loadMap: \"%s\" — spawned %u mesh entities, %u point lights "
+      "(%u skipped)\n",
+      path.c_str(), meshEntities, pointLights, skippedLights);
   return true;
 }
