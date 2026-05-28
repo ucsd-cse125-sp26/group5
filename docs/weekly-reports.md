@@ -49,6 +49,57 @@ Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
 
+## Week 8 Group Report
+
+## Rendering
+**Jacob**
+- General graphics improvements with a focus on performance optimization.
+  - Adjusted presets and reduced shadow quality for better performance.
+  - Graphics branch is ready to merge.
+- Attempted to set up remote access for the demo, but access is currently broken, will take some time to resolve.
+
+## Physics / Audio
+**Alain**
+- Continued work on sounds and additional physics tasks.
+- Needs clarity on the minigame system and where it is headed.
+
+## Game Logic: Minigames / Puzzles
+**Philip**
+- Completed fragment logic end-to-end: fragments spawn on the map, the player completes the maze, fragments then spawn and must be picked up, map color restores once all are collected, and the wall barrier disappears.
+- Finished the box barrier system, invisible walls are placed around the map. Updated bounding boxes to correct some minor misalignment.
+
+**Leon**
+- Finished the second minigame.
+- Estimates about one day of work this week to wrap it up completely.
+
+## Modeling
+**Sarah**
+- Gurf is fully modeled.
+- Currently modeling the mouse and the goose; no textures yet and not expected given the timeline, models will ship as basic. Aiming to finish both within the next two weeks.
+
+**Rebecca**
+Landscape: 
+Started final integration of Fallen star, Pathways, trees, shrubs, etc. I have started speeding up the process; I am glad I spent a lot of time practicing and slowly figure things out the many weeks prior to this. 
+
+Individual assets: 
+1. Sungod model that I might or might not use. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week8/rebecca/1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week8/rebecca/2.png' | relative_url }}" alt="Note">
+</div>
+
+2. Closer look at new draw-on texture for bear and fallen star. Sketch-like texture that fits the dreamy landscape more; Hopefully this can be reflected in the delivery. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week8/rebecca/3.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week8/rebecca/4.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week8/rebecca/5.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week8/rebecca/6.png' | relative_url }}" alt="Note">
+</div>
+<img src="{{ '/assets/week8/rebecca/7.png' | relative_url }}" alt="Note">
+
+---
+**Reminder:** Final demo is Friday, June 5th, 4:00 – 5:30 PM.
+
 ## Week 7 Group Report
 
 ## Modeling
