@@ -8,6 +8,14 @@ permalink: /project-spec/alain-zhang-individual-report/
 
 ## Weekly Notes
 
+### Week 8
+
+Working on a puzzle where the players have to dodge falling objects for a certain duration of time. Will update 
+progress and specifics in this portion of the report in detail when I awake (currently writing this placeholder at 5:30) but should be done before demo day.
+Other tasks I have been assigned are notifications, i.e pop-ups or overlays to let the players know how to interact with the world or other things that may be of importance. Also need to source audio files, but I'll be leaving that for the artists.
+
+Suffice to say, my current stack should be doable before presentation.
+
 ### Week 5 + 6 + 7
 
 #### Goals
