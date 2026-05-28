@@ -8,6 +8,39 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
+### Week 8 (May 28)
+
+🚨🚨🚨I updated the weekly report AGAIN, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
+
+1. What were your concrete goals for the week?
+
+- merge rendering megapr
+- skybox stuff
+- helping integrate puzzles and stuff
+- windows misc testing, windows perf testing
+- demo box testing
+
+1. What goals were you able to accomplish?
+
+- merge rendering megapr
+- skybox stuff
+- helping integrate puzzles and stuff
+
+1. If the week went differently than you had planned, what were the reasons?
+
+I was not able to connect usiong nomachine
+
+1. What are your specific goals for the next week?
+
+- finish game
+
+1. What did you learn this week, if anything (and did you expect to learn it)?
+
+idk
+
+1. What is your individual morale (which might be different from the overall group morale)?
+CSE 123's PA 2a was unforutnately not good, I had a double digit number of clarification questions
+
 ### Week 7 (May 21)
 
 🚨🚨🚨I updated the weekly report AGAIN, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
