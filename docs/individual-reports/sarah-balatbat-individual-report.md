@@ -38,8 +38,8 @@ permalink: /project-spec/sarah-balatbat-individual-report/
   <img src="{{ '/assets/week8/sarah/symbols-sketch-0.jpg' | relative_url }}" alt="drafts of the final symbols">
   <img src="{{ '/assets/week8/sarah/symbols-sketch-1.jpg' | relative_url }}" alt="finalized sketch of symbols">
   - Created font files for ease of use in design with Figma -- the font is called ReCollect Enscrypt, created with [Calligraphr](https://www.calligraphr.com)
-    - <a src="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.otf' | relative_url }}" alt="Open Type Font file download">Open Type Font file</a>
-    - <a src="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.ttf' | relative_url }}" alt="True Type Font file download">True Type Font file</a>
+    - <a href="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.otf' | relative_url }}" alt="Open Type Font file download">Open Type Font file</a>
+    - <a href="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.ttf' | relative_url }}" alt="True Type Font file download">True Type Font file</a>
   <img src="{{ '/assets/week8/sarah/enscrypt-font.png' | relative_url }}" alt="Calligraphr template filled with glyphs for ReCollect Enscrypt">
   - Created static decryption game screen for the demo -- the team discussed that the puzzle will be implemented as a physical object in the game that players will have their perspectives locked onto, making the only other thing that needs implementation for it be the input text field for inputting the answer
   <img src="{{ '/assets/week8/sarah/decrypt-screen.png' | relative_url }}" alt="decryption puzzle screen for the demo"> 
