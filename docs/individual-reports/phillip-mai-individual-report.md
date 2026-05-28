@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 8
+1. What were your concrete goals for the week?  
+Main goals were just to get barrier logic finished up, like adding in barriers around the whole map and for each season section.
+2. What goals were you able to accomplish?  
+I was able to finish up the barriers. There was some misunderstanding between Rebecca and I about what we intended the barriers to be, but we were able to get it worked out and I ended up implementing what Rebecca visualized. The logic should all be completed as well, so you can unlock next sections as soon as you pick up the fragments.
+3. If the week went differently than you had planned, what were the reasons?  
+This week actually went good, the barrier logic code wasn't that bad so it went relatively smoothly.
+4. What are your specific goals for the next week?  
+I would like to get a full run through of the maze (the first puzzle) to see if everyones code integrated correctly and then work with Leon on the Tangram puzzle. 
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I actually learned something that seems really obvious, but I somehow never realized before, which is that the renderInfo component only covers the model that renders for the entity, and doesn't actually create any physical body for it. So if you have a model rendered, but no physical body component, players can't "collide" with the object. 
+6. What is your individual morale (which might be different from the overall group morale)?  
+My morale is getting pretty low since we have a lot left to do and not much time to do it. I am also being pressured in other classes, so the stress is getting pretty high. 
+
 ## Week 7
 1. What were your concrete goals for the week?  
 I wanted to finish up the color restoration logic and was given the subsequent task of hooking up the color restoration logic with the fragment pickup logic.
