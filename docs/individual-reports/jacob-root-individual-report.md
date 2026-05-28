@@ -10,8 +10,6 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ### Week 8 (May 28)
 
-🚨🚨🚨I updated the weekly report AGAIN, since you're reading this today morning you should go check out the group weekly also. It's under my name there. 🚨🚨🚨
-
 1. What were your concrete goals for the week?
 
 - merge rendering megapr
