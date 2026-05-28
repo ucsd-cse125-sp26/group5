@@ -4,7 +4,7 @@ title: Sarah Balatbat — Individual Report
 permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
-[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}})
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}}) [8]({{ '/project-spec/sarah-balatbat-individual-report/#week-8' | relative_url}})
 
 
 <!-- Sarah's template 
@@ -21,7 +21,7 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Individual Morale
 -->
-## Week 8
+## [Week 8](#week-8)
 ### Goals
 
 - [ ] Continue modeling
@@ -46,7 +46,7 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Progress Evaluation
 
-Due to (again) CSE 123, I didn't get to do as much as I hoped. I think all of us are quite behind on our goals now, as we haven't playtested as far as I'm aware. I still have two more models to do, and I'm somewhat worried I won't be able to get them done in time for the demo.
+Due to (again) CSE 123, I didn't get to do as much as I hoped. I think all of us are quite behind on our goals now, as we haven't playtested as far as I'm aware. I still have two more models to do, and I'm somewhat worried I won't be able to get them done in time for the demo. The demo is already next week Friday, time flew way too fast.
 
 ### Upcoming Goals
 
