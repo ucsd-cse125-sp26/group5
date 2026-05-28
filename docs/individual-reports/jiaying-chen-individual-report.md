@@ -5,6 +5,29 @@ permalink: /project-spec/jiaying-chen-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+---
+
+## Week 8
+1. What were your concrete goals for the week?
+Goals: 1. Finish the sungod mesh that I might potentially use. 2. Finish as much as the main landscape mesh as possible; work with the game logic people for barrier and minigame placement. 
+
+2. What goals were you able to accomplish?
+I wanted to finish a huge portion of modeling, as stated last week, and that is basically achieved. I am confident I will be able to get everything done in time. I also worked with game logic people for places to test and place the minigame. 
+
+3. If the week went differently than you had planned, what were the reasons? 
+Still wasn't able to finish everything, but confident I will as stated above. 
+
+4. What are your specific goals for the next week?
+- Keep working and finishing up the aesthetic side of the main model; 
+- Work even more closely with game logic people to put everything together. Specifically, set locations for fragment spawn points and minigame placement. Those cannot be completely random as they can clip into the meshes. So I will have to make empty objects for their locations. Also work with Jacob to fix the skybox issue. 
+
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Still more learned about modeling, but mostly sculpting. Since landscape does not require a lot of sculpting, I did not have experience with that before, so this is definitely fun. 
+
+6. What is your individual morale (which might be different from the overall group morale)?
+I am slowly but steadily wrapping things up. I believe things should be alright. 
+
+
 ## Week 7 
 1. What were your concrete goals for the week?
 I wanted to figure out how scattering work, also potentially work on putting actual objects onto the map. 
