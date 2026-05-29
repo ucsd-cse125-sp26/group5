@@ -24,8 +24,8 @@ bool AudioEngine::init() {
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
 
-  // loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
-  //           "assets/sounds/oof.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
+            "assets/sounds/oof.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
             "assets/sounds/scattered.wav");
   // uncomment when you have the files:
