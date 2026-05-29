@@ -161,6 +161,11 @@ class PhysicsEngine {
                                        const glm::quat& rot,
                                        const glm::vec3& scale);
 
+  // Gravity-driven obstacle (falling hazard cube). Dynamic, full DOFs so it
+  // tumbles, LinearCast so it can't tunnel through the floor or a player.
+  JPH::BodyID createFallingObjectBody(const glm::vec3& halfExtents,
+                                      const glm::vec3& pos);
+
   // Asset orientation is baked into the shape so the body's rotation can
   // stay equal to the entity's rotation. `centerOffsetMask` is multiplied
   // per-axis with the AABB's local-space center before baking — use (0,0,1)

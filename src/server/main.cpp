@@ -26,7 +26,7 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
   // only entities whose synced components can change every tick belong here.
   return registry.any_of<shared::PlayerInput, shared::Velocity,
                          shared::PointLight, shared::DirectionalLight,
-                         shared::Scene, shared::FragmentComponent>(ent);
+                         shared::Scene, shared::FragmentComponent, shared::FallingObject>(ent);
 }
 
 }  // namespace

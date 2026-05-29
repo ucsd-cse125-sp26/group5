@@ -231,4 +231,19 @@ struct OverworldMazePuzzleState {
 };
 
 struct OverworldMazePiece {};
+
+// Server-only: marks a falling hazard cube. `age` drives lifetime cleanup so
+// objects that land and rest on the floor don't accumulate forever.
+struct FallingObject {
+  float age = 0.0f;
+};
+
+// Server-only: a marker entity that rains FallingObjects within `radius` of its
+// own Position. `timer` is a per-zone spawn accumulator.
+struct FallingHazardZone {
+  float radius = 8.0f;
+  float spawnHeight = 20.0f;  // spawn this far above the zone's Position.z
+  float interval = 0.4f;      // seconds between drops
+  float timer = 0.0f;
+};
 }  // namespace shared

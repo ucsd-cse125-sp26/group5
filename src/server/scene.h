@@ -71,6 +71,23 @@ void spawnInvisibleWall(ServerGame& game, const glm::vec3& pos,
       entity, bodyId.GetIndexAndSequenceNumber());
 }
 
+
+template <typename WorldTag>
+void spawnFallingHazardZone(ServerGame& game, const glm::vec3& center,
+                            float radius, float spawnHeight, float interval) {
+  auto [id, entity] = new_entity(game);
+  game.registry.template emplace<shared::Position>(
+      entity, center.x, center.y, center.z, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.template emplace<WorldTag>(entity);
+  game.registry.template emplace<shared::FallingHazardZone>(
+      entity, radius, spawnHeight, interval, 0.0f);
+  // Visible marker so you can see the zone center while tuning. Delete this
+  // line once you're happy with the placement to make the zone invisible.
+  game.registry.template emplace<shared::RenderInfo>(entity, "cube", 0.5f, 0.5f,
+                                                     0.5f);
+}
+
+
 template <typename WorldTag>
 void spawnStaticEntities(ServerGame& game,
                          const std::vector<StaticEntityDesc>& descs) {
