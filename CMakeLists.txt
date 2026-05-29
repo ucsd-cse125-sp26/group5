@@ -111,12 +111,20 @@ target_compile_definitions(soloud PUBLIC
     MA_NO_JACK
 )
 
+# if(UNIX AND NOT APPLE)
+#     target_compile_definitions(soloud PUBLIC
+#         MA_NO_JACK
+#         MA_NO_PULSEAUDIO
+#         MA_NO_ALSA
+#     )
+# endif()
+
 if(UNIX AND NOT APPLE)
-    target_compile_definitions(soloud PUBLIC
-        MA_NO_JACK
-        MA_NO_PULSEAUDIO
-        MA_NO_ALSA
-    )
+    # don't disable backends — let miniaudio pick what's available
+    find_package(ALSA QUIET)
+    if(ALSA_FOUND)
+        target_link_libraries(soloud PUBLIC ALSA::ALSA)
+    endif()
 endif()
 
 
