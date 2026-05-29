@@ -410,6 +410,9 @@ void initWorldEntities(ServerGame& game) {
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
+  spawnFallingHazardZone<shared::OverworldTag>(
+      game, /*center=*/glm::vec3(50.0f, 0.0f, 0.0f),
+      /*radius=*/8.0f, /*spawnHeight=*/20.0f, /*interval=*/0.4f);
 
   // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
   spawnInvisibleWall<shared::OverworldTag>(
@@ -557,6 +560,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   tickOverworldGameLogic(game, dt);
+  falling_objects_system(game, dt);
 
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {

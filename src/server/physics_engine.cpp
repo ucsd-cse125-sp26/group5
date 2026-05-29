@@ -72,6 +72,25 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
   return body->GetID();
 }
 
+JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
+                                                   const glm::vec3& pos) {
+  auto& bodyInterface = getBodyInterface();
+  JPH::BoxShapeSettings boxSettings(
+      JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+  boxSettings.SetEmbedded();
+  JPH::ShapeRefC shape = boxSettings.Create().Get();
+
+  JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
+                                     JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Dynamic, Layers::MOVING);
+  settings.mGravityFactor = 1.0f;
+  settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+
+  JPH::Body* body = bodyInterface.CreateBody(settings);
+  bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+  return body->GetID();
+}
+
 namespace {
 
 std::string cacheKey(const shared::ParsedModel& parsed, const aiNode& node) {
