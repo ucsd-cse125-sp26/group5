@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <glm/vec3.hpp>
 #include <string>
 
 #include "input.h"
@@ -17,6 +18,16 @@ struct Position {
 
 struct Velocity {
   float dx, dy, dz;
+};
+
+// Picks which animation clip a model should be playing. Empty clipName
+// falls back to the first clip in the model's AnimationLibrary. The client
+// drives playhead time off its own frame dt; startTickMs is reserved for a
+// later authoritative-sync pass but currently unused.
+struct AnimationState {
+  std::string clipName;
+  uint32_t startTickMs = 0;
+  bool loop = true;
 };
 
 struct RenderInfo {
@@ -82,6 +93,49 @@ struct Scene {
 // };
 struct PhysicsBody {
   uint32_t bodyId;
+};
+
+// Sound stuff
+enum class SoundPlayMode : uint8_t {
+  POSITIONAL,
+  AMBIENT,
+};
+
+enum class SoundTriggerType : uint8_t {
+  ALWAYS,     // loop forever while entity exists
+  PROXIMITY,  // loop while player within range
+  ON_EVENT,   // one-shot via SoundEventPacket
+};
+
+struct SoundLayer {
+  uint32_t soundId = 0;
+  SoundTriggerType trigger = SoundTriggerType::ALWAYS;
+  SoundPlayMode playMode = SoundPlayMode::POSITIONAL;
+  float volume = 1.0f;
+  float proximityRange = 10.0f;
+  float fadeSpeed = 2.0f;
+
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.soundId, self.trigger, self.playMode, self.volume,
+                   self.proximityRange, self.fadeSpeed);
+  }
+};
+
+// shared/components.h
+struct SoundEmitter {
+  static constexpr uint8_t MAX_LAYERS = 4;
+  SoundLayer layers[MAX_LAYERS];
+  uint8_t layerCount = 0;
+
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.layers, self.layerCount);
+  }
+};
+
+// Sound detection for landing
+struct Grounded {
+  bool isGrounded = false;
+  bool wasGrounded = false;  // last frame's value, for edge detection
 };
 
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
@@ -152,10 +206,6 @@ struct SectionDoorComponent {
   DoorState state = DoorState::CLOSED;
   uint8_t requiredPlayers = 4;
   uint32_t sectionID = 0;  // the section this door is linked to
-
-  // track the physical animation
-  float currentZ = 0.0f;
-  float targetOpenZ = -10.0f;  // where the door should end up
 };
 
 struct SwitchComponent {
@@ -163,6 +213,20 @@ struct SwitchComponent {
       0;  // what entity this switch is linked to (door, puzzle, etc)
   bool switchOn = false;
 };
+
+// Tag component — marks this entity as a section barrier
+struct SectionBarrierTag {
+  uint8_t sectionID;  // matches SectionController's puzzleID
+  glm::vec3 halfExtents;
+  SectionSeasonMap season;
+};
+
+// Flag component — added to a barrier when it should be torn down
+// OverworldState::update sees this and calls destroyBody
+struct SectionBarrierPendingRemoval {};
+
+struct SectionBarrierVisible {
+};  // tag — present = has RenderInfo, absent = invisible
 
 struct FragmentComponent {
   SectionSeasonMap season;

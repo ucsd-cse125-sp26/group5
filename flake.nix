@@ -59,6 +59,11 @@
           libGL
           libGLU
 
+          # Audio 
+          alsa-lib 
+          libpulseaudio
+          libjack2
+
           # Python (for glad)
           (python3.withPackages (ps: [ ps.jinja2 ]))
 

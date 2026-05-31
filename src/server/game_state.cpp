@@ -29,8 +29,8 @@
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/input.h"
+#include "shared/sound_constants.h"
 #include "shared/util.h"
-
 // ── GameStateManager ─────────────────────────────────────
 
 void GameStateManager::changeState(ServerGame& game,
@@ -131,6 +131,13 @@ static void addPhysicsBodies(ServerGame& game) {
     if (!bodyInterface.IsAdded(bodyId)) {
       bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
     }
+    // Prime wasGrounded=true so the first grounded tick doesn't look like a
+    // landing
+    if (game.registry.all_of<shared::Grounded>(ent)) {
+      auto& g = game.registry.get<shared::Grounded>(ent);
+      g.wasGrounded = true;
+      g.isGrounded = true;
+    }
   }
 }
 
@@ -215,6 +222,7 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
+  game.registry.emplace<shared::Grounded>(entity);
   game.registry.emplace<shared::ColorBoundingBox>(entity);
   {
     auto& box = game.registry.get<shared::ColorBoundingBox>(entity);
@@ -276,35 +284,98 @@ void initWorldEntities(ServerGame& game) {
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
-      game, {
-                // 100³ floor cube; top surface lands on z=0.
-                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(100.0f)},
-                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
-                                 .modelName = "cube"},
-                StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(1.5f)},
-                StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(0.8f)},
-                StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
-                                 .modelName = "cube",
-                                 .scale = glm::vec3(2.0f)},
-                StaticEntityDesc{.position = glm::vec3(10.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Box},
-                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
-                                 .modelName = "bear",
-                                 .scale = glm::vec3(0.5f),
-                                 .collision = CollisionShape::Mesh},
-            });
+      game,
+      {
+          // 100³ floor cube; top surface lands on z=0.
+          StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(100.0f)},
+          StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
+                           .modelName = "cube"},
+          StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(1.5f)},
+          StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(0.8f)},
+          StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
+                           .modelName = "cube",
+                           .scale = glm::vec3(2.0f)},
+          StaticEntityDesc{
+              .position = glm::vec3(10.0f, 0.0f, 0.0f),
+              .modelName = "bear",
+              .scale = glm::vec3(0.5f),
+              .collision = CollisionShape::Box,
+              .soundLayers =
+                  {
+                      shared::SoundLayer{
+                          .soundId = static_cast<uint32_t>(
+                              shared::SoundId::AMBIENT_HUM),
+                          .trigger = shared::SoundTriggerType::ALWAYS,
+                          .volume = 0.5f},
+                  }},
+          StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
+                           .modelName = "bear",
+                           .scale = glm::vec3(0.5f),
+                           .collision = CollisionShape::Mesh},
+      });
   maze_puzzle::initOverworldMazePuzzleController(game);
   maze_layout_editor::spawnLayoutVisuals(game);
   tangram_puzzle::initController(game);
   tangram_layout_editor::spawnLayoutVisuals(game);
+
+  // Section barriers — TODO: replace positions/sizes once you have map coords
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
+      /*sectionID=*/0,
+      /*season=*/shared::SectionSeasonMap::WINTER,
+      /*pos=*/glm::vec3(90.0f, 47.5f, 0.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 58.0f, 100.0f));
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
+      /*sectionID=*/1,
+      /*season=*/shared::SectionSeasonMap::FALL,
+      /*pos=*/glm::vec3(92.5f, -10.0f, 0.0f),
+      /*halfExtents=*/glm::vec3(82.0f, 1.0f, 100.0f));
+  spawnSectionBarrier<shared::OverworldTag>(
+      game,
+      /*sectionID=*/2,
+      /*season=*/shared::SectionSeasonMap::SUMMER,
+      /*pos=*/glm::vec3(10.0f, 0.0f, 0.0f),
+      /*halfExtents=*/glm::vec3(1.0f, 105.0f, 100.0f));
+  // spawnSectionBarrier<shared::OverworldTag>(game,
+  //     /*sectionID=*/3,
+  //     /*season=*/shared::SectionSeasonMap::SPRING,
+  //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
+  //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
+  // add more per section as needed
+
+  // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(1.0f, 103.0f, 0.0f),  // north  (Y=105 + buffer)
+      glm::vec3(172.0f, 1.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(1.0f, -105.0f, 0.0f),  // south  (Y=-105 - buffer)
+      glm::vec3(172.0f, 1.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(170.0f, 1.0f, 0.0f),  // east   (X=171 + buffer)
+      glm::vec3(1.0f, 106.0f, 150.0f));
+  spawnInvisibleWall<shared::OverworldTag>(
+      game, glm::vec3(-170.0f, 1.0f, 0.0f),  // west   (X=-169 - buffer)
+      glm::vec3(1.0f, 106.0f, 150.0f));
+  // Skinned demo: dancing vampire. No physics body — the DAE is large and
+  // a collision proxy isn't useful for a decorative animation test.
+  {
+    auto [vampireId, vampire] = new_entity(game);
+    (void)vampireId;
+    game.registry.emplace<shared::Position>(vampire, 5.0f, 0.0f, 0.0f, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(vampire, "vampire", 1.0f, 1.0f,
+                                              1.0f);
+    game.registry.emplace<shared::AnimationState>(vampire, std::string{}, 0u,
+                                                  true);
+    game.registry.emplace<shared::OverworldTag>(vampire);
+  }
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
@@ -369,6 +440,10 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
+  shared::StateChangePacket pkt;
+  pkt.state = shared::GameStateType::OVERWORLD;
+  net::broadcastPacket(game.network->getHost(), pkt);
+
   addPhysicsBodies<shared::OverworldTag>(game);
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
@@ -473,6 +548,24 @@ void OverworldState::update(ServerGame& game, float dt) {
       }
     }
   }
+  tickOverworldGameLogic(game, dt);
+  if (tangram_trigger::canTriggerTangram(game)) {
+    const bool allInTypingTrigger =
+        tangram_trigger::allActivePlayersInTangramTrigger(game);
+    if (!allInTypingTrigger) {
+      game.overworldTangramTriggerArmed = true;
+      game.overworldTangramFocusTimer = 0.0f;
+    } else if (game.overworldTangramTriggerArmed) {
+      tangram_camera::snapOverworldAvatarsFaceTangramBoard(game);
+      game.overworldTangramFocusTimer += dt;
+      if (game.overworldTangramFocusTimer >= tangram_camera::kFocusHoldSeconds) {
+        game.overworldTangramTriggerArmed = false;
+        game.overworldTangramFocusTimer = 0.0f;
+        tangram_puzzle::beginPuzzle(game);
+        return;
+      }
+    }
+  }
 
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {
@@ -488,10 +581,79 @@ void OverworldState::update(ServerGame& game, float dt) {
       maze_puzzle::beginPuzzle(game);
       return;
     }
+
+    // Hijack KEY_CYCLE_SCENE for testing, e.g. cycling scenes different sounds
+    // if (input.keys_newly_pressed & KEY_CYCLE_SCENE) {
+    //     shared::SoundEventPacket pkt;
+    //     pkt.soundId = static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED);
+    //     pkt.volume = 1.0f;
+    //     pkt.positional = false;
+    //     net::broadcastPacket(game.network->getHost(), pkt);
+    // }
+  }
+  render_model_change(game, dt);
+
+  auto inputView = game.registry.view<shared::PlayerInput>();
+
+  // DEBUG: press B to complete section 0
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_COMPLETE_SECTION) {
+      auto barrierView2 =
+          game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+      for (auto barrier : barrierView2) {
+        auto& phys = game.registry.get<shared::PhysicsBody>(barrier);
+        JPH::BodyID bodyId(phys.bodyId);
+        auto& bodyInterface = game.physics.getBodyInterface();
+        if (bodyInterface.IsAdded(bodyId)) {
+          bodyInterface.RemoveBody(bodyId);
+          printf("DEBUG: removed collision body\n");
+        } else {
+          bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+          printf("DEBUG: re-added collision body\n");
+        }
+      }
+    }
   }
 
-  movement_system(game, dt, StateType::OVERWORLD);
-  render_model_change(game, dt);
+  // DEBUG: press N to toggle barrier visibility
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_TOGGLE_BARRIERS) {
+      auto barrierView =
+          game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+      printf("DEBUG: toggling %zu barriers\n", barrierView.size_hint());
+      for (auto barrier : barrierView) {
+        auto& tag = barrierView.get<shared::SectionBarrierTag>(barrier);
+        uint32_t eid = game.registry.get<shared::Entity>(barrier).id;
+
+        if (game.registry.all_of<shared::SectionBarrierVisible>(barrier)) {
+          // hide: remove RenderInfo, tell client to despawn+respawn without it
+          game.registry.remove<shared::RenderInfo>(barrier);
+          game.registry.remove<shared::SectionBarrierVisible>(barrier);
+        } else {
+          // show: add RenderInfo back
+          game.registry.emplace<shared::RenderInfo>(
+              barrier, "cube", tag.halfExtents.x * 2.0f,
+              tag.halfExtents.y * 2.0f, tag.halfExtents.z * 2.0f);
+          game.registry.emplace<shared::SectionBarrierVisible>(barrier);
+        }
+
+        // despawn then respawn so client gets fresh component list
+        shared::DespawnPacket despawn;
+        despawn.type = shared::PacketType::DESPAWN_ENTITY;
+        despawn.entityId = eid;
+        net::broadcastPacket(game.network->getHost(), despawn);
+
+        std::vector<entt::entity> toRespawn = {barrier};
+        auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                     shared::PacketType::SPAWN_ENTITY,
+                                     toRespawn, false);
+        net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+      }
+      break;
+    }
+  }
 
   uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
   if (lightId != kInvalidEntityId)
@@ -502,6 +664,10 @@ void OverworldState::update(ServerGame& game, float dt) {
 // ── MazeState ────────────────────────────────────────────
 
 void MazeState::onEnter(ServerGame& game) {
+  shared::StateChangePacket pkt;
+  pkt.state = shared::GameStateType::MAZE;
+  net::broadcastPacket(game.network->getHost(), pkt);
+
   addPhysicsBodies<shared::MazeTag>(game);
   ResetMazeSpiritSpawn(game);
 

@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 
 #include <cmath>
@@ -14,6 +15,62 @@
 #include "shared/protocol.h"
 #include "shared/puzzles/tangram/roles.h"
 #include "shared/simple_profiler.h"
+#include "shared/sound_constants.h"
+
+namespace {
+
+void removeSyncedComponent(entt::registry& registry, entt::entity entity,
+                           shared::ComponentTypeId cid) {
+  switch (cid) {
+    case shared::CID_POSITION:
+      registry.remove<shared::Position>(entity);
+      break;
+    case shared::CID_ENTITY:
+      registry.remove<shared::Entity>(entity);
+      break;
+    case shared::CID_RENDERINFO:
+      registry.remove<shared::RenderInfo>(entity);
+      break;
+    case shared::CID_CAMERA:
+      registry.remove<shared::Camera>(entity);
+      break;
+    case shared::CID_VELOCITY:
+      registry.remove<shared::Velocity>(entity);
+      break;
+    case shared::CID_POINTLIGHT:
+      registry.remove<shared::PointLight>(entity);
+      break;
+    case shared::CID_SCENE:
+      registry.remove<shared::Scene>(entity);
+      break;
+    case shared::CID_DIRECTIONALLIGHT:
+      registry.remove<shared::DirectionalLight>(entity);
+      break;
+    case shared::CID_OVERWORLD_MAZE_PUZZLE:
+      registry.remove<shared::OverworldMazePuzzleState>(entity);
+      break;
+    case shared::CID_COLORBOUNDINGBOX:
+      registry.remove<shared::ColorBoundingBox>(entity);
+      break;
+    case shared::CID_ANIMATIONSTATE:
+      registry.remove<shared::AnimationState>(entity);
+      break;
+    case shared::CID_MAZESPIRITGRID:
+      registry.remove<shared::MazeSpiritGrid>(entity);
+      break;
+    case shared::CID_SOUNDEMITTER:
+      registry.remove<shared::SoundEmitter>(entity);
+      break;
+    case shared::CID_OVERWORLD_TANGRAM_PUZZLE:
+      registry.remove<shared::OverworldTangramPuzzleState>(entity);
+      break;
+    case shared::CID_TANGRAM_PIECE:
+      registry.remove<shared::TangramPiece>(entity);
+      break;
+  }
+}
+
+}  // namespace
 
 // ── Component deserialization helper ─────────────────────
 //
@@ -58,7 +115,7 @@ void registerClientHandlers(ClientNetwork& network) {
         uint16_t entityCount;
         std::memcpy(&entityCount, data + offset, sizeof(uint16_t));
         offset += sizeof(uint16_t);
-
+        printf("CLIENT: spawn %u entities\n", entityCount);
         for (uint16_t i = 0; i < entityCount; i++) {
           uint32_t entityId;
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
@@ -85,8 +142,10 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
+        printf("CLIENT: despawn entity %u\n", pkt.entityId);
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
+          game.audio.stopAllForEntity(pkt.entityId);
           game.networkRegistry.destroy(it->second);
           game.networkEntityMap.erase(it);
           printf("Destroyed entity %d\n", pkt.entityId);
@@ -108,6 +167,32 @@ void registerClientHandlers(ClientNetwork& network) {
 
           auto it = game.networkEntityMap.find(entityId);
           if (it != game.networkEntityMap.end()) {
+            size_t entityStart = offset;
+            uint16_t compCount;
+            std::memcpy(&compCount, data + offset, sizeof(uint16_t));
+            offset += sizeof(uint16_t);
+
+            bool present[static_cast<size_t>(shared::CID_TANGRAM_PIECE) + 1] =
+                {};
+            for (uint16_t c = 0; c < compCount; c++) {
+              shared::ComponentTypeId cid;
+              std::memcpy(&cid, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              uint16_t dataSize;
+              std::memcpy(&dataSize, data + offset, sizeof(uint16_t));
+              offset += sizeof(uint16_t);
+              if (cid < std::size(present)) present[cid] = true;
+              offset += dataSize;
+            }
+
+            auto entity = it->second;
+            for (auto cid : game.componentRegistry.syncedIds()) {
+              if (cid < std::size(present) && !present[cid]) {
+                removeSyncedComponent(game.networkRegistry, entity, cid);
+              }
+            }
+
+            offset = entityStart;
             deserializeComponents(game, it->second, data, offset, len);
           } else {
             // Entity not known — skip its components
@@ -122,6 +207,34 @@ void registerClientHandlers(ClientNetwork& network) {
               offset += dataSize;
             }
           }
+        }
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::SOUND_EVENT,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::SoundEventPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        if (pkt.positional) {
+          game.audio.playSound(pkt.soundId, pkt.x, pkt.y, pkt.z, pkt.volume,
+                               pkt.pitch);
+        } else {
+          game.audio.playNonPositionalSound(pkt.soundId, pkt.volume, pkt.pitch);
+        }
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::STATE_CHANGE,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::StateChangePacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.audio.stopAllGlobalLoops();
+        if (pkt.state == shared::GameStateType::OVERWORLD) {
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::MAZE) {
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         }
       });
 }
@@ -237,22 +350,32 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys) {
+                  InputKeys& prevKeys, bool debugMode) {
   InputKeys keys = 0;
   const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
 
   if (!mazeBoardControl) {
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
-  if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
-  if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
-  if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
-  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
-  if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
-  if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
-  if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
+    if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
+    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
+    if (debugMode) {
+      if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+        keys |= KEY_DEBUG_COMPLETE_SECTION;
+      if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
+        keys |= KEY_DEBUG_TOGGLE_BARRIERS;
+      if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
+        keys |= KEY_DEBUG_PRINT_POS;
+    }
   }
 
   if (mazeBoardControl) {
@@ -275,11 +398,6 @@ void processInput(GLFWwindow* window, const ClientGame& game,
       keys |= KEY_ROTATE_PIECE;
     }
   }
-
-  // Always allow exiting a minigame (works in maze arrow-control too).
-  if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
-  if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) keys |= KEY_DEBUG_PRINT_POS;
-
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
   static uint32_t prevRotateTargetId = 0;
@@ -328,5 +446,22 @@ void printEntityPositions(const ClientGame& game) {
     auto& p = view.get<shared::Position>(ent);
     printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
            e.id == game.renderEntityId ? " (me)" : "");
+  }
+}
+
+// Sound
+void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
+                         float listenerZ, float dt) {
+  SIMPLE_PROFILE_SCOPE("Sound Emitters");
+  auto view =
+      game.renderRegistry
+          .view<shared::Entity, shared::Position, shared::SoundEmitter>();
+  for (auto ent : view) {
+    auto& entity = view.get<shared::Entity>(ent);
+    auto& pos = view.get<shared::Position>(ent);
+    auto& emitter = view.get<shared::SoundEmitter>(ent);
+
+    game.audio.updateEmitter(entity.id, emitter, pos.x, pos.y, pos.z, listenerX,
+                             listenerY, listenerZ, dt);
   }
 }

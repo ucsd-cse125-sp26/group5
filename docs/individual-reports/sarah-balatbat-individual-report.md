@@ -4,7 +4,7 @@ title: Sarah Balatbat — Individual Report
 permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
-[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}})
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}}) [8]({{ '/project-spec/sarah-balatbat-individual-report/#week-8' | relative_url}})
 
 
 <!-- Sarah's template 
@@ -21,7 +21,48 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Individual Morale
 -->
+## [Week 8](#week-8)
+### Goals
 
+- [ ] Continue modeling
+  - [ ] Mouse
+  - [ ] Goose
+- [x] Create decryption puzzle symbols
+  - [x] Create static decryption game screen for demo
+- [ ] Watch UV unwrapping and texturing tutorials
+
+### Achieved
+
+- Decryption puzzle
+  - Finalized sketches -- made mostly angular symbols based on nature in keeping with the themes we were going for (low poly, natural map)
+  <img src="{{ '/assets/week8/sarah/symbols-sketch-0.jpg' | relative_url }}" alt="drafts of the final symbols">
+  <img src="{{ '/assets/week8/sarah/symbols-sketch-1.jpg' | relative_url }}" alt="finalized sketch of symbols">
+  - Created font files for ease of use in design with Figma -- the font is called ReCollect Enscrypt, created with [Calligraphr](https://www.calligraphr.com)
+    - <a href="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.otf' | relative_url }}" alt="Open Type Font file download">Open Type Font file</a>
+    - <a href="{{ '/assets/week8/sarah/RecollectEnscrypt-Regular.ttf' | relative_url }}" alt="True Type Font file download">True Type Font file</a>
+  <img src="{{ '/assets/week8/sarah/enscrypt-font.png' | relative_url }}" alt="Calligraphr template filled with glyphs for ReCollect Enscrypt">
+  - Created static decryption game screen for the demo -- the team discussed that the puzzle will be implemented as a physical object in the game that players will have their perspectives locked onto, making the only other thing that needs implementation for it be the input text field for inputting the answer
+  <img src="{{ '/assets/week8/sarah/decrypt-screen.png' | relative_url }}" alt="decryption puzzle screen for the demo"> 
+
+### Progress Evaluation
+
+Due to (again) CSE 123, I didn't get to do as much as I hoped. I think all of us are quite behind on our goals now, as we haven't playtested as far as I'm aware. I still have two more models to do, and I'm somewhat worried I won't be able to get them done in time for the demo. The demo is already next week Friday, time flew way too fast.
+
+### Upcoming Goals
+
+- [ ] Continue modeling
+  - [ ] Mouse
+  - [ ] Goose
+- [ ] Watch UV unwrapping and texturing tutorials
+
+### Lessons Learned
+
+- I got to try making a font, which was much easier than I thought
+- Compromise is often the way through -- I was really hopeful that the decryption puzzle would stay since I was the one that suggested it, and I'm glad we found a way to keep it for the demo
+
+### Individual Morale
+
+I am feeling sick once again. This quarter has not been a good one for me health-wise, as this would be the 2nd time I'm symptomatically sick, on top of having had to previously deal with a dental emergency and, more recently, a sizable skin abrasion due to a scooter accident. I'm somewhat upset that all these things came at my last quarter and made it so much more difficult than it could've been.
 
 ## [Week 7](#week-7)
 ### Goals
