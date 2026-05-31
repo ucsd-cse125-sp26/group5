@@ -107,7 +107,7 @@ target_include_directories(soloud PUBLIC lib/soloud/include)
 target_compile_definitions(soloud PUBLIC 
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
-    MA_NO_RUNTIME_LINKING
+    #MA_NO_RUNTIME_LINKING
     MA_NO_JACK
 )
 
