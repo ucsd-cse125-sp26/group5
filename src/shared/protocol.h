@@ -12,6 +12,18 @@ enum class PacketType : uint8_t {
   SPAWN_ENTITY,
   ASSIGN_ENTITY,
   DESPAWN_ENTITY,
+  SOUND_EVENT,
+  STATE_CHANGE,
+};
+
+enum class GameStateType : uint8_t {
+  OVERWORLD,
+  MAZE,
+};
+
+struct StateChangePacket {
+  PacketType type = PacketType::STATE_CHANGE;
+  GameStateType state;
 };
 
 struct AssignPacket {
@@ -31,5 +43,14 @@ struct InputPacket {
   float mouseDy;
   // Network entity id under the screen-center reticle (0 = none).
   uint32_t rotateTargetId = 0;
+};
+
+struct SoundEventPacket {
+  PacketType type = PacketType::SOUND_EVENT;
+  uint32_t soundId;
+  float x, y, z;
+  float volume = 1.0f;
+  float pitch = 1.0f;
+  bool positional = true;
 };
 }  // namespace shared

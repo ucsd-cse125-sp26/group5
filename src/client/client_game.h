@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "glm/ext/matrix_float4x4.hpp"
+#include "audio_engine.h"
 #include "shared/component_registry.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
@@ -37,6 +38,7 @@ struct ClientGame {
       shared::tangram::ArenaLayout::defaults();
   // Entity id under screen-center reticle (updated each frame during tangram).
   uint32_t tangramCrosshairTargetId = 0;
+  AudioEngine audio;
 };
 
 void syncToRender(ClientGame& game);
@@ -56,6 +58,8 @@ void registerClientHandlers(ClientNetwork& network);
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys);
+                  InputKeys& prevKeys, bool debugMode);
 void updateWinterMazeWindowTitle(GLFWwindow* window, const ClientGame& game);
 void printEntityPositions(const ClientGame& game);
+void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,
+                         float listenerZ, float dt);

@@ -32,10 +32,10 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
   // Static map / wall / marker entities are sent by SPAWN_ENTITY when a state
   // is entered or a client connects. Per-frame UPDATE_ENTITY should stay small:
   // only entities whose synced components can change every tick belong here.
-  return registry
-      .any_of<shared::PlayerInput, shared::Velocity, shared::PointLight,
-              shared::DirectionalLight, shared::Scene, shared::OverworldTangramPiece>(
-          ent);
+  return registry.any_of<shared::PlayerInput, shared::Velocity,
+                         shared::PointLight, shared::DirectionalLight,
+                         shared::Scene, shared::FragmentComponent,
+                         shared::OverworldTangramPiece>(ent);
 }
 
 }  // namespace
@@ -146,6 +146,13 @@ int main() {
     assignPkt.type = shared::PacketType::ASSIGN_ENTITY;
     assignPkt.entityId = g.registry.get<shared::Entity>(activeEntity).id;
     net::sendPacket(peer, assignPkt);
+    shared::StateChangePacket statePkt;
+    if (currentState->getStateType() == StateType::OVERWORLD) {
+      statePkt.state = shared::GameStateType::OVERWORLD;
+    } else {
+      statePkt.state = shared::GameStateType::MAZE;
+    }
+    net::sendPacket(peer, statePkt);
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
@@ -212,9 +219,10 @@ int main() {
     previousTime = currentTime;
     accumulator += dt;
     while (accumulator >= fixedDt) {
-      game.gameStateManager.update(game, fixedDt);
-
       game.physics.step(fixedDt);
+      update_grounded_system(game);
+
+      game.gameStateManager.update(game, fixedDt);
 
       // Jolt → ECS sync. Skip rotation for player entities; their yaw is
       // movement_system's responsibility (Jolt rotation DOFs are locked).

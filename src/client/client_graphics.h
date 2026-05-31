@@ -1,12 +1,16 @@
 #pragma once
 
+#include <entt/entt.hpp>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "asset.h"
+#include "client/animation.h"
 #include "client/client_game.h"
+#include "client/graphics_settings.h"
 #include "client/shaders.h"
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -43,6 +47,8 @@ struct Graphics {
   GLFWwindow* window = nullptr;
   std::optional<Shader> gbufferShader;
   std::optional<Shader> lightingShader;
+  std::optional<Shader> lightingCelShader;
+  std::optional<Shader> outlineSobelShader;
   std::optional<Shader> skyboxShader;
   std::optional<Shader> presentShader;
   std::optional<Shader> debugOverlay;
@@ -75,6 +81,14 @@ struct Graphics {
   GLuint ldrFBO = 0;
   GLuint ldrColor = 0;
 
+  // Post-process outline (Sobel) writes here when enabled.
+  GLuint sobelFBO = 0;
+  GLuint sobelColor = 0;
+
+  // Optional 1D cel ramp texture loaded from settings.celRampPath.
+  GLuint celRampTexture = 0;
+  std::string lastCelRampPath = "";
+
   std::optional<Shader> blurShader;
   std::optional<Shader> tonemapShader;
   std::optional<Shader> ssaoShader;
@@ -87,14 +101,12 @@ struct Graphics {
   GLuint ssaoNoiseTex = 0;
   std::vector<glm::vec3> ssaoKernel;
 
-  int ssaoKernelSize = 64;
-  float ssaoRadius = 0.5f;
-  float ssaoBias = 0.025f;
+  GraphicsSettings settings;
 
-  float exposure = 1.0f;
-  float bloomThreshold = 1.0f;
-  float bloomStrength = 1.0f;
-  int bloomBlurIterations = 10;
+  // Tracked from settings to detect resolution changes and reallocate.
+  int lastDirShadowSize = 0;
+  int lastPointShadowSize = 0;
+  bool prevShadowsEnabled = true;
 
   GLuint dirShadowFBO = 0;
   GLuint dirShadowMap = 0;
@@ -109,6 +121,24 @@ struct Graphics {
 
   int fbWidth = 0;
   int fbHeight = 0;
+  // Offscreen render resolution = fbWidth/Height / pixelationScale; the
+  // present pass upscales this with GL_NEAREST to the default framebuffer.
+  int renderWidth = 0;
+  int renderHeight = 0;
+  int lastPixelationScale = 1;
+
+  // Tracks the active palette size so a change can trigger per-model
+  // k-means rebuilds. The palette itself lives on each Model.
+  int lastPaletteColors = 0;
+
+  // Skeletal animation. AnimationLibrary is built lazily once per skinned
+  // model; Animator state lives per entity and is garbage-collected when
+  // the entity disappears from the registry.
+  std::unordered_map<std::string, std::unique_ptr<AnimationLibrary>>
+      animationLibraries;
+  std::unordered_map<entt::entity, Animator> animators;
+  // glfwGetTime() at the previous render() call; 0 on first frame.
+  double lastFrameTime = 0.0;
 
   bool fullscreen = false;
   int windowedX = 0;
@@ -120,6 +150,10 @@ struct Graphics {
   bool keyF5Prev = false;
   bool keyF11Prev = false;
 
+  bool settingsMenuOpen = false;
+  bool keyEscapePrev = false;
+  bool prevSyncedMenuOpen = false;
+
   DebugChannel debugChannel = DebugChannel::Off;
 
   // Bound for fullscreen-triangle draws; positions come from gl_VertexID.
@@ -127,6 +161,16 @@ struct Graphics {
 
   // CameraBlock UBO at binding=0; mirrored by CameraUBOData in the .cpp.
   GLuint cameraUBO = 0;
+
+  // Tiny self-contained loading scene: standalone cube VAO/VBO/EBO + a
+  // minimal shader that only reads position + normal. None of the main
+  // rendering machinery needs to be online for it to draw.
+  std::optional<Shader> loadingShader;
+  GLuint loadingCubeVAO = 0;
+  GLuint loadingCubeVBO = 0;
+  GLuint loadingCubeEBO = 0;
+  int loadingCubeIndexCount = 0;
+  double loadingStartTime = 0.0;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);
@@ -140,4 +184,21 @@ struct Graphics {
   void cycleDebugChannel();
   void processDebugKeys();
   void drawDebugOverlay();
+
+  void initImGui();
+  void shutdownImGui();
+  void drawSettingsUIFrame();
+
+  // Loading screen: minimal self-contained renderer that runs before the
+  // rest of the pipeline is online.
+  void initLoadingScreen();
+  void destroyLoadingScreen();
+  void renderLoadingFrame(const std::string& status);
+
+  void allocateDirShadowMap(int size);
+  void allocatePointShadowMaps(int size);
+  void clearShadowMaps();
+
+  // Reloads celRampTexture if settings.celRampPath changed since last call.
+  void ensureCelRampLoaded();
 };

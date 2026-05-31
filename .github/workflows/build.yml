@@ -141,7 +141,10 @@ jobs:
             libx11-dev libxcursor-dev libxi-dev libxinerama-dev \
             libxrandr-dev libxrender-dev \
             libgl1-mesa-dev libglu1-mesa-dev \
-            python3-jinja2
+            python3-jinja2 \
+            libasound2-dev \
+            libpulse-dev \
+            libjack-jackd2-dev
 
       - uses: lukka/get-cmake@latest
 

@@ -167,6 +167,7 @@ class PhysicsEngine {
 
   void destroyBody(uint32_t bodyId) {
     JPH::BodyID joltId(bodyId);
+    bodyFootOffset_.erase(joltId.GetIndexAndSequenceNumber());
     getBodyInterface().RemoveBody(joltId);
     getBodyInterface().DestroyBody(joltId);
   }
@@ -176,6 +177,7 @@ class PhysicsEngine {
   JPH::BodyID createPlayerBody(const std::string& modelName,
                                const glm::vec3& pos, const glm::quat& rot,
                                const glm::vec3& scale);
+  bool isBodyGrounded(JPH::BodyID bodyId, float checkDistance = 0.2f);
 
   // Shared maze piece on the overworld preview board: no gravity, slides on XZ.
   JPH::BodyID createMazeBoardPieceBody(const std::string& modelName,
@@ -228,6 +230,7 @@ class PhysicsEngine {
                             const glm::quat& rot, const glm::vec3& scale);
 
  private:
+  std::unordered_map<uint32_t, float> bodyFootOffset_;
   struct BoxExtents {
     glm::vec3 center;
     glm::vec3 halfExtents;

@@ -21,8 +21,8 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
   switch (season) {
     case shared::SectionSeasonMap::WINTER:
       // Stage 1: Start + Winter Unlocked
-      return SeasonColorBounds{.minX = 40.0f,
-                               .minY = 25.0f,
+      return SeasonColorBounds{.minX = 15.0f,
+                               .minY = -10.0f,
                                .minZ = kMinZ,
                                .maxX = 90.0f,
                                .maxY = 105.0f,
@@ -30,8 +30,8 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
 
     case shared::SectionSeasonMap::FALL:
       // Stage 2: Start + Winter + Autumn Unlocked
-      return SeasonColorBounds{.minX = 40.0f,
-                               .minY = 25.0f,
+      return SeasonColorBounds{.minX = 15.0f,
+                               .minY = -10.0f,
                                .minZ = kMinZ,
                                .maxX = 170.0f,
                                .maxY = 105.0f,
@@ -39,7 +39,7 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
 
     case shared::SectionSeasonMap::SUMMER:
       // Stage 3: Start + Winter + Autumn + Summer Unlocked
-      return SeasonColorBounds{.minX = 40.0f,
+      return SeasonColorBounds{.minX = 15.0f,
                                .minY = -105.0f,
                                .minZ = kMinZ,
                                .maxX = 170.0f,
@@ -64,9 +64,9 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
                            .maxY = 105.0f,
                            .maxZ = kMaxZ};
 }
+}  // namespace
 
-void updateColorBoundingBoxes(ServerGame& game,
-                              shared::SectionSeasonMap season) {
+void colorizeSection(ServerGame& game, shared::SectionSeasonMap season) {
   auto bounds = boundsForSeason(season);
   auto view =
       game.registry.view<shared::ColorBoundingBox, shared::PlayerInput>();
@@ -80,4 +80,3 @@ void updateColorBoundingBoxes(ServerGame& game,
     box.maxZ = bounds.maxZ;
   }
 }
-}  // namespace
