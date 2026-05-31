@@ -71,7 +71,6 @@ void spawnInvisibleWall(ServerGame& game, const glm::vec3& pos,
       entity, bodyId.GetIndexAndSequenceNumber());
 }
 
-
 template <typename WorldTag>
 void spawnFallingHazardZone(ServerGame& game, const glm::vec3& center,
                             float radius, float spawnHeight, float interval) {
@@ -86,7 +85,6 @@ void spawnFallingHazardZone(ServerGame& game, const glm::vec3& center,
   game.registry.template emplace<shared::RenderInfo>(entity, "cube", 0.5f, 0.5f,
                                                      0.5f);
 }
-
 
 template <typename WorldTag>
 void spawnStaticEntities(ServerGame& game,

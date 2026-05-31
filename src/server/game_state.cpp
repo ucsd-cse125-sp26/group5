@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "game/fall_challenge.h"
 #include "game/maze.h"
 #include "game/maze_camera.h"
 #include "game/maze_generation.h"
@@ -560,7 +561,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   tickOverworldGameLogic(game, dt);
-  falling_objects_system(game, dt);
+  fall_challenge::update(game, dt);
 
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {

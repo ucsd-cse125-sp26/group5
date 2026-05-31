@@ -120,8 +120,17 @@ static void movement_system_for_world(ServerGame& game, float dt) {
       net::broadcastPacket(game.network->getHost(), pkt);
     }
 
-    bodyInterface.SetLinearVelocity(
-        bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    bool knocked =
+        game.registry.all_of<shared::Knockback>(entity) &&
+        game.registry.get<shared::Knockback>(entity).remaining > 0.0f;
+    if (knocked) {
+      // Physics owns X/Y; only enforce jump/gravity on Z.
+      bodyInterface.SetLinearVelocity(
+          bodyId, JPH::Vec3(currentVel.GetX(), currentVel.GetY(), verticalVel));
+    } else {
+      bodyInterface.SetLinearVelocity(
+          bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    }
 
     // ── Landing detection (ECS-driven via Grounded component) ──
     if (game.registry.all_of<shared::Grounded>(entity)) {
@@ -368,70 +377,6 @@ void update_grounded_system(ServerGame& game) {
 
     grounded.wasGrounded = grounded.isGrounded;
     grounded.isGrounded = game.physics.isBodyGrounded(bodyId);
-  }
-}
-
-void falling_objects_system(ServerGame& game, float dt) {
-  static std::mt19937 rng(1337);
-
-  // Defer spawns: emplacing Position/OverworldTag on new entities while the
-  // zone view (over those same pools) is being iterated can invalidate it.
-  std::vector<glm::vec3> spawnPositions;
-
-  auto zones = game.registry.view<shared::FallingHazardZone, shared::Position,
-                                  shared::OverworldTag>();
-  for (auto zoneEnt : zones) {
-    auto& zone = zones.get<shared::FallingHazardZone>(zoneEnt);
-    auto& center = zones.get<shared::Position>(zoneEnt);
-    zone.timer += dt;
-    if (zone.timer >= zone.interval) {
-      zone.timer = 0.0f;
-      // Uniform sampling over a disk: sqrt(u) keeps it from clumping at center.
-      std::uniform_real_distribution<float> angDist(0.0f,
-                                                    glm::two_pi<float>());
-      std::uniform_real_distribution<float> rDist(0.0f, 1.0f);
-      float ang = angDist(rng);
-      float r = zone.radius * std::sqrt(rDist(rng));
-      spawnPositions.emplace_back(center.x + std::cos(ang) * r,
-                                  center.y + std::sin(ang) * r,
-                                  center.z + zone.spawnHeight);
-    }
-  }
-
-  for (const auto& pos : spawnPositions) {
-    auto [id, ent] = new_entity(game);
-    game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f, 0.0f,
-                                            0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "cube", 0.5f, 0.5f, 0.5f);
-    game.registry.emplace<shared::OverworldTag>(ent);  // REQUIRED to sync/render
-    game.registry.emplace<shared::FallingObject>(ent);
-    JPH::BodyID body =
-        game.physics.createFallingObjectBody(glm::vec3(0.25f), pos);
-    game.registry.emplace<shared::PhysicsBody>(
-        ent, body.GetIndexAndSequenceNumber());
-
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::SPAWN_ENTITY, {ent}, false);
-    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
-  }
-
-  // Cleanup by lifetime OR falling out of the world. Lifetime is what stops
-  // landed cubes from piling up on the floor forever.
-  std::vector<entt::entity> dead;
-  auto falling = game.registry.view<shared::FallingObject, shared::Position,
-                                    shared::Entity>();
-  for (auto ent : falling) {
-    auto& fo = falling.get<shared::FallingObject>(ent);
-    fo.age += dt;
-    bool belowWorld = falling.get<shared::Position>(ent).z < -5.0f;
-    if (fo.age > 4.0f || belowWorld) dead.push_back(ent);
-  }
-  for (auto ent : dead) {
-    shared::DespawnPacket pkt;
-    pkt.type = shared::PacketType::DESPAWN_ENTITY;
-    pkt.entityId = game.registry.get<shared::Entity>(ent).id;
-    net::broadcastPacket(game.network->getHost(), pkt);
-    game.registry.destroy(ent);  // fires on_destroy<PhysicsBody> → destroyBody
   }
 }
 

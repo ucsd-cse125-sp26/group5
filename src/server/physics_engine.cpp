@@ -407,3 +407,17 @@ bool PhysicsEngine::isBodyGrounded(JPH::BodyID bodyId, float checkDistance) {
       JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING),
       JPH::SpecifiedObjectLayerFilter(Layers::NON_MOVING));
 }
+
+bool PhysicsEngine::getBodyWorldZSpan(JPH::BodyID bodyId, float& minZ,
+                                      float& maxZ) {
+  auto& bodyInterface = getBodyInterface();
+  if (!bodyInterface.IsAdded(bodyId)) return false;
+  // Same path isBodyGrounded uses: GetTransformedShape applies the body's
+  // world transform, and GetWorldSpaceBounds folds in RotatedTranslatedShape /
+  // ScaledShape so the AABB reflects the real, scaled, offset collision box.
+  JPH::AABox bounds =
+      bodyInterface.GetTransformedShape(bodyId).GetWorldSpaceBounds();
+  minZ = bounds.mMin.GetZ();
+  maxZ = bounds.mMax.GetZ();
+  return true;
+}
