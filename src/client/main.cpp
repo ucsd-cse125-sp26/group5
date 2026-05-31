@@ -35,7 +35,7 @@ int main() {
     return EXIT_FAILURE;
   }
 
-    if (!network.connect("localhost", 7777)) {
+  if (!network.connect("localhost", 7777)) {
     return EXIT_FAILURE;
   }
 

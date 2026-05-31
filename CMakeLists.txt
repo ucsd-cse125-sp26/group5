@@ -166,6 +166,7 @@ target_sources(client PRIVATE
     src/client/animation.cpp
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
+    src/client/puzzle_hud.cpp
 )
 target_link_libraries(client PRIVATE shared 
     glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud
@@ -203,6 +204,7 @@ add_library(server_lib STATIC
     src/server/game/maze_camera.cpp
     src/server/game/maze_spirit_control.cpp
     src/server/game/overworld_maze_puzzle.cpp
+    src/server/game/fall_challenge.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp

@@ -35,6 +35,10 @@ bool AudioEngine::init() {
             "assets/sounds/yaku.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
             "assets/sounds/oof.mp3");  // temporary, reuses jump sound
+
+  // in AudioEngine::init(), around the other puzzle sound loadSound calls:
+  loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
+            "assets/sounds/angel.mp3");
   // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1),
   // "assets/sounds/oof.mp3");
   // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_2),
