@@ -145,7 +145,10 @@ elseif(UNIX)
 endif()
 
 if(WIN32)
-    target_compile_definitions(soloud PUBLIC NOMINMAX)
+    target_compile_definitions(soloud PUBLIC 
+    NOMINMAX
+    MA_NO_RUNTIME_LINKING
+)
 endif()
 
 target_include_directories(imgui PUBLIC
