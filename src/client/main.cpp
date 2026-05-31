@@ -14,7 +14,12 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
+#include "shared/map_format.h"
+#include "shared/map_gamelogic_layout.h"
 #include "shared/simple_profiler.h"
+#include "shared/puzzles/tangram/arena_layout.h"
+#include "shared/dev_spawn.h"
+#include "shared/util.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
@@ -31,30 +36,55 @@ int main() {
 
   registerClientHandlers(network);
 
+  // Service ENet while graphics.load() parses the huge map glb (~130 meshes).
+  // Otherwise the client never calls enet_host_service for minutes and the
+  // connection times out (looks like "last player disconnects" when the
+  // slowest loader finishes last). Same for tryApplyMazeLayoutFromMapFile.
+  InputKeys prevKeys = 0;
+  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
+
   Graphics graphics;
   if (!graphics.load(960, 600)) {
+    game.running.store(false, std::memory_order_release);
+    networkThread.join();
     return EXIT_FAILURE;
   }
 
-  InputKeys prevKeys = 0;
+  shared::map_gamelogic_layout::tryApplyMazeLayoutFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.mazeLayout);
+  shared::map_gamelogic_layout::tryApplyTangramArenaFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.tangramArena);
+  game.mazeLayout.applyHeightBoost();
+  game.tangramArena.applyHeightBoost();
 
-  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
+  if (shared::dev_spawn::kOverworldSpawn ==
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    printf("[DevSpawn] Client fallback camera: tangram pad\n");
+  } else {
+    printf("[DevSpawn] Client fallback camera: winter maze\n");
+  }
+
   while (!glfwWindowShouldClose(graphics.window)) {
     SIMPLE_PROFILE_FRAME_START();
     GPU_PROFILE_FRAME_BEGIN();
+
+    glfwPollEvents();
+    graphics.processDebugKeys();
 
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::scoped_lock lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
+    } else if (game.renderEntityMap.empty() &&
+               !game.networkEntityMap.empty()) {
+      bootstrapClientWorldSnapshot(game);
     }
 
-    graphics.render(game);
+    updateWinterMazeWindowTitle(graphics.window, game);
+    graphics.render(game, network);
     graphics.swap();
     GPU_PROFILE_FRAME_END();
     GPU_MEM_FRAME_END();
-    glfwPollEvents();
-    graphics.processDebugKeys();
 
     // ESC releases the cursor; left-click re-captures it.
     if (glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {

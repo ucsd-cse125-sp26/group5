@@ -121,6 +121,8 @@ enum ComponentIds : ComponentTypeId {
   CID_SCENE = 7,
   CID_DIRECTIONALLIGHT = 8,
   CID_OVERWORLD_MAZE_PUZZLE = 9,
+  CID_OVERWORLD_TANGRAM_PUZZLE = 10,
+  CID_TANGRAM_PIECE = 11,
 };
 
 inline ComponentRegistry createDefaultRegistry() {
@@ -133,6 +135,9 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<Scene>(CID_SCENE);
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
   reg.registerComponent<OverworldMazePuzzleState>(CID_OVERWORLD_MAZE_PUZZLE);
+  reg.registerComponent<OverworldTangramPuzzleState>(
+      CID_OVERWORLD_TANGRAM_PUZZLE);
+  reg.registerComponent<TangramPiece>(CID_TANGRAM_PIECE);
   return reg;
 }
 

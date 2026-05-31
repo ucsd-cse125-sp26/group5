@@ -3,6 +3,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
@@ -20,6 +22,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/util.h"
 
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
@@ -263,6 +266,197 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   return id;
+}
+
+
+namespace {
+
+void tangramFootprint(const shared::tangram_puzzle::PieceDef& def,
+                      std::vector<glm::vec2>& out) {
+  out.clear();
+  switch (def.shape) {
+    case shared::tangram_puzzle::PieceShape::LargeTriangle:
+      out = {{-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}};
+      break;
+    case shared::tangram_puzzle::PieceShape::MediumTriangle:
+      out = {{-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}};
+      break;
+    case shared::tangram_puzzle::PieceShape::SmallTriangle:
+      out = {{-0.5f, -0.5f}, {0.5f, -0.5f}, {-0.5f, 0.5f}};
+      break;
+    case shared::tangram_puzzle::PieceShape::Square:
+      out = {{-0.5f, -0.5f}, {0.5f, -0.5f}, {0.5f, 0.5f}, {-0.5f, 0.5f}};
+      break;
+    case shared::tangram_puzzle::PieceShape::Parallelogram: {
+      const float w = 0.42f;
+      const float h = 0.28f;
+      const float sl = 0.22f;
+      out = {{-w, -h}, {w, -h}, {w + sl, h}, {-w + sl, h}};
+      break;
+    }
+  }
+}
+
+void appendPrismFaces(std::vector<Vertex>& vertices, std::vector<GLuint>& indices,
+                      const std::vector<glm::vec2>& footprint, float z0,
+                      float z1, const glm::vec2& uv) {
+  if (footprint.size() < 3) return;
+  const int n = static_cast<int>(footprint.size());
+
+  auto pushTri = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 normal) {
+    const auto base = static_cast<GLuint>(vertices.size());
+    vertices.push_back({a, normal, uv});
+    vertices.push_back({b, normal, uv});
+    vertices.push_back({c, normal, uv});
+    indices.push_back(base);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+  };
+
+  for (int i = 1; i < n - 1; ++i) {
+    pushTri({footprint[0].x, footprint[0].y, z1},
+            {footprint[static_cast<size_t>(i)].x,
+             footprint[static_cast<size_t>(i)].y, z1},
+            {footprint[static_cast<size_t>(i + 1)].x,
+             footprint[static_cast<size_t>(i + 1)].y, z1},
+            {0, 0, 1});
+    pushTri({footprint[0].x, footprint[0].y, z0},
+            {footprint[static_cast<size_t>(i + 1)].x,
+             footprint[static_cast<size_t>(i + 1)].y, z0},
+            {footprint[static_cast<size_t>(i)].x,
+             footprint[static_cast<size_t>(i)].y, z0},
+            {0, 0, -1});
+  }
+
+  for (int i = 0; i < n; ++i) {
+    const int j = (i + 1) % n;
+    const glm::vec2 a = footprint[static_cast<size_t>(i)];
+    const glm::vec2 b = footprint[static_cast<size_t>(j)];
+    glm::vec3 edge(b.x - a.x, b.y - a.y, 0.0f);
+    glm::vec3 normal = glm::normalize(glm::cross(edge, glm::vec3(0, 0, 1)));
+    const auto base = static_cast<GLuint>(vertices.size());
+    vertices.push_back({{a.x, a.y, z0}, normal, uv});
+    vertices.push_back({{b.x, b.y, z0}, normal, uv});
+    vertices.push_back({{b.x, b.y, z1}, normal, uv});
+    vertices.push_back({{a.x, a.y, z1}, normal, uv});
+    indices.push_back(base);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
+  }
+}
+
+}  // namespace
+
+Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def) {
+  std::vector<glm::vec2> footprint;
+  tangramFootprint(def, footprint);
+  if (footprint.empty()) return nullptr;
+
+  std::vector<Vertex> vertices;
+  std::vector<GLuint> indices;
+  vertices.reserve(64);
+  indices.reserve(96);
+  appendPrismFaces(vertices, indices, footprint, -0.5f, 0.5f, {0.5f, 0.5f});
+
+  GLuint diffuseTex = makeSolidTexture(def.colorR, def.colorG, def.colorB, 255);
+
+  auto* model = new Model();
+  Material material;
+  material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.shininess = 12.0f;
+  model->materials.push_back(material);
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  return model;
+}
+
+Model* makeTangramPieceMuteModel(const shared::tangram_puzzle::PieceDef& def) {
+  std::vector<glm::vec2> footprint;
+  tangramFootprint(def, footprint);
+  if (footprint.empty()) return nullptr;
+
+  std::vector<Vertex> vertices;
+  std::vector<GLuint> indices;
+  appendPrismFaces(vertices, indices, footprint, -0.5f, 0.5f, {0.5f, 0.5f});
+
+  GLuint diffuseTex = makeSolidTexture(118, 118, 128, 255);
+
+  auto* model = new Model();
+  Material material;
+  material.ambient = {.constant = glm::vec3(0.7f), .texture = diffuseTex};
+  material.diffuse = {.constant = glm::vec3(0.85f), .texture = diffuseTex};
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.shininess = 8.0f;
+  model->materials.push_back(material);
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  return model;
+}
+
+Model* makeTangramColoredGhostSlotModel(
+    const shared::tangram_puzzle::PieceDef& def) {
+  std::vector<glm::vec2> footprint;
+  tangramFootprint(def, footprint);
+  if (footprint.empty()) return nullptr;
+
+  std::vector<Vertex> vertices;
+  std::vector<GLuint> indices;
+  appendPrismFaces(vertices, indices, footprint, -0.5f, 0.5f, {0.5f, 0.5f});
+
+  GLuint diffuseTex =
+      makeSolidTexture(def.colorR, def.colorG, def.colorB, 210);
+
+  auto* model = new Model();
+  Material fillMat;
+  const glm::vec3 tint(def.colorR / 255.0f, def.colorG / 255.0f,
+                       def.colorB / 255.0f);
+  fillMat.ambient = {.constant = tint * 0.65f, .texture = diffuseTex};
+  fillMat.diffuse = {.constant = tint * 0.95f, .texture = diffuseTex};
+  fillMat.specular = {.constant = glm::vec3(0.0f),
+                      .texture = makeSolidTexture(0, 0, 0, 255)};
+  fillMat.emissive = {.constant = tint * 0.28f, .texture = diffuseTex};
+  fillMat.shininess = 4.0f;
+  model->materials.push_back(fillMat);
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  return model;
+}
+
+Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def) {
+  std::vector<glm::vec2> footprint;
+  tangramFootprint(def, footprint);
+  if (footprint.empty()) return nullptr;
+
+  std::vector<Vertex> vertices;
+  std::vector<GLuint> indices;
+  appendPrismFaces(vertices, indices, footprint, -0.5f, 0.5f, {0.5f, 0.5f});
+
+  GLuint diffuseTex = makeSolidTexture(48, 42, 58, 235);
+
+  auto* model = new Model();
+  Material fillMat;
+  fillMat.ambient = {.constant = glm::vec3(0.55f, 0.45f, 0.65f), .texture = diffuseTex};
+  fillMat.diffuse = {.constant = glm::vec3(0.85f, 0.75f, 0.95f), .texture = diffuseTex};
+  fillMat.specular = {.constant = glm::vec3(0.0f),
+                      .texture = makeSolidTexture(0, 0, 0, 255)};
+  fillMat.emissive = {.constant = glm::vec3(0.45f, 0.38f, 0.55f),
+                      .texture = makeSolidTexture(0, 0, 0, 255)};
+  fillMat.shininess = 2.0f;
+  model->materials.push_back(fillMat);
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  return model;
 }
 
 Model* makeCubeModel(const shared::CubeSpec& spec) {

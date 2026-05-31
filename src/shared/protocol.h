@@ -29,5 +29,7 @@ struct InputPacket {
   InputKeys keys;
   float mouseDx;
   float mouseDy;
+  // Network entity id under the screen-center reticle (0 = none).
+  uint32_t rotateTargetId = 0;
 };
 }  // namespace shared

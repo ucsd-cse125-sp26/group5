@@ -5,11 +5,12 @@
 
 #include <enet/enet.h>
 
-#include "server/game/maze_camera.h"
-#include "server/game/maze_trigger.h"
+#include "server/game/puzzles/maze/camera.h"
+#include "server/game/puzzles/maze/trigger.h"
 #include "server/server_game.h"
 #include "shared/components.h"
-#include "shared/maze_preview.h"
+#include "shared/puzzles/maze/layout.h"
+#include "shared/puzzles/maze/defaults.h"
 
 namespace {
 
@@ -70,10 +71,11 @@ TEST(MazeCamera, AllFacingAfterSnapWithFourPlayers) {
 }
 
 TEST(MazeCamera, TriggerRegionMatchesPreviewConstants) {
+  const auto layout = shared::maze_layout::Config::defaults();
   EXPECT_TRUE(maze_trigger::isInsideMazeTriggerRegion(
-      shared::Position{.x = shared::maze_preview::kTriggerCenterX,
-                       .y = shared::maze_preview::kTriggerCenterY}));
+      shared::Position{.x = layout.triggerCenterX, .y = layout.triggerCenterY},
+      layout));
   EXPECT_FALSE(maze_trigger::isInsideMazeTriggerRegion(
-      shared::Position{.x = shared::maze_preview::kBoardCenterX,
-                       .y = shared::maze_preview::kBoardCenterY}));
+      shared::Position{.x = layout.boardCenterX, .y = layout.boardCenterY},
+      layout));
 }

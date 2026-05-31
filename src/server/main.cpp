@@ -6,13 +6,21 @@
 #include <memory>
 #include <thread>
 
-#include "game/maze_trigger.h"
+#include <glm/glm.hpp>
+
+#include "server/game/puzzles/maze/trigger.h"
+#include "server/game/puzzles/maze/camera.h"
+#include "server/game/puzzles/tangram/camera.h"
+#include "server/game/puzzles/tangram/trigger.h"
 #include "game_state.h"
-#include "server/game/overworld_maze_puzzle.h"
+#include "server/game/puzzles/tangram/puzzle.h"
+#include "server/game/puzzles/maze/puzzle.h"
+#include "server/game/puzzles/tangram/roles.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
+#include "shared/dev_spawn.h"
 #include "shared/hello.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
@@ -26,7 +34,8 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
   // only entities whose synced components can change every tick belong here.
   return registry
       .any_of<shared::PlayerInput, shared::Velocity, shared::PointLight,
-              shared::DirectionalLight, shared::Scene>(ent);
+              shared::DirectionalLight, shared::Scene, shared::OverworldTangramPiece>(
+          ent);
 }
 
 }  // namespace
@@ -49,6 +58,13 @@ int main() {
 
   loadLevel(game);
   initWorldEntities(game);
+
+  if (shared::dev_spawn::kOverworldSpawn ==
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    printf("[DevSpawn] Overworld connect spawn: tangram pad\n");
+  } else {
+    printf("[DevSpawn] Overworld connect spawn: winter maze\n");
+  }
 
   // Start in the Overworld
   game.gameStateManager.changeState(game, std::make_unique<OverworldState>());
@@ -78,8 +94,41 @@ int main() {
     if (g.gameStateManager.currentState() &&
         g.gameStateManager.currentState()->getStateType() ==
             StateType::OVERWORLD) {
-      maze_trigger::placeOverworldAvatarInTrigger(g, slots.overworld_avatar,
-                                                  slot);
+      if (g.registry.valid(slots.overworld_avatar) &&
+          g.registry.all_of<shared::Position>(slots.overworld_avatar)) {
+        const glm::vec3 spawn = shared::dev_spawn::overworldSpawnPosition(
+            g.mazeLayout, g.tangramArena, slot);
+        auto& pos = g.registry.get<shared::Position>(slots.overworld_avatar);
+        pos.x = spawn.x;
+        pos.y = spawn.y;
+        pos.z = spawn.z;
+        if (shared::dev_spawn::kOverworldSpawn ==
+            shared::dev_spawn::OverworldSpawn::Tangram) {
+          tangram_camera::snapOverworldAvatarFaceTangramBoard(
+              g, slots.overworld_avatar);
+        } else {
+          maze_camera::snapOverworldAvatarFaceMazePreview(g,
+                                                          slots.overworld_avatar);
+        }
+        tangram_role_server::revertCollisionRoles(g);
+        if (g.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
+          auto& pb = g.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
+          auto& bi = g.physics.getBodyInterface();
+          JPH::BodyID body(pb.bodyId);
+          if (!bi.IsAdded(body)) {
+            bi.AddBody(body, JPH::EActivation::Activate);
+          }
+          bi.SetPosition(body, JPH::RVec3(pos.x, pos.y, pos.z),
+                         JPH::EActivation::Activate);
+          bi.SetLinearVelocity(body, JPH::Vec3::sZero());
+          bi.SetAngularVelocity(body, JPH::Vec3::sZero());
+        }
+        auto buf =
+            serializeEntities(g.registry, g.componentRegistry,
+                              shared::PacketType::UPDATE_ENTITY,
+                              {slots.overworld_avatar}, false);
+        net::sendRaw(peer, buf.data(), buf.size());
+      }
     }
 
     auto* currentState = g.gameStateManager.currentState();
@@ -134,6 +183,15 @@ int main() {
       }
     }
     slots.resetControls(g.registry);
+    if (g.registry.valid(slots.overworld_avatar) &&
+        g.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
+      auto& pb = g.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
+      JPH::BodyID body(pb.bodyId);
+      auto& bi = g.physics.getBodyInterface();
+      if (bi.IsAdded(body)) {
+        bi.RemoveBody(body);
+      }
+    }
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
     if (g.active_players.empty()) {
@@ -175,7 +233,15 @@ int main() {
         pos.z = jp.GetZ();
 
         if (game.registry.all_of<shared::OverworldMazePiece>(ent)) {
-          overworld_maze_puzzle::clampPieceToBoard(game);
+          maze_puzzle::clampPieceToBoard(game);
+        }
+        if (game.registry.all_of<shared::OverworldTangramPiece>(ent)) {
+          tangram_puzzle::clampPieceToArena(game, ent);
+          JPH::Vec3 v = bi.GetLinearVelocity(id);
+          constexpr float kStopEps = 0.045f;
+          if (v.LengthSq() < kStopEps * kStopEps) {
+            bi.SetLinearVelocity(id, JPH::Vec3::sZero());
+          }
         }
         if (game.registry.all_of<shared::MazeSpiritGrid>(ent)) {
           constexpr float kMazeTileSpacing = 1.5f;
@@ -218,7 +284,10 @@ int main() {
           pos.qz = jr.GetZ();
         }
       }
-      overworld_maze_puzzle::tryCompleteOnGoal(game);
+      if (game.overworldTangramActive) {
+        tangram_puzzle::clampPlayersToPlayArena(game);
+      }
+      maze_puzzle::tryCompleteOnGoal(game);
       accumulator -= fixedDt;
 
       SIMPLE_PROFILE_SCOPE("Broadcast State");

@@ -22,3 +22,7 @@ constexpr InputKeys KEY_SPIRIT_DOWN = 1 << 14;
 constexpr InputKeys KEY_SPIRIT_LEFT = 1 << 15;
 constexpr InputKeys KEY_SPIRIT_RIGHT = 1 << 16;
 constexpr InputKeys KEY_MAZE_COLLECT = 1 << 17;
+// Tangram: rotate nearest piece (R key).
+constexpr InputKeys KEY_ROTATE_PIECE = 1 << 18;
+// Debug: print current player position (G key).
+constexpr InputKeys KEY_DEBUG_PRINT_POS = 1 << 19;

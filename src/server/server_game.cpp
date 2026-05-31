@@ -8,9 +8,11 @@
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include "server/game/puzzles/maze/layout_editor.h"
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/puzzles/maze/layout.h"
 #include "shared/simple_profiler.h"
 
 constexpr float kHeldKeyScaleFactor = 1.1f;
@@ -98,7 +100,7 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     if (input.keys & KEY_RIGHT) strafeInput += 1.0f;
     if (input.keys & KEY_LEFT) strafeInput -= 1.0f;
 
-    const float speed = 10.0f;
+    const float speed = game.overworldTangramActive ? 4.0f : 10.0f;
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 
@@ -324,7 +326,9 @@ void registerServerHandlers(ServerNetwork& network) {
         playerInput.keys = pkt.keys;
         playerInput.mouseDx += pkt.mouseDx;
         playerInput.mouseDy += pkt.mouseDy;
+        playerInput.rotateTargetId = pkt.rotateTargetId;
       });
+
 }
 
 // ── Entity serialization ─────────────────────────────────

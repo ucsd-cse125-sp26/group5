@@ -1,6 +1,7 @@
 #pragma once
 #include <enet/enet.h>
 
+#include <array>
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
@@ -10,7 +11,10 @@
 #include "game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
+#include "shared/puzzles/maze/layout.h"
 #include "shared/protocol.h"
+#include "shared/puzzles/tangram/slot_layout.h"
+#include "shared/puzzles/tangram/arena_layout.h"
 class ServerNetwork;
 
 struct PlayerAvatars {
@@ -26,6 +30,7 @@ struct PlayerAvatars {
         input.keys_newly_pressed = 0;
         input.mouseDx = 0.0f;
         input.mouseDy = 0.0f;
+        input.rotateTargetId = 0;
       }
       if (registry.all_of<shared::Velocity>(avatar)) {
         auto& velocity = registry.get<shared::Velocity>(avatar);
@@ -81,6 +86,20 @@ struct ServerGame {
   int overworldMazeGoalTileX = 0;
   int overworldMazeGoalTileY = 0;
   bool overworldMazeReachGoalPending = false;
+
+  shared::maze_layout::Config mazeLayout = shared::maze_layout::Config::defaults();
+
+  // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
+  bool overworldTangramActive = false;
+  bool overworldTangramTriggerArmed = true;
+  float overworldTangramFocusTimer = 0.0f;
+  entt::entity overworldTangramController = entt::null;
+  std::array<entt::entity, 7> overworldFallFragmentEntities{};
+  std::array<entt::entity, 7> overworldTangramGhostSlotEntities{};
+  std::array<glm::vec2, 7> overworldFallFragmentSpawnXZ{};
+  shared::tangram::ArenaLayout tangramArena =
+      shared::tangram::ArenaLayout::defaults();
+  shared::tangram_slot::Config tangramSlotLayout{};
 };
 
 // Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,
