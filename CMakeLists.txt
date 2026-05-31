@@ -103,6 +103,7 @@ add_library(soloud STATIC
     lib/soloud/src/audiosource/wav/stb_vorbis.c
 )
 target_include_directories(soloud PUBLIC lib/soloud/include)
+target_compile_options(soloud PRIVATE -Wno-deprecated-declarations -Wno-tautological-compare)
 
 target_compile_definitions(soloud PUBLIC 
     WITH_MINIAUDIO 
