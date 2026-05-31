@@ -14,6 +14,7 @@
 
 struct GLFWwindow;
 struct GLFWmonitor;
+class ClientNetwork;
 
 struct CameraState {
   glm::vec3 position;
@@ -128,7 +129,7 @@ struct Graphics {
   GLuint cameraUBO = 0;
 
   bool load(int width, int height);
-  void render(ClientGame& game);
+  void render(ClientGame& game, ClientNetwork& network);
   void swap();
   ~Graphics();
 

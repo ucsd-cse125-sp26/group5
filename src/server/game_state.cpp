@@ -4,22 +4,31 @@
 #include <memory>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 #include "game/maze.h"
-#include "game/maze_camera.h"
+#include "server/game/puzzles/maze/camera.h"
 #include "game/maze_generation.h"
-#include "game/maze_trigger.h"
+#include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/trigger.h"
 #include "game/overworld.h"
-#include "game/overworld_maze_puzzle.h"
+#include "server/game/puzzles/maze/puzzle.h"
+#include "server/game/puzzles/tangram/puzzle.h"
+#include "server/game/puzzles/tangram/layout_editor.h"
+#include "server/game/puzzles/tangram/trigger.h"
+#include "server/game/puzzles/tangram/camera.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
+#include "shared/dev_spawn.h"
 #include "shared/lighting.h"
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/input.h"
 #include "shared/util.h"
 
 // ── GameStateManager ─────────────────────────────────────
@@ -95,6 +104,7 @@ static void clearTaggedPlayerControls(ServerGame& game) {
     input.keys_newly_pressed = 0;
     input.mouseDx = 0.0f;
     input.mouseDy = 0.0f;
+    input.rotateTargetId = 0;
 
     if (game.registry.all_of<shared::Velocity>(ent)) {
       auto& velocity = game.registry.get<shared::Velocity>(ent);
@@ -110,6 +120,12 @@ static void addPhysicsBodies(ServerGame& game) {
   auto view = game.registry.view<Tag, shared::PhysicsBody>();
   auto& bodyInterface = game.physics.getBodyInterface();
   for (auto ent : view) {
+    // Unassigned pool avatars (playerSlot==0) stay out of the sim until connect.
+    if (game.registry.all_of<shared::PlayerInput, shared::RenderInfo>(ent)) {
+      const uint8_t slot =
+          game.registry.get<shared::RenderInfo>(ent).playerSlot;
+      if (slot == 0) continue;
+    }
     auto& phys = view.template get<shared::PhysicsBody>(ent);
     JPH::BodyID bodyId(phys.bodyId);
     if (!bodyInterface.IsAdded(bodyId)) {
@@ -128,6 +144,24 @@ static void removePhysicsBodies(ServerGame& game) {
     if (bodyInterface.IsAdded(bodyId)) {
       bodyInterface.RemoveBody(bodyId);
     }
+  }
+}
+
+static void debugPrintRequestedPlayerPosition(ServerGame& game) {
+  auto view =
+      game.registry.view<shared::OverworldTag, shared::PlayerInput,
+                         shared::Position, shared::RenderInfo>();
+  for (auto ent : view) {
+    const auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if ((input.keys_newly_pressed & KEY_DEBUG_PRINT_POS) == 0) continue;
+
+    const auto& pos = game.registry.get<shared::Position>(ent);
+    const auto& ri = game.registry.get<shared::RenderInfo>(ent);
+    printf(
+        "[DebugPos] slot=%u player=(%.3f, %.3f, %.3f) "
+        "maze_board_suggest=(%.3f, %.3f, %.3f)\n",
+        static_cast<unsigned>(ri.playerSlot), pos.x, pos.y, pos.z, pos.x, pos.y,
+        pos.z);
   }
 }
 
@@ -233,71 +267,12 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
   return entities;
 }
 
-std::vector<StaticEntityDesc> buildOverworldMazePreviewEntities() {
-  const GeneratedMazeData data = buildGeneratedMazeData();
-  constexpr glm::vec3 kPreviewCenter =
-      glm::vec3(shared::maze_preview::kCenterX, shared::maze_preview::kCenterY,
-                shared::maze_preview::kCenterZ);
-  constexpr float kPreviewTileSpacing = 0.18f;
-  constexpr float kFloorDepthOffset = -0.20f;
-  // Walls protrude along board normal (+Y) so they read as white barriers.
-  constexpr float kWallDepthOffset = -0.04f;
-  constexpr glm::vec3 kFloorScale = glm::vec3(0.18f, 0.02f, 0.18f);
-  constexpr glm::vec3 kWallScale = glm::vec3(0.18f, 0.30f, 0.18f);
-  constexpr float kMarkerDepthOffset = -0.30f;
-  constexpr glm::vec3 kGoalMarkerScale = glm::vec3(0.28f, 0.16f, 0.28f);
-
-  const float xOffset = (static_cast<float>(data.tileGrid.width) - 1.0f) * 0.5f;
-  const float yOffset =
-      (static_cast<float>(data.tileGrid.height) - 1.0f) * 0.5f;
-
-  auto previewPosition = [&](int x, int y, float yOffsetFromBoard) {
-    return glm::vec3(kPreviewCenter.x + (static_cast<float>(x) - xOffset) *
-                                            kPreviewTileSpacing,
-                     kPreviewCenter.y + yOffsetFromBoard,
-                     kPreviewCenter.z + (yOffset - static_cast<float>(y)) *
-                                            kPreviewTileSpacing);
-  };
-
-  std::vector<StaticEntityDesc> entities;
-
-  for (int y = 0; y < data.tileGrid.height; ++y) {
-    for (int x = 0; x < data.tileGrid.width; ++x) {
-      const bool isWall = data.tileGrid.Tile(x, y) == maze::MazeTile::Wall;
-
-      if (isWall) {
-        entities.push_back(StaticEntityDesc{
-            .position = previewPosition(x, y, kWallDepthOffset),
-            .modelName = "light_cube",
-            .scale = kWallScale,
-        });
-      } else {
-        entities.push_back(StaticEntityDesc{
-            .position = previewPosition(x, y, kFloorDepthOffset),
-            .modelName = "cube",
-            .scale = kFloorScale,
-        });
-      }
-    }
-  }
-
-  const int goalTileX = data.layout.goalX * 2 + 1;
-  const int goalTileY = data.layout.goalY * 2 + 1;
-  entities.push_back(StaticEntityDesc{
-      .position = previewPosition(goalTileX, goalTileY, kMarkerDepthOffset),
-      .modelName = "goal_cube",
-      .scale = kGoalMarkerScale,
-      .collision = CollisionShape::None,
-  });
-
-  return entities;
-}
-
 }  // namespace
 
 void initWorldEntities(ServerGame& game) {
   // --- Overworld ---
   spawnDemoLight<shared::OverworldTag>(game, "sunny");
+  game.tangramArena = shared::tangram::ArenaLayout::defaults();
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
@@ -326,11 +301,10 @@ void initWorldEntities(ServerGame& game) {
                                  .scale = glm::vec3(0.5f),
                                  .collision = CollisionShape::Mesh},
             });
-  spawnStaticEntities<shared::OverworldTag>(
-      game, buildOverworldMazePreviewEntities());
-  spawnStaticEntities<shared::OverworldTag>(
-      game, maze_trigger::buildMazeTriggerMarkerEntities());
-  overworld_maze_puzzle::initOverworldMazePuzzleController(game);
+  maze_puzzle::initOverworldMazePuzzleController(game);
+  maze_layout_editor::spawnLayoutVisuals(game);
+  tangram_puzzle::initController(game);
+  tangram_layout_editor::spawnLayoutVisuals(game);
 
   // --- Maze ---
   spawnDemoLight<shared::MazeTag>(game, "night");
@@ -344,13 +318,15 @@ void initWorldEntities(ServerGame& game) {
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
         game, overworldEntity, "cube",
-        maze_trigger::overworldSpawnPosition(slot), glm::vec3(1.0f));
-    game.registry.get<shared::RenderInfo>(overworldEntity).playerSlot = slot;
+        shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
+                                                  game.tangramArena, slot),
+        glm::vec3(1.0f));
+    game.registry.get<shared::RenderInfo>(overworldEntity).playerSlot = 0;
     slots.overworld_avatar = overworldEntity;
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
     spawnPlayerAvatar<shared::MazeTag>(
-        game, mazeEntity, "bear", maze_trigger::overworldSpawnPosition(slot),
+        game, mazeEntity, "bear", maze_trigger::overworldSpawnPosition(game, slot),
         glm::vec3(0.5f));
     slots.maze_avatar = mazeEntity;
 
@@ -403,8 +379,29 @@ void OverworldState::onEnter(ServerGame& game) {
                  .playerSlot;
       if (slot < 1 || slot > 4) slot = 1;
     }
-    maze_trigger::placeOverworldAvatarInTrigger(game, slots.overworld_avatar,
-                                                slot);
+    if (game.registry.valid(slots.overworld_avatar) &&
+        game.registry.all_of<shared::Position>(slots.overworld_avatar)) {
+      const glm::vec3 spawn = shared::dev_spawn::overworldSpawnPosition(
+          game.mazeLayout, game.tangramArena, slot);
+      auto& pos = game.registry.get<shared::Position>(slots.overworld_avatar);
+      pos.x = spawn.x;
+      pos.y = spawn.y;
+      pos.z = spawn.z;
+      if (game.registry.all_of<shared::Velocity>(slots.overworld_avatar)) {
+        auto& vel = game.registry.get<shared::Velocity>(slots.overworld_avatar);
+        vel.dx = vel.dy = vel.dz = 0.0f;
+      }
+      if (game.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
+        auto& pb = game.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
+        auto& bi = game.physics.getBodyInterface();
+        JPH::BodyID body(pb.bodyId);
+        if (bi.IsAdded(body)) {
+          bi.SetPosition(body, JPH::RVec3(pos.x, pos.y, pos.z),
+                         JPH::EActivation::Activate);
+          bi.SetLinearVelocity(body, JPH::Vec3::sZero());
+        }
+      }
+    }
   }
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
@@ -412,8 +409,11 @@ void OverworldState::onEnter(ServerGame& game) {
 
 void OverworldState::onExit(ServerGame& game) {
   printf("[State] Exiting Overworld\n");
-  if (overworld_maze_puzzle::isPuzzleActive(game)) {
-    overworld_maze_puzzle::endPuzzle(game);
+  if (maze_puzzle::isPuzzleActive(game)) {
+    maze_puzzle::endPuzzle(game);
+  }
+  if (tangram_puzzle::isPuzzleActive(game)) {
+    tangram_puzzle::endPuzzle(game);
   }
   removePhysicsBodies<shared::OverworldTag>(game);
   clearTaggedPlayerControls<shared::OverworldTag>(game);
@@ -431,9 +431,22 @@ std::vector<entt::entity> OverworldState::getStateEntities(
 
 void OverworldState::update(ServerGame& game, float dt) {
   input_tick(game.registry);
+  debugPrintRequestedPlayerPosition(game);
 
-  if (overworld_maze_puzzle::isPuzzleActive(game)) {
-    overworld_maze_puzzle::updatePuzzle(game, dt);
+  if (tangram_puzzle::isPuzzleActive(game)) {
+    tangram_trigger::keepPlayersOnTangramPlatform(game);
+    movement_system(game, dt, StateType::OVERWORLD);
+    tangram_puzzle::updatePuzzle(game, dt);
+    render_model_change(game, dt);
+    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
+    if (lightId != kInvalidEntityId)
+      hardcoded_spinning_light(game.registry, dt, lightId);
+    scene_cycle_system(game.registry, StateType::OVERWORLD);
+    return;
+  }
+
+  if (maze_puzzle::isPuzzleActive(game)) {
+    maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
     uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
@@ -443,18 +456,36 @@ void OverworldState::update(ServerGame& game, float dt) {
     return;
   }
 
+  if (tangram_trigger::canTriggerTangram(game)) {
+    const bool allInTypingTrigger =
+        tangram_trigger::allActivePlayersInTangramTrigger(game);
+    if (!allInTypingTrigger) {
+      game.overworldTangramTriggerArmed = true;
+      game.overworldTangramFocusTimer = 0.0f;
+    } else if (game.overworldTangramTriggerArmed) {
+      tangram_camera::snapOverworldAvatarsFaceTangramBoard(game);
+      game.overworldTangramFocusTimer += dt;
+      if (game.overworldTangramFocusTimer >= tangram_camera::kFocusHoldSeconds) {
+        game.overworldTangramTriggerArmed = false;
+        game.overworldTangramFocusTimer = 0.0f;
+        tangram_puzzle::beginPuzzle(game);
+        return;
+      }
+    }
+  }
+
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {
     game.overworldMazeTriggerArmed = true;
     game.overworldMazeFocusTimer = 0.0f;
-  } else if (game.overworldMazeTriggerArmed) {
+  } else if (game.overworldMazeTriggerArmed &&
+             maze_trigger::canTriggerMaze(game)) {
     maze_camera::snapOverworldAvatarsFaceMazePreview(game);
     game.overworldMazeFocusTimer += dt;
-    if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds &&
-        maze_camera::allOverworldAvatarsFacingMazePreview(game)) {
+    if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds) {
       game.overworldMazeTriggerArmed = false;
       game.overworldMazeFocusTimer = 0.0f;
-      overworld_maze_puzzle::beginPuzzle(game);
+      maze_puzzle::beginPuzzle(game);
       return;
     }
   }

@@ -22,6 +22,8 @@ struct StaticEntityDesc {
   std::string modelName;  // "" → no visual entity
   glm::vec3 scale{1.0f, 1.0f, 1.0f};
   CollisionShape collision = CollisionShape::Box;
+  /// If >= 0, applied to static Jolt body (higher = grippier tangram platform).
+  float staticFriction = -1.0f;
 };
 
 template <typename WorldTag>
@@ -57,7 +59,8 @@ void spawnStaticEntities(ServerGame& game,
     if (!shape) continue;
 
     JPH::BodyID bodyId =
-        game.physics.createStaticBody(shape, d.position, d.rotation);
+        game.physics.createStaticBody(shape, d.position, d.rotation,
+                                      d.staticFriction);
     game.registry.template emplace<shared::PhysicsBody>(
         entity, bodyId.GetIndexAndSequenceNumber());
   }

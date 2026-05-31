@@ -69,6 +69,15 @@ add_executable(overworld_maze_puzzle_tests
     overworld_maze_puzzle_tests.cpp
 )
 
+add_executable(tangram_layout_tests
+    tangram_layout_tests.cpp
+)
+
+target_link_libraries(tangram_layout_tests PRIVATE
+    GTest::gtest_main
+    shared
+)
+
 target_link_libraries(overworld_logic_tests PRIVATE
     GTest::gtest_main
     server_lib
@@ -89,3 +98,4 @@ gtest_discover_tests(maze_spirit_control_tests)
 gtest_discover_tests(maze_logic_tests)
 gtest_discover_tests(overworld_logic_tests)
 gtest_discover_tests(overworld_maze_puzzle_tests)
+gtest_discover_tests(tangram_layout_tests)

@@ -56,12 +56,12 @@ SeasonColorBounds boundsForSeason(shared::SectionSeasonMap season) {
                                .maxZ = kMaxZ};
   }
 
-  // Stage 0 (Default): Start Area Only
+  // Stage 0 (Default): Winter spawn + preview board on the mountain.
   return SeasonColorBounds{.minX = 40.0f,
-                           .minY = 25.0f,
+                           .minY = 10.0f,
                            .minZ = kMinZ,
                            .maxX = 90.0f,
-                           .maxY = 55.0f,
+                           .maxY = 105.0f,
                            .maxZ = kMaxZ};
 }
 

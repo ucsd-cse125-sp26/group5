@@ -32,6 +32,44 @@ inline constexpr CubeSpec CUBE_WHITE_EMISSIVE = {
     .emissive = {255, 255, 255, 255},
 };
 
+// Tangram pieces — bright fall palette (matte).
+// Match tangram_puzzle_data.h swan reference colors.
+inline constexpr CubeSpec CUBE_TANGRAM_1 = {
+    .palette = {{235, 145, 55, 255}, {235, 145, 55, 255}, {235, 145, 55, 255},
+                {235, 145, 55, 255}, {235, 145, 55, 255}, {235, 145, 55, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_2 = {
+    .palette = {{58, 118, 195, 255}, {58, 118, 195, 255}, {58, 118, 195, 255},
+                {58, 118, 195, 255}, {58, 118, 195, 255}, {58, 118, 195, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_3 = {
+    .palette = {{235, 130, 155, 255}, {235, 130, 155, 255}, {235, 130, 155, 255},
+                {235, 130, 155, 255}, {235, 130, 155, 255}, {235, 130, 155, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_4 = {
+    .palette = {{195, 65, 75, 255},  {195, 65, 75, 255},  {195, 65, 75, 255},
+                {195, 65, 75, 255},  {195, 65, 75, 255},  {195, 65, 75, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_5 = {
+    .palette = {{145, 95, 185, 255}, {145, 95, 185, 255}, {145, 95, 185, 255},
+                {145, 95, 185, 255}, {145, 95, 185, 255}, {145, 95, 185, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_6 = {
+    .palette = {{75, 165, 95, 255},  {75, 165, 95, 255},  {75, 165, 95, 255},
+                {75, 165, 95, 255},  {75, 165, 95, 255},  {75, 165, 95, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_7 = {
+    .palette = {{238, 205, 55, 255}, {238, 205, 55, 255}, {238, 205, 55, 255},
+                {238, 205, 55, 255}, {238, 205, 55, 255}, {238, 205, 55, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+
 inline constexpr CubeSpec CUBE_START_MARKER = {
     .palette = {{40, 210, 90, 255},
                 {40, 210, 90, 255},
@@ -88,6 +126,34 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_GOAL_MARKER},
+    {.name = "tangram_1",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_1},
+    {.name = "tangram_2",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_2},
+    {.name = "tangram_3",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_3},
+    {.name = "tangram_4",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_4},
+    {.name = "tangram_5",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_5},
+    {.name = "tangram_6",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_6},
+    {.name = "tangram_7",
+     .filename = "",
+     .qw = 1.0f, .qx = 0.0f, .qy = 0.0f, .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_7},
     {.name = "bear",
      .filename = "assets/bear/bear_full.obj",
      .qw = 0.0f,

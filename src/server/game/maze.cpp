@@ -107,9 +107,7 @@ void EnterMazePuzzle(ServerGame& game) {
     return;
 
   auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
-  if (puzzle.phase == shared::RunPhase::LOBBY) {
-    puzzle.phase = shared::RunPhase::INPROGRESS;
-  }
+  puzzle.phase = shared::RunPhase::INPROGRESS;
 
   for (auto e : game.registry.view<shared::RunState>()) {
     auto& run = game.registry.get<shared::RunState>(e);
