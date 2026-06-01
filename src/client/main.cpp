@@ -58,10 +58,14 @@ int main() {
   game.mazeLayout.applyHeightBoost();
   game.tangramArena.applyHeightBoost();
 
+  // if (!game.audio.init()) {
+  //   game.running.store(false, std::memory_order_release);
+  //   networkThread.join();
+  //   return EXIT_FAILURE;
+  // }
+
   if (!game.audio.init()) {
-    game.running.store(false, std::memory_order_release);
-    networkThread.join();
-    return EXIT_FAILURE;
+    printf("Audio init failed; continuing without audio\n");
   }
 
   if (shared::dev_spawn::kOverworldSpawn ==

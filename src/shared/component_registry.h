@@ -99,6 +99,7 @@ enum ComponentIds : ComponentTypeId {
   CID_SOUNDEMITTER = 13,
   CID_OVERWORLD_TANGRAM_PUZZLE = 14,
   CID_TANGRAM_PIECE = 15,
+  CID_FALL_CHALLENGE = 16,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -151,6 +152,9 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_TANGRAM_PIECE:
         dst.remove<TangramPiece>(entity);
+        break;
+      case CID_FALL_CHALLENGE:
+        dst.remove<FallChallengeState>(entity);
         break;
     }
   };
@@ -257,6 +261,7 @@ inline ComponentRegistry createDefaultRegistry() {
   // the first-person camera to (avoids fingerprinting by mesh+scale, which
   // collides with overworld decoration cubes that happen to share a scale).
   reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
+  reg.registerComponent<FallChallengeState>(CID_FALL_CHALLENGE);
   return reg;
 }
 
