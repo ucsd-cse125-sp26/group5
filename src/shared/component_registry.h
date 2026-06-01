@@ -97,6 +97,7 @@ enum ComponentIds : ComponentTypeId {
   CID_ANIMATIONSTATE = 11,
   CID_MAZESPIRITGRID = 12,
   CID_SOUNDEMITTER = 13,
+  CID_FALL_CHALLENGE = 14,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -247,6 +248,7 @@ inline ComponentRegistry createDefaultRegistry() {
   // the first-person camera to (avoids fingerprinting by mesh+scale, which
   // collides with overworld decoration cubes that happen to share a scale).
   reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
+  reg.registerComponent<FallChallengeState>(CID_FALL_CHALLENGE);
   return reg;
 }
 
