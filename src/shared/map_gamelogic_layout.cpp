@@ -263,8 +263,8 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
     printf("[MapGamelogic] tangram slots: only %d/7 empties — ignoring map "
            "(need all spring_tangram_slot_1..7 or none)\n",
            found);
-    for (int i = 0; i < 7; ++i) {
-      layout.slots[i] = {};
+    for (auto& slot : layout.slots) {
+      slot = {};
     }
     layout.anyFromMap = false;
     return false;
@@ -279,8 +279,8 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
       shared::tangram_slot_validate::slotPosesOverlap(loaded)) {
     printf("[MapGamelogic] tangram slots overlap in map — ignoring map layout "
            "(fix empty positions or remove spring_tangram_slot_*)\n");
-    for (int i = 0; i < 7; ++i) {
-      layout.slots[i] = {};
+    for (auto& slot : layout.slots) {
+      slot = {};
     }
     layout.anyFromMap = false;
     return false;

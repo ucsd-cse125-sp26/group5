@@ -102,7 +102,6 @@ void snapAllPlayersToTangramPad(ServerGame& game) {
 
 void keepPlayersOnTangramPlatform(ServerGame& game) {
   const shared::tangram::ArenaLayout& layout = game.tangramArena;
-  const float topZ = layout.platformTopZ();
   const float minZ = layout.spawnHeightZ;
   const float hx = layout.platformScaleX * 0.5f + 1.5f;
   const float hy = layout.platformScaleY * 0.5f + 1.5f;

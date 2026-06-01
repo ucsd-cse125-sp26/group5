@@ -398,11 +398,11 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
 }
 
 static bool isTangramGhostModelName(const std::string& name) {
-  return name.size() > 14 && name.compare(0, 14, "tangram_ghost_") == 0;
+  return name.size() > 14 && name.starts_with("tangram_ghost_");
 }
 
 static bool isTangramPlayPieceModelName(const std::string& name) {
-  return name.size() > 8 && name.compare(0, 8, "tangram_") == 0 &&
+  return name.size() > 8 && name.starts_with("tangram_") &&
          !isTangramGhostModelName(name);
 }
 
@@ -776,8 +776,7 @@ bool Graphics::load(int width, int height) {
     }
   }
 
-  for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
-    const auto& def = shared::tangram_puzzle::kPieces[i];
+  for (const auto& def : shared::tangram_puzzle::kPieces) {
     Model* m = makeTangramPieceModel(def);
     if (m) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <numbers>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -68,97 +69,20 @@ struct PieceDef {
 // slots leave walk/push gaps (~0.45m) while keeping the swan silhouette.
 // SAT-verified: no footprint overlap (tangram_slot_validate.h).
 inline constexpr PieceDef kPieces[kPieceCount] = {
-    {1,
-     "tangram_1",
-     "Orange wing",
-     PieceShape::LargeTriangle,
-     2.112f,
-     2.112f,
-     kPieceThickness,
-     -2.25f,
-     -0.15f,
-     2.3561945f,
-     235,
-     145,
-     55},
-    {2,
-     "tangram_2",
-     "Blue base",
-     PieceShape::LargeTriangle,
-     2.112f,
-     2.112f,
-     kPieceThickness,
-     -0.10f,
-     -2.29f,
-     1.5707963f,
-     58,
-     118,
-     195},
-    {3,
-     "tangram_3",
-     "Pink body",
-     PieceShape::MediumTriangle,
-     1.496f,
-     1.496f,
-     kPieceThickness,
-     1.26f,
-     -0.73f,
-     4.71238898f,
-     235,
-     130,
-     155},
-    {4,
-     "tangram_4",
-     "Red tail",
-     PieceShape::SmallTriangle,
-     1.056f,
-     1.056f,
-     kPieceThickness,
-     1.46f,
-     0.44f,
-     3.92699082f,
-     195,
-     65,
-     75},
-    {5,
-     "tangram_5",
-     "Purple head",
-     PieceShape::SmallTriangle,
-     1.056f,
-     1.056f,
-     kPieceThickness,
-     1.85f,
-     2.19f,
-     3.14159265f,
-     145,
-     95,
-     185},
-    {6,
-     "tangram_6",
-     "Green chest",
-     PieceShape::Square,
-     0.924f,
-     0.924f,
-     kPieceThickness,
-     -0.10f,
-     1.22f,
-     0.78539816f,
-     75,
-     165,
-     95},
-    {7,
-     "tangram_7",
-     "Yellow neck",
-     PieceShape::Parallelogram,
-     1.144f,
-     1.672f,
-     kPieceThickness,
-     0.29f,
-     2.78f,
-     1.5707963f,
-     238,
-     205,
-     55},
+    {1, "tangram_1", "Orange wing", PieceShape::LargeTriangle, 2.112f, 2.112f,
+     kPieceThickness, -2.25f, -0.15f, 2.3561945f, 235, 145, 55},
+    {2, "tangram_2", "Blue base", PieceShape::LargeTriangle, 2.112f, 2.112f,
+     kPieceThickness, -0.10f, -2.29f, 1.5707963f, 58, 118, 195},
+    {3, "tangram_3", "Pink body", PieceShape::MediumTriangle, 1.496f, 1.496f,
+     kPieceThickness, 1.26f, -0.73f, 4.71238898f, 235, 130, 155},
+    {4, "tangram_4", "Red tail", PieceShape::SmallTriangle, 1.056f, 1.056f,
+     kPieceThickness, 1.46f, 0.44f, 3.92699082f, 195, 65, 75},
+    {5, "tangram_5", "Purple head", PieceShape::SmallTriangle, 1.056f, 1.056f,
+     kPieceThickness, 1.85f, 2.19f, std::numbers::pi_v<float>, 145, 95, 185},
+    {6, "tangram_6", "Green chest", PieceShape::Square, 0.924f, 0.924f,
+     kPieceThickness, -0.10f, 1.22f, 0.78539816f, 75, 165, 95},
+    {7, "tangram_7", "Yellow neck", PieceShape::Parallelogram, 1.144f, 1.672f,
+     kPieceThickness, 0.29f, 2.78f, 1.5707963f, 238, 205, 55},
 };
 
 [[nodiscard]] inline const PieceDef* pieceDefForId(uint8_t id) {
@@ -189,9 +113,8 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
                                                    float boardCenterX,
                                                    float boardCenterY,
                                                    float platformTopZ) {
-  return glm::vec3(
-      boardCenterX + def.targetRelX, boardCenterY + def.targetRelY,
-      platformTopZ + kGhostSlotThickness * 0.5f + 0.02f);
+  return {boardCenterX + def.targetRelX, boardCenterY + def.targetRelY,
+          platformTopZ + kGhostSlotThickness * 0.5f + 0.02f};
 }
 
 [[nodiscard]] inline glm::vec3 targetWorldPosition(const PieceDef& def) {
@@ -205,9 +128,9 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
 }
 
 [[nodiscard]] inline glm::vec3 slotSnapWorldPosition(const PieceDef& def) {
-  return glm::vec3(shared::tangram_defaults::kPuzzleCenterX + def.targetRelX,
-                   shared::tangram_defaults::kPuzzleCenterY + def.targetRelY,
-                   shared::tangram_defaults::pieceSurfaceZ(def.scaleZ));
+  return {shared::tangram_defaults::kPuzzleCenterX + def.targetRelX,
+          shared::tangram_defaults::kPuzzleCenterY + def.targetRelY,
+          shared::tangram_defaults::pieceSurfaceZ(def.scaleZ)};
 }
 
 [[nodiscard]] inline bool isInsideShapeGoalZone(float x, float y, float centerX,
@@ -222,7 +145,7 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
 }
 
 [[nodiscard]] inline float normalizeYawRad(float yaw) {
-  constexpr float kPi = 3.14159265f;
+  constexpr float kPi = std::numbers::pi_v<float>;
   constexpr float kTwoPi = kPi * 2.0f;
   yaw = std::fmod(yaw + kPi, kTwoPi);
   if (yaw < 0.0f) yaw += kTwoPi;
