@@ -11,10 +11,10 @@
 #include "game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
-#include "shared/puzzles/maze/layout.h"
 #include "shared/protocol.h"
-#include "shared/puzzles/tangram/slot_layout.h"
+#include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
+#include "shared/puzzles/tangram/slot_layout.h"
 class ServerNetwork;
 
 struct PlayerAvatars {
@@ -87,7 +87,8 @@ struct ServerGame {
   int overworldMazeGoalTileY = 0;
   bool overworldMazeReachGoalPending = false;
 
-  shared::maze_layout::Config mazeLayout = shared::maze_layout::Config::defaults();
+  shared::maze_layout::Config mazeLayout =
+      shared::maze_layout::Config::defaults();
 
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
   bool overworldTangramActive = false;

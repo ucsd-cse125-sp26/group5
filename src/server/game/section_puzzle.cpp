@@ -6,7 +6,7 @@
 namespace section_puzzle {
 
 entt::entity findSection(const ServerGame& game,
-                        shared::SectionSeasonMap season) {
+                         shared::SectionSeasonMap season) {
   auto view = game.registry.view<shared::SectionController>();
   for (auto ent : view) {
     if (view.get<shared::SectionController>(ent).type == season) return ent;
@@ -27,7 +27,8 @@ entt::entity findPuzzleForSection(const ServerGame& game,
   return entt::null;
 }
 
-bool isSectionUnlocked(const ServerGame& game, shared::SectionSeasonMap season) {
+bool isSectionUnlocked(const ServerGame& game,
+                       shared::SectionSeasonMap season) {
   const entt::entity section = findSection(game, season);
   if (section == entt::null) return false;
   return game.registry.get<shared::SectionController>(section).unlocked;

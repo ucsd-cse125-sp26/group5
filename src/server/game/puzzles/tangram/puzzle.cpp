@@ -1,32 +1,31 @@
 #include "server/game/puzzles/tangram/puzzle.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <random>
-#include <vector>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 
-#include "server/game/section_puzzle.h"
-#include "server/game/puzzles/tangram/roles.h"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdio>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <random>
+#include <vector>
+
 #include "server/game/puzzles/maze/trigger.h"
+#include "server/game/puzzles/tangram/roles.h"
 #include "server/game/puzzles/tangram/trigger.h"
-#include "shared/puzzles/tangram/roles.h"
+#include "server/game/section_puzzle.h"
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
-#include "shared/puzzles/tangram/puzzle_data.h"
-#include "shared/puzzles/tangram/slot_validate.h"
 #include "shared/puzzles/tangram/defaults.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
+#include "shared/puzzles/tangram/roles.h"
+#include "shared/puzzles/tangram/slot_validate.h"
 
 namespace {
 
@@ -44,19 +43,16 @@ PlatformBounds fullPlatformBounds(const ServerGame& game, float inset = 0.5f) {
   const float hx = L.platformScaleX * 0.5f - inset;
   const float hy = L.platformScaleY * 0.5f - inset;
   return PlatformBounds{
-      L.platformCenterX - hx,
-      L.platformCenterX + hx,
-      L.platformCenterY - hy,
-      L.platformCenterY + hy,
-      L.platformTopZ(),
-      L.spawnHeightZ + 2.0f,
+      L.platformCenterX - hx, L.platformCenterX + hx, L.platformCenterY - hy,
+      L.platformCenterY + hy, L.platformTopZ(),       L.spawnHeightZ + 2.0f,
   };
 }
 
 void slotRelPose(const ServerGame& game,
                  const shared::tangram_puzzle::PieceDef& def, float& relX,
                  float& relY, float& rotRad) {
-  if (shared::tangram_slot_validate::mapSlotLayoutUsable(game.tangramSlotLayout) &&
+  if (shared::tangram_slot_validate::mapSlotLayoutUsable(
+          game.tangramSlotLayout) &&
       def.id >= 1 && def.id <= 7) {
     const shared::tangram_slot::SlotPose& slot =
         game.tangramSlotLayout.slots[def.id - 1];
@@ -112,9 +108,8 @@ float yawFromPosition(const shared::Position& pos) {
   if (std::abs(pos.qx) < 1e-4f && std::abs(pos.qy) < 1e-4f) {
     return 2.0f * std::atan2(pos.qz, pos.qw);
   }
-  return std::atan2(
-      2.0f * (pos.qw * pos.qz + pos.qx * pos.qy),
-      1.0f - 2.0f * (pos.qy * pos.qy + pos.qz * pos.qz));
+  return std::atan2(2.0f * (pos.qw * pos.qz + pos.qx * pos.qy),
+                    1.0f - 2.0f * (pos.qy * pos.qy + pos.qz * pos.qz));
 }
 
 bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
@@ -133,8 +128,7 @@ bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
   slotRelPose(game, *def, relX, relY, targetRot);
 
   const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
-  const float reach =
-      shared::tangram_puzzle::snapRadiusForPiece(*def) * 1.15f;
+  const float reach = shared::tangram_puzzle::snapRadiusForPiece(*def) * 1.15f;
   if (std::hypot(pos.x - slotPos.x, pos.y - slotPos.y) > reach) {
     return false;
   }
@@ -211,11 +205,9 @@ void trySnapPiecesToSlots(ServerGame& game) {
 
     piece.slotSnapped = true;
     // Lock XY to slot; random facing — use R to align each piece.
-    const float snapYaw =
-        static_cast<float>(stepDist(tangramSnapRng())) *
-        shared::tangram_puzzle::kRotateStepRad;
-    const glm::quat rot =
-        shared::tangram_puzzle::quatFromYawRad(snapYaw);
+    const float snapYaw = static_cast<float>(stepDist(tangramSnapRng())) *
+                          shared::tangram_puzzle::kRotateStepRad;
+    const glm::quat rot = shared::tangram_puzzle::quatFromYawRad(snapYaw);
     applyPieceTransform(game, ent, slotPos, rot);
 
     printf("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
@@ -290,8 +282,7 @@ void tryRotateNearbyPiece(ServerGame& game) {
                       game.overworldTangramController)
                   .roleIsolationStage;
     }
-    const uint8_t slot =
-        tangram_role_server::playerSlotForAvatar(game, avatar);
+    const uint8_t slot = tangram_role_server::playerSlotForAvatar(game, avatar);
     if (!shared::tangram_roles::canRotate(stage, slot)) continue;
 
     const auto& ppos = game.registry.get<shared::Position>(avatar);
@@ -327,8 +318,7 @@ void tryRotateNearbyPiece(ServerGame& game) {
 
     auto& pos = game.registry.get<shared::Position>(best);
     const float yaw = yawFromPosition(pos);
-    const float newYaw =
-        yaw + shared::tangram_puzzle::kRotateStepRad;
+    const float newYaw = yaw + shared::tangram_puzzle::kRotateStepRad;
     glm::quat q = glm::angleAxis(newYaw, glm::vec3(0.0f, 0.0f, 1.0f));
     pos.qw = q.w;
     pos.qx = q.x;
@@ -352,11 +342,13 @@ void rollRandomPieceSpawns(ServerGame& game) {
   const float bcx = layout.boardCenterX;
   const float bcy = layout.boardCenterY;
 
-  // Fixed grid on the SOUTH half of the green trigger pad (away from goal board).
-  static constexpr glm::vec2 kSpawnOffsets[shared::tangram_puzzle::kPieceCount] = {
-      {-6.0f, -7.5f}, {-2.0f, -8.5f}, {2.0f, -8.5f}, {6.0f, -7.5f},
-      {-4.0f, -10.5f}, {0.0f, -11.0f}, {4.0f, -10.5f},
-  };
+  // Fixed grid on the SOUTH half of the green trigger pad (away from goal
+  // board).
+  static constexpr glm::vec2
+      kSpawnOffsets[shared::tangram_puzzle::kPieceCount] = {
+          {-6.0f, -7.5f},  {-2.0f, -8.5f}, {2.0f, -8.5f},  {6.0f, -7.5f},
+          {-4.0f, -10.5f}, {0.0f, -11.0f}, {4.0f, -10.5f},
+      };
 
   for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
     glm::vec2 pos = kSpawnOffsets[i] + glm::vec2(tcx, tcy);
@@ -392,7 +384,9 @@ void tryCompletePuzzle(ServerGame& game) {
                                           shared::SectionSeasonMap::FALL)) {
     section_puzzle::completeSection(game, shared::SectionSeasonMap::FALL);
   }
-  printf("[Tangram] All pieces in slots with correct rotation — puzzle finished\n");
+  printf(
+      "[Tangram] All pieces in slots with correct rotation — puzzle "
+      "finished\n");
   endPuzzle(game);
 }
 
@@ -492,7 +486,8 @@ void beginPuzzle(ServerGame& game) {
   for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
     const shared::tangram_puzzle::PieceDef& def =
         shared::tangram_puzzle::kPieces[i];
-    const glm::vec2& xz = game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)];
+    const glm::vec2& xz =
+        game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)];
     const float pieceZ = def.scaleZ;
     const float z = game.tangramArena.pieceRestZ(pieceZ);
     const glm::vec3 pos(xz.x, xz.y, z);
@@ -502,8 +497,8 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::OverworldTag>(ent);
     game.registry.emplace<shared::OverworldTangramPiece>(ent);
     game.registry.emplace<shared::TangramPiece>(ent, def.id, false);
-    game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f, 0.0f,
-                                          0.0f, 0.0f);
+    game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
     game.registry.emplace<shared::RenderInfo>(ent, def.modelName, def.scaleX,
                                               def.scaleY, pieceZ);
     game.registry.emplace<shared::Velocity>(ent, 0.0f, 0.0f, 0.0f);
@@ -515,8 +510,8 @@ void beginPuzzle(ServerGame& game) {
     JPH::BodyID body = game.physics.createTangramPieceBody(
         def.modelName, pos, glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
         glm::vec3(def.scaleX, def.scaleY, pieceZ), pieceLayer);
-    game.registry.emplace<shared::PhysicsBody>(ent,
-                                               body.GetIndexAndSequenceNumber());
+    game.registry.emplace<shared::PhysicsBody>(
+        ent, body.GetIndexAndSequenceNumber());
     if (!bodyInterface.IsAdded(body)) {
       bodyInterface.AddBody(body, JPH::EActivation::Activate);
     }
@@ -539,9 +534,9 @@ void beginPuzzle(ServerGame& game) {
     (void)gid;
     game.registry.emplace<shared::OverworldTag>(ghostEnt);
     game.registry.emplace<shared::TangramSlotGhost>(ghostEnt, def.id);
-    game.registry.emplace<shared::Position>(
-        ghostEnt, ghostPos.x, ghostPos.y, ghostPos.z, ghostRot.w, ghostRot.x,
-        ghostRot.y, ghostRot.z);
+    game.registry.emplace<shared::Position>(ghostEnt, ghostPos.x, ghostPos.y,
+                                            ghostPos.z, ghostRot.w, ghostRot.x,
+                                            ghostRot.y, ghostRot.z);
     constexpr float kGhostScale = 0.97f;
     game.registry.emplace<shared::RenderInfo>(
         ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id),
@@ -566,8 +561,9 @@ void beginPuzzle(ServerGame& game) {
   if (game.tangramSlotLayout.anyFromMap) {
     printf("[Tangram] Slot poses from map (spring_tangram_slot_1..7)\n");
   } else {
-    printf("[Tangram] Slot poses from tangram_puzzle_data.h (add Blender "
-           "empties spring_tangram_slot_1..7 to override)\n");
+    printf(
+        "[Tangram] Slot poses from tangram_puzzle_data.h (add Blender "
+        "empties spring_tangram_slot_1..7 to override)\n");
   }
   printf("[Tangram] %d ghost slots (one per piece, ids 1–7)\n",
          shared::tangram_puzzle::kPieceCount);
@@ -604,7 +600,8 @@ void endPuzzle(ServerGame& game) {
       pkt.entityId = game.registry.get<shared::Entity>(ent).id;
       net::broadcastPacket(game.network->getHost(), pkt);
     }
-    // PhysicsBody on_destroy hook removes the Jolt body — do not destroyBody here.
+    // PhysicsBody on_destroy hook removes the Jolt body — do not destroyBody
+    // here.
     game.registry.destroy(ent);
   };
 
@@ -617,7 +614,8 @@ void endPuzzle(ServerGame& game) {
     slotEnt = entt::null;
   }
 
-  // Must leave the trigger pad before the puzzle can start again (prevents Q → instant restart).
+  // Must leave the trigger pad before the puzzle can start again (prevents Q →
+  // instant restart).
   game.overworldTangramTriggerArmed = false;
   game.overworldTangramFocusTimer = 0.0f;
   releasePlayersAfterExit(game);

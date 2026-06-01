@@ -1,8 +1,8 @@
 #include "server/game/puzzles/tangram/roles.h"
-#include "server/game/puzzles/tangram/puzzle.h"
 
 #include <cstdio>
 
+#include "server/game/puzzles/tangram/puzzle.h"
 #include "server/physics_engine.h"
 #include "server/server_game.h"
 #include "shared/components.h"
@@ -57,8 +57,9 @@ void syncPieceCollisionLayer(ServerGame& game, entt::entity pieceEnt,
 void applyCollisionRoles(ServerGame& game, uint8_t isolationStage) {
   if (!shared::tangram_roles::pushCollisionIsolation(isolationStage)) return;
 
-  auto playerView = game.registry.view<shared::OverworldTag, shared::PhysicsBody,
-                                      shared::PlayerInput, shared::RenderInfo>();
+  auto playerView =
+      game.registry.view<shared::OverworldTag, shared::PhysicsBody,
+                         shared::PlayerInput, shared::RenderInfo>();
   for (auto ent : playerView) {
     const uint8_t slot = playerSlotForAvatar(game, ent);
     const JPH::ObjectLayer layer =
@@ -68,22 +69,23 @@ void applyCollisionRoles(ServerGame& game, uint8_t isolationStage) {
     setBodyLayer(game, ent, layer);
   }
 
-  auto pieceView = game.registry.view<shared::OverworldTangramPiece,
-                                      shared::PhysicsBody>();
+  auto pieceView =
+      game.registry.view<shared::OverworldTangramPiece, shared::PhysicsBody>();
   for (auto ent : pieceView) {
     syncPieceCollisionLayer(game, ent, isolationStage);
   }
 }
 
 void revertCollisionRoles(ServerGame& game) {
-  auto playerView = game.registry.view<shared::OverworldTag, shared::PhysicsBody,
-                                      shared::PlayerInput>();
+  auto playerView =
+      game.registry.view<shared::OverworldTag, shared::PhysicsBody,
+                         shared::PlayerInput>();
   for (auto ent : playerView) {
     setBodyLayer(game, ent, Layers::MOVING);
   }
 
-  auto pieceView = game.registry.view<shared::OverworldTangramPiece,
-                                      shared::PhysicsBody>();
+  auto pieceView =
+      game.registry.view<shared::OverworldTangramPiece, shared::PhysicsBody>();
   for (auto ent : pieceView) {
     setBodyLayer(game, ent, Layers::MOVING);
   }

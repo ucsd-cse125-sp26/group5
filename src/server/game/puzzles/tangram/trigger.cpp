@@ -1,15 +1,15 @@
 #include "server/game/puzzles/tangram/trigger.h"
 
-#include <cstdio>
-
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Body/BodyInterface.h>
 
+#include <cstdio>
+
 #include "server/game/section_puzzle.h"
 #include "server/server_game.h"
-#include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/puzzles/tangram/defaults.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
 
 namespace tangram_trigger {
 

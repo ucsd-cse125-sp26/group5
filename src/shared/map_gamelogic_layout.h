@@ -3,8 +3,8 @@
 #include <string>
 
 #include "shared/puzzles/maze/layout.h"
-#include "shared/puzzles/tangram/slot_layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
+#include "shared/puzzles/tangram/slot_layout.h"
 
 namespace shared {
 
@@ -35,18 +35,20 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
 bool tryApplyMazeLayoutFromMapFile(const std::string& path,
                                    maze_layout::Config& layout);
 
-// Spring tangram arena: spring_trigger, spring_tangram_zone, optional spring_player_start.
-// Does not affect maze_layout (Winter connect spawn stays on player_start).
+// Spring tangram arena: spring_trigger, spring_tangram_zone, optional
+// spring_player_start. Does not affect maze_layout (Winter connect spawn stays
+// on player_start).
 bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
                                  tangram::ArenaLayout& layout);
 
 bool tryApplyTangramArenaFromMapFile(const std::string& path,
                                      tangram::ArenaLayout& layout);
 
-// Reads spring_tangram_slot_1 .. spring_tangram_slot_7 empties (position + yaw).
-// relX/relY are offsets from boardCenter; falls back to code defaults if missing.
-bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed,
-                                 float boardCenterX, float boardCenterY,
+// Reads spring_tangram_slot_1 .. spring_tangram_slot_7 empties (position +
+// yaw). relX/relY are offsets from boardCenter; falls back to code defaults if
+// missing.
+bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
+                                 float boardCenterY,
                                  tangram_slot::Config& layout);
 
 }  // namespace map_gamelogic_layout

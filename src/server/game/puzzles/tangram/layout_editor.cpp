@@ -1,23 +1,22 @@
 #include "server/game/puzzles/tangram/layout_editor.h"
 
-#include <cstdint>
-#include <vector>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
 
+#include <cstdint>
 #include <glm/glm.hpp>
+#include <vector>
 
 #include "server/server_game.h"
 #include "shared/components.h"
-#include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/puzzles/tangram/defaults.h"
-
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/BodyID.h>
+#include "shared/puzzles/tangram/puzzle_data.h"
 
 namespace tangram_layout_editor {
 namespace {
 
-std::vector<entt::entity> spawnDescBatch(ServerGame& game,
-                                         const std::vector<StaticEntityDesc>& descs) {
+std::vector<entt::entity> spawnDescBatch(
+    ServerGame& game, const std::vector<StaticEntityDesc>& descs) {
   std::vector<entt::entity> created;
   created.reserve(descs.size());
   for (const StaticEntityDesc& d : descs) {
@@ -36,9 +35,8 @@ std::vector<entt::entity> spawnDescBatch(ServerGame& game,
       JPH::ShapeRefC shape =
           game.physics.boxShapeForAsset(d.modelName, d.scale);
       if (shape) {
-        JPH::BodyID bodyId =
-            game.physics.createStaticBody(shape, d.position, d.rotation,
-                                          d.staticFriction);
+        JPH::BodyID bodyId = game.physics.createStaticBody(
+            shape, d.position, d.rotation, d.staticFriction);
         game.registry.emplace<shared::PhysicsBody>(
             entity, bodyId.GetIndexAndSequenceNumber());
       }
@@ -74,8 +72,8 @@ std::vector<StaticEntityDesc> buildArenaEntities(
   constexpr float kRimT = 0.22f;
   constexpr float kRimH = 0.07f;
 
-  // Orange rim frames the swan goal area (no extra cream slab — it looked like an
-  // 8th slot). The 7 colored ghost outlines are the only slot markers.
+  // Orange rim frames the swan goal area (no extra cream slab — it looked like
+  // an 8th slot). The 7 colored ghost outlines are the only slot markers.
   const float rimZ = topZ + kSurface + kRimH * 0.5f;
   const float outerX = goalHalfX * 2.0f + kRimT;
   const float outerY = goalHalfY * 2.0f + kRimT;
@@ -123,8 +121,8 @@ std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
       .position = glm::vec3(layout.triggerCenterX, layout.triggerCenterY,
                             topZ + kPadH * 0.5f),
       .modelName = "start_cube",
-      .scale = glm::vec3(layout.halfExtent * 2.0f, layout.halfExtent * 2.0f,
-                         kPadH),
+      .scale =
+          glm::vec3(layout.halfExtent * 2.0f, layout.halfExtent * 2.0f, kPadH),
       .collision = CollisionShape::None,
   });
 

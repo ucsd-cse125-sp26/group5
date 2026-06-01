@@ -1,9 +1,9 @@
-#include "server/game/puzzles/maze/puzzle.h"
 #include "server/game/puzzles/maze/trigger.h"
 
 #include <cmath>
 
 #include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
 #include "server/game/section_puzzle.h"
 #include "server/server_game.h"
 #include "shared/puzzles/maze/defaults.h"

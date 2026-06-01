@@ -34,7 +34,8 @@ class ParsedModel;
 namespace Layers {
 static constexpr JPH::ObjectLayer NON_MOVING = 0;
 static constexpr JPH::ObjectLayer MOVING = 1;
-// Tangram pieces when push isolation is on (collide floor + pusher + other pieces).
+// Tangram pieces when push isolation is on (collide floor + pusher + other
+// pieces).
 static constexpr JPH::ObjectLayer TANGRAM = 2;
 // Overworld avatars that must not shove tangram pieces (slots 2–4).
 static constexpr JPH::ObjectLayer MOVING_NO_TANGRAM = 3;
@@ -52,7 +53,8 @@ class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
       case Layers::NON_MOVING:
         return b == Layers::MOVING || b == Layers::MOVING_NO_TANGRAM ||
                b == Layers::TANGRAM;
-      // Pusher (slot 1): floor + tangram only — no player–player shove into pieces.
+      // Pusher (slot 1): floor + tangram only — no player–player shove into
+      // pieces.
       case Layers::MOVING:
         return b == Layers::NON_MOVING || b == Layers::TANGRAM;
       case Layers::MOVING_NO_TANGRAM:
@@ -81,8 +83,7 @@ class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
     mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
     mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
     mObjectToBroadPhase[Layers::TANGRAM] = BroadPhaseLayers::MOVING;
-    mObjectToBroadPhase[Layers::MOVING_NO_TANGRAM] =
-        BroadPhaseLayers::MOVING;
+    mObjectToBroadPhase[Layers::MOVING_NO_TANGRAM] = BroadPhaseLayers::MOVING;
     mObjectToBroadPhase[Layers::TANGRAM_SNAPPED] = BroadPhaseLayers::MOVING;
   }
   [[nodiscard]] JPH::uint GetNumBroadPhaseLayers() const override {
@@ -188,8 +189,7 @@ class PhysicsEngine {
   // Tangram piece on the overworld platform: slides on XY, no gravity.
   JPH::BodyID createTangramPieceBody(
       const std::string& modelName, const glm::vec3& pos, const glm::quat& rot,
-      const glm::vec3& scale,
-      JPH::ObjectLayer objectLayer = Layers::MOVING);
+      const glm::vec3& scale, JPH::ObjectLayer objectLayer = Layers::MOVING);
 
   // Asset orientation is baked into the shape so the body's rotation can
   // stay equal to the entity's rotation. `centerOffsetMask` is multiplied

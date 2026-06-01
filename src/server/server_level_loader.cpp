@@ -73,8 +73,8 @@ void loadLevel(ServerGame& game) {
   auto [fallSectionID, fallSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       fallSection, shared::SectionSeasonMap::FALL, puzzleTypingID,
-      true,   // unlocked for typing test arena (set false when gated on winter)
-      false   // not completed yet
+      true,  // unlocked for typing test arena (set false when gated on winter)
+      false  // not completed yet
   );
   auto [summerSectionID, summerSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(

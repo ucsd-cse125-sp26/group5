@@ -13,8 +13,8 @@
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
-#include "shared/puzzles/maze/layout.h"
 #include "shared/net/packet_utils.h"
+#include "shared/puzzles/maze/layout.h"
 #include "shared/simple_profiler.h"
 #include "shared/sound_constants.h"
 constexpr float kHeldKeyScaleFactor = 1.1f;
@@ -412,7 +412,6 @@ void registerServerHandlers(ServerNetwork& network) {
         playerInput.mouseDy += pkt.mouseDy;
         playerInput.rotateTargetId = pkt.rotateTargetId;
       });
-
 }
 
 // ── Entity serialization ─────────────────────────────────

@@ -12,14 +12,14 @@
 #include "client_game.h"
 #include "client_network.h"
 #include "imgui.h"
+#include "shared/dev_spawn.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
-#include "shared/simple_profiler.h"
 #include "shared/puzzles/tangram/arena_layout.h"
-#include "shared/dev_spawn.h"
+#include "shared/simple_profiler.h"
 #include "shared/util.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
@@ -84,8 +84,7 @@ int main() {
       std::scoped_lock lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
-    } else if (game.renderEntityMap.empty() &&
-               !game.networkEntityMap.empty()) {
+    } else if (game.renderEntityMap.empty() && !game.networkEntityMap.empty()) {
       bootstrapClientWorldSnapshot(game);
     }
 

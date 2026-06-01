@@ -12,10 +12,11 @@ struct ServerGame;
 namespace maze_trigger {
 
 [[nodiscard]] bool isInsideMazeTriggerRegion(
-    const shared::Position& position, const shared::maze_layout::Config& layout);
+    const shared::Position& position,
+    const shared::maze_layout::Config& layout);
 
 [[nodiscard]] bool isInsideMazeTriggerRegion(const shared::Position& position,
-                                           const ServerGame& game);
+                                             const ServerGame& game);
 
 [[nodiscard]] bool allActivePlayersInMazeTrigger(const ServerGame& game);
 

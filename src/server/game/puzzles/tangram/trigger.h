@@ -12,7 +12,8 @@ struct ServerGame;
 namespace tangram_trigger {
 
 [[nodiscard]] bool isInsideTypingTriggerRegion(
-    const shared::Position& position, const shared::tangram::ArenaLayout& layout);
+    const shared::Position& position,
+    const shared::tangram::ArenaLayout& layout);
 
 [[nodiscard]] bool isInsideTypingTriggerRegion(const shared::Position& position,
                                                const ServerGame& game);

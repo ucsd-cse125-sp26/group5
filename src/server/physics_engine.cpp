@@ -83,7 +83,8 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
                                      joltRot, JPH::EMotionType::Dynamic,
                                      objectLayer);
   settings.mGravityFactor = 0.0f;
-  // Heavy slabs: hard to shove, high damping kills glide after you stop pushing.
+  // Heavy slabs: hard to shove, high damping kills glide after you stop
+  // pushing.
   settings.mOverrideMassProperties =
       JPH::EOverrideMassProperties::CalculateInertia;
   settings.mMassPropertiesOverride.mMass = 550.0f;

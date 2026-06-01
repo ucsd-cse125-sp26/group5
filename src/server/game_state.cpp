@@ -1,34 +1,33 @@
 #include "game_state.h"
 
 #include <cstdio>
+#include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 
-#include <glm/glm.hpp>
-
 #include "game/maze.h"
-#include "server/game/puzzles/maze/camera.h"
 #include "game/maze_generation.h"
-#include "server/game/puzzles/maze/layout_editor.h"
-#include "server/game/puzzles/maze/trigger.h"
 #include "game/overworld.h"
-#include "server/game/puzzles/maze/puzzle.h"
-#include "server/game/puzzles/tangram/puzzle.h"
-#include "server/game/puzzles/tangram/layout_editor.h"
-#include "server/game/puzzles/tangram/trigger.h"
-#include "server/game/puzzles/tangram/camera.h"
 #include "map_loader.h"
 #include "scene.h"
+#include "server/game/puzzles/maze/camera.h"
+#include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
+#include "server/game/puzzles/maze/trigger.h"
+#include "server/game/puzzles/tangram/camera.h"
+#include "server/game/puzzles/tangram/layout_editor.h"
+#include "server/game/puzzles/tangram/puzzle.h"
+#include "server/game/puzzles/tangram/trigger.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
+#include "shared/input.h"
 #include "shared/lighting.h"
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
-#include "shared/input.h"
 #include "shared/sound_constants.h"
 #include "shared/util.h"
 // ── GameStateManager ─────────────────────────────────────
@@ -120,7 +119,8 @@ static void addPhysicsBodies(ServerGame& game) {
   auto view = game.registry.view<Tag, shared::PhysicsBody>();
   auto& bodyInterface = game.physics.getBodyInterface();
   for (auto ent : view) {
-    // Unassigned pool avatars (playerSlot==0) stay out of the sim until connect.
+    // Unassigned pool avatars (playerSlot==0) stay out of the sim until
+    // connect.
     if (game.registry.all_of<shared::PlayerInput, shared::RenderInfo>(ent)) {
       const uint8_t slot =
           game.registry.get<shared::RenderInfo>(ent).playerSlot;
@@ -155,9 +155,8 @@ static void removePhysicsBodies(ServerGame& game) {
 }
 
 static void debugPrintRequestedPlayerPosition(ServerGame& game) {
-  auto view =
-      game.registry.view<shared::OverworldTag, shared::PlayerInput,
-                         shared::Position, shared::RenderInfo>();
+  auto view = game.registry.view<shared::OverworldTag, shared::PlayerInput,
+                                 shared::Position, shared::RenderInfo>();
   for (auto ent : view) {
     const auto& input = game.registry.get<shared::PlayerInput>(ent);
     if ((input.keys_newly_pressed & KEY_DEBUG_PRINT_POS) == 0) continue;
@@ -284,41 +283,40 @@ void initWorldEntities(ServerGame& game) {
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
   spawnStaticEntities<shared::OverworldTag>(
-      game,
-      {
-          // 100³ floor cube; top surface lands on z=0.
-          StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(100.0f)},
-          StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
-                           .modelName = "cube"},
-          StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(1.5f)},
-          StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(0.8f)},
-          StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
-                           .modelName = "cube",
-                           .scale = glm::vec3(2.0f)},
-          StaticEntityDesc{
-              .position = glm::vec3(10.0f, 0.0f, 0.0f),
-              .modelName = "bear",
-              .scale = glm::vec3(0.5f),
-              .collision = CollisionShape::Box,
-              .soundLayers =
-                  {
-                      shared::SoundLayer{
-                          .soundId = static_cast<uint32_t>(
-                              shared::SoundId::AMBIENT_HUM),
-                          .trigger = shared::SoundTriggerType::ALWAYS,
-                          .volume = 0.5f},
-                  }},
-          StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
-                           .modelName = "bear",
-                           .scale = glm::vec3(0.5f),
-                           .collision = CollisionShape::Mesh},
-      });
+      game, {
+                // 100³ floor cube; top surface lands on z=0.
+                StaticEntityDesc{.position = glm::vec3(0.0f, 0.0f, -50.0f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(100.0f)},
+                StaticEntityDesc{.position = glm::vec3(5.0f, 5.0f, 0.5f),
+                                 .modelName = "cube"},
+                StaticEntityDesc{.position = glm::vec3(-5.0f, 3.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(1.5f)},
+                StaticEntityDesc{.position = glm::vec3(3.0f, -7.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(0.8f)},
+                StaticEntityDesc{.position = glm::vec3(-8.0f, -4.0f, 0.5f),
+                                 .modelName = "cube",
+                                 .scale = glm::vec3(2.0f)},
+                StaticEntityDesc{
+                    .position = glm::vec3(10.0f, 0.0f, 0.0f),
+                    .modelName = "bear",
+                    .scale = glm::vec3(0.5f),
+                    .collision = CollisionShape::Box,
+                    .soundLayers =
+                        {
+                            shared::SoundLayer{
+                                .soundId = static_cast<uint32_t>(
+                                    shared::SoundId::AMBIENT_HUM),
+                                .trigger = shared::SoundTriggerType::ALWAYS,
+                                .volume = 0.5f},
+                        }},
+                StaticEntityDesc{.position = glm::vec3(20.0f, 0.0f, 0.0f),
+                                 .modelName = "bear",
+                                 .scale = glm::vec3(0.5f),
+                                 .collision = CollisionShape::Mesh},
+            });
   maze_puzzle::initOverworldMazePuzzleController(game);
   maze_layout_editor::spawnLayoutVisuals(game);
   tangram_puzzle::initController(game);
@@ -397,8 +395,8 @@ void initWorldEntities(ServerGame& game) {
 
     auto [mazeEntityId, mazeEntity] = new_entity(game);
     spawnPlayerAvatar<shared::MazeTag>(
-        game, mazeEntity, "bear", maze_trigger::overworldSpawnPosition(game, slot),
-        glm::vec3(0.5f));
+        game, mazeEntity, "bear",
+        maze_trigger::overworldSpawnPosition(game, slot), glm::vec3(0.5f));
     slots.maze_avatar = mazeEntity;
 
     game.unused_player_slots.push_back(slots);
@@ -467,7 +465,8 @@ void OverworldState::onEnter(ServerGame& game) {
         vel.dx = vel.dy = vel.dz = 0.0f;
       }
       if (game.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
-        auto& pb = game.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
+        auto& pb =
+            game.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
         auto& bi = game.physics.getBodyInterface();
         JPH::BodyID body(pb.bodyId);
         if (bi.IsAdded(body)) {
@@ -540,7 +539,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     } else if (game.overworldTangramTriggerArmed) {
       tangram_camera::snapOverworldAvatarsFaceTangramBoard(game);
       game.overworldTangramFocusTimer += dt;
-      if (game.overworldTangramFocusTimer >= tangram_camera::kFocusHoldSeconds) {
+      if (game.overworldTangramFocusTimer >=
+          tangram_camera::kFocusHoldSeconds) {
         game.overworldTangramTriggerArmed = false;
         game.overworldTangramFocusTimer = 0.0f;
         tangram_puzzle::beginPuzzle(game);
@@ -558,7 +558,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     } else if (game.overworldTangramTriggerArmed) {
       tangram_camera::snapOverworldAvatarsFaceTangramBoard(game);
       game.overworldTangramFocusTimer += dt;
-      if (game.overworldTangramFocusTimer >= tangram_camera::kFocusHoldSeconds) {
+      if (game.overworldTangramFocusTimer >=
+          tangram_camera::kFocusHoldSeconds) {
         game.overworldTangramTriggerArmed = false;
         game.overworldTangramFocusTimer = 0.0f;
         tangram_puzzle::beginPuzzle(game);

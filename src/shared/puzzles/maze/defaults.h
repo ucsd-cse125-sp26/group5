@@ -38,8 +38,7 @@ inline constexpr float kBoardHeightBoostZ = 1.0f;
 // in Blender; Y must be past triggerCenterY + kHalfExtent + kMazeGap.
 constexpr float kMazeGap = 2.0f;
 constexpr float kBoardCenterX = kTriggerCenterX;
-constexpr float kBoardCenterY =
-    kTriggerCenterY + kHalfExtent + kMazeGap + 0.5f;
+constexpr float kBoardCenterY = kTriggerCenterY + kHalfExtent + kMazeGap + 0.5f;
 constexpr float kBoardCenterZ = kSpawnHeightZ;
 
 constexpr float kLookAtX = kBoardCenterX;

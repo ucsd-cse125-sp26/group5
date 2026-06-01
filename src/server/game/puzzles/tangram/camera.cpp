@@ -1,13 +1,13 @@
 #include "server/game/puzzles/tangram/camera.h"
 
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Body/BodyID.h>
+#include <Jolt/Physics/Body/BodyInterface.h>
+
 #include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <numbers>
-
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/BodyID.h>
-#include <Jolt/Physics/Body/BodyInterface.h>
 
 #include "server/server_game.h"
 #include "shared/components.h"
@@ -51,7 +51,8 @@ float yawErrorRad(const shared::Position& position, float targetX,
 
 }  // namespace
 
-void snapOverworldAvatarFaceTangramBoard(ServerGame& game, entt::entity avatar) {
+void snapOverworldAvatarFaceTangramBoard(ServerGame& game,
+                                         entt::entity avatar) {
   if (!game.registry.valid(avatar) ||
       !game.registry.all_of<shared::Position>(avatar)) {
     return;
@@ -82,7 +83,7 @@ void snapOverworldAvatarsFaceTangramBoard(ServerGame& game) {
 }
 
 bool allOverworldAvatarsFacingTangramBoard(const ServerGame& game,
-                                          float maxYawErrorRad) {
+                                           float maxYawErrorRad) {
   if (game.active_players.size() != 4) return false;
   for (const auto& [peer, slots] : game.active_players) {
     (void)peer;
