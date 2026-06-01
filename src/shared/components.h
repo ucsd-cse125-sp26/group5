@@ -242,7 +242,7 @@ struct OverworldMazePuzzleState {
 struct OverworldMazePiece {};
 
 struct TangramPiece {
-  uint8_t pieceId = 0;  // 1–7
+  uint8_t pieceId = 0;       // 1–7
   bool slotSnapped = false;  // XY locked to slot; yaw still player-controlled
 };
 

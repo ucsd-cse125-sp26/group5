@@ -8,14 +8,12 @@ struct ArenaLayout {
   float spawnBaseX = tangram_defaults::kSpawnBaseX;
   float spawnBaseY = tangram_defaults::kSpawnBaseY;
   float spawnHeightZ = tangram_defaults::kSpawnHeightZ;
-  float spawnOffsetX[4] = {tangram_defaults::kSpawnOffsetX[0],
-                           tangram_defaults::kSpawnOffsetX[1],
-                           tangram_defaults::kSpawnOffsetX[2],
-                           tangram_defaults::kSpawnOffsetX[3]};
-  float spawnOffsetY[4] = {tangram_defaults::kSpawnOffsetY[0],
-                           tangram_defaults::kSpawnOffsetY[1],
-                           tangram_defaults::kSpawnOffsetY[2],
-                           tangram_defaults::kSpawnOffsetY[3]};
+  float spawnOffsetX[4] = {
+      tangram_defaults::kSpawnOffsetX[0], tangram_defaults::kSpawnOffsetX[1],
+      tangram_defaults::kSpawnOffsetX[2], tangram_defaults::kSpawnOffsetX[3]};
+  float spawnOffsetY[4] = {
+      tangram_defaults::kSpawnOffsetY[0], tangram_defaults::kSpawnOffsetY[1],
+      tangram_defaults::kSpawnOffsetY[2], tangram_defaults::kSpawnOffsetY[3]};
 
   float triggerCenterX = tangram_defaults::kTriggerCenterX;
   float triggerCenterY = tangram_defaults::kTriggerCenterY;
@@ -50,9 +48,9 @@ struct ArenaLayout {
   [[nodiscard]] float lookAtY() const { return boardCenterY; }
   [[nodiscard]] float lookAtZ() const { return boardCenterZ; }
 
-  // Raises platform, board, and pad spawn by kArenaHeightBoostZ (call once after map load).
-  void applyHeightBoost(
-      float dz = tangram_defaults::kArenaHeightBoostZ) {
+  // Raises platform, board, and pad spawn by kArenaHeightBoostZ (call once
+  // after map load).
+  void applyHeightBoost(float dz = tangram_defaults::kArenaHeightBoostZ) {
     platformCenterZ += dz;
     boardCenterZ += dz;
     spawnHeightZ += dz;

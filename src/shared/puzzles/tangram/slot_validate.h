@@ -1,14 +1,15 @@
 #pragma once
 
-// 2D footprint overlap tests for tangram ghost slots (matches client asset.cpp).
+// 2D footprint overlap tests for tangram ghost slots (matches client
+// asset.cpp).
 
 #include <array>
 #include <cmath>
 #include <utility>
 #include <vector>
 
-#include "shared/puzzles/tangram/slot_layout.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
+#include "shared/puzzles/tangram/slot_layout.h"
 
 namespace shared::tangram_slot_validate {
 

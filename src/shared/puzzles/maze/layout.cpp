@@ -11,7 +11,7 @@ constexpr float kFaceTowardTriggerY = 0.12f;
 constexpr float kBoardNorthPadding = 0.5f;
 
 }  // namespace
-  
+
 Config Config::defaults() { return Config{}; }
 
 void Config::syncBoardFromTrigger() {
@@ -25,17 +25,14 @@ void Config::resolveBoardPlacement() {
   boardCenterZ = std::max(boardCenterZ, triggerCenterZ);
 }
 
-void Config::applyHeightBoost(float dz) {
-  boardCenterZ += dz;
-}
+void Config::applyHeightBoost(float dz) { boardCenterZ += dz; }
 
 float Config::boardWallBaseZ() const { return boardCenterZ + kBoardZLift; }
 
 float Config::boardFaceY() const {
   // Always place the visible face on the side that looks toward trigger.
-  return boardCenterY +
-         (triggerCenterY >= boardCenterY ? kFaceTowardTriggerY
-                                         : -kFaceTowardTriggerY);
+  return boardCenterY + (triggerCenterY >= boardCenterY ? kFaceTowardTriggerY
+                                                        : -kFaceTowardTriggerY);
 }
 
 bool Config::isInsideTrigger(float x, float y) const {

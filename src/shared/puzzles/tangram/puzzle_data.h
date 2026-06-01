@@ -17,10 +17,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <numbers>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <numbers>
 
 #include "shared/puzzles/tangram/defaults.h"
 
@@ -97,9 +96,8 @@ inline constexpr PieceDef kPieces[kPieceCount] = {
 }
 
 inline constexpr const char* kGhostModelNames[kPieceCount] = {
-    "tangram_ghost_1", "tangram_ghost_2", "tangram_ghost_3",
-    "tangram_ghost_4", "tangram_ghost_5", "tangram_ghost_6",
-    "tangram_ghost_7",
+    "tangram_ghost_1", "tangram_ghost_2", "tangram_ghost_3", "tangram_ghost_4",
+    "tangram_ghost_5", "tangram_ghost_6", "tangram_ghost_7",
 };
 
 [[nodiscard]] inline const char* ghostModelForId(uint8_t id) {
@@ -153,8 +151,7 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
 }
 
 [[nodiscard]] inline bool yawMatchesTarget(float yaw, float targetRad) {
-  return std::abs(normalizeYawRad(yaw - targetRad)) <=
-         kRotateStepRad * 0.51f;
+  return std::abs(normalizeYawRad(yaw - targetRad)) <= kRotateStepRad * 0.51f;
 }
 
 [[nodiscard]] inline glm::quat quatFromYawRad(float yaw) {
