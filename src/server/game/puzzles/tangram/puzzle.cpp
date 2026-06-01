@@ -86,8 +86,8 @@ glm::vec3 slotSnapWorldPos(const ServerGame& game,
   float rotRad = 0.0f;
   slotRelPose(game, def, relX, relY, rotRad);
   (void)rotRad;
-  return glm::vec3(layout.boardCenterX + relX, layout.boardCenterY + relY,
-                   layout.pieceRestZ(def.scaleZ));
+  return {layout.boardCenterX + relX, layout.boardCenterY + relY,
+          layout.pieceRestZ(def.scaleZ)};
 }
 
 void setActiveFlag(ServerGame& game, bool active, uint8_t isolationStage = 0) {
@@ -482,8 +482,8 @@ void beginPuzzle(ServerGame& game) {
 
   rollRandomPieceSpawns(game);
 
-  for (size_t i = 0; i < game.overworldTangramGhostSlotEntities.size(); ++i) {
-    game.overworldTangramGhostSlotEntities[i] = entt::null;
+  for (auto& slotEnt : game.overworldTangramGhostSlotEntities) {
+    slotEnt = entt::null;
   }
 
   std::vector<entt::entity> spawned;
@@ -608,13 +608,13 @@ void endPuzzle(ServerGame& game) {
     game.registry.destroy(ent);
   };
 
-  for (size_t i = 0; i < game.overworldFallFragmentEntities.size(); ++i) {
-    despawnEnt(game.overworldFallFragmentEntities[i]);
-    game.overworldFallFragmentEntities[i] = entt::null;
+  for (auto& fragEnt : game.overworldFallFragmentEntities) {
+    despawnEnt(fragEnt);
+    fragEnt = entt::null;
   }
-  for (size_t i = 0; i < game.overworldTangramGhostSlotEntities.size(); ++i) {
-    despawnEnt(game.overworldTangramGhostSlotEntities[i]);
-    game.overworldTangramGhostSlotEntities[i] = entt::null;
+  for (auto& slotEnt : game.overworldTangramGhostSlotEntities) {
+    despawnEnt(slotEnt);
+    slotEnt = entt::null;
   }
 
   // Must leave the trigger pad before the puzzle can start again (prevents Q → instant restart).
