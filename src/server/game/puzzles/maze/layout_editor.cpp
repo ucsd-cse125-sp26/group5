@@ -1,9 +1,8 @@
 #include "server/game/puzzles/maze/layout_editor.h"
 
 #include <cstdio>
-#include <vector>
-
 #include <glm/glm.hpp>
+#include <vector>
 
 #include "server/game/maze_generation.h"
 #include "server/game/puzzles/maze/puzzle.h"
@@ -21,8 +20,8 @@ constexpr int kMazeHeight = 8;
 constexpr uint32_t kMazeSeed = 12505;
 constexpr float kPreviewTileSpacing = 0.18f;
 
-std::vector<entt::entity> spawnDescBatch(ServerGame& game,
-                                         const std::vector<StaticEntityDesc>& descs) {
+std::vector<entt::entity> spawnDescBatch(
+    ServerGame& game, const std::vector<StaticEntityDesc>& descs) {
   std::vector<entt::entity> created;
   created.reserve(descs.size());
   for (const StaticEntityDesc& d : descs) {
@@ -146,11 +145,10 @@ std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
   constexpr glm::vec3 kBorderScale(0.45f, 0.45f, 0.16f);
   constexpr glm::vec3 kCornerScale(0.55f, 0.55f, 1.6f);
 
-  for (const glm::vec3& pos :
-       {glm::vec3(minX, minY, groundZ + kCornerLift),
-        glm::vec3(minX, maxY, groundZ + kCornerLift),
-        glm::vec3(maxX, minY, groundZ + kCornerLift),
-        glm::vec3(maxX, maxY, groundZ + kCornerLift)}) {
+  for (const glm::vec3& pos : {glm::vec3(minX, minY, groundZ + kCornerLift),
+                               glm::vec3(minX, maxY, groundZ + kCornerLift),
+                               glm::vec3(maxX, minY, groundZ + kCornerLift),
+                               glm::vec3(maxX, maxY, groundZ + kCornerLift)}) {
     entities.push_back(StaticEntityDesc{
         .position = pos,
         .modelName = "goal_cube",
@@ -253,9 +251,8 @@ void printLayoutSnippet(const shared::maze_layout::Config& layout) {
       "constexpr float kBoardCenterZ = %.3ff;\n"
       "------------------------------------------------\n",
       layout.triggerCenterX, layout.triggerCenterY, layout.triggerCenterZ,
-      layout.halfExtent,
-      layout.mazeGap, layout.boardCenterX, layout.boardCenterY,
-      layout.boardCenterZ);
+      layout.halfExtent, layout.mazeGap, layout.boardCenterX,
+      layout.boardCenterY, layout.boardCenterZ);
 }
 
 }  // namespace maze_layout_editor

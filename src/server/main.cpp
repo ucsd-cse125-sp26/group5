@@ -2,20 +2,19 @@
 #include <chrono>
 #include <cinttypes>
 #include <cmath>
+#include <glm/glm.hpp>
 #include <iostream>
 #include <memory>
 #include <thread>
 
-#include <glm/glm.hpp>
-
-#include "server/game/puzzles/maze/trigger.h"
-#include "server/game/puzzles/maze/camera.h"
-#include "server/game/puzzles/tangram/camera.h"
-#include "server/game/puzzles/tangram/trigger.h"
 #include "game_state.h"
-#include "server/game/puzzles/tangram/puzzle.h"
+#include "server/game/puzzles/maze/camera.h"
 #include "server/game/puzzles/maze/puzzle.h"
+#include "server/game/puzzles/maze/trigger.h"
+#include "server/game/puzzles/tangram/camera.h"
+#include "server/game/puzzles/tangram/puzzle.h"
 #include "server/game/puzzles/tangram/roles.h"
+#include "server/game/puzzles/tangram/trigger.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
@@ -32,10 +31,10 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
   // Static map / wall / marker entities are sent by SPAWN_ENTITY when a state
   // is entered or a client connects. Per-frame UPDATE_ENTITY should stay small:
   // only entities whose synced components can change every tick belong here.
-  return registry.any_of<shared::PlayerInput, shared::Velocity,
-                         shared::PointLight, shared::DirectionalLight,
-                         shared::Scene, shared::FragmentComponent,
-                         shared::OverworldTangramPiece>(ent);
+  return registry
+      .any_of<shared::PlayerInput, shared::Velocity, shared::PointLight,
+              shared::DirectionalLight, shared::Scene,
+              shared::FragmentComponent, shared::OverworldTangramPiece>(ent);
 }
 
 }  // namespace
@@ -107,12 +106,13 @@ int main() {
           tangram_camera::snapOverworldAvatarFaceTangramBoard(
               g, slots.overworld_avatar);
         } else {
-          maze_camera::snapOverworldAvatarFaceMazePreview(g,
-                                                          slots.overworld_avatar);
+          maze_camera::snapOverworldAvatarFaceMazePreview(
+              g, slots.overworld_avatar);
         }
         tangram_role_server::revertCollisionRoles(g);
         if (g.registry.all_of<shared::PhysicsBody>(slots.overworld_avatar)) {
-          auto& pb = g.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
+          auto& pb =
+              g.registry.get<shared::PhysicsBody>(slots.overworld_avatar);
           auto& bi = g.physics.getBodyInterface();
           JPH::BodyID body(pb.bodyId);
           if (!bi.IsAdded(body)) {
@@ -123,10 +123,9 @@ int main() {
           bi.SetLinearVelocity(body, JPH::Vec3::sZero());
           bi.SetAngularVelocity(body, JPH::Vec3::sZero());
         }
-        auto buf =
-            serializeEntities(g.registry, g.componentRegistry,
-                              shared::PacketType::UPDATE_ENTITY,
-                              {slots.overworld_avatar}, false);
+        auto buf = serializeEntities(g.registry, g.componentRegistry,
+                                     shared::PacketType::UPDATE_ENTITY,
+                                     {slots.overworld_avatar}, false);
         net::sendRaw(peer, buf.data(), buf.size());
       }
     }

@@ -15,7 +15,8 @@ void updatePuzzle(ServerGame& game, float dt);
 [[nodiscard]] bool isPuzzleActive(const ServerGame& game);
 void clampPieceToArena(ServerGame& game, entt::entity ent);
 
-// True when piece is at its slot position with correct rotation (win condition).
+// True when piece is at its slot position with correct rotation (win
+// condition).
 [[nodiscard]] bool isPieceCorrectlyPlaced(const ServerGame& game,
                                           entt::entity ent);
 

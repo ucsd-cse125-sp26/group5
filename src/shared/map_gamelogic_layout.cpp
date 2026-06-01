@@ -59,8 +59,8 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
     layout.triggerCenterY = y;
     layout.triggerCenterZ = z;
     foundTrigger = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeTriggerNode, x,
-           y, z);
+    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeTriggerNode, x, y,
+           z);
   } else {
     printf("[MapGamelogic] node \"%s\" not found; using layout default\n",
            kMazeTriggerNode);
@@ -84,15 +84,15 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
     layout.spawnBaseY = y;
     layout.spawnHeightZ = z;
     foundSpawn = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kPlayerStartNode, x,
-           y, z);
+    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kPlayerStartNode, x, y,
+           z);
   } else {
     printf("[MapGamelogic] node \"%s\" not found; using layout default\n",
            kPlayerStartNode);
   }
 
-  // Rebecca's player_start is often below walkable mesh; use maze_trigger height
-  // when the empty sits low (manual bump until Blender export is fixed).
+  // Rebecca's player_start is often below walkable mesh; use maze_trigger
+  // height when the empty sits low (manual bump until Blender export is fixed).
   if (foundSpawn && foundTrigger &&
       layout.spawnHeightZ < layout.triggerCenterZ + 0.25f) {
     const float adjusted = layout.triggerCenterZ + 0.5f;
@@ -135,16 +135,16 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     layout.platformCenterX = x;
     layout.platformCenterY = y;
     const float topZ = z + 0.5f;
-    layout.platformCenterZ =
-        topZ - layout.platformScaleZ * 0.5f;
+    layout.platformCenterZ = topZ - layout.platformScaleZ * 0.5f;
     layout.spawnHeightZ = topZ + 0.5f;
     foundTrigger = true;
     printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTriggerNode, x,
            y, z);
   } else {
-    printf("[MapGamelogic] node \"%s\" not found; tangram trigger uses "
-           "tangram_defaults fallback\n",
-           kSpringTriggerNode);
+    printf(
+        "[MapGamelogic] node \"%s\" not found; tangram trigger uses "
+        "tangram_defaults fallback\n",
+        kSpringTriggerNode);
   }
 
   if (nodePosition(parsed, kSpringTangramZoneNode, x, y, z)) {
@@ -155,9 +155,10 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTangramZoneNode,
            x, y, z);
   } else {
-    printf("[MapGamelogic] node \"%s\" not found; tangram board derived from "
-           "trigger\n",
-           kSpringTangramZoneNode);
+    printf(
+        "[MapGamelogic] node \"%s\" not found; tangram board derived from "
+        "trigger\n",
+        kSpringTangramZoneNode);
   }
 
   if (nodePosition(parsed, kSpringPlayerStartNode, x, y, z)) {
@@ -166,9 +167,10 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     if (foundTrigger) {
       const float topZ = layout.platformTopZ();
       if (z < topZ - 0.25f) {
-        printf("[MapGamelogic] %s Z raised %.3f -> %.3f (spring_trigger "
-               "floor)\n",
-               kSpringPlayerStartNode, z, topZ + 0.5f);
+        printf(
+            "[MapGamelogic] %s Z raised %.3f -> %.3f (spring_trigger "
+            "floor)\n",
+            kSpringPlayerStartNode, z, topZ + 0.5f);
         layout.spawnHeightZ = topZ + 0.5f;
       } else {
         layout.spawnHeightZ = z + 0.5f;
@@ -260,9 +262,10 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
            layout.slots[i].relX, layout.slots[i].relY, layout.slots[i].rotRad);
   }
   if (found > 0 && found < 7) {
-    printf("[MapGamelogic] tangram slots: only %d/7 empties — ignoring map "
-           "(need all spring_tangram_slot_1..7 or none)\n",
-           found);
+    printf(
+        "[MapGamelogic] tangram slots: only %d/7 empties — ignoring map "
+        "(need all spring_tangram_slot_1..7 or none)\n",
+        found);
     for (auto& slot : layout.slots) {
       slot = {};
     }
@@ -277,8 +280,9 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
   }
   if (layout.anyFromMap &&
       shared::tangram_slot_validate::slotPosesOverlap(loaded)) {
-    printf("[MapGamelogic] tangram slots overlap in map — ignoring map layout "
-           "(fix empty positions or remove spring_tangram_slot_*)\n");
+    printf(
+        "[MapGamelogic] tangram slots overlap in map — ignoring map layout "
+        "(fix empty positions or remove spring_tangram_slot_*)\n");
     for (auto& slot : layout.slots) {
       slot = {};
     }

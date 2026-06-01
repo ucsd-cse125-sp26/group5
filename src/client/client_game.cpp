@@ -3,14 +3,13 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
-#include <cmath>
-
-#include "glm/glm.hpp"
 #include "client/spsc_queue.h"
 #include "client_network.h"
+#include "glm/glm.hpp"
 #include "shared/components.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/tangram/roles.h"

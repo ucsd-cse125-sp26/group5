@@ -12,8 +12,8 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
-#include "shared/puzzles/maze/defaults.h"
 #include "shared/net/packet_utils.h"
+#include "shared/puzzles/maze/defaults.h"
 
 namespace maze_puzzle {
 namespace {
@@ -346,9 +346,8 @@ void beginPuzzle(ServerGame& game) {
   printf(
       "[OverworldMaze] Puzzle started — slot 1=Up 2=Down 3=Left 4=Right "
       "(all 4 players on pad required)\n");
-  printf(
-      "[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
-      layout.startPos.x, layout.startPos.y, layout.startPos.z);
+  printf("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
+         layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
 void endPuzzle(ServerGame& game) {
@@ -504,8 +503,9 @@ void completeOverworldMazePreview(ServerGame& game) {
   }
 
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
-  printf("[OverworldMaze] Winter maze complete — arrow control exited "
-         "automatically\n");
+  printf(
+      "[OverworldMaze] Winter maze complete — arrow control exited "
+      "automatically\n");
 }
 
 void tryCompleteOnGoal(ServerGame& game) {

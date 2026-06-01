@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-
 #include <glm/vec3.hpp>
 
 #include "shared/puzzles/maze/layout.h"

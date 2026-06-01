@@ -593,7 +593,6 @@ static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   return id;
 }
 
-
 namespace {
 
 void tangramFootprint(const shared::tangram_puzzle::PieceDef& def,
@@ -622,7 +621,8 @@ void tangramFootprint(const shared::tangram_puzzle::PieceDef& def,
   }
 }
 
-void appendPrismFaces(std::vector<Vertex>& vertices, std::vector<GLuint>& indices,
+void appendPrismFaces(std::vector<Vertex>& vertices,
+                      std::vector<GLuint>& indices,
                       const std::vector<glm::vec2>& footprint, float z0,
                       float z1, const glm::vec2& uv) {
   if (footprint.size() < 3) return;
@@ -739,8 +739,7 @@ Model* makeTangramColoredGhostSlotModel(
   std::vector<GLuint> indices;
   appendPrismFaces(vertices, indices, footprint, -0.5f, 0.5f, {0.5f, 0.5f});
 
-  GLuint diffuseTex =
-      makeSolidTexture(def.colorR, def.colorG, def.colorB, 210);
+  GLuint diffuseTex = makeSolidTexture(def.colorR, def.colorG, def.colorB, 210);
 
   auto* model = new Model();
   Material fillMat;
@@ -771,8 +770,10 @@ Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def) {
 
   auto* model = new Model();
   Material fillMat;
-  fillMat.ambient = {.constant = glm::vec3(0.55f, 0.45f, 0.65f), .texture = diffuseTex};
-  fillMat.diffuse = {.constant = glm::vec3(0.85f, 0.75f, 0.95f), .texture = diffuseTex};
+  fillMat.ambient = {.constant = glm::vec3(0.55f, 0.45f, 0.65f),
+                     .texture = diffuseTex};
+  fillMat.diffuse = {.constant = glm::vec3(0.85f, 0.75f, 0.95f),
+                     .texture = diffuseTex};
   fillMat.specular = {.constant = glm::vec3(0.0f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = glm::vec3(0.45f, 0.38f, 0.55f),

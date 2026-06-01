@@ -5,12 +5,12 @@
 #include <map>
 #include <mutex>
 
-#include "glm/ext/matrix_float4x4.hpp"
 #include "audio_engine.h"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "shared/component_registry.h"
+#include "shared/protocol.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
-#include "shared/protocol.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "spsc_queue.h"
 
@@ -33,7 +33,8 @@ struct ClientGame {
   std::atomic<bool> running = true;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
-  shared::maze_layout::Config mazeLayout = shared::maze_layout::Config::defaults();
+  shared::maze_layout::Config mazeLayout =
+      shared::maze_layout::Config::defaults();
   shared::tangram::ArenaLayout tangramArena =
       shared::tangram::ArenaLayout::defaults();
   // Entity id under screen-center reticle (updated each frame during tangram).

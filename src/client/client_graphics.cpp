@@ -19,10 +19,9 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
-#include "shared/puzzles/tangram/puzzle_data.h"
-#include "shared/puzzles/tangram/roles.h"
 #include "client/client_game.h"
 #include "client/ui_settings.h"
+#include "client_network.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -33,15 +32,15 @@
 #include "imgui.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/dev_spawn.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
-
-#include "client_network.h"
 #include "shared/puzzles/maze/layout.h"
-#include "shared/shader_constants.h"
 #include "shared/puzzles/tangram/defaults.h"
-#include "shared/dev_spawn.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
+#include "shared/puzzles/tangram/roles.h"
+#include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 #include "shared/util.h"
 
@@ -233,8 +232,9 @@ static std::optional<CameraState> tangramLobbyFallbackCamera(
                         topZ + 1.0f);
   const glm::vec3 eye(focus.x, focus.y - 5.5f, topZ + 4.0f);
   const glm::vec3 target(layout.lookAtX(), layout.lookAtY(), topZ + 0.5f);
-  return CameraState{.position = eye,
-                     .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
+  return CameraState{
+      .position = eye,
+      .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
 }
 
 static std::optional<CameraState> overworldHubFallbackCamera(
@@ -254,8 +254,9 @@ static std::optional<CameraState> overworldHubFallbackCamera(
                         spawnZ + 1.0f);
   const glm::vec3 eye(focus.x, focus.y - 5.5f, spawnZ + 4.0f);
   const glm::vec3 target(layout.lookAtX(), layout.lookAtY(), layout.lookAtZ());
-  return CameraState{.position = eye,
-                     .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
+  return CameraState{
+      .position = eye,
+      .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
 }
 
 std::optional<CameraState> computeCamera(const ClientGame& game) {

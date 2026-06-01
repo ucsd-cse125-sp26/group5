@@ -105,9 +105,8 @@ void spawnStaticEntities(ServerGame& game,
     }
     if (!shape) continue;
 
-    JPH::BodyID bodyId =
-        game.physics.createStaticBody(shape, d.position, d.rotation,
-                                      d.staticFriction);
+    JPH::BodyID bodyId = game.physics.createStaticBody(
+        shape, d.position, d.rotation, d.staticFriction);
     game.registry.template emplace<shared::PhysicsBody>(
         entity, bodyId.GetIndexAndSequenceNumber());
     if (!d.soundLayers.empty()) {
