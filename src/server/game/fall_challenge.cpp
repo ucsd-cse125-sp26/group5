@@ -357,6 +357,42 @@ bool isActive(ServerGame& game) {
   return false;
 }
 
+void CollectFallFragment(ServerGame& game) {
+  // Find the fall section controller.
+  entt::entity fallSect = entt::null;
+  auto sectView = game.registry.view<shared::SectionController>();
+  for (auto e : sectView) {
+    if (sectView.get<shared::SectionController>(e).type ==
+        shared::SectionSeasonMap::FALL) {
+      fallSect = e;
+      break;
+    }
+  }
+  if (fallSect == entt::null) return;
+
+  auto& section = game.registry.get<shared::SectionController>(fallSect);
+
+  // Find and finish the linked puzzle entity.
+  auto entityView = game.registry.view<shared::Entity>();
+  for (auto e : entityView) {
+    if (entityView.get<shared::Entity>(e).id != section.puzzleID) continue;
+    if (!game.registry.all_of<shared::PuzzleComponent>(e)) break;
+    auto& puzzle = game.registry.get<shared::PuzzleComponent>(e);
+    if (puzzle.phase == shared::RunPhase::FINISHED) break;
+    puzzle.phase = shared::RunPhase::FINISHED;
+    break;
+  }
+
+  if (section.completed) return;
+  section.completed = true;
+
+  for (auto e : game.registry.view<shared::GameSection>()) {
+    auto& gs = game.registry.get<shared::GameSection>(e);
+    if (gs.sectionsCompleted < 255) gs.sectionsCompleted++;
+  }
+  printf("[GameLogic] CollectFallFragment: fall done, sections completed++\n");
+}
+
 void update(ServerGame& game, float dt) {
   maybeActivateFallChallenge(game);
   if (!isActive(game)) return;

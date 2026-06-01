@@ -31,9 +31,7 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  if (!game.audio.init()) {
-    return EXIT_FAILURE;
-  }
+  game.audio.init();  // non-fatal: runs silently if audio backend unavailable
 
   if (!network.connect("localhost", 7777)) {
     return EXIT_FAILURE;

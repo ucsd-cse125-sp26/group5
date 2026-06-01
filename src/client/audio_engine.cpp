@@ -17,8 +17,17 @@ bool AudioEngine::init() {
   SoLoud::result result = soloud_->init();
 
   if (result != SoLoud::SO_NO_ERROR) {
-    printf("AudioEngine: SoLoud init failed: %d\n", result);
-    return false;
+    printf(
+        "AudioEngine: SoLoud init failed (error %d), retrying with null "
+        "driver\n",
+        result);
+    result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
+                           SoLoud::Soloud::NULLDRIVER);
+    if (result != SoLoud::SO_NO_ERROR) {
+      printf("AudioEngine: null driver also failed: %d\n", result);
+      return false;
+    }
+    printf("AudioEngine: running in silent mode (no audio output)\n");
   }
 
   // raise voice limit to 32 for more simultaneous sounds
