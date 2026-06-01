@@ -8,14 +8,12 @@ struct Config {
   float spawnBaseX = maze_preview::kSpawnBaseX;
   float spawnBaseY = maze_preview::kSpawnBaseY;
   float spawnHeightZ = maze_preview::kSpawnHeightZ;
-  float spawnOffsetX[4] = {maze_preview::kSpawnOffsetX[0],
-                           maze_preview::kSpawnOffsetX[1],
-                           maze_preview::kSpawnOffsetX[2],
-                           maze_preview::kSpawnOffsetX[3]};
-  float spawnOffsetY[4] = {maze_preview::kSpawnOffsetY[0],
-                           maze_preview::kSpawnOffsetY[1],
-                           maze_preview::kSpawnOffsetY[2],
-                           maze_preview::kSpawnOffsetY[3]};
+  float spawnOffsetX[4] = {
+      maze_preview::kSpawnOffsetX[0], maze_preview::kSpawnOffsetX[1],
+      maze_preview::kSpawnOffsetX[2], maze_preview::kSpawnOffsetX[3]};
+  float spawnOffsetY[4] = {
+      maze_preview::kSpawnOffsetY[0], maze_preview::kSpawnOffsetY[1],
+      maze_preview::kSpawnOffsetY[2], maze_preview::kSpawnOffsetY[3]};
 
   float triggerCenterX = maze_preview::kTriggerCenterX;
   float triggerCenterY = maze_preview::kTriggerCenterY;
