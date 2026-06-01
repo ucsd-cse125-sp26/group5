@@ -155,11 +155,23 @@ class PhysicsEngine {
                                const glm::vec3& scale);
   bool isBodyGrounded(JPH::BodyID bodyId, float checkDistance = 0.2f);
 
+  // World-space vertical extent of a body's collision shape. The fall-challenge
+  // hit test needs this because a player's Position sits near its feet while
+  // the box reaches well above it — a cube landing on the head is metres above
+  // Position.z, so a flat radius around Position can't see overhead hits.
+  // Returns false (leaving outputs untouched) if the body isn't in the sim.
+  bool getBodyWorldZSpan(JPH::BodyID bodyId, float& minZ, float& maxZ);
+
   // Shared maze piece on the overworld preview board: no gravity, slides on XZ.
   JPH::BodyID createMazeBoardPieceBody(const std::string& modelName,
                                        const glm::vec3& pos,
                                        const glm::quat& rot,
                                        const glm::vec3& scale);
+
+  // Gravity-driven obstacle (falling hazard cube). Dynamic, full DOFs so it
+  // tumbles, LinearCast so it can't tunnel through the floor or a player.
+  JPH::BodyID createFallingObjectBody(const glm::vec3& halfExtents,
+                                      const glm::vec3& pos);
 
   // Asset orientation is baked into the shape so the body's rotation can
   // stay equal to the entity's rotation. `centerOffsetMask` is multiplied

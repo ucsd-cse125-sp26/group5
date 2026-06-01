@@ -231,4 +231,52 @@ struct OverworldMazePuzzleState {
 };
 
 struct OverworldMazePiece {};
+
+// Server-only: marks a falling hazard cube. `age` drives lifetime cleanup so
+// objects that land and rest on the floor don't accumulate forever.
+struct FallingObject {
+  float age = 0.0f;
+};
+
+// Server-only: a marker entity that rains FallingObjects within `radius` of its
+// own Position. `timer` is a per-zone spawn accumulator.
+struct FallingHazardZone {
+  float radius = 8.0f;
+  float spawnHeight = 20.0f;  // spawn this far above the zone's Position.z
+  float interval = 0.4f;      // seconds between drops
+  float timer = 0.0f;
+};
+
+struct Knockback {
+  float remaining =
+      0.0f;              // seconds left where physics owns horizontal velocity
+  bool contact = false;  // overlapping a cube last frame (for edge detection)
+  bool justHit =
+      false;  // true only on the frame contact begins; meter reads it
+  float lastDirX = 1.0f;  // last horizontal push dir, reused for overhead hits
+  float lastDirY = 0.0f;
+};
+
+// Fall section "don't get hit" challenge. One controller entity holds all four
+// quarters; replicated so each client can draw its own slot. Index = slot - 1.
+struct FallChallengeState {
+  bool active = false;
+  bool completed = false;       // set true on solve; blocks re-triggering
+  uint8_t participantMask = 0;  // bit i set => player slot (i+1) is playing
+  float fill[4] = {0.0f, 0.0f, 0.0f, 0.0f};  // 0..1 per player slot
+  float fillRate = 0.05f;    // regained per second while NOT being hit
+  float hitPenalty = 0.25f;  // lost per hit
+
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.active, self.completed, self.participantMask, self.fill,
+                   self.fillRate, self.hitPenalty);
+  }
+};
+
+// Server-only: per-player ring of recent hit timestamps, used to detect
+// "4 hits within 4 seconds". Not registered for replication.
+struct FallHitWindow {
+  float times[4] = {-1000.0f, -1000.0f, -1000.0f, -1000.0f};
+  int head = 0;
+};
 }  // namespace shared

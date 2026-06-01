@@ -26,20 +26,18 @@ int main() {
   game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
 
-  if (!network.connect("localhost", 7777)) {
-    return EXIT_FAILURE;
-  }
-
-  registerClientHandlers(network);
-
   Graphics graphics;
   if (!graphics.load(960, 600)) {
     return EXIT_FAILURE;
   }
 
-  if (!game.audio.init()) {
+  game.audio.init();  // non-fatal: runs silently if audio backend unavailable
+
+  if (!network.connect("localhost", 7777)) {
     return EXIT_FAILURE;
   }
+
+  registerClientHandlers(network);
 
   InputKeys prevKeys = 0;
 

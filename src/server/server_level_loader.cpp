@@ -25,6 +25,15 @@ void loadLevel(ServerGame& game) {
   auto [puzzleTengramID, puzzleTengram] = new_entity(game);
   game.registry.emplace<shared::PuzzleComponent>(puzzleTengram);
 
+  // Fall-section falling-cube challenge controller. OverworldTag so it
+  // replicates to clients (the HUD reads its `fill[]`).
+  auto [fallChallengeID, fallChallenge] = new_entity(game);
+  (void)fallChallengeID;
+  auto& fc = game.registry.emplace<shared::FallChallengeState>(fallChallenge);
+  // fc.active = true;  // TEST: start immediately. Remove once a trigger sets
+  // this.
+  game.registry.emplace<shared::OverworldTag>(fallChallenge);
+
   // entity holding game progress for each season
   // Shared memory spirit: visible green piece players move through the maze
   // toward the orange goal marker.
@@ -128,7 +137,10 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::Position>(fallFragment, 130.0f, 65.0f, 22.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
   // for testing, fragments will be light cubes
-  game.registry.emplace<shared::RenderInfo>(fallFragment, "light_cube", 0.5f);
+  // game.registry.emplace<shared::RenderInfo>(fallFragment, "light_cube",
+  // 0.5f);
+  // RenderInfo omitted: fall fragment is invisible until the falling-block
+  // challenge is solved (fall_challenge_system reveals it).
   game.registry.emplace<shared::FragmentComponent>(
       fallFragment, shared::SectionSeasonMap::FALL, false);
   game.registry.emplace<shared::OverworldTag>(fallFragment);

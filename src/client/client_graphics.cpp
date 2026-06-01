@@ -20,6 +20,7 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
 #include "client/client_game.h"
+#include "client/puzzle_hud.h"
 #include "client/ui_settings.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
@@ -1614,7 +1615,7 @@ void Graphics::render(ClientGame& game) {
 
   drawDebugOverlay();
 
-  drawSettingsUIFrame();
+  drawSettingsUIFrame(game);
 }
 
 void Graphics::swap() { glfwSwapBuffers(window); }
@@ -1940,11 +1941,12 @@ void Graphics::shutdownImGui() {
   ImGui::DestroyContext();
 }
 
-void Graphics::drawSettingsUIFrame() {
+void Graphics::drawSettingsUIFrame(ClientGame& game) {
   if (!ImGui::GetCurrentContext()) return;
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+  drawPuzzleHUDs(game);
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

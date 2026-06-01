@@ -186,7 +186,7 @@ struct Graphics {
 
   void initImGui();
   void shutdownImGui();
-  void drawSettingsUIFrame();
+  void drawSettingsUIFrame(ClientGame& game);
 
   // Loading screen: minimal self-contained renderer that runs before the
   // rest of the pipeline is online.
