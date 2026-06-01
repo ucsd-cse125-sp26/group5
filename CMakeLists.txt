@@ -107,20 +107,31 @@ add_library(soloud STATIC
     lib/soloud/src/audiosource/wav/stb_vorbis.c
 )
 target_include_directories(soloud PUBLIC lib/soloud/include)
+if(NOT MSVC)
+    target_compile_options(soloud PRIVATE -Wno-deprecated-declarations -Wno-tautological-compare)
+endif()
 
-target_compile_definitions(soloud PUBLIC 
+target_compile_definitions(soloud PUBLIC
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
-    MA_NO_RUNTIME_LINKING
+    #MA_NO_RUNTIME_LINKING
     MA_NO_JACK
 )
 
+# if(UNIX AND NOT APPLE)
+#     target_compile_definitions(soloud PUBLIC
+#         MA_NO_JACK
+#         MA_NO_PULSEAUDIO
+#         MA_NO_ALSA
+#     )
+# endif()
+
 if(UNIX AND NOT APPLE)
-    target_compile_definitions(soloud PUBLIC
-        MA_NO_JACK
-        MA_NO_PULSEAUDIO
-        MA_NO_ALSA
-    )
+    # don't disable backends — let miniaudio pick what's available
+    find_package(ALSA QUIET)
+    if(ALSA_FOUND)
+        target_link_libraries(soloud PUBLIC ALSA::ALSA)
+    endif()
 endif()
 
 
@@ -140,7 +151,10 @@ elseif(UNIX)
 endif()
 
 if(WIN32)
-    target_compile_definitions(soloud PUBLIC NOMINMAX)
+    target_compile_definitions(soloud PUBLIC
+    NOMINMAX
+    MA_NO_RUNTIME_LINKING
+)
 endif()
 
 target_include_directories(imgui PUBLIC
@@ -162,6 +176,7 @@ target_sources(client PRIVATE
     src/client/animation.cpp
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
+    src/client/puzzle_hud.cpp
 )
 target_link_libraries(client PRIVATE shared 
     glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud
@@ -206,6 +221,7 @@ add_library(server_lib STATIC
     src/server/game/puzzles/tangram/puzzle.cpp
     src/server/game/puzzles/tangram/roles.cpp
     src/server/game/maze_spirit_control.cpp
+    src/server/game/fall_challenge.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp

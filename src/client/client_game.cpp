@@ -66,6 +66,9 @@ void removeSyncedComponent(entt::registry& registry, entt::entity entity,
     case shared::CID_TANGRAM_PIECE:
       registry.remove<shared::TangramPiece>(entity);
       break;
+    case shared::CID_FALL_CHALLENGE:
+      registry.remove<shared::FallChallengeState>(entity);
+      break;
   }
 }
 

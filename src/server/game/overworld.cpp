@@ -2,6 +2,7 @@
 
 #include <cstdio>
 
+#include "server/game/fall_challenge.h"
 #include "server/game/maze.h"
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
@@ -81,7 +82,7 @@ void ProcessFragmentPickups(ServerGame& game) {
         if (fragment.season == shared::SectionSeasonMap::WINTER) {
           CollectMazeFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::FALL) {
-          // CollectFallFragment(game);
+          fall_challenge::CollectFallFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
           // CollectSummerFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SPRING) {

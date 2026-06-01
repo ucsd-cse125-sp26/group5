@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "game/fall_challenge.h"
 #include "game/maze.h"
 #include "game/maze_generation.h"
 #include "game/overworld.h"
@@ -347,6 +348,9 @@ void initWorldEntities(ServerGame& game) {
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
+  spawnFallingHazardZone<shared::OverworldTag>(
+      game, /*center=*/glm::vec3(50.0f, 0.0f, 0.0f),
+      /*radius=*/8.0f, /*spawnHeight=*/20.0f, /*interval=*/0.4f);
 
   // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
   spawnInvisibleWall<shared::OverworldTag>(
@@ -549,24 +553,7 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
   tickOverworldGameLogic(game, dt);
-  if (tangram_trigger::canTriggerTangram(game)) {
-    const bool allInTypingTrigger =
-        tangram_trigger::allActivePlayersInTangramTrigger(game);
-    if (!allInTypingTrigger) {
-      game.overworldTangramTriggerArmed = true;
-      game.overworldTangramFocusTimer = 0.0f;
-    } else if (game.overworldTangramTriggerArmed) {
-      tangram_camera::snapOverworldAvatarsFaceTangramBoard(game);
-      game.overworldTangramFocusTimer += dt;
-      if (game.overworldTangramFocusTimer >=
-          tangram_camera::kFocusHoldSeconds) {
-        game.overworldTangramTriggerArmed = false;
-        game.overworldTangramFocusTimer = 0.0f;
-        tangram_puzzle::beginPuzzle(game);
-        return;
-      }
-    }
-  }
+  fall_challenge::update(game, dt);
 
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {

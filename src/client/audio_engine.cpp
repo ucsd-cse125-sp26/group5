@@ -17,24 +17,37 @@ bool AudioEngine::init() {
   SoLoud::result result = soloud_->init();
 
   if (result != SoLoud::SO_NO_ERROR) {
-    printf("AudioEngine: SoLoud init failed: %d\n", result);
-    return false;
+    printf(
+        "AudioEngine: SoLoud init failed (error %d), retrying with null "
+        "driver\n",
+        result);
+    result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
+                           SoLoud::Soloud::NULLDRIVER);
+    if (result != SoLoud::SO_NO_ERROR) {
+      printf("AudioEngine: null driver also failed: %d\n", result);
+      return false;
+    }
+    printf("AudioEngine: running in silent mode (no audio output)\n");
   }
 
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
 
-  // loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
-  //           "assets/sounds/oof.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
+            "assets/sounds/oof.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
             "assets/sounds/scattered.wav");
   // uncomment when you have the files:
   loadSound(static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC),
-            "assets/sounds/angel.mp3");
+            "assets/sounds/angelll.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
             "assets/sounds/yaku.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
             "assets/sounds/oof.mp3");  // temporary, reuses jump sound
+
+  // in AudioEngine::init(), around the other puzzle sound loadSound calls:
+  loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
+            "assets/sounds/angel.mp3");
   // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1),
   // "assets/sounds/oof.mp3");
   // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_2),

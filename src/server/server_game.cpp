@@ -122,8 +122,17 @@ static void movement_system_for_world(ServerGame& game, float dt) {
       net::broadcastPacket(game.network->getHost(), pkt);
     }
 
-    bodyInterface.SetLinearVelocity(
-        bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    bool knocked =
+        game.registry.all_of<shared::Knockback>(entity) &&
+        game.registry.get<shared::Knockback>(entity).remaining > 0.0f;
+    if (knocked) {
+      // Physics owns X/Y; only enforce jump/gravity on Z.
+      bodyInterface.SetLinearVelocity(
+          bodyId, JPH::Vec3(currentVel.GetX(), currentVel.GetY(), verticalVel));
+    } else {
+      bodyInterface.SetLinearVelocity(
+          bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
+    }
 
     // ── Landing detection (ECS-driven via Grounded component) ──
     if (game.registry.all_of<shared::Grounded>(entity)) {

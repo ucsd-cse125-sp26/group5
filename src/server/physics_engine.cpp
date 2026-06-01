@@ -102,6 +102,25 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
   return body->GetID();
 }
 
+JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
+                                                   const glm::vec3& pos) {
+  auto& bodyInterface = getBodyInterface();
+  JPH::BoxShapeSettings boxSettings(
+      JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+  boxSettings.SetEmbedded();
+  JPH::ShapeRefC shape = boxSettings.Create().Get();
+
+  JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
+                                     JPH::Quat::sIdentity(),
+                                     JPH::EMotionType::Dynamic, Layers::MOVING);
+  settings.mGravityFactor = 1.0f;
+  settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+
+  JPH::Body* body = bodyInterface.CreateBody(settings);
+  bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+  return body->GetID();
+}
+
 namespace {
 
 std::string cacheKey(const shared::ParsedModel& parsed, const aiNode& node) {
@@ -421,4 +440,18 @@ bool PhysicsEngine::isBodyGrounded(JPH::BodyID bodyId, float checkDistance) {
       ray, result,
       JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING),
       JPH::SpecifiedObjectLayerFilter(Layers::NON_MOVING));
+}
+
+bool PhysicsEngine::getBodyWorldZSpan(JPH::BodyID bodyId, float& minZ,
+                                      float& maxZ) {
+  auto& bodyInterface = getBodyInterface();
+  if (!bodyInterface.IsAdded(bodyId)) return false;
+  // Same path isBodyGrounded uses: GetTransformedShape applies the body's
+  // world transform, and GetWorldSpaceBounds folds in RotatedTranslatedShape /
+  // ScaledShape so the AABB reflects the real, scaled, offset collision box.
+  JPH::AABox bounds =
+      bodyInterface.GetTransformedShape(bodyId).GetWorldSpaceBounds();
+  minZ = bounds.mMin.GetZ();
+  maxZ = bounds.mMax.GetZ();
+  return true;
 }
