@@ -208,8 +208,19 @@ void render_model_change(ServerGame& game, float dt) {
     auto& pb = view.get<shared::PhysicsBody>(entity);
     bool shapeDirty = false;
     if (input.keys_newly_pressed & KEY_SWAP_MODEL) {
-      renderInfo.modelName =
-          renderInfo.modelName == "playerbase" ? "dog" : "playerbase";
+      // Find the current model in the cycle; if it's not in the list (e.g.
+      // a non-player model assigned for testing) fall back to index 0.
+      size_t idx = shared::PLAYER_MODEL_CYCLE_COUNT;
+      for (size_t i = 0; i < shared::PLAYER_MODEL_CYCLE_COUNT; ++i) {
+        if (renderInfo.modelName == shared::PLAYER_MODEL_CYCLE[i]) {
+          idx = i;
+          break;
+        }
+      }
+      size_t next = idx == shared::PLAYER_MODEL_CYCLE_COUNT
+                        ? 0
+                        : (idx + 1) % shared::PLAYER_MODEL_CYCLE_COUNT;
+      renderInfo.modelName = std::string(shared::PLAYER_MODEL_CYCLE[next]);
       shapeDirty = true;
     }
     if (input.keys & KEY_MODEL_BIGGER) {

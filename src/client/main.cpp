@@ -30,26 +30,52 @@ int main() {
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
-
-  if (!network.connect("localhost", 7777)) {
-    return EXIT_FAILURE;
-  }
-
   registerClientHandlers(network);
-
-  // Service ENet while graphics.load() parses the huge map glb (~130 meshes).
-  // Otherwise the client never calls enet_host_service for minutes and the
-  // connection times out (looks like "last player disconnects" when the
-  // slowest loader finishes last). Same for tryApplyMazeLayoutFromMapFile.
-  InputKeys prevKeys = 0;
-  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
 
   Graphics graphics;
   if (!graphics.load(960, 600)) {
-    game.running.store(false, std::memory_order_release);
-    networkThread.join();
     return EXIT_FAILURE;
   }
+
+  // load() captures the cursor for gameplay; release it for the menu.
+  glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+  char hostBuf[256] = "localhost";
+  int portValue = 7777;
+  std::string statusMsg;
+  bool connected = false;
+  while (!glfwWindowShouldClose(graphics.window)) {
+    glfwPollEvents();
+    auto result = graphics.renderServerMenuFrame(
+        hostBuf, sizeof(hostBuf), &portValue, statusMsg.c_str());
+    if (result == Graphics::ServerMenuResult::Quit) break;
+    if (result != Graphics::ServerMenuResult::Connect) continue;
+
+    statusMsg = std::string("Connecting to ") + hostBuf + ":" +
+                std::to_string(portValue) + "...";
+    glfwPollEvents();
+    graphics.renderServerMenuFrame(hostBuf, sizeof(hostBuf), &portValue,
+                                   statusMsg.c_str());
+    if (network.connect(hostBuf, static_cast<uint16_t>(portValue))) {
+      connected = true;
+      break;
+    }
+    // Tear down the partially-initialized ENet host before retrying so a
+    // second connect() starts from a clean state.
+    network.shutdown();
+    statusMsg = std::string("Failed to connect to ") + hostBuf + ":" +
+                std::to_string(portValue) + ". Try again.";
+  }
+
+  if (!connected) {
+    return EXIT_SUCCESS;
+  }
+
+  // Back to mouselook for gameplay.
+  glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+  InputKeys prevKeys = 0;
+  std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
 
   shared::map_gamelogic_layout::tryApplyMazeLayoutFromMapFile(
       (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.mazeLayout);

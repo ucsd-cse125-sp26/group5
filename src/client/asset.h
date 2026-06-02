@@ -99,6 +99,12 @@ struct Model {
 struct Skybox {
   GLuint vao;
   GLuint cubemapTexture;
+  // Stride-sampled cubemap face pixels, kept around so the palette can be
+  // rebuilt at runtime when the user changes skyboxPaletteColors. Linear-RGB
+  // colors with unit weight; sampling is uniform across face pixels.
+  std::vector<DiffuseSample> diffuseSamples;
+  // Current k-means centroids; empty when skybox palette quantization is off.
+  std::vector<glm::vec3> palette;
 };
 
 class Shader;
@@ -134,3 +140,5 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
 // centroids in model.palette. colors <= 0, an empty sample buffer, or a
 // total weight of zero leave model.palette empty.
 void buildModelPalette(Model& model, int colors);
+// Same algorithm against the cubemap face samples retained on the Skybox.
+void buildSkyboxPalette(Skybox& skybox, int colors);

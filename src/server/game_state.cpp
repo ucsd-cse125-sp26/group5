@@ -22,6 +22,7 @@
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
+#include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
@@ -453,7 +454,8 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, "cube",
+        game, overworldEntity,
+        std::string(shared::PLAYER_MODEL_CYCLE[0]),
         shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
                                                   game.tangramArena, slot),
         glm::vec3(1.0f));

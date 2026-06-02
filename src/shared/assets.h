@@ -235,7 +235,28 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.70710678f,
      .qz = 0.70710678f,
      .cubeSpec = nullptr},
+    {.name = "gurf",
+     .filename = "assets/gurf/gurf-rigged-orange.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
+    {.name = "rat",
+     .filename = "assets/rat/gurf-rigged-orange.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
 };
+
+// Models a player avatar can take. Index 0 is the spawn default; pressing
+// KEY_SWAP_MODEL advances to the next entry (wrapping).
+inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {"gurf", "rat",
+                                                          "playerbase", "dog"};
+inline constexpr std::size_t PLAYER_MODEL_CYCLE_COUNT =
+    sizeof(PLAYER_MODEL_CYCLE) / sizeof(PLAYER_MODEL_CYCLE[0]);
 
 inline constexpr std::size_t ASSET_COUNT = sizeof(ASSETS) / sizeof(ASSETS[0]);
 
@@ -253,6 +274,11 @@ struct SceneInfo {
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
+  // Optional per-skybox quantize overrides applied to GraphicsSettings when
+  // this scene becomes active. -1 = "don't touch the current setting"; 0 =
+  // explicitly off; >=2 = force that level/palette count.
+  int skyboxQuantizeLevels = -1;
+  int skyboxPaletteColors = -1;
 };
 
 inline constexpr SceneInfo SCENES[] = {
