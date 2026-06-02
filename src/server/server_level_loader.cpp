@@ -159,8 +159,8 @@ void loadLevel(ServerGame& game) {
   auto [springFragmentID, springFragment] = new_entity(game);
   game.registry.emplace<shared::Position>(springFragment, -65.0f, 0.0f, 70.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
-  // for testing, fragments will be light cubes
-  game.registry.emplace<shared::RenderInfo>(springFragment, "light_cube", 0.5f);
+  // RenderInfo omitted: spring fragment is invisible until the tangram puzzle
+  // is solved, then appears for pickup like the winter/fall flow.
   game.registry.emplace<shared::FragmentComponent>(
       springFragment, shared::SectionSeasonMap::SPRING, false);
   game.registry.emplace<shared::OverworldTag>(springFragment);

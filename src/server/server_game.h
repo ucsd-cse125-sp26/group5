@@ -11,6 +11,7 @@
 #include "game_state.h"
 #include "physics_engine.h"
 #include "shared/component_registry.h"
+#include "shared/map_gamelogic_layout.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
@@ -89,6 +90,7 @@ struct ServerGame {
 
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();
+  shared::map_gamelogic_layout::FallLayout fallLayout{};
 
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
   bool overworldTangramActive = false;

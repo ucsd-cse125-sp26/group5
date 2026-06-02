@@ -374,19 +374,28 @@ void tryCompletePuzzle(ServerGame& game) {
   if (!game.overworldTangramActive || !allPiecesSolved(game)) return;
 
   entt::entity puzzleEnt = section_puzzle::findPuzzleForSection(
-      game, shared::SectionSeasonMap::FALL);
+      game, shared::SectionSeasonMap::SPRING);
   if (puzzleEnt != entt::null &&
       game.registry.all_of<shared::PuzzleComponent>(puzzleEnt)) {
     game.registry.get<shared::PuzzleComponent>(puzzleEnt).phase =
         shared::RunPhase::FINISHED;
   }
-  if (!section_puzzle::isSectionCompleted(game,
-                                          shared::SectionSeasonMap::FALL)) {
-    section_puzzle::completeSection(game, shared::SectionSeasonMap::FALL);
+
+  auto frags = game.registry.view<shared::FragmentComponent>();
+  for (auto fe : frags) {
+    if (frags.get<shared::FragmentComponent>(fe).season !=
+        shared::SectionSeasonMap::SPRING)
+      continue;
+    if (game.registry.all_of<shared::RenderInfo>(fe)) continue;
+    game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
+    auto buf =
+        serializeEntities(game.registry, game.componentRegistry,
+                          shared::PacketType::SPAWN_ENTITY, {fe}, false);
+    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
   printf(
-      "[Tangram] All pieces in slots with correct rotation — puzzle "
-      "finished\n");
+      "[Tangram] All pieces in slots with correct rotation — spring fragment "
+      "revealed\n");
   endPuzzle(game);
 }
 
@@ -466,7 +475,7 @@ void beginPuzzle(ServerGame& game) {
   if (game.overworldTangramActive) return;
 
   entt::entity puzzleEnt = section_puzzle::findPuzzleForSection(
-      game, shared::SectionSeasonMap::FALL);
+      game, shared::SectionSeasonMap::SPRING);
   if (puzzleEnt != entt::null &&
       game.registry.all_of<shared::PuzzleComponent>(puzzleEnt)) {
     auto& puzzle = game.registry.get<shared::PuzzleComponent>(puzzleEnt);
