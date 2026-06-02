@@ -35,7 +35,8 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
       .any_of<shared::PlayerInput, shared::Velocity, shared::PointLight,
               shared::DirectionalLight, shared::Scene,
               shared::FragmentComponent, shared::OverworldTangramPiece,
-              shared::FallChallengeState, shared::FallingObject>(ent);
+              shared::FallChallengeState, shared::SummerEscapeState,
+              shared::FallingObject>(ent);
 }
 
 }  // namespace
