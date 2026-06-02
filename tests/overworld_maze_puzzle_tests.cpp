@@ -2,7 +2,8 @@
 
 #include "server/game/maze_generation.h"
 #include "server/game/maze_spirit_control.h"
-#include "server/game/overworld_maze_puzzle.h"
+#include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
 #include "server/server_game.h"
 #include "shared/components.h"
 #include "shared/input.h"
@@ -80,13 +81,27 @@ TEST(OverworldMazePuzzle, GoalTileMatchesGeneratedLayout) {
   EXPECT_EQ(grid.Tile(goalTileX, goalTileY), maze::MazeTile::Floor);
 }
 
+TEST(OverworldMazePuzzle, PreviewBoardTilesUseLogicalCollisionOnly) {
+  const auto entities = maze_layout_editor::buildPreviewEntities(
+      shared::maze_layout::Config::defaults());
+
+  ASSERT_FALSE(entities.empty());
+  for (const auto& entity : entities) {
+    EXPECT_EQ(entity.collision, CollisionShape::None);
+  }
+}
+
 TEST(OverworldMazePuzzle, PuzzleInactiveByDefault) {
   ServerGame game;
-  overworld_maze_puzzle::initOverworldMazePuzzleController(game);
-  EXPECT_FALSE(overworld_maze_puzzle::isPuzzleActive(game));
+  maze_puzzle::initOverworldMazePuzzleController(game);
+  EXPECT_FALSE(maze_puzzle::isPuzzleActive(game));
   ASSERT_TRUE(game.registry.valid(game.overworldMazePuzzleController));
   EXPECT_FALSE(game.registry
                    .get<shared::OverworldMazePuzzleState>(
                        game.overworldMazePuzzleController)
                    .active);
+  EXPECT_FALSE(game.registry
+                   .get<shared::OverworldMazePuzzleState>(
+                       game.overworldMazePuzzleController)
+                   .completed);
 }

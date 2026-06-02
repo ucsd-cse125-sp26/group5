@@ -1,4 +1,4 @@
-#include "server/game/overworld_maze_puzzle.h"
+#include "server/game/puzzles/maze/puzzle.h"
 
 #include <algorithm>
 #include <cmath>
@@ -12,17 +12,17 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
-#include "shared/maze_preview.h"
 #include "shared/net/packet_utils.h"
+#include "shared/puzzles/maze/defaults.h"
 
-namespace overworld_maze_puzzle {
+namespace maze_puzzle {
 namespace {
 
 constexpr int kMazeWidth = 8;
 constexpr int kMazeHeight = 8;
 constexpr uint32_t kMazeSeed = 12505;
 constexpr float kPreviewTileSpacing = 0.18f;
-constexpr float kMarkerDepthOffset = -0.30f;
+constexpr float kMarkerDepthOffset = 0.08f;
 constexpr glm::vec3 kStartMarkerScale(0.24f, 0.16f, 0.24f);
 // Green + orange marker are larger than one tile; allow overlap reach.
 constexpr float kGoalReachDistance = 0.32f;
@@ -45,27 +45,28 @@ struct PreviewLayout {
   float gridYOffset = 0.0f;
 };
 
-PreviewLayout buildPreviewLayout() {
+PreviewLayout buildPreviewLayout(const ServerGame& game) {
   const maze::MazeLayout layout =
       maze::GenerateMazeLayout(kMazeWidth, kMazeHeight, kMazeSeed);
   PreviewLayout out;
   out.tileGrid = maze::ConvertToTileGrid(layout);
 
-  const glm::vec3 center(shared::maze_preview::kCenterX,
-                         shared::maze_preview::kCenterY,
-                         shared::maze_preview::kCenterZ);
+  const auto& cfg = game.mazeLayout;
+  const float baseZ = cfg.boardWallBaseZ();
+  const float faceY = cfg.boardFaceY();
+  const float centerX = cfg.boardCenterX;
   const float xOffset = (static_cast<float>(out.tileGrid.width) - 1.0f) * 0.5f;
   const float yOffset = (static_cast<float>(out.tileGrid.height) - 1.0f) * 0.5f;
-  out.gridCenterX = center.x;
-  out.gridCenterZ = center.z;
+  out.gridCenterX = centerX;
+  out.gridCenterZ = baseZ;
   out.gridXOffset = xOffset;
   out.gridYOffset = yOffset;
 
   auto tilePos = [&](int x, int y) {
     return glm::vec3(
-        center.x + (static_cast<float>(x) - xOffset) * kPreviewTileSpacing,
-        center.y + kMarkerDepthOffset,
-        center.z + (yOffset - static_cast<float>(y)) * kPreviewTileSpacing);
+        centerX + (static_cast<float>(x) - xOffset) * kPreviewTileSpacing,
+        faceY + kMarkerDepthOffset,
+        baseZ + (static_cast<float>(y) - yOffset) * kPreviewTileSpacing);
   };
 
   const int startTileX = layout.startX * 2 + 1;
@@ -76,12 +77,12 @@ PreviewLayout buildPreviewLayout() {
   const int goalTileY = layout.goalY * 2 + 1;
   out.startPos = tilePos(startTileX, startTileY);
   out.goalPos = tilePos(goalTileX, goalTileY);
-  out.boardY = out.startPos.y;
+  out.boardY = faceY + kMarkerDepthOffset;
 
-  out.minX = center.x - xOffset * kPreviewTileSpacing;
-  out.maxX = center.x + xOffset * kPreviewTileSpacing;
-  out.minZ = center.z - yOffset * kPreviewTileSpacing;
-  out.maxZ = center.z + yOffset * kPreviewTileSpacing;
+  out.minX = centerX - xOffset * kPreviewTileSpacing;
+  out.maxX = centerX + xOffset * kPreviewTileSpacing;
+  out.minZ = baseZ - yOffset * kPreviewTileSpacing;
+  out.maxZ = baseZ + yOffset * kPreviewTileSpacing;
   return out;
 }
 
@@ -106,7 +107,7 @@ void worldToTile(const ServerGame& game, float worldX, float worldZ, int& tx,
   tx = static_cast<int>(
       std::lround(relX / kPreviewTileSpacing + game.overworldMazeGridXOffset));
   ty = static_cast<int>(
-      std::lround(game.overworldMazeGridYOffset - relZ / kPreviewTileSpacing));
+      std::lround(relZ / kPreviewTileSpacing + game.overworldMazeGridYOffset));
 }
 
 [[nodiscard]] bool isWalkableTile(const ServerGame& game, int tx, int ty) {
@@ -153,12 +154,28 @@ void setPuzzleActiveFlag(ServerGame& game, bool active) {
   state.active = active;
 }
 
+void setPuzzleCompletedFlag(ServerGame& game, bool completed) {
+  if (!game.registry.valid(game.overworldMazePuzzleController)) return;
+  auto& state = game.registry.get<shared::OverworldMazePuzzleState>(
+      game.overworldMazePuzzleController);
+  state.completed = completed;
+}
+
 void broadcastSpawnEntities(ServerGame& game,
                             const std::vector<entt::entity>& entities) {
   if (entities.empty() || game.network == nullptr) return;
   auto buf =
       serializeEntities(game.registry, game.componentRegistry,
                         shared::PacketType::SPAWN_ENTITY, entities, false);
+  net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+}
+
+void broadcastUpdateEntities(ServerGame& game,
+                             const std::vector<entt::entity>& entities) {
+  if (entities.empty() || game.network == nullptr) return;
+  auto buf =
+      serializeEntities(game.registry, game.componentRegistry,
+                        shared::PacketType::UPDATE_ENTITY, entities, false);
   net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
 }
 
@@ -266,10 +283,9 @@ void initOverworldMazePuzzleController(ServerGame& game) {
   (void)id;
   game.registry.emplace<shared::OverworldTag>(ent);
   game.registry.emplace<shared::Position>(
-      ent, shared::maze_preview::kBoardCenterX,
-      shared::maze_preview::kBoardCenterY, shared::maze_preview::kBoardCenterZ,
-      1.0f, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::OverworldMazePuzzleState>(ent, false);
+      ent, game.mazeLayout.boardCenterX, game.mazeLayout.boardCenterY,
+      game.mazeLayout.boardCenterZ, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::OverworldMazePuzzleState>(ent, false, false);
   game.overworldMazePuzzleController = ent;
 }
 
@@ -280,7 +296,7 @@ bool isPuzzleActive(const ServerGame& game) {
 void beginPuzzle(ServerGame& game) {
   if (game.overworldMazePuzzleActive) return;
 
-  const PreviewLayout layout = buildPreviewLayout();
+  const PreviewLayout layout = buildPreviewLayout(game);
   game.overworldMazePreviewGoal = layout.goalPos;
   game.overworldMazePreviewBoardY = layout.boardY;
   game.overworldMazePreviewMinX = layout.minX;
@@ -320,15 +336,18 @@ void beginPuzzle(ServerGame& game) {
   game.overworldMazePieceEntity = piece;
   game.overworldMazePuzzleActive = true;
   setPuzzleActiveFlag(game, true);
+  setPuzzleCompletedFlag(game, false);
   EnterMazePuzzle(game);
   claimOverworldPadsForActivePlayers(game);
 
-  broadcastSpawnEntities(game, {piece, game.overworldMazePuzzleController});
+  broadcastSpawnEntities(game, {piece});
+  broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
   printf(
-      "[OverworldMaze] Puzzle started on preview board at (%.2f, %.2f, "
-      "%.2f)\n",
-      layout.startPos.x, layout.startPos.y, layout.startPos.z);
+      "[OverworldMaze] Puzzle started — slot 1=Up 2=Down 3=Left 4=Right "
+      "(all 4 players on pad required)\n");
+  printf("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
+         layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
 void endPuzzle(ServerGame& game) {
@@ -360,7 +379,7 @@ void endPuzzle(ServerGame& game) {
     }
   }
 
-  broadcastSpawnEntities(game, {game.overworldMazePuzzleController});
+  broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
   printf("[OverworldMaze] Puzzle ended\n");
 }
@@ -450,15 +469,51 @@ void clampPieceToBoard(ServerGame& game) {
   }
 }
 
+void completeOverworldMazePreview(ServerGame& game) {
+  const entt::entity piece = game.overworldMazePieceEntity;
+  if (piece != entt::null && game.registry.valid(piece) &&
+      game.registry.all_of<shared::PhysicsBody>(piece)) {
+    auto& bodyInterface = game.physics.getBodyInterface();
+    const auto& pb = game.registry.get<shared::PhysicsBody>(piece);
+    JPH::BodyID body(pb.bodyId);
+    if (bodyInterface.IsAdded(body)) {
+      bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
+    }
+    if (game.registry.all_of<shared::Velocity>(piece)) {
+      auto& velocity = game.registry.get<shared::Velocity>(piece);
+      velocity.dx = velocity.dy = velocity.dz = 0.0f;
+    }
+  }
+
+  CollectMazeFragment(game);
+  ExitMazePuzzle(game);
+
+  game.overworldMazePuzzleActive = false;
+  setPuzzleActiveFlag(game, false);
+  setPuzzleCompletedFlag(game, true);
+  // Must step off the pad before the preview can start again.
+  game.overworldMazeTriggerArmed = false;
+
+  for (auto& kv : game.active_players) {
+    entt::entity avatar = kv.second.overworld_avatar;
+    if (avatar != entt::null && game.registry.valid(avatar) &&
+        game.registry.all_of<shared::MazePadBinding>(avatar)) {
+      game.registry.remove<shared::MazePadBinding>(avatar);
+    }
+  }
+
+  broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
+  printf(
+      "[OverworldMaze] Winter maze complete — arrow control exited "
+      "automatically\n");
+}
+
 void tryCompleteOnGoal(ServerGame& game) {
   if (!game.overworldMazePuzzleActive || !game.overworldMazeReachGoalPending) {
     return;
   }
   game.overworldMazeReachGoalPending = false;
-
-  printf("[OverworldMaze] Green piece reached goal — auto exit\n");
-  CollectMazeFragment(game);
-  endPuzzle(game);
+  completeOverworldMazePreview(game);
 }
 
-}  // namespace overworld_maze_puzzle
+}  // namespace maze_puzzle

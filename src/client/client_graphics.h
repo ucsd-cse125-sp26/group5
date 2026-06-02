@@ -18,6 +18,7 @@
 
 struct GLFWwindow;
 struct GLFWmonitor;
+class ClientNetwork;
 
 struct CameraState {
   glm::vec3 position;
@@ -172,7 +173,7 @@ struct Graphics {
   double loadingStartTime = 0.0;
 
   bool load(int width, int height);
-  void render(ClientGame& game);
+  void render(ClientGame& game, ClientNetwork& network);
   void swap();
   ~Graphics();
 

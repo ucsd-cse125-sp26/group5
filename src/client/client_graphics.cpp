@@ -22,6 +22,7 @@
 #include "client/client_game.h"
 #include "client/puzzle_hud.h"
 #include "client/ui_settings.h"
+#include "client_network.h"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/ext/quaternion_float.hpp"
@@ -32,10 +33,14 @@
 #include "imgui.h"
 #include "shared/assets.h"
 #include "shared/components.h"
+#include "shared/dev_spawn.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
-#include "shared/maze_preview.h"
+#include "shared/puzzles/maze/layout.h"
+#include "shared/puzzles/tangram/defaults.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
+#include "shared/puzzles/tangram/roles.h"
 #include "shared/shader_constants.h"
 #include "shared/simple_profiler.h"
 #include "shared/util.h"
@@ -216,21 +221,58 @@ static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
   return proj * view;
 }
 
+static std::optional<CameraState> tangramLobbyFallbackCamera(
+    const ClientGame& game) {
+  const shared::tangram::ArenaLayout& layout = game.tangramArena;
+  const float topZ = layout.platformTopZ();
+  uint8_t slot = localOverworldPlayerSlot(game);
+  if (slot < 1 || slot > 4) slot = 1;
+  const int idx = static_cast<int>(slot) - 1;
+  const glm::vec3 focus(layout.spawnBaseX + layout.spawnOffsetX[idx],
+                        layout.spawnBaseY + layout.spawnOffsetY[idx],
+                        topZ + 1.0f);
+  const glm::vec3 eye(focus.x, focus.y - 5.5f, topZ + 4.0f);
+  const glm::vec3 target(layout.lookAtX(), layout.lookAtY(), topZ + 0.5f);
+  return CameraState{
+      .position = eye,
+      .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
+}
+
+static std::optional<CameraState> overworldHubFallbackCamera(
+    const ClientGame& game) {
+  if (isOverworldTangramPuzzleActive(game) ||
+      shared::dev_spawn::kOverworldSpawn ==
+          shared::dev_spawn::OverworldSpawn::Tangram) {
+    return tangramLobbyFallbackCamera(game);
+  }
+  const shared::maze_layout::Config& layout = game.mazeLayout;
+  uint8_t slot = localOverworldPlayerSlot(game);
+  if (slot < 1 || slot > 4) slot = 1;
+  const int idx = static_cast<int>(slot) - 1;
+  const float spawnZ = layout.spawnHeightZ;
+  const glm::vec3 focus(layout.spawnBaseX + layout.spawnOffsetX[idx],
+                        layout.spawnBaseY + layout.spawnOffsetY[idx],
+                        spawnZ + 1.0f);
+  const glm::vec3 eye(focus.x, focus.y - 5.5f, spawnZ + 4.0f);
+  const glm::vec3 target(layout.lookAtX(), layout.lookAtY(), layout.lookAtZ());
+  return CameraState{
+      .position = eye,
+      .view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f))};
+}
+
 std::optional<CameraState> computeCamera(const ClientGame& game) {
   auto selfIt = game.renderEntityMap.find(game.renderEntityId);
   if (selfIt == game.renderEntityMap.end() ||
       !game.renderRegistry.valid(selfIt->second) ||
       !game.renderRegistry.all_of<shared::Position, shared::Camera>(
           selfIt->second)) {
-    return std::nullopt;
+    return overworldHubFallbackCamera(game);
   }
   if (!game.renderRegistry.all_of<shared::RenderInfo>(selfIt->second)) {
-    return std::nullopt;
+    return overworldHubFallbackCamera(game);
   }
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
-  const auto& selfRender =
-      game.renderRegistry.get<shared::RenderInfo>(selfIt->second);
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
@@ -251,7 +293,7 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
     }
     if (spirit != entt::null) {
       const auto& sp = game.renderRegistry.get<shared::Position>(spirit);
-      int slot = selfRender.playerSlot;
+      int slot = localOverworldPlayerSlot(game);
       if (slot < 1 || slot > 4) slot = 1;
 
       glm::vec3 side(0.0f);
@@ -277,13 +319,10 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   }
 
   // During the preview-board puzzle only; after exit, normal FPS view
-  // immediately. Branch switched the overworld avatar from "cube" to
-  // "playerbase", so the puzzle-active gate alone is the right filter —
-  // the spirit-grid case above already preempts the maze state.
+  // immediately.
   if (isOverworldMazePuzzleActive(game)) {
-    const glm::vec3 target(shared::maze_preview::kLookAtX,
-                           shared::maze_preview::kLookAtY,
-                           shared::maze_preview::kLookAtZ);
+    const glm::vec3 target(game.mazeLayout.lookAtX(), game.mazeLayout.lookAtY(),
+                           game.mazeLayout.lookAtZ());
     glm::mat4 view = glm::lookAt(pos, target, worldUp);
     return CameraState{.position = pos, .view = view};
   }
@@ -358,6 +397,29 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
   glDrawArrays(GL_TRIANGLES, 0, 36);
   glBindVertexArray(0);
   glDepthFunc(GL_LESS);
+}
+
+static bool isTangramGhostModelName(const std::string& name) {
+  return name.size() > 14 && name.starts_with("tangram_ghost_");
+}
+
+static bool isTangramPlayPieceModelName(const std::string& name) {
+  return name.size() > 8 && name.starts_with("tangram_") &&
+         !isTangramGhostModelName(name);
+}
+
+static bool shouldDrawTangramEntity(const ClientGame& game,
+                                    const std::string& modelName) {
+  if (!isOverworldTangramPuzzleActive(game)) return true;
+  const uint8_t stage = tangramRoleIsolationStage(game);
+  if (!shared::tangram_roles::rolesActive(stage)) return true;
+
+  const uint8_t slot = localOverworldPlayerSlot(game);
+  if (isTangramGhostModelName(modelName) &&
+      !shared::tangram_roles::canSeeSlots(stage, slot)) {
+    return false;
+  }
+  return true;
 }
 
 // Advances every entity's Animator and drops cache entries for entities
@@ -478,7 +540,19 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     if (!forShadowPass) {
       if (entity.id == game.renderEntityId) continue;
     }
+    if (!shouldDrawTangramEntity(game, renderInfo.modelName)) continue;
+
     std::string modelKey = renderInfo.modelName;
+    if (isTangramGhostModelName(renderInfo.modelName)) {
+      modelKey = renderInfo.modelName + "_colored";
+    } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
+      const uint8_t stage = tangramRoleIsolationStage(game);
+      const uint8_t slot = localOverworldPlayerSlot(game);
+      if (shared::tangram_roles::colorRestricted(stage) &&
+          !shared::tangram_roles::canSeeColor(stage, slot)) {
+        modelKey = renderInfo.modelName + "_mute";
+      }
+    }
     if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
         renderInfo.modelName == "cube") {
       modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
@@ -701,6 +775,34 @@ bool Graphics::load(int width, int height) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[name] = m;
       printf("Loaded asset: %s (player join order)\n", name.c_str());
+    }
+  }
+
+  for (const auto& def : shared::tangram_puzzle::kPieces) {
+    Model* m = makeTangramPieceModel(def);
+    if (m) {
+      m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[std::string(def.modelName)] = m;
+      printf("Loaded tangram mesh: %s\n", def.modelName);
+    }
+    Model* mute = makeTangramPieceMuteModel(def);
+    if (mute) {
+      mute->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[std::string(def.modelName) + "_mute"] = mute;
+    }
+    const std::string ghostName =
+        std::string(shared::tangram_puzzle::ghostModelForId(def.id));
+    Model* ghost = makeTangramGhostSlotModel(def);
+    if (ghost) {
+      ghost->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[ghostName] = ghost;
+    }
+    Model* ghostColored = makeTangramColoredGhostSlotModel(def);
+    if (ghostColored) {
+      ghostColored->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+      models[ghostName + "_colored"] = ghostColored;
+      printf("Loaded tangram ghost: %s (colored slot guide)\n",
+             ghostName.c_str());
     }
   }
 
@@ -1183,12 +1285,38 @@ void Graphics::drawDebugOverlay() {
   glViewport(0, 0, fbWidth, fbHeight);
 }
 
-void Graphics::render(ClientGame& game) {
+static void drawTangramCrosshair(int fbWidth, int fbHeight) {
+  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_SCISSOR_TEST);
+  const int cx = fbWidth / 2;
+  const int cy = fbHeight / 2;
+  glClearColor(1.0f, 1.0f, 1.0f, 0.9f);
+  const int r = 2;
+  glScissor(cx - r, cy - r, 2 * r + 1, 2 * r + 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glClearColor(1.0f, 1.0f, 1.0f, 0.65f);
+  const int arm = 7;
+  const int thick = 1;
+  glScissor(cx - arm, cy - thick, 2 * arm + 1, 2 * thick + 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glScissor(cx - thick, cy - arm, 2 * thick + 1, 2 * arm + 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glDisable(GL_SCISSOR_TEST);
+  glDisable(GL_BLEND);
+}
+
+void Graphics::render(ClientGame& game, ClientNetwork& network) {
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
   auto camera = computeCamera(game);
   if (!camera) return;
 
+  game.tangramCrosshairTargetId =
+      isOverworldTangramPuzzleActive(game)
+          ? pickTangramPieceAtScreenCenter(game, camera->view, projection)
+          : 0;
   if (settings.dirShadowMapSize != lastDirShadowSize) {
     allocateDirShadowMap(settings.dirShadowMapSize);
     lastDirShadowSize = settings.dirShadowMapSize;
@@ -1610,6 +1738,14 @@ void Graphics::render(ClientGame& game) {
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
+    }
+  }
+
+  if (isOverworldTangramPuzzleActive(game)) {
+    const uint8_t stage = tangramRoleIsolationStage(game);
+    const uint8_t slot = localOverworldPlayerSlot(game);
+    if (shared::tangram_roles::canRotate(stage, slot)) {
+      drawTangramCrosshair(fbWidth, fbHeight);
     }
   }
 
