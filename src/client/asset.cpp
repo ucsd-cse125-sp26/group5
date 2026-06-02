@@ -1159,21 +1159,22 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
   }
 }
 
-void buildModelPalette(Model& model, int colors) {
-  model.palette.clear();
-  if (colors <= 0 || model.diffuseSamples.empty()) return;
+// Weighted k-means with deterministic strided seeding. 12 fixed iterations is
+// plenty for the tiny K (<=64) we care about and avoids needing a convergence
+// check. Empty samples / colors <= 0 → empty palette.
+static void runWeightedKMeans(const std::vector<DiffuseSample>& samples,
+                              int colors, std::vector<glm::vec3>& outPalette) {
+  outPalette.clear();
+  if (colors <= 0 || samples.empty()) return;
 
   const int maxColors = shared::kMaxPaletteColors;
-  const int k = std::min(
-      {colors, maxColors, static_cast<int>(model.diffuseSamples.size())});
+  const int k =
+      std::min({colors, maxColors, static_cast<int>(samples.size())});
 
-  // Deterministic strided seeds — spreads initial centroids without a PRNG.
   std::vector<glm::vec3> centroids(k);
-  const size_t stride = std::max<size_t>(1, model.diffuseSamples.size() / k);
+  const size_t stride = std::max<size_t>(1, samples.size() / k);
   for (int i = 0; i < k; ++i) {
-    centroids[i] = model
-                       .diffuseSamples[(static_cast<size_t>(i) * stride) %
-                                       model.diffuseSamples.size()]
+    centroids[i] = samples[(static_cast<size_t>(i) * stride) % samples.size()]
                        .color;
   }
 
@@ -1183,7 +1184,7 @@ void buildModelPalette(Model& model, int colors) {
   for (int iter = 0; iter < kIterations; ++iter) {
     std::ranges::fill(sums, glm::vec3(0.0f));
     std::ranges::fill(weights, 0.0f);
-    for (const auto& s : model.diffuseSamples) {
+    for (const auto& s : samples) {
       int best = 0;
       float bestD = std::numeric_limits<float>::infinity();
       for (int i = 0; i < k; ++i) {
@@ -1201,12 +1202,27 @@ void buildModelPalette(Model& model, int colors) {
       if (weights[i] > 0.0f) centroids[i] = sums[i] / weights[i];
     }
   }
-  model.palette = std::move(centroids);
+  outPalette = std::move(centroids);
 }
 
-static GLuint loadCubemap(const std::string& directory) {
+void buildModelPalette(Model& model, int colors) {
+  runWeightedKMeans(model.diffuseSamples, colors, model.palette);
+}
+
+void buildSkyboxPalette(Skybox& skybox, int colors) {
+  runWeightedKMeans(skybox.diffuseSamples, colors, skybox.palette);
+}
+
+static GLuint loadCubemap(const std::string& directory,
+                          std::vector<DiffuseSample>& outSamples) {
   const std::string suffixes[] = {"px.png", "nx.png", "py.png",
                                   "ny.png", "pz.png", "nz.png"};
+  // Fixed per-face sample budget — caps total samples at 6*N*N regardless of
+  // cubemap resolution so palette rebuilds stay cheap.
+  constexpr int kSamplesPerFaceAxis = 32;
+  outSamples.clear();
+  outSamples.reserve(6 * kSamplesPerFaceAxis * kSamplesPerFaceAxis);
+
   GLuint textureID;
   glGenTextures(1, &textureID);
   glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
@@ -1220,6 +1236,21 @@ static GLuint loadCubemap(const std::string& directory) {
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_SRGB8_ALPHA8,
                    width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
       GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, width, height);
+      // Stride-sample face pixels for k-means seeding. sRGB→linear so the
+      // palette lives in the same color space as paletteSnap() in the shader.
+      const int sw = std::max(1, width / kSamplesPerFaceAxis);
+      const int sh = std::max(1, height / kSamplesPerFaceAxis);
+      for (int py = 0; py < height; py += sh) {
+        for (int px = 0; px < width; px += sw) {
+          const uint8_t* p =
+              data + (static_cast<size_t>(py) * width + px) * 4;
+          outSamples.push_back(
+              {.color = glm::vec3(srgbToLinear(p[0] / 255.0f),
+                                  srgbToLinear(p[1] / 255.0f),
+                                  srgbToLinear(p[2] / 255.0f)),
+               .weight = 1.0f});
+        }
+      }
       stbi_image_free(data);
     } else {
       std::cout << "Cubemap tex failed to load at path: " << fullPath << '\n';
@@ -1273,7 +1304,9 @@ Skybox loadSkybox(const std::string& directory) {
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
   glBindVertexArray(0);
 
-  return Skybox{.vao = vao, .cubemapTexture = loadCubemap(directory)};
+  Skybox skybox{.vao = vao};
+  skybox.cubemapTexture = loadCubemap(directory, skybox.diffuseSamples);
+  return skybox;
 }
 
 std::vector<std::pair<std::string, Model*>> loadMapModels(
