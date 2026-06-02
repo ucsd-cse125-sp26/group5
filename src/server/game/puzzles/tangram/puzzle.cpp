@@ -388,9 +388,8 @@ void tryCompletePuzzle(ServerGame& game) {
       continue;
     if (game.registry.all_of<shared::RenderInfo>(fe)) continue;
     game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
-    auto buf =
-        serializeEntities(game.registry, game.componentRegistry,
-                          shared::PacketType::SPAWN_ENTITY, {fe}, false);
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::SPAWN_ENTITY, {fe}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
   printf(
