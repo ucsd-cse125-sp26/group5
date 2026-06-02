@@ -260,9 +260,8 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
     if (std::abs(sx) > 1.25f) layout.triggerHalfX = std::abs(sx);
     if (std::abs(sy) > 1.25f) layout.triggerHalfY = std::abs(sy);
     foundTrigger = true;
-    printf(
-        "[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
-        matchedName, x, y, z, sx, sy, sz);
+    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+           matchedName, x, y, z, sx, sy, sz);
   } else {
     printf(
         "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall trigger uses "
@@ -278,9 +277,8 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
     if (std::abs(sx) > 1.25f) layout.playHalfX = std::abs(sx);
     if (std::abs(sy) > 1.25f) layout.playHalfY = std::abs(sy);
     foundPlay = true;
-    printf(
-        "[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
-        matchedName, x, y, z, sx, sy, sz);
+    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+           matchedName, x, y, z, sx, sy, sz);
   } else {
     printf(
         "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall play zone uses "
@@ -320,7 +318,8 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
   return foundTrigger || foundPlay;
 }
 
-bool tryApplyFallLayoutFromMapFile(const std::string& path, FallLayout& layout) {
+bool tryApplyFallLayoutFromMapFile(const std::string& path,
+                                   FallLayout& layout) {
   ParsedModel parsed;
   if (!parsed.load(path, MAP_LOAD_FLAGS)) {
     printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),

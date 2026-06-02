@@ -350,9 +350,9 @@ void initWorldEntities(ServerGame& game) {
   // add more per section as needed
   spawnFallingHazardZone<shared::OverworldTag>(
       game,
-      /*center=*/glm::vec3(game.fallLayout.playCenterX,
-                           game.fallLayout.playCenterY,
-                           game.fallLayout.playCenterZ),
+      /*center=*/
+      glm::vec3(game.fallLayout.playCenterX, game.fallLayout.playCenterY,
+                game.fallLayout.playCenterZ),
       /*radius=*/std::min(game.fallLayout.playHalfX, game.fallLayout.playHalfY),
       /*spawnHeight=*/game.fallLayout.spawnHeight,
       /*interval=*/0.4f);
@@ -369,41 +369,37 @@ void initWorldEntities(ServerGame& game) {
               .collision = CollisionShape::None,
           },
           StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.playCenterX -
-                                        game.fallLayout.playHalfX,
-                                    game.fallLayout.playCenterY -
-                                        game.fallLayout.playHalfY,
-                                    game.fallLayout.playCenterZ + 4.0f),
+              .position = glm::vec3(
+                  game.fallLayout.playCenterX - game.fallLayout.playHalfX,
+                  game.fallLayout.playCenterY - game.fallLayout.playHalfY,
+                  game.fallLayout.playCenterZ + 4.0f),
               .modelName = "goal_cube",
               .scale = glm::vec3(1.2f, 1.2f, 8.0f),
               .collision = CollisionShape::None,
           },
           StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.playCenterX -
-                                        game.fallLayout.playHalfX,
-                                    game.fallLayout.playCenterY +
-                                        game.fallLayout.playHalfY,
-                                    game.fallLayout.playCenterZ + 4.0f),
+              .position = glm::vec3(
+                  game.fallLayout.playCenterX - game.fallLayout.playHalfX,
+                  game.fallLayout.playCenterY + game.fallLayout.playHalfY,
+                  game.fallLayout.playCenterZ + 4.0f),
               .modelName = "goal_cube",
               .scale = glm::vec3(1.2f, 1.2f, 8.0f),
               .collision = CollisionShape::None,
           },
           StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.playCenterX +
-                                        game.fallLayout.playHalfX,
-                                    game.fallLayout.playCenterY -
-                                        game.fallLayout.playHalfY,
-                                    game.fallLayout.playCenterZ + 4.0f),
+              .position = glm::vec3(
+                  game.fallLayout.playCenterX + game.fallLayout.playHalfX,
+                  game.fallLayout.playCenterY - game.fallLayout.playHalfY,
+                  game.fallLayout.playCenterZ + 4.0f),
               .modelName = "goal_cube",
               .scale = glm::vec3(1.2f, 1.2f, 8.0f),
               .collision = CollisionShape::None,
           },
           StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.playCenterX +
-                                        game.fallLayout.playHalfX,
-                                    game.fallLayout.playCenterY +
-                                        game.fallLayout.playHalfY,
-                                    game.fallLayout.playCenterZ + 4.0f),
+              .position = glm::vec3(
+                  game.fallLayout.playCenterX + game.fallLayout.playHalfX,
+                  game.fallLayout.playCenterY + game.fallLayout.playHalfY,
+                  game.fallLayout.playCenterZ + 4.0f),
               .modelName = "goal_cube",
               .scale = glm::vec3(1.2f, 1.2f, 8.0f),
               .collision = CollisionShape::None,
