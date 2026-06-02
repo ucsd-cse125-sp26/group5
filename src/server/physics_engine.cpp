@@ -72,6 +72,36 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
   return body->GetID();
 }
 
+JPH::BodyID PhysicsEngine::createTangramPieceBody(
+    const std::string& modelName, const glm::vec3& pos, const glm::quat& rot,
+    const glm::vec3& scale, JPH::ObjectLayer objectLayer) {
+  auto& bodyInterface = getBodyInterface();
+  JPH::ShapeRefC shape = playerShapeForAsset(modelName, scale);
+
+  JPH::Quat joltRot(rot.x, rot.y, rot.z, rot.w);
+  JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
+                                     joltRot, JPH::EMotionType::Dynamic,
+                                     objectLayer);
+  settings.mGravityFactor = 0.0f;
+  // Heavy slabs: hard to shove, high damping kills glide after you stop
+  // pushing.
+  settings.mOverrideMassProperties =
+      JPH::EOverrideMassProperties::CalculateInertia;
+  settings.mMassPropertiesOverride.mMass = 550.0f;
+  settings.mFriction = 1.15f;
+  settings.mRestitution = 0.0f;
+  settings.mLinearDamping = 48.0f;
+  settings.mAngularDamping = 10.0f;
+  settings.mMaxLinearVelocity = 1.6f;
+  settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
+                          JPH::EAllowedDOFs::TranslationY |
+                          JPH::EAllowedDOFs::RotationZ;
+  settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+
+  JPH::Body* body = bodyInterface.CreateBody(settings);
+  return body->GetID();
+}
+
 JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
                                                    const glm::vec3& pos) {
   auto& bodyInterface = getBodyInterface();
@@ -160,11 +190,15 @@ JPH::ShapeRefC buildMeshShape(JPH::TriangleList&& tris, const char* tag) {
 
 JPH::BodyID PhysicsEngine::createStaticBody(const JPH::ShapeRefC& shape,
                                             const glm::vec3& pos,
-                                            const glm::quat& rot) {
+                                            const glm::quat& rot,
+                                            float frictionOrNegative) {
   JPH::Quat joltRot(rot.x, rot.y, rot.z, rot.w);
   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
                                      joltRot, JPH::EMotionType::Static,
                                      Layers::NON_MOVING);
+  if (frictionOrNegative >= 0.0f) {
+    settings.mFriction = frictionOrNegative;
+  }
   JPH::Body* body = getBodyInterface().CreateBody(settings);
   getBodyInterface().AddBody(body->GetID(), JPH::EActivation::DontActivate);
   return body->GetID();

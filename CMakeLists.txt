@@ -18,14 +18,18 @@ add_library(shared
     src/shared/hello.cpp
     src/shared/util.cpp
     src/shared/mesh_loader.cpp
+    src/shared/puzzles/maze/layout.cpp
+    src/shared/map_gamelogic_layout.cpp
+    src/shared/puzzles/tangram/arena_layout.cpp
     )
 target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-add_subdirectory(lib/glfw)
-
 add_subdirectory(lib/glm)
+target_link_libraries(shared PUBLIC glm::glm)
+
+add_subdirectory(lib/glfw)
 
 add_subdirectory(lib/enet)
 target_include_directories(enet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include)
@@ -107,7 +111,7 @@ if(NOT MSVC)
     target_compile_options(soloud PRIVATE -Wno-deprecated-declarations -Wno-tautological-compare)
 endif()
 
-target_compile_definitions(soloud PUBLIC 
+target_compile_definitions(soloud PUBLIC
     WITH_MINIAUDIO 
     #MA_DEBUG_OUTPUT
     #MA_NO_RUNTIME_LINKING
@@ -147,7 +151,7 @@ elseif(UNIX)
 endif()
 
 if(WIN32)
-    target_compile_definitions(soloud PUBLIC 
+    target_compile_definitions(soloud PUBLIC
     NOMINMAX
     MA_NO_RUNTIME_LINKING
 )
@@ -206,10 +210,17 @@ add_library(server_lib STATIC
     src/server/server_game.cpp
     src/server/game_state.cpp
     src/server/game/maze_generation.cpp
-    src/server/game/maze_trigger.cpp
-    src/server/game/maze_camera.cpp
+    src/server/game/section_puzzle.cpp
+    src/server/game/puzzles/maze/trigger.cpp
+    src/server/game/puzzles/maze/layout_editor.cpp
+    src/server/game/puzzles/maze/camera.cpp
+    src/server/game/puzzles/maze/puzzle.cpp
+    src/server/game/puzzles/tangram/trigger.cpp
+    src/server/game/puzzles/tangram/layout_editor.cpp
+    src/server/game/puzzles/tangram/camera.cpp
+    src/server/game/puzzles/tangram/puzzle.cpp
+    src/server/game/puzzles/tangram/roles.cpp
     src/server/game/maze_spirit_control.cpp
-    src/server/game/overworld_maze_puzzle.cpp
     src/server/game/fall_challenge.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp

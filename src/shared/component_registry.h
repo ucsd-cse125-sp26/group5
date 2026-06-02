@@ -97,7 +97,9 @@ enum ComponentIds : ComponentTypeId {
   CID_ANIMATIONSTATE = 11,
   CID_MAZESPIRITGRID = 12,
   CID_SOUNDEMITTER = 13,
-  CID_FALL_CHALLENGE = 14,
+  CID_OVERWORLD_TANGRAM_PUZZLE = 14,
+  CID_TANGRAM_PIECE = 15,
+  CID_FALL_CHALLENGE = 16,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -144,6 +146,15 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_MAZESPIRITGRID:
         dst.remove<MazeSpiritGrid>(entity);
+        break;
+      case CID_OVERWORLD_TANGRAM_PUZZLE:
+        dst.remove<OverworldTangramPuzzleState>(entity);
+        break;
+      case CID_TANGRAM_PIECE:
+        dst.remove<TangramPiece>(entity);
+        break;
+      case CID_FALL_CHALLENGE:
+        dst.remove<FallChallengeState>(entity);
         break;
     }
   };
@@ -230,7 +241,6 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
     }
   }
 }
-
 inline ComponentRegistry createDefaultRegistry() {
   ComponentRegistry reg;
   reg.registerComponent<Position>(CID_POSITION);
@@ -242,6 +252,9 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<DirectionalLight>(CID_DIRECTIONALLIGHT);
   reg.registerComponent<SoundEmitter>(CID_SOUNDEMITTER);
   reg.registerComponent<OverworldMazePuzzleState>(CID_OVERWORLD_MAZE_PUZZLE);
+  reg.registerComponent<OverworldTangramPuzzleState>(
+      CID_OVERWORLD_TANGRAM_PUZZLE);
+  reg.registerComponent<TangramPiece>(CID_TANGRAM_PIECE);
   reg.registerComponent<ColorBoundingBox>(CID_COLORBOUNDINGBOX);
   reg.registerComponent<AnimationState>(CID_ANIMATIONSTATE);
   // Replicated so the client can identify the maze spirit cube to attach

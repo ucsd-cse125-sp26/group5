@@ -63,6 +63,7 @@ struct PlayerInput {
   InputKeys keys_newly_pressed;
   float mouseDx;
   float mouseDy;
+  uint32_t rotateTargetId = 0;
 };
 
 struct PointLight {
@@ -153,10 +154,17 @@ struct GameSection {
   uint8_t sectionsCompleted = 0;  // count 0 to 4
 };
 
+enum class OverworldPuzzleKind : uint8_t {
+  None = 0,
+  Maze = 1,
+  Tangram = 2,
+};
+
 struct PuzzleComponent {
   RunPhase phase = RunPhase::LOBBY;
   uint32_t puzzleElapsedTimeMs = 0;
   uint32_t puzzleTimeLimitMs = 0;
+  OverworldPuzzleKind overworldKind = OverworldPuzzleKind::None;
 };
 
 enum class MazeDirection : uint8_t { NONE = 0, UP, DOWN, LEFT, RIGHT };
@@ -228,9 +236,33 @@ struct FragmentComponent {
 // Overworld mini-board puzzle (four players, shared green piece).
 struct OverworldMazePuzzleState {
   bool active = false;
+  bool completed = false;
 };
 
 struct OverworldMazePiece {};
+
+struct TangramPiece {
+  uint8_t pieceId = 0;       // 1–7
+  bool slotSnapped = false;  // XY locked to slot; yaw still player-controlled
+};
+
+struct OverworldTangramPiece {};
+
+// Ghost outline on the goal square (target pose per piece id 1–7).
+struct TangramSlotGhost {
+  uint8_t pieceId = 0;
+};
+
+// Tangram push puzzle active flag (synced to clients).
+struct OverworldTangramPuzzleState {
+  bool active = false;
+  // shared::tangram_roles::kIsolationStage while active; 0 = full access.
+  uint8_t roleIsolationStage = 0;
+};
+
+struct TangramLayoutVisual {};
+
+struct MazeLayoutVisual {};
 
 // Server-only: marks a falling hazard cube. `age` drives lifetime cleanup so
 // objects that land and rest on the floor don't accumulate forever.

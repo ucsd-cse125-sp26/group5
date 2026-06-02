@@ -3,13 +3,16 @@
 #include <GLFW/glfw3.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
 #include "client/spsc_queue.h"
 #include "client_network.h"
+#include "glm/glm.hpp"
 #include "shared/components.h"
 #include "shared/protocol.h"
+#include "shared/puzzles/tangram/roles.h"
 #include "shared/simple_profiler.h"
 #include "shared/sound_constants.h"
 
@@ -44,6 +47,27 @@ void removeSyncedComponent(entt::registry& registry, entt::entity entity,
       break;
     case shared::CID_OVERWORLD_MAZE_PUZZLE:
       registry.remove<shared::OverworldMazePuzzleState>(entity);
+      break;
+    case shared::CID_COLORBOUNDINGBOX:
+      registry.remove<shared::ColorBoundingBox>(entity);
+      break;
+    case shared::CID_ANIMATIONSTATE:
+      registry.remove<shared::AnimationState>(entity);
+      break;
+    case shared::CID_MAZESPIRITGRID:
+      registry.remove<shared::MazeSpiritGrid>(entity);
+      break;
+    case shared::CID_SOUNDEMITTER:
+      registry.remove<shared::SoundEmitter>(entity);
+      break;
+    case shared::CID_OVERWORLD_TANGRAM_PUZZLE:
+      registry.remove<shared::OverworldTangramPuzzleState>(entity);
+      break;
+    case shared::CID_TANGRAM_PIECE:
+      registry.remove<shared::TangramPiece>(entity);
+      break;
+    case shared::CID_FALL_CHALLENGE:
+      registry.remove<shared::FallChallengeState>(entity);
       break;
   }
 }
@@ -112,6 +136,7 @@ void registerClientHandlers(ClientNetwork& network) {
         shared::AssignPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.networkEntityId = pkt.entityId;
+        game.snapshotDirty.store(true, std::memory_order_release);
       });
 
   network.dispatcher().on(
@@ -149,9 +174,8 @@ void registerClientHandlers(ClientNetwork& network) {
             std::memcpy(&compCount, data + offset, sizeof(uint16_t));
             offset += sizeof(uint16_t);
 
-            bool
-                present[static_cast<size_t>(shared::CID_OVERWORLD_MAZE_PUZZLE) +
-                        1] = {};
+            bool present[static_cast<size_t>(shared::CID_TANGRAM_PIECE) + 1] =
+                {};
             for (uint16_t c = 0; c < compCount; c++) {
               shared::ComponentTypeId cid;
               std::memcpy(&cid, data + offset, sizeof(uint16_t));
@@ -224,6 +248,12 @@ void syncToRender(ClientGame& game) {
                         game.renderEntityMap);
 }
 
+void bootstrapClientWorldSnapshot(ClientGame& game) {
+  std::scoped_lock lock(game.snapshotMutex);
+  syncToRender(game);
+  game.snapshotDirty.store(false, std::memory_order_release);
+}
+
 // ── Input ────────────────────────────────────────────────
 
 bool isOverworldMazePuzzleActive(const ClientGame& game) {
@@ -234,78 +264,152 @@ bool isOverworldMazePuzzleActive(const ClientGame& game) {
   return false;
 }
 
+bool isOverworldMazePuzzleComplete(const ClientGame& game) {
+  auto view = game.renderRegistry.view<shared::OverworldMazePuzzleState>();
+  for (auto ent : view) {
+    if (view.get<shared::OverworldMazePuzzleState>(ent).completed) return true;
+  }
+  return false;
+}
+
+void updateWinterMazeWindowTitle(GLFWwindow* window, const ClientGame& game) {
+  if (isOverworldMazePuzzleComplete(game)) {
+    glfwSetWindowTitle(window, "Winter Maze Complete");
+  } else if (isOverworldMazePuzzleActive(game)) {
+    glfwSetWindowTitle(window, "Winter Maze - Arrow Control");
+  } else {
+    glfwSetWindowTitle(window, "Hello World");
+  }
+}
+
+bool isOverworldTangramPuzzleActive(const ClientGame& game) {
+  auto view = game.renderRegistry.view<shared::OverworldTangramPuzzleState>();
+  for (auto ent : view) {
+    if (view.get<shared::OverworldTangramPuzzleState>(ent).active) return true;
+  }
+  return false;
+}
+
+uint8_t tangramRoleIsolationStage(const ClientGame& game) {
+  auto view = game.renderRegistry.view<shared::OverworldTangramPuzzleState>();
+  for (auto ent : view) {
+    const auto& st = view.get<shared::OverworldTangramPuzzleState>(ent);
+    if (st.active) return st.roleIsolationStage;
+  }
+  return 0;
+}
+
+uint8_t localOverworldPlayerSlot(const ClientGame& game) {
+  auto it = game.renderEntityMap.find(game.renderEntityId);
+  if (it == game.renderEntityMap.end() ||
+      !game.renderRegistry.valid(it->second)) {
+    return 0;
+  }
+  if (!game.renderRegistry.all_of<shared::RenderInfo>(it->second)) return 0;
+  const uint8_t slot =
+      game.renderRegistry.get<shared::RenderInfo>(it->second).playerSlot;
+  if (slot < 1 || slot > 4) return 0;
+  return slot;
+}
+
+bool isLocalOverworldTangramPuzzleControl(const ClientGame& game) {
+  return isOverworldTangramPuzzleActive(game);
+}
+
 bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
   if (!isOverworldMazePuzzleActive(game)) return false;
 
   auto it = game.renderEntityMap.find(game.renderEntityId);
-  if (it == game.renderEntityMap.end() ||
-      !game.renderRegistry.valid(it->second)) {
-    return false;
+  return it != game.renderEntityMap.end() &&
+         game.renderRegistry.valid(it->second);
+}
+
+uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
+                                        const glm::mat4& view,
+                                        const glm::mat4& projection) {
+  uint32_t bestId = 0;
+  float bestDist = 1e9f;
+  constexpr float kMaxNdcRadius = 0.14f;
+
+  auto pieceView =
+      game.renderRegistry
+          .view<shared::Entity, shared::Position, shared::TangramPiece>();
+  for (auto ent : pieceView) {
+    const auto& pos = pieceView.get<shared::Position>(ent);
+    const auto& entity = pieceView.get<shared::Entity>(ent);
+    const glm::vec4 clip =
+        projection * view * glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+    if (clip.w <= 0.0f) continue;
+    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+    if (ndc.z < -1.0f || ndc.z > 1.0f) continue;
+    const float d = std::hypot(ndc.x, ndc.y);
+    if (d > kMaxNdcRadius || d >= bestDist) continue;
+    bestDist = d;
+    bestId = entity.id;
   }
-  return game.renderRegistry.all_of<shared::RenderInfo>(it->second);
+  return bestId;
 }
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys, bool debugMode) {
   InputKeys keys = 0;
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
-  if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
-  if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
-  if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
-  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
-  if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
-  if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
-  if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
-  if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
-  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
-  if (debugMode) {
-    if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
-      keys |= KEY_DEBUG_COMPLETE_SECTION;
-    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
-      keys |= KEY_DEBUG_TOGGLE_BARRIERS;
+  const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
+
+  if (!mazeBoardControl) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
+    if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) keys |= KEY_LIGHT_DIM;
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) keys |= KEY_LIGHT_BRIGHT;
+    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
+    if (debugMode) {
+      if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+        keys |= KEY_DEBUG_COMPLETE_SECTION;
+      if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
+        keys |= KEY_DEBUG_TOGGLE_BARRIERS;
+      if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
+        keys |= KEY_DEBUG_PRINT_POS;
+    }
   }
 
-  // Overworld preview board: each client controls one direction on the shared
-  // green piece (slot 1=up, 2=down, 3=left, 4=right).
-  if (isLocalOverworldMazePuzzleControl(game)) {
-    auto it = game.renderEntityMap.find(game.renderEntityId);
-    uint8_t slot = 1;
-    if (it != game.renderEntityMap.end() &&
-        game.renderRegistry.valid(it->second) &&
-        game.renderRegistry.all_of<shared::RenderInfo>(it->second)) {
-      slot = game.renderRegistry.get<shared::RenderInfo>(it->second).playerSlot;
-      if (slot < 1 || slot > 4) slot = 1;
-    }
-    switch (slot) {
-      case 1:
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-          keys |= KEY_SPIRIT_UP;
-        break;
-      case 2:
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-          keys |= KEY_SPIRIT_DOWN;
-        break;
-      case 3:
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-          keys |= KEY_SPIRIT_LEFT;
-        break;
-      case 4:
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-          keys |= KEY_SPIRIT_RIGHT;
-        break;
-      default:
-        break;
+  if (mazeBoardControl) {
+    // Send every arrow key pressed; server MazePadBinding picks the one
+    // assigned to this player's join slot.
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) keys |= KEY_SPIRIT_UP;
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+      keys |= KEY_SPIRIT_DOWN;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+      keys |= KEY_SPIRIT_LEFT;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+      keys |= KEY_SPIRIT_RIGHT;
+  }
+
+  if (isOverworldTangramPuzzleActive(game) &&
+      glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+    const uint8_t stage = tangramRoleIsolationStage(game);
+    const uint8_t slot = localOverworldPlayerSlot(game);
+    if (shared::tangram_roles::canRotate(stage, slot)) {
+      keys |= KEY_ROTATE_PIECE;
     }
   }
   static bool mouseInit = false;
   static double prevMouseX = 0.0, prevMouseY = 0.0;
+  static uint32_t prevRotateTargetId = 0;
   float mouseDx = 0.0f, mouseDy = 0.0f;
+  const bool tangramActive = isOverworldTangramPuzzleActive(game);
+  const uint32_t rotateTargetId =
+      tangramActive ? game.tangramCrosshairTargetId : 0;
+  const bool lockCamera = mazeBoardControl;
   bool captured = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
-  if (captured) {
+  if (captured && !lockCamera) {
     double mouseX, mouseY;
     glfwGetCursorPos(window, &mouseX, &mouseY);
     if (mouseInit) {
@@ -320,15 +424,19 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     mouseInit = false;  // re-prime on next capture
   }
 
-  if (keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f) {
+  if (keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f ||
+      rotateTargetId != prevRotateTargetId ||
+      (tangramActive && (keys & KEY_ROTATE_PIECE))) {
     shared::InputPacket pkt;
     pkt.type = shared::PacketType::INPUT;
     pkt.keys = keys;
     pkt.mouseDx = mouseDx;
     pkt.mouseDy = mouseDy;
+    pkt.rotateTargetId = rotateTargetId;
     inputQueue.tryPush(pkt);
   }
   prevKeys = keys;
+  prevRotateTargetId = rotateTargetId;
 }
 
 // ── Debug ────────────────────────────────────────────────

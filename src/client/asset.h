@@ -11,6 +11,7 @@
 #include "glm/ext/quaternion_float.hpp"
 #include "shared/assets.h"
 #include "shared/mesh_loader.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
 
 // Skinning caps. Vertex slot count must match MAX_BONE_INFLUENCE, and the
 // vertex shaders' uniform array length must match MAX_BONES.
@@ -104,6 +105,15 @@ class Shader;
 
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel(const shared::CubeSpec& spec);
+// Flat tangram piece mesh (triangle / square / parallelogram) in the X/Y plane,
+// Z up.
+Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def);
+// Grey silhouette for non–slot-2 players when color isolation is on.
+Model* makeTangramPieceMuteModel(const shared::tangram_puzzle::PieceDef& def);
+Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def);
+// Ghost outline tinted like the playable piece (for slot 3 placement guide).
+Model* makeTangramColoredGhostSlotModel(
+    const shared::tangram_puzzle::PieceDef& def);
 // Player join order 1–4: same rainbow cube with digit 1–4 on the top face.
 Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot);
 Skybox loadSkybox(const std::string& directory);

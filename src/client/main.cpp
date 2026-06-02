@@ -12,10 +12,15 @@
 #include "client_game.h"
 #include "client_network.h"
 #include "imgui.h"
+#include "shared/dev_spawn.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
+#include "shared/map_format.h"
+#include "shared/map_gamelogic_layout.h"
+#include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/simple_profiler.h"
+#include "shared/util.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
@@ -26,40 +31,68 @@ int main() {
   game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
 
-  Graphics graphics;
-  if (!graphics.load(960, 600)) {
-    return EXIT_FAILURE;
-  }
-
-  game.audio.init();  // non-fatal: runs silently if audio backend unavailable
-
   if (!network.connect("localhost", 7777)) {
     return EXIT_FAILURE;
   }
 
   registerClientHandlers(network);
 
+  // Service ENet while graphics.load() parses the huge map glb (~130 meshes).
+  // Otherwise the client never calls enet_host_service for minutes and the
+  // connection times out (looks like "last player disconnects" when the
+  // slowest loader finishes last). Same for tryApplyMazeLayoutFromMapFile.
   InputKeys prevKeys = 0;
-
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
 
-  auto lastTime = (float)glfwGetTime();
+  Graphics graphics;
+  if (!graphics.load(960, 600)) {
+    game.running.store(false, std::memory_order_release);
+    networkThread.join();
+    return EXIT_FAILURE;
+  }
 
+  shared::map_gamelogic_layout::tryApplyMazeLayoutFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.mazeLayout);
+  shared::map_gamelogic_layout::tryApplyTangramArenaFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.tangramArena);
+  game.mazeLayout.applyHeightBoost();
+  game.tangramArena.applyHeightBoost();
+
+  // if (!game.audio.init()) {
+  //   game.running.store(false, std::memory_order_release);
+  //   networkThread.join();
+  //   return EXIT_FAILURE;
+  // }
+
+  if (!game.audio.init()) {
+    printf("Audio init failed; continuing without audio\n");
+  }
+
+  if (shared::dev_spawn::kOverworldSpawn ==
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    printf("[DevSpawn] Client fallback camera: tangram pad\n");
+  } else {
+    printf("[DevSpawn] Client fallback camera: winter maze\n");
+  }
+  auto lastTime = (float)glfwGetTime();
   while (!glfwWindowShouldClose(graphics.window)) {
-    // add dt calculation at top of loop
     auto currentTime = (float)glfwGetTime();
     float dt = currentTime - lastTime;
     lastTime = currentTime;
     SIMPLE_PROFILE_FRAME_START();
     GPU_PROFILE_FRAME_BEGIN();
 
-    SIMPLE_PROFILE_FRAME_START();
+    glfwPollEvents();
+    graphics.processDebugKeys();
     if (game.snapshotDirty.load(std::memory_order_acquire)) {
       std::scoped_lock lock(game.snapshotMutex);
       syncToRender(game);
       game.snapshotDirty.store(false, std::memory_order_release);
+    } else if (game.renderEntityMap.empty() && !game.networkEntityMap.empty()) {
+      bootstrapClientWorldSnapshot(game);
     }
 
+    updateWinterMazeWindowTitle(graphics.window, game);
     float lx = 0, ly = 0, lz = 0;
     float fwdX = 0, fwdY = 1, fwdZ = 0;
     auto camView = game.renderRegistry.view<shared::Position, shared::Camera>();
@@ -74,7 +107,7 @@ int main() {
     game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
     updateSoundEmitters(game, lx, ly, lz, dt);  // pass dt
 
-    graphics.render(game);
+    graphics.render(game, network);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");
       game.audio.update(dt);
@@ -82,8 +115,6 @@ int main() {
     graphics.swap();
     GPU_PROFILE_FRAME_END();
     GPU_MEM_FRAME_END();
-    glfwPollEvents();
-    graphics.processDebugKeys();
 
     // ESC toggles the settings menu (and the cursor follows menu state).
     bool escNow = glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
@@ -111,10 +142,6 @@ int main() {
 
     processInput(graphics.window, game, game.inputQueue, prevKeys,
                  graphics.debugChannel != DebugChannel::Off);
-    if (!graphics.settingsMenuOpen) {
-      processInput(graphics.window, game, game.inputQueue, prevKeys,
-                   graphics.debugChannel != DebugChannel::Off);
-    }
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 

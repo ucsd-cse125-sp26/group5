@@ -34,7 +34,14 @@ class ParsedModel;
 namespace Layers {
 static constexpr JPH::ObjectLayer NON_MOVING = 0;
 static constexpr JPH::ObjectLayer MOVING = 1;
-static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
+// Tangram pieces when push isolation is on (collide floor + pusher + other
+// pieces).
+static constexpr JPH::ObjectLayer TANGRAM = 2;
+// Overworld avatars that must not shove tangram pieces (slots 2–4).
+static constexpr JPH::ObjectLayer MOVING_NO_TANGRAM = 3;
+// Snapped tangram pieces: no collision — players and loose pieces pass through.
+static constexpr JPH::ObjectLayer TANGRAM_SNAPPED = 4;
+static constexpr JPH::ObjectLayer NUM_LAYERS = 5;
 };  // namespace Layers
 
 // Tells Jolt which layers can collide with each other
@@ -44,9 +51,19 @@ class ObjectLayerPairFilterImpl : public JPH::ObjectLayerPairFilter {
                                    JPH::ObjectLayer b) const override {
     switch (a) {
       case Layers::NON_MOVING:
-        return b == Layers::MOVING;
+        return b == Layers::MOVING || b == Layers::MOVING_NO_TANGRAM ||
+               b == Layers::TANGRAM;
+      // Pusher (slot 1): floor + tangram only — no player–player shove into
+      // pieces.
       case Layers::MOVING:
-        return true;
+        return b == Layers::NON_MOVING || b == Layers::TANGRAM;
+      case Layers::MOVING_NO_TANGRAM:
+        return b == Layers::NON_MOVING || b == Layers::MOVING_NO_TANGRAM;
+      case Layers::TANGRAM:
+        return b == Layers::NON_MOVING || b == Layers::MOVING ||
+               b == Layers::TANGRAM;
+      case Layers::TANGRAM_SNAPPED:
+        return false;
       default:
         return false;
     }
@@ -65,6 +82,9 @@ class BPLayerInterfaceImpl : public JPH::BroadPhaseLayerInterface {
   BPLayerInterfaceImpl() {
     mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
     mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
+    mObjectToBroadPhase[Layers::TANGRAM] = BroadPhaseLayers::MOVING;
+    mObjectToBroadPhase[Layers::MOVING_NO_TANGRAM] = BroadPhaseLayers::MOVING;
+    mObjectToBroadPhase[Layers::TANGRAM_SNAPPED] = BroadPhaseLayers::MOVING;
   }
   [[nodiscard]] JPH::uint GetNumBroadPhaseLayers() const override {
     return BroadPhaseLayers::NUM_LAYERS;
@@ -101,7 +121,12 @@ class ObjectVsBroadPhaseLayerFilterImpl
       case Layers::NON_MOVING:
         return bpLayer == BroadPhaseLayers::MOVING;
       case Layers::MOVING:
-        return true;
+      case Layers::MOVING_NO_TANGRAM:
+      case Layers::TANGRAM:
+      case Layers::TANGRAM_SNAPPED:
+        // Static map meshes live in NON_MOVING broadphase; must query both.
+        return bpLayer == BroadPhaseLayers::NON_MOVING ||
+               bpLayer == BroadPhaseLayers::MOVING;
       default:
         return false;
     }
@@ -168,6 +193,11 @@ class PhysicsEngine {
                                        const glm::quat& rot,
                                        const glm::vec3& scale);
 
+  // Tangram piece on the overworld platform: slides on XY, no gravity.
+  JPH::BodyID createTangramPieceBody(
+      const std::string& modelName, const glm::vec3& pos, const glm::quat& rot,
+      const glm::vec3& scale, JPH::ObjectLayer objectLayer = Layers::MOVING);
+
   // Gravity-driven obstacle (falling hazard cube). Dynamic, full DOFs so it
   // tumbles, LinearCast so it can't tunnel through the floor or a player.
   JPH::BodyID createFallingObjectBody(const glm::vec3& halfExtents,
@@ -190,7 +220,8 @@ class PhysicsEngine {
                                      const glm::vec3& scale);
 
   JPH::BodyID createStaticBody(const JPH::ShapeRefC& shape,
-                               const glm::vec3& pos, const glm::quat& rot);
+                               const glm::vec3& pos, const glm::quat& rot,
+                               float frictionOrNegative = -1.0f);
 
   // `localCenterOffset` keeps the body at `pos` while shifting the collision
   // volume — avoids the per-tick sync writing an offset back into Position.

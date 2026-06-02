@@ -12,6 +12,7 @@
 #include "shared/components.h"
 #include "shared/lighting.h"
 #include "shared/map_format.h"
+#include "shared/map_gamelogic_layout.h"
 #include "shared/mesh_loader.h"
 
 namespace {
@@ -121,6 +122,18 @@ bool loadMap(ServerGame& game, const std::string& path,
       ++skippedLights;
     }
   }
+
+  shared::map_gamelogic_layout::tryApplyMazeLayoutFromMap(parsed,
+                                                          game.mazeLayout);
+  game.mazeLayout.applyHeightBoost();
+  shared::map_gamelogic_layout::tryApplyFallLayoutFromMap(parsed,
+                                                          game.fallLayout);
+  shared::map_gamelogic_layout::tryApplyTangramArenaFromMap(parsed,
+                                                            game.tangramArena);
+  game.tangramArena.applyHeightBoost();
+  shared::map_gamelogic_layout::tryApplyTangramSlotsFromMap(
+      parsed, game.tangramArena.boardCenterX, game.tangramArena.boardCenterY,
+      game.tangramSlotLayout);
 
   printf(
       "loadMap: \"%s\" — spawned %u mesh entities, %u point lights "

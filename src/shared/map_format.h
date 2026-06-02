@@ -3,7 +3,6 @@
 #include <assimp/postprocess.h>
 
 namespace shared {
-
 inline constexpr const char* DEFAULT_MAP_PATH = "maps/assets/landscape.glb";
 inline constexpr const char* MAP_MODEL_PREFIX = "map:";
 
