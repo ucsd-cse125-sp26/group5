@@ -43,12 +43,12 @@ bool allActivePlayersInTangramTrigger(const ServerGame& game) {
 
 bool isFallTypingAvailable(const ServerGame& game) {
   return section_puzzle::isSectionAvailable(game,
-                                            shared::SectionSeasonMap::FALL);
+                                            shared::SectionSeasonMap::SPRING);
 }
 
 bool canTriggerTangram(const ServerGame& game) {
   return section_puzzle::isSectionUnlocked(game,
-                                           shared::SectionSeasonMap::FALL);
+                                           shared::SectionSeasonMap::SPRING);
 }
 
 glm::vec3 overworldSpawnPosition(const shared::tangram::ArenaLayout& layout,

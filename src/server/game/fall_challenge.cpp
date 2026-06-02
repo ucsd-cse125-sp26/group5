@@ -17,12 +17,6 @@
 namespace fall_challenge {
 namespace {
 
-// Single source of truth for the fall-section zone. Both activation and the
-// meter use these; previously the same numbers were duplicated in two places
-// with a "must match" comment, which was easy to break.
-const glm::vec3 kZoneCenter(50.0f, 0.0f, 0.0f);
-const glm::vec3 kZoneHalf(12.0f, 12.0f, 60.0f);
-
 void falling_objects_system(ServerGame& game, float dt) {
   static std::mt19937 rng(1337);
 
@@ -206,9 +200,13 @@ void maybeActivateFallChallenge(ServerGame& game) {
   auto& cs = game.registry.get<shared::FallChallengeState>(ctrl);
   if (cs.active || cs.completed) return;  // don't restart a finished challenge
 
-  // Activation fires when every connected player is inside the zone box.
-  const glm::vec3& center = kZoneCenter;
-  const glm::vec3& half = kZoneHalf;
+  // Activation fires when every connected player is inside the trigger box.
+  const float cx = game.fallLayout.triggerCenterX;
+  const float cy = game.fallLayout.triggerCenterY;
+  const float cz = game.fallLayout.triggerCenterZ;
+  const float hx = game.fallLayout.triggerHalfX;
+  const float hy = game.fallLayout.triggerHalfY;
+  constexpr float hz = 60.0f;
 
   int connected = 0, insideCount = 0;
   for (auto& [peer, slots] : game.active_players) {
@@ -218,9 +216,8 @@ void maybeActivateFallChallenge(ServerGame& game) {
       continue;
     ++connected;
     auto& pos = game.registry.get<shared::Position>(p);
-    if (std::abs(pos.x - center.x) <= half.x &&
-        std::abs(pos.y - center.y) <= half.y &&
-        std::abs(pos.z - center.z) <= half.z)
+    if (std::abs(pos.x - cx) <= hx && std::abs(pos.y - cy) <= hy &&
+        std::abs(pos.z - cz) <= hz)
       ++insideCount;
   }
   // Dynamic: fires when every CONNECTED player is inside, whatever the count.
@@ -241,9 +238,13 @@ void fall_challenge_system(ServerGame& game, float dt) {
   auto& cs = game.registry.get<shared::FallChallengeState>(ctrl);
   if (!cs.active) return;
 
-  // Zone bounds — single source of truth in kZoneCenter / kZoneHalf above.
-  const glm::vec3& center = kZoneCenter;
-  const glm::vec3& half = kZoneHalf;
+  // Play-zone bounds: players survive inside this area while cubes rain above.
+  const float cx = game.fallLayout.playCenterX;
+  const float cy = game.fallLayout.playCenterY;
+  const float cz = game.fallLayout.playCenterZ;
+  const float hx = game.fallLayout.playHalfX;
+  const float hy = game.fallLayout.playHalfY;
+  constexpr float hz = 60.0f;
 
   bool present[4] = {false, false, false, false};
   bool inZone[4] = {false, false, false, false};
@@ -260,9 +261,8 @@ void fall_challenge_system(ServerGame& game, float dt) {
 
     if (game.registry.all_of<shared::Position>(p)) {
       auto& pos = game.registry.get<shared::Position>(p);
-      if (std::abs(pos.x - center.x) <= half.x &&
-          std::abs(pos.y - center.y) <= half.y &&
-          std::abs(pos.z - center.z) <= half.z) {
+      if (std::abs(pos.x - cx) <= hx && std::abs(pos.y - cy) <= hy &&
+          std::abs(pos.z - cz) <= hz) {
         inZone[i] = true;
         mask |= (1u << i);
       }

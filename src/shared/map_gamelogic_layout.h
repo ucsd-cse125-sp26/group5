@@ -12,6 +12,21 @@ class ParsedModel;
 
 namespace map_gamelogic_layout {
 
+struct FallLayout {
+  float triggerCenterX = 50.0f;
+  float triggerCenterY = -16.0f;
+  float triggerCenterZ = 0.0f;
+  float playCenterX = 50.0f;
+  float playCenterY = 0.0f;
+  float playCenterZ = 0.0f;
+  float triggerHalfX = 8.0f;
+  float triggerHalfY = 8.0f;
+  float playHalfX = 12.0f;
+  float playHalfY = 12.0f;
+  float spawnHeight = 20.0f;
+  float markerTopZ() const { return playCenterZ + 0.6f; }
+};
+
 inline constexpr const char* kMazeTriggerNode = "maze_trigger";
 inline constexpr const char* kMazeBoardNode = "maze_board";
 inline constexpr const char* kPlayerStartNode = "player_start";
@@ -20,6 +35,8 @@ inline constexpr const char* kPlayerStartNode = "player_start";
 inline constexpr const char* kFallPlayerStartNode = "fall_player_start";
 inline constexpr const char* kFallTriggerNode = "fall_trigger";
 inline constexpr const char* kFallPlayZoneNode = "fall_play_zone";
+inline constexpr const char* kAutumnTriggerNode = "autumn_trigger";
+inline constexpr const char* kAutumnZoneNode = "autumn_zone";
 
 // Spring — tangram push puzzle (auto-read planned).
 inline constexpr const char* kSpringPlayerStartNode = "spring_player_start";
@@ -43,6 +60,11 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
 
 bool tryApplyTangramArenaFromMapFile(const std::string& path,
                                      tangram::ArenaLayout& layout);
+
+// Fall challenge: fall_trigger = gather/start pad, fall_play_zone = cube arena.
+// Missing nodes keep the current defaults.
+bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout);
+bool tryApplyFallLayoutFromMapFile(const std::string& path, FallLayout& layout);
 
 // Reads spring_tangram_slot_1 .. spring_tangram_slot_7 empties (position +
 // yaw). relX/relY are offsets from boardCenter; falls back to code defaults if

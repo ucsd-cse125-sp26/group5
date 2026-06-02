@@ -4,6 +4,7 @@
 
 #include "server/game/fall_challenge.h"
 #include "server/game/maze.h"
+#include "server/game/section_puzzle.h"
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
@@ -86,7 +87,11 @@ void ProcessFragmentPickups(ServerGame& game) {
         } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
           // CollectSummerFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
-          // CollectSpringFragment(game);
+          if (!section_puzzle::isSectionCompleted(
+                  game, shared::SectionSeasonMap::SPRING)) {
+            section_puzzle::completeSection(game,
+                                            shared::SectionSeasonMap::SPRING);
+          }
         }
 
         bool shouldRestore = false;

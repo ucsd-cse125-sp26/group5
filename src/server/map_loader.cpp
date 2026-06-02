@@ -126,6 +126,8 @@ bool loadMap(ServerGame& game, const std::string& path,
   shared::map_gamelogic_layout::tryApplyMazeLayoutFromMap(parsed,
                                                           game.mazeLayout);
   game.mazeLayout.applyHeightBoost();
+  shared::map_gamelogic_layout::tryApplyFallLayoutFromMap(parsed,
+                                                          game.fallLayout);
   shared::map_gamelogic_layout::tryApplyTangramArenaFromMap(parsed,
                                                             game.tangramArena);
   game.tangramArena.applyHeightBoost();

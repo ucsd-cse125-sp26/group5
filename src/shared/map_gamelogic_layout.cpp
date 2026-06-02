@@ -14,8 +14,8 @@
 namespace shared::map_gamelogic_layout {
 namespace {
 
-bool nodePosition(const ParsedModel& parsed, const char* name, float& x,
-                  float& y, float& z) {
+bool nodeTransform(const ParsedModel& parsed, const char* name, float& x,
+                   float& y, float& z, float& sx, float& sy, float& sz) {
   const aiMatrix4x4* world = parsed.worldTransform(name);
   if (!world) return false;
 
@@ -26,7 +26,18 @@ bool nodePosition(const ParsedModel& parsed, const char* name, float& x,
   x = t.x;
   y = t.y;
   z = t.z;
+  sx = s.x;
+  sy = s.y;
+  sz = s.z;
   return true;
+}
+
+bool nodePosition(const ParsedModel& parsed, const char* name, float& x,
+                  float& y, float& z) {
+  float sx = 0.0f;
+  float sy = 0.0f;
+  float sz = 0.0f;
+  return nodeTransform(parsed, name, x, y, z, sx, sy, sz);
 }
 
 bool nodeYaw(const ParsedModel& parsed, const char* name, float& yaw) {
@@ -40,6 +51,20 @@ bool nodeYaw(const ParsedModel& parsed, const char* name, float& yaw) {
   yaw = std::atan2(2.0f * (r.w * r.z + r.x * r.y),
                    1.0f - 2.0f * (r.y * r.y + r.z * r.z));
   return true;
+}
+
+bool nodeTransformAny(const ParsedModel& parsed,
+                      std::initializer_list<const char*> names,
+                      const char*& matchedName, float& x, float& y, float& z,
+                      float& sx, float& sy, float& sz) {
+  for (const char* name : names) {
+    if (nodeTransform(parsed, name, x, y, z, sx, sy, sz)) {
+      matchedName = name;
+      return true;
+    }
+  }
+  matchedName = nullptr;
+  return false;
 }
 
 }  // namespace
@@ -213,6 +238,96 @@ bool tryApplyTangramArenaFromMapFile(const std::string& path,
     return false;
   }
   return tryApplyTangramArenaFromMap(parsed, layout);
+}
+
+bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
+  bool foundTrigger = false;
+  bool foundPlay = false;
+
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float sx = 1.0f;
+  float sy = 1.0f;
+  float sz = 1.0f;
+  const char* matchedName = nullptr;
+
+  if (nodeTransformAny(parsed, {kFallTriggerNode, kAutumnTriggerNode},
+                       matchedName, x, y, z, sx, sy, sz)) {
+    layout.triggerCenterX = x;
+    layout.triggerCenterY = y;
+    layout.triggerCenterZ = z;
+    if (std::abs(sx) > 1.25f) layout.triggerHalfX = std::abs(sx);
+    if (std::abs(sy) > 1.25f) layout.triggerHalfY = std::abs(sy);
+    foundTrigger = true;
+    printf(
+        "[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+        matchedName, x, y, z, sx, sy, sz);
+  } else {
+    printf(
+        "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall trigger uses "
+        "default\n",
+        kFallTriggerNode, kAutumnTriggerNode);
+  }
+
+  if (nodeTransformAny(parsed, {kFallPlayZoneNode, kAutumnZoneNode},
+                       matchedName, x, y, z, sx, sy, sz)) {
+    layout.playCenterX = x;
+    layout.playCenterY = y;
+    layout.playCenterZ = z;
+    if (std::abs(sx) > 1.25f) layout.playHalfX = std::abs(sx);
+    if (std::abs(sy) > 1.25f) layout.playHalfY = std::abs(sy);
+    foundPlay = true;
+    printf(
+        "[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+        matchedName, x, y, z, sx, sy, sz);
+  } else {
+    printf(
+        "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall play zone uses "
+        "default\n",
+        kFallPlayZoneNode, kAutumnZoneNode);
+  }
+
+  // Blender empties in this map have been inconsistent about Z. Keep both
+  // regions on the same effective floor so the arena marker does not spawn
+  // underground while still preserving the map-authored X/Y placement.
+  if (foundTrigger || foundPlay) {
+    const float floorZ = std::max(layout.triggerCenterZ, layout.playCenterZ);
+    if (layout.triggerCenterZ < floorZ - 0.25f) {
+      printf("[MapGamelogic] fall trigger Z raised %.3f -> %.3f\n",
+             layout.triggerCenterZ, floorZ);
+      layout.triggerCenterZ = floorZ;
+    }
+    if (layout.playCenterZ < floorZ - 0.25f) {
+      printf("[MapGamelogic] fall play Z raised %.3f -> %.3f\n",
+             layout.playCenterZ, floorZ);
+      layout.playCenterZ = floorZ;
+    }
+  }
+
+  layout.spawnHeight = layout.playCenterZ + 20.0f;
+
+  if (foundTrigger || foundPlay) {
+    printf(
+        "[MapGamelogic] fall layout: trigger (%.3f, %.3f, %.3f) half (%.3f, "
+        "%.3f) play (%.3f, %.3f, %.3f) half (%.3f, %.3f) spawnHeight %.3f\n",
+        layout.triggerCenterX, layout.triggerCenterY, layout.triggerCenterZ,
+        layout.triggerHalfX, layout.triggerHalfY, layout.playCenterX,
+        layout.playCenterY, layout.playCenterZ, layout.playHalfX,
+        layout.playHalfY, layout.spawnHeight);
+  }
+
+  return foundTrigger || foundPlay;
+}
+
+bool tryApplyFallLayoutFromMapFile(const std::string& path, FallLayout& layout) {
+  ParsedModel parsed;
+  if (!parsed.load(path, MAP_LOAD_FLAGS)) {
+    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+           parsed.lastError().c_str());
+    return false;
+  }
+  return tryApplyFallLayoutFromMap(parsed, layout);
 }
 
 bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
