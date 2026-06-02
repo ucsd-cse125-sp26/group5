@@ -100,6 +100,7 @@ enum ComponentIds : ComponentTypeId {
   CID_OVERWORLD_TANGRAM_PUZZLE = 14,
   CID_TANGRAM_PIECE = 15,
   CID_FALL_CHALLENGE = 16,
+  CID_SUMMER_ESCAPE = 17,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -155,6 +156,9 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_FALL_CHALLENGE:
         dst.remove<FallChallengeState>(entity);
+        break;
+      case CID_SUMMER_ESCAPE:
+        dst.remove<SummerEscapeState>(entity);
         break;
     }
   };
@@ -262,6 +266,7 @@ inline ComponentRegistry createDefaultRegistry() {
   // collides with overworld decoration cubes that happen to share a scale).
   reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
   reg.registerComponent<FallChallengeState>(CID_FALL_CHALLENGE);
+  reg.registerComponent<SummerEscapeState>(CID_SUMMER_ESCAPE);
   return reg;
 }
 

@@ -5,6 +5,7 @@
 #include "client/client_game.h"
 #include "imgui.h"
 #include "shared/components.h"
+#include "shared/puzzles/summer/layout.h"
 static void drawFallChallengeHUD(const shared::FallChallengeState& cs) {
   if (!cs.active) return;
 
@@ -64,10 +65,99 @@ static void drawFallChallengeHUD(const shared::FallChallengeState& cs) {
   ImGui::End();
 }
 
+static void drawSummerEscapeHUD(const shared::SummerEscapeState& s,
+                                const ClientGame& game) {
+  if (!s.active) return;
+
+  const shared::summer::Layout L = shared::summer::Layout::defaults();
+  const float mapW = L.mapMaxX - L.mapMinX;
+  const float mapH = L.mapMaxY - L.mapMinY;
+  if (mapW <= 0.0f || mapH <= 0.0f) return;
+
+  ImGuiIO& io = ImGui::GetIO();
+  const float padInner = 220.0f;  // drawable square for the minimap
+  const float winW = padInner + 24.0f, winH = padInner + 64.0f;
+
+  ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - winW - 20.0f, 20.0f),
+                          ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(winW, winH), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.65f);
+  ImGui::Begin("##summerescape", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
+                   ImGuiWindowFlags_NoCollapse);
+
+  char header[48];
+  std::snprintf(header, sizeof(header), "Stay in the zone!  Wave %d/%d",
+                static_cast<int>(s.wave) + 1, shared::summer::Layout::kWaveCount);
+  ImGui::TextUnformatted(header);
+
+  ImVec2 p = ImGui::GetCursorScreenPos();
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const float ox = p.x, oy = p.y + 4.0f;
+
+  // World (x,y) -> overlay pixel. Screen Y is flipped so world +Y is "up".
+  auto toScreen = [&](float wx, float wy) -> ImVec2 {
+    float u = (wx - L.mapMinX) / mapW;
+    float v = (wy - L.mapMinY) / mapH;
+    if (u < 0.0f) u = 0.0f; else if (u > 1.0f) u = 1.0f;
+    if (v < 0.0f) v = 0.0f; else if (v > 1.0f) v = 1.0f;
+    return ImVec2(ox + u * padInner, oy + (1.0f - v) * padInner);
+  };
+
+  // Map background + border.
+  dl->AddRectFilled(ImVec2(ox, oy), ImVec2(ox + padInner, oy + padInner),
+                    IM_COL32(28, 30, 38, 255));
+  dl->AddRect(ImVec2(ox, oy), ImVec2(ox + padInner, oy + padInner),
+              IM_COL32(255, 255, 255, 160), 0.0f, 0, 1.5f);
+
+  // Next-wave target region (faint dashed-ish outline).
+  {
+    ImVec2 a = toScreen(s.tgtMinX, s.tgtMaxY);
+    ImVec2 b = toScreen(s.tgtMaxX, s.tgtMinY);
+    dl->AddRect(a, b, IM_COL32(255, 200, 80, 120), 0.0f, 0, 1.5f);
+  }
+
+  // Live survival region (red box).
+  {
+    ImVec2 a = toScreen(s.regMinX, s.regMaxY);
+    ImVec2 b = toScreen(s.regMaxX, s.regMinY);
+    dl->AddRectFilled(a, b, IM_COL32(220, 60, 60, 45));
+    dl->AddRect(a, b, IM_COL32(240, 70, 70, 255), 0.0f, 0, 2.5f);
+  }
+
+  // Player dots (read replicated Position + RenderInfo.playerSlot).
+  static const ImU32 kSlotColors[4] = {
+      IM_COL32(90, 170, 255, 255), IM_COL32(120, 230, 140, 255),
+      IM_COL32(255, 210, 90, 255), IM_COL32(220, 130, 255, 255)};
+  auto players =
+      game.renderRegistry.view<shared::Position, shared::RenderInfo>();
+  for (auto e : players) {
+    const auto& ri = players.get<shared::RenderInfo>(e);
+    if (ri.playerSlot < 1 || ri.playerSlot > 4) continue;
+    const auto& pos = players.get<shared::Position>(e);
+    ImVec2 c = toScreen(pos.x, pos.y);
+    const ImU32 col = kSlotColors[ri.playerSlot - 1];
+    dl->AddCircleFilled(c, 4.5f, col);
+    dl->AddCircle(c, 4.5f, IM_COL32(0, 0, 0, 200), 0, 1.5f);
+    char lbl[4];
+    std::snprintf(lbl, sizeof(lbl), "%d", static_cast<int>(ri.playerSlot));
+    dl->AddText(ImVec2(c.x + 5.0f, c.y - 7.0f), col, lbl);
+  }
+
+  ImGui::End();
+}
+
 void drawPuzzleHUDs(const ClientGame& game) {
   auto v = game.renderRegistry.view<shared::FallChallengeState>();
   for (auto e : v) {
     drawFallChallengeHUD(v.get<shared::FallChallengeState>(e));
+    break;  // single controller entity
+  }
+  auto se = game.renderRegistry.view<shared::SummerEscapeState>();
+  for (auto e : se) {
+    drawSummerEscapeHUD(se.get<shared::SummerEscapeState>(e), game);
     break;  // single controller entity
   }
   // Future puzzle HUDs hang off here.
