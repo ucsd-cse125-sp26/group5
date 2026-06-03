@@ -104,6 +104,10 @@ struct GraphicsSettings {
   // Same algorithm as paletteQuantizeColors but built per-skybox and bound
   // only by the skybox fragment shader. Capped at shared::kMaxPaletteColors.
   int skyboxPaletteColors = 0;
+  // 0 = off, 1 = max softening. Bayer 4×4 dither offset applied before
+  // skybox brightness quantize and palette snap, so hard plateau / region
+  // boundaries break into a stippled transition instead of a sharp line.
+  float skyboxSoftEdge = 0.0f;
   int celBands = 4;
   float celBandEpsilon = 0.02f;  // 0 = hard, ~0.1 = soft
   bool celHalfLambert = true;

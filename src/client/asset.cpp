@@ -888,6 +888,80 @@ Model* makeCubeModel(const shared::CubeSpec& spec) {
   return model;
 }
 
+// UV sphere of radius 0.5 (matches makeCubeModel's unit-cube convention so
+// RenderInfo.scale acts as a diameter). Solid-color diffuse + emissive from
+// `spec`; specular/normal handled the same as makeCubeModel.
+Model* makeSphereModel(const shared::CubeSpec& spec, int rings, int segments,
+                       float emissiveBoost) {
+  if (rings < 3) rings = 3;
+  if (segments < 3) segments = 3;
+
+  std::vector<Vertex> vertices;
+  vertices.reserve(static_cast<size_t>((rings + 1) * (segments + 1)));
+  for (int r = 0; r <= rings; ++r) {
+    float v = static_cast<float>(r) / static_cast<float>(rings);
+    float theta = v * glm::pi<float>();  // 0 (north pole) .. pi (south)
+    float sinT = std::sin(theta);
+    float cosT = std::cos(theta);
+    for (int s = 0; s <= segments; ++s) {
+      float u = static_cast<float>(s) / static_cast<float>(segments);
+      float phi = u * glm::two_pi<float>();
+      float sinP = std::sin(phi);
+      float cosP = std::cos(phi);
+      glm::vec3 n(sinT * cosP, sinT * sinP, cosT);
+      glm::vec3 pos = 0.5f * n;
+      // dPos/dPhi gives an east-pointing tangent.
+      glm::vec3 t(-sinP, cosP, 0.0f);
+      glm::vec3 b = glm::cross(n, t);
+      vertices.push_back({.position = pos,
+                          .normal = n,
+                          .texture_coordinates = glm::vec2(u, v),
+                          .tangent = t,
+                          .bitangent = b});
+    }
+  }
+
+  std::vector<GLuint> indices;
+  indices.reserve(static_cast<size_t>(rings * segments * 6));
+  const int row = segments + 1;
+  for (int r = 0; r < rings; ++r) {
+    for (int s = 0; s < segments; ++s) {
+      GLuint a = static_cast<GLuint>(r * row + s);
+      GLuint c = static_cast<GLuint>((r + 1) * row + s);
+      indices.push_back(a);
+      indices.push_back(c);
+      indices.push_back(c + 1);
+      indices.push_back(a);
+      indices.push_back(c + 1);
+      indices.push_back(a + 1);
+    }
+  }
+
+  auto* model = new Model();
+
+  Material material;
+  GLuint diffuseTex = makeSolidTexture(spec.palette[0][0], spec.palette[0][1],
+                                       spec.palette[0][2], spec.palette[0][3]);
+  material.ambient = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.diffuse = {.constant = glm::vec3(1.0f), .texture = diffuseTex};
+  material.specular = {.constant = glm::vec3(0.0f),
+                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.emissive = {
+      .constant = glm::vec3(emissiveBoost),
+      .texture = makeSolidTexture(spec.emissive[0], spec.emissive[1],
+                                  spec.emissive[2], spec.emissive[3])};
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
+  material.shininess = 32.0f;
+  model->materials.push_back(material);
+
+  model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
+  model->mesh_instances.emplace_back(0u, glm::mat4(1.0f));
+  computeModelBounds(*model);
+
+  return model;
+}
+
 Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot) {
   if (slot < 1 || slot > 4) return nullptr;
 

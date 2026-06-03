@@ -386,7 +386,7 @@ static void uploadDirectionalLight(const Shader& shader, const ClientGame& game,
 
 static void drawSkybox(const Shader& shader, const Skybox& skybox,
                        const CameraState& camera, const glm::mat4& projection,
-                       int quantizeLevels) {
+                       int quantizeLevels, bool flipZ, float softEdge) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
@@ -394,6 +394,8 @@ static void drawSkybox(const Shader& shader, const Skybox& skybox,
   shader.setMat4("view", skyboxView);
   shader.setMat4("projection", projection);
   shader.setInt("skyboxQuantizeLevels", quantizeLevels);
+  shader.setFloat("skyboxSoftEdge", softEdge);
+  shader.setInt("skyboxFlipZ", flipZ ? 1 : 0);
   const int paletteSize = static_cast<int>(skybox.palette.size());
   shader.setInt("skyboxPaletteSize", paletteSize);
   if (paletteSize > 0) {
@@ -551,6 +553,15 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       if (entity.id == game.renderEntityId) continue;
     }
     if (!shouldDrawTangramEntity(game, renderInfo.modelName)) continue;
+
+    // Hardcoded winter moon: never cast a shadow (a giant cube silhouette
+    // would tank the scene), and only render in the night scene (which is
+    // the WINTER season per sceneNameForSeason).
+    if (renderInfo.modelName == "moon") {
+      if (forShadowPass) continue;
+      auto* sc = currentScene(game);
+      if (!sc || sc->name != std::string_view("night")) continue;
+    }
 
     std::string modelKey = renderInfo.modelName;
     if (isTangramGhostModelName(renderInfo.modelName)) {
@@ -764,8 +775,15 @@ bool Graphics::load(int width, int height) {
   for (const auto& asset : shared::ASSETS) {
     renderLoadingFrame(std::string("Loading asset: ") +
                        std::string(asset.name));
-    Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
-                              : loadModel(std::string(asset.filename));
+    // "moon" is the only procedural sphere asset; everything else with a
+    // CubeSpec is a cube. Mesh-backed assets go through loadModel as before.
+    // The 10× emissive boost pushes the moon well past the bloom threshold so
+    // it glows hard on the night skybox.
+    Model* m = asset.cubeSpec
+                   ? (asset.name == "moon"
+                          ? makeSphereModel(*asset.cubeSpec, 16, 28, 10.0f)
+                          : makeCubeModel(*asset.cubeSpec))
+                   : loadModel(std::string(asset.filename));
     if (!m) {
       fprintf(stderr, "Failed to load asset '%s' (%s)\n",
               std::string(asset.name).c_str(),
@@ -1649,7 +1667,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       auto it = skyboxes.find(skyboxDir);
       if (it != skyboxes.end()) {
         drawSkybox(*skyboxShader, it->second, *camera, projection,
-                   settings.skyboxQuantizeLevels);
+                   settings.skyboxQuantizeLevels, sceneInfo->skyboxFlipZ,
+                   settings.skyboxSoftEdge);
       }
     }
   }

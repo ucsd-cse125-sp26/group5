@@ -88,6 +88,12 @@ struct ServerGame {
   int overworldMazeGoalTileY = 0;
   bool overworldMazeReachGoalPending = false;
 
+  // Set by KEY_DEBUG_CYCLE_SEASON (Y). When true, the per-tick
+  // "force winter while winter unlocked+incomplete" clamp in MoveInMainMap is
+  // skipped so the debug-cycled season actually sticks. One-way: stays on for
+  // the rest of the run.
+  bool debugSeasonOverride = false;
+
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();
   shared::map_gamelogic_layout::FallLayout fallLayout{};

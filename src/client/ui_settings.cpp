@@ -60,6 +60,11 @@ void shadingSection(GraphicsSettings& s) {
                    IM_ARRAYSIZE(paletteLabels))) {
     s.skyboxPaletteColors = paletteOptions[skyboxPaletteIdx];
   }
+  // Bayer ordered-dither strength for the skybox. Softens the hard plateau
+  // and Voronoi-region boundaries that brightness quantize + palette snap
+  // produce — 0 = crisp (default), 1 = full stipple.
+  ImGui::SliderFloat("Skybox soft edge", &s.skyboxSoftEdge, 0.0f, 1.0f,
+                     "%.2f");
   ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
   ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");

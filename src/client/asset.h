@@ -111,6 +111,12 @@ class Shader;
 
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel(const shared::CubeSpec& spec);
+// Procedural UV sphere (lat/long grid) using the spec's emissive color as a
+// solid emissive surface. Diffuse uses the first palette entry.
+// emissiveBoost multiplies the material's emissive constant — bump above 1.0
+// to push the surface past the bloom threshold (used by the moon).
+Model* makeSphereModel(const shared::CubeSpec& spec, int rings = 16,
+                       int segments = 28, float emissiveBoost = 1.0f);
 // Flat tangram piece mesh (triangle / square / parallelogram) in the X/Y plane,
 // Z up.
 Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def);
