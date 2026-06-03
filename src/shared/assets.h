@@ -253,7 +253,38 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.70710678f,
      .qz = 0.70710678f,
      .cubeSpec = nullptr},
+    {.name = "gurf",
+     .filename = "assets/gurf/gurf-rigged-orange.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
+    {.name = "rat",
+     .filename = "assets/rat/gurf-rigged-orange.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
+    // Decorative emissive cube used as the hardcoded winter-scene moon. Same
+    // procedural spec as light_cube but a distinct asset so the client can
+    // filter it (winter-only) and skip it in the shadow pass.
+    {.name = "moon",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_WHITE_EMISSIVE},
 };
+
+// Models a player avatar can take. Index 0 is the spawn default; pressing
+// KEY_SWAP_MODEL advances to the next entry (wrapping).
+inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {"gurf", "rat",
+                                                          "playerbase", "dog"};
+inline constexpr std::size_t PLAYER_MODEL_CYCLE_COUNT =
+    sizeof(PLAYER_MODEL_CYCLE) / sizeof(PLAYER_MODEL_CYCLE[0]);
 
 inline constexpr std::size_t ASSET_COUNT = sizeof(ASSETS) / sizeof(ASSETS[0]);
 
@@ -271,6 +302,15 @@ struct SceneInfo {
   float ambientR, ambientG, ambientB;
   float diffuseR, diffuseG, diffuseB;
   float specularR, specularG, specularB;
+  // Optional per-skybox quantize overrides applied to GraphicsSettings when
+  // this scene becomes active. -1 = "don't touch the current setting"; 0 =
+  // explicitly off; >=2 = force that level/palette count.
+  int skyboxQuantizeLevels = -1;
+  int skyboxPaletteColors = -1;
+  // When true the skybox cubemap is sampled with Z negated, effectively
+  // flipping it upside-down across the Z=0 plane. Used for the winter scene
+  // so the night sky reflects off the horizon.
+  bool skyboxFlipZ = false;
 };
 
 inline constexpr SceneInfo SCENES[] = {
@@ -287,7 +327,9 @@ inline constexpr SceneInfo SCENES[] = {
      .diffuseB = 0.6f,
      .specularR = 0.9f,
      .specularG = 0.85f,
-     .specularB = 0.75f},
+     .specularB = 0.75f,
+     .skyboxQuantizeLevels = 16,
+     .skyboxPaletteColors = 64},
     {.name = "noon",
      .skyboxDirectory = "assets/noon",
      .dirX = 0.3f,
@@ -301,7 +343,8 @@ inline constexpr SceneInfo SCENES[] = {
      .diffuseB = 0.95f,
      .specularR = 1.0f,
      .specularG = 1.0f,
-     .specularB = 1.0f},
+     .specularB = 1.0f,
+     .skyboxPaletteColors = 16},
     {.name = "sunset",
      .skyboxDirectory = "assets/sunset",
      .dirX = -0.9f,
@@ -318,18 +361,26 @@ inline constexpr SceneInfo SCENES[] = {
      .specularB = 0.5f},
     {.name = "night",
      .skyboxDirectory = "assets/night",
+     // Direction of light travel = (target − moon) for moon at (0, 350, 160)
+     // → normalized (0, -0.910, -0.416). Keep this in sync with the moon
+     // entity's position in initWorldEntities.
      .dirX = 0.0f,
-     .dirY = 0.0f,
-     .dirZ = -1.0f,
-     .ambientR = 0.02f,
-     .ambientG = 0.02f,
-     .ambientB = 0.05f,
-     .diffuseR = 0.0f,
-     .diffuseG = 0.0f,
-     .diffuseB = 0.0f,
-     .specularR = 0.0f,
-     .specularG = 0.0f,
-     .specularB = 0.0f},
+     .dirY = -0.910f,
+     .dirZ = -0.416f,
+     // Cool moonlight — strong enough to read clearly on the landscape
+     // while keeping the blue cast that sells "night, lit by the moon".
+     .ambientR = 0.10f,
+     .ambientG = 0.10f,
+     .ambientB = 0.18f,
+     .diffuseR = 0.70f,
+     .diffuseG = 0.80f,
+     .diffuseB = 1.10f,
+     .specularR = 1.00f,
+     .specularG = 1.10f,
+     .specularB = 1.40f,
+     .skyboxQuantizeLevels = 3,
+     .skyboxPaletteColors = 8,
+     .skyboxFlipZ = true},
     {.name = "sunny",
      .skyboxDirectory = "assets/skybox-1",
      .dirX = 0.3f,

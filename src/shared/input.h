@@ -31,3 +31,5 @@ constexpr InputKeys KEY_DEBUG_COMPLETE_SECTION = 1 << 21;
 constexpr InputKeys KEY_DEBUG_TOGGLE_BARRIERS = 1 << 22;
 // Debug: teleport all overworld players onto the summer trigger pad (V key).
 constexpr InputKeys KEY_DEBUG_SUMMER_PAD = 1 << 23;
+// Debug: cycle the active season (Y key). Advances winter→spring→summer→fall.
+constexpr InputKeys KEY_DEBUG_CYCLE_SEASON = 1 << 24;

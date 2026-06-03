@@ -20,9 +20,12 @@
 #include "server/game/puzzles/tangram/layout_editor.h"
 #include "server/game/puzzles/tangram/puzzle.h"
 #include "server/game/puzzles/tangram/trigger.h"
+#include "server/game/section_puzzle.h"
 #include "server_game.h"
 #include "server_level_loader.h"
+#include "server_memory_system.h"
 #include "server_network.h"
+#include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
@@ -331,6 +334,22 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
 void initWorldEntities(ServerGame& game) {
   // --- Overworld ---
   spawnDemoLight<shared::OverworldTag>(game, "sunny");
+
+  // Hardcoded moon for the winter scene. Lives just past the northern
+  // landscape edge at roughly main-map Z so it reads as a giant horizon moon.
+  // Always present in the registry; the client filters it to night-scene only.
+  // Scale is the sphere's diameter (makeSphereModel produces a unit-diameter
+  // sphere). Keep the position in sync with SceneInfo "night".dirX/Y/Z below —
+  // the directional light direction is derived from this position.
+  {
+    auto [moonId, moonEnt] = new_entity(game);
+    game.registry.emplace<shared::Position>(moonEnt, 0.0f, 350.0f, 160.0f, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(moonEnt, "moon", 200.0f, 200.0f,
+                                              200.0f);
+    game.registry.emplace<shared::OverworldTag>(moonEnt);
+  }
+
   game.tangramArena = shared::tangram::ArenaLayout::defaults();
   loadMap<shared::OverworldTag>(game,
                                 (exeDir() / shared::DEFAULT_MAP_PATH).string());
@@ -523,7 +542,7 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, "cube",
+        game, overworldEntity, std::string(shared::PLAYER_MODEL_CYCLE[0]),
         shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
                                                   game.tangramArena, slot),
         glm::vec3(1.0f));
@@ -736,6 +755,46 @@ void OverworldState::update(ServerGame& game, float dt) {
           printf("DEBUG: re-added collision body\n");
         }
       }
+    }
+  }
+
+  // DEBUG: press Y to cycle the active season (winter→spring→summer→fall→…).
+  // Drives the overworld Scene swap (skybox + directional light) via
+  // setActiveSeason — pure cosmetic; section-completion state is untouched.
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_CYCLE_SEASON) {
+      shared::SectionSeasonMap current = shared::SectionSeasonMap::WINTER;
+      auto gsView = game.registry.view<shared::GameSection>();
+      for (auto e : gsView) {
+        current = gsView.get<shared::GameSection>(e).currentActiveSeason;
+        break;
+      }
+      shared::SectionSeasonMap next;
+      switch (current) {
+        case shared::SectionSeasonMap::WINTER:
+          next = shared::SectionSeasonMap::SPRING;
+          break;
+        case shared::SectionSeasonMap::SPRING:
+          next = shared::SectionSeasonMap::SUMMER;
+          break;
+        case shared::SectionSeasonMap::SUMMER:
+          next = shared::SectionSeasonMap::FALL;
+          break;
+        case shared::SectionSeasonMap::FALL:
+          next = shared::SectionSeasonMap::WINTER;
+          break;
+      }
+      // Disable MoveInMainMap's winter clamp so the cycled season actually
+      // sticks past the next tick. One-way for the rest of the run.
+      game.debugSeasonOverride = true;
+      section_puzzle::setActiveSeason(game, next);
+      // Resize every player's ColorBoundingBox to match the new season so
+      // color restoration tracks the cycle (Y key is desat-region debug too).
+      colorizeSection(game, next);
+      printf("DEBUG: cycled active season to %s\n",
+             section_puzzle::sceneNameForSeason(next));
+      break;
     }
   }
 

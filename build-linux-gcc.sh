@@ -2,7 +2,7 @@
 
 set -e
 
-cmake -B build-linux-gcc -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/linux-gcc.cmake
+cmake -B build-linux-gcc -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/linux-gcc.cmake "$@"
 (
 	cd build-linux-gcc || exit
 	ninja

@@ -1,0 +1,77 @@
+name: server-image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: server-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: git.rooty.dev
+  IMAGE_NAME: jrt/${{ github.event.repository.name }}-server
+  SCCACHE_GHA_ENABLED: "true"
+  CMAKE_C_COMPILER_LAUNCHER: sccache
+  CMAKE_CXX_COMPILER_LAUNCHER: sccache
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      # Build only the server in the CI devShell (git handles the submodules
+      # that break Nix's pure flake submodule fetch), then inject the binary
+      # into the dockerTools image; its nix glibc closure is pulled in automatically.
+      - name: Build server (Release)
+        run: |
+          nix develop .#ci -c bash -c '
+            set -e
+            cmake -B build-linux-gcc -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE=toolchains/linux-gcc.cmake \
+              -DCMAKE_BUILD_TYPE=Release
+            ninja -C build-linux-gcc server
+          '
+
+      - name: Build server image
+        run: CSE125_SERVER_BIN="$PWD/build-linux-gcc/server" nix build --impure '.#serverImage' -L
+
+      - name: Load image
+        id: load
+        run: |
+          set -euo pipefail
+          loaded="$(docker load -i "$(readlink -f result)" | sed -n 's/^Loaded image: //p' | head -n1)"
+          echo "local=$loaded" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Gitea registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+
+      - name: Tag and push
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          local='${{ steps.load.outputs.local }}'
+          remote="${REGISTRY}/${IMAGE_NAME}"
+          sha="$(git rev-parse --short HEAD)"
+          docker tag "$local" "${remote}:sha-${sha}"
+          docker tag "$local" "${remote}:latest"
+          docker push "${remote}:sha-${sha}"
+          docker push "${remote}:latest"
