@@ -124,17 +124,22 @@ static void addPhysicsBodies(ServerGame& game) {
   auto view = game.registry.view<Tag, shared::PhysicsBody>();
   auto& bodyInterface = game.physics.getBodyInterface();
   for (auto ent : view) {
-    // Unassigned pool avatars (playerSlot==0) stay out of the sim until
-    // connect.
+    // Unassigned pool avatars (playerSlot==0) are idle placeholders with no
+    // controller. Add them activated so gravity settles them onto the ground
+    // (otherwise they hover at their spawn height); assigned avatars wake on
+    // their first input.
+    bool unassignedPool = false;
     if (game.registry.all_of<shared::PlayerInput, shared::RenderInfo>(ent)) {
       const uint8_t slot =
           game.registry.get<shared::RenderInfo>(ent).playerSlot;
-      if (slot == 0) continue;
+      unassignedPool = (slot == 0);
     }
     auto& phys = view.template get<shared::PhysicsBody>(ent);
     JPH::BodyID bodyId(phys.bodyId);
     if (!bodyInterface.IsAdded(bodyId)) {
-      bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+      bodyInterface.AddBody(bodyId, unassignedPool
+                                        ? JPH::EActivation::Activate
+                                        : JPH::EActivation::DontActivate);
     }
     // Prime wasGrounded=true so the first grounded tick doesn't look like a
     // landing
@@ -272,7 +277,7 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::Velocity>(entity, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(entity, modelName, scale.x, scale.y,
                                             scale.z);
-  game.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
+  game.registry.emplace<shared::Camera>(entity, 0.0f, 2.0f);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
@@ -348,6 +353,27 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::RenderInfo>(moonEnt, "moon", 200.0f, 200.0f,
                                               200.0f);
     game.registry.emplace<shared::OverworldTag>(moonEnt);
+  }
+
+  // Hardcoded suns, one per daytime scene. Like the moon, each is always in
+  // the registry and the client filters it to its scene. Positions sit at
+  // -normalize(dir) * ~385 so the sun lands on the incoming light ray of the
+  // matching SceneInfo (morning / noon / sunset) — keep them in sync with
+  // those dirX/Y/Z values.
+  struct SunSpawn {
+    const char* model;
+    float x, y, z;
+  };
+  for (const SunSpawn& sun : {
+           SunSpawn{"sun_morning", -336.1f, -168.0f, 84.0f},
+           SunSpawn{"sun_sunset", 353.2f, -98.1f, 117.7f},
+       }) {
+    auto [sunId, sunEnt] = new_entity(game);
+    game.registry.emplace<shared::Position>(sunEnt, sun.x, sun.y, sun.z, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(sunEnt, sun.model, 200.0f, 200.0f,
+                                              200.0f);
+    game.registry.emplace<shared::OverworldTag>(sunEnt);
   }
 
   game.tangramArena = shared::tangram::ArenaLayout::defaults();
@@ -542,7 +568,9 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, std::string(shared::PLAYER_MODEL_CYCLE[0]),
+        game, overworldEntity,
+        std::string(
+            shared::PLAYER_MODEL_CYCLE[i % shared::PLAYER_MODEL_CYCLE_COUNT]),
         shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
                                                   game.tangramArena, slot),
         glm::vec3(1.0f));
