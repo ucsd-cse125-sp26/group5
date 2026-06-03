@@ -22,6 +22,7 @@
 #include "shared/components.h"
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
+#include "shared/dev_spawn.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/puzzles/tangram/roles.h"
@@ -153,25 +154,22 @@ float pieceFootprintMismatch(const ServerGame& game,
   const float pieceRelX = pos.x - layout.boardCenterX;
   const float pieceRelY = pos.y - layout.boardCenterY;
   const float pieceYaw = flattenedYaw(pos);
-  const float slotYaw =
-      shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
 
+  if (shared::tangram_slot_validate::footprintsMatch(
+          def, pieceRelX, pieceRelY, pieceYaw, relX, relY, targetRot,
+          shared::tangram_puzzle::kWinFootprintMismatchMax)) {
+    return 0.0f;
+  }
+
+  using shared::tangram_slot_validate::detail::cyclicVertexMismatch;
   using shared::tangram_slot_validate::detail::Vec2;
   using shared::tangram_slot_validate::detail::worldPolygon;
+  const float slotYaw =
+      shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
   const std::vector<Vec2> slotPoly = worldPolygon(def, relX, relY, slotYaw);
   const std::vector<Vec2> piecePoly =
       worldPolygon(def, pieceRelX, pieceRelY, pieceYaw);
-  if (slotPoly.size() != piecePoly.size() || slotPoly.empty()) {
-    return 1e9f;
-  }
-
-  float maxDist = 0.0f;
-  for (size_t i = 0; i < slotPoly.size(); ++i) {
-    const float d = std::hypot(piecePoly[i].x - slotPoly[i].x,
-                               piecePoly[i].y - slotPoly[i].y);
-    maxDist = std::max(maxDist, d);
-  }
-  return maxDist;
+  return cyclicVertexMismatch(piecePoly, slotPoly);
 }
 
 bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
@@ -189,9 +187,11 @@ bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
   float targetRot = 0.0f;
   slotRelPose(game, *def, relX, relY, targetRot);
 
-  // Match the visible triangle footprint (not the physics AABB center).
-  return pieceFootprintMismatch(game, *def, pos, relX, relY, targetRot) <=
-         shared::tangram_puzzle::kWinFootprintMismatchMax;
+  const shared::tangram::ArenaLayout& layout = game.tangramArena;
+  return shared::tangram_slot_validate::footprintsMatch(
+      *def, pos.x - layout.boardCenterX, pos.y - layout.boardCenterY,
+      flattenedYaw(pos), relX, relY, targetRot,
+      shared::tangram_puzzle::kWinFootprintMismatchMax);
 }
 
 bool pieceIsNearSlot(const ServerGame& game,
@@ -204,8 +204,10 @@ bool pieceIsNearSlot(const ServerGame& game,
   if (centerDist <= reach) {
     return true;
   }
-  return pieceFootprintMismatch(game, def, pos, relX, relY, targetRot) <=
-         shared::tangram_puzzle::kSnapFootprintMismatchMax;
+  return shared::tangram_slot_validate::footprintsMatch(
+      def, pos.x - game.tangramArena.boardCenterX,
+      pos.y - game.tangramArena.boardCenterY, flattenedYaw(pos), relX, relY,
+      targetRot, shared::tangram_puzzle::kSnapFootprintMismatchMax);
 }
 
 void applyPieceTransform(ServerGame& game, entt::entity ent,
@@ -306,6 +308,17 @@ void trySnapPiecesToSlots(ServerGame& game) {
         static_cast<float>(off) * shared::tangram_puzzle::kRotateStepRad);
     const glm::quat rot = shared::tangram_puzzle::quatFromYawRad(snapYaw);
     applyPieceTransform(game, ent, slotPos, rot);
+
+    uint8_t stage = 0;
+    if (game.registry.valid(game.overworldTangramController) &&
+        game.registry.all_of<shared::OverworldTangramPuzzleState>(
+            game.overworldTangramController)) {
+      stage = game.registry
+                  .get<shared::OverworldTangramPuzzleState>(
+                      game.overworldTangramController)
+                  .roleIsolationStage;
+    }
+    tangram_role_server::syncPieceCollisionLayer(game, ent, stage);
 
     printf("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
            static_cast<unsigned>(piece.pieceId));
@@ -476,6 +489,35 @@ void tryRotateNearbyPiece(ServerGame& game) {
 
 void rollRandomPieceSpawns(ServerGame& game) {
   const shared::tangram::ArenaLayout& layout = game.tangramArena;
+
+  if (shared::dev_spawn::spawnTangramPiecesNearSlots()) {
+    for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
+      const shared::tangram_puzzle::PieceDef& def =
+          shared::tangram_puzzle::kPieces[i];
+      float relX = 0.0f;
+      float relY = 0.0f;
+      float targetRot = 0.0f;
+      slotRelPose(game, def, relX, relY, targetRot);
+      const glm::vec3 slotPos = slotSnapWorldPos(game, def);
+      glm::vec2 towardSlot(slotPos.x - layout.boardCenterX,
+                           slotPos.y - layout.boardCenterY);
+      const float len = std::hypot(towardSlot.x, towardSlot.y);
+      if (len > 1e-3f) {
+        towardSlot /= len;
+      } else {
+        towardSlot = {0.0f, -1.0f};
+      }
+      const float off = shared::dev_spawn::kTangramDevPieceOffsetFromSlotM;
+      game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)] = {
+          slotPos.x - towardSlot.x * off, slotPos.y - towardSlot.y * off};
+    }
+    printf(
+        "[DevSpawn] Pieces near ghost slots (%.1fm outside — short push to "
+        "snap)\n",
+        shared::dev_spawn::kTangramDevPieceOffsetFromSlotM);
+    return;
+  }
+
   const float tcx = layout.triggerCenterX;
   const float tcy = layout.triggerCenterY;
   const float bcx = layout.boardCenterX;
@@ -930,6 +972,17 @@ void updatePuzzle(ServerGame& game, float dt) {
   trySnapPiecesToSlots(game);
   tryRotateNearbyPiece(game);
   lockAlignedPieces(game);
+
+  if (game.registry.valid(game.overworldTangramController) &&
+      game.registry.all_of<shared::OverworldTangramPuzzleState>(
+          game.overworldTangramController)) {
+    const uint8_t stage = game.registry
+                              .get<shared::OverworldTangramPuzzleState>(
+                                  game.overworldTangramController)
+                              .roleIsolationStage;
+    tangram_role_server::syncCollisionRoles(game, stage);
+  }
+
   tryCompletePuzzle(game);
 }
 

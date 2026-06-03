@@ -10,11 +10,18 @@ namespace shared::dev_spawn {
 
 enum class OverworldSpawn : uint8_t {
   Winter,   // maze player_start (normal gameplay)
-  Tangram,  // spring tangram pad (local testing)
+  Tangram,  // spring tangram pad (local testing only)
 };
 
-// Toggle here, then rebuild client + server.
+// Normal play: Winter. For tangram testing, switch to Tangram and rebuild.
 inline constexpr OverworldSpawn kOverworldSpawn = OverworldSpawn::Winter;
+
+// Only active when kOverworldSpawn == Tangram (pieces spawn near ghost slots).
+inline constexpr float kTangramDevPieceOffsetFromSlotM = 1.15f;
+
+[[nodiscard]] inline bool spawnTangramPiecesNearSlots() {
+  return kOverworldSpawn == OverworldSpawn::Tangram;
+}
 
 [[nodiscard]] inline glm::vec3 overworldSpawnPosition(
     OverworldSpawn mode, const maze_layout::Config& maze,
