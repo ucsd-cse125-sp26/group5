@@ -69,6 +69,9 @@ void removeSyncedComponent(entt::registry& registry, entt::entity entity,
     case shared::CID_FALL_CHALLENGE:
       registry.remove<shared::FallChallengeState>(entity);
       break;
+    case shared::CID_SUMMER_ESCAPE:
+      registry.remove<shared::SummerEscapeState>(entity);
+      break;
   }
 }
 
@@ -174,7 +177,7 @@ void registerClientHandlers(ClientNetwork& network) {
             std::memcpy(&compCount, data + offset, sizeof(uint16_t));
             offset += sizeof(uint16_t);
 
-            bool present[static_cast<size_t>(shared::CID_TANGRAM_PIECE) + 1] =
+            bool present[static_cast<size_t>(shared::CID_SUMMER_ESCAPE) + 1] =
                 {};
             for (uint16_t c = 0; c < compCount; c++) {
               shared::ComponentTypeId cid;
@@ -377,6 +380,8 @@ void processInput(GLFWwindow* window, const ClientGame& game,
         keys |= KEY_DEBUG_TOGGLE_BARRIERS;
       if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
         keys |= KEY_DEBUG_PRINT_POS;
+      if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS)
+        keys |= KEY_DEBUG_SUMMER_PAD;
     }
   }
 
