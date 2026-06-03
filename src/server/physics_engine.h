@@ -216,6 +216,13 @@ class PhysicsEngine {
   JPH::ShapeRefC meshShapeForAsset(const std::string& modelName,
                                    const glm::vec3& scale);
 
+  // Convex hull of the asset mesh (orientation baked in like the box). Unlike
+  // a triangle MeshShape this is valid for dynamic bodies, so player avatars
+  // collide against their silhouette instead of a loose box. Returns nullptr
+  // for procedural assets (no mesh) — callers fall back to a box.
+  JPH::ShapeRefC convexHullForAsset(const std::string& modelName,
+                                    const glm::vec3& scale);
+
   JPH::ShapeRefC playerShapeForAsset(const std::string& modelName,
                                      const glm::vec3& scale);
 
@@ -252,6 +259,7 @@ class PhysicsEngine {
 
   std::unordered_map<std::string, BoxExtents> assetBoxCache_;
   std::unordered_map<std::string, JPH::ShapeRefC> assetMeshCache_;
+  std::unordered_map<std::string, JPH::ShapeRefC> assetHullCache_;
 
   BPLayerInterfaceImpl broadPhaseLayerInterface_;
   ObjectVsBroadPhaseLayerFilterImpl objectVsBroadPhaseLayerFilter_;
