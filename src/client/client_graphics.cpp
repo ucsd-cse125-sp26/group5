@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <random>
@@ -39,6 +40,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
+#include "shared/mesh_loader.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
@@ -674,6 +676,22 @@ bool Graphics::load(int width, int height) {
   initLoadingScreen();
   renderLoadingFrame("Compiling shaders");
 
+  // Kick off a worker that parses the landscape glTF (the dominant single
+  // CPU cost in load()). All the small asset loads + shader compilation +
+  // FBO allocs run in parallel on the main thread; when we reach the map
+  // upload stage below, we just await the parsed scene and skip the parse.
+  std::future<std::shared_ptr<shared::ParsedModel>> landscapeParse =
+      std::async(std::launch::async, [] {
+        auto parsed = std::make_shared<shared::ParsedModel>();
+        const std::string fullPath =
+            (exeDir() / shared::DEFAULT_MAP_PATH).string();
+        if (!parsed->load(fullPath, shared::MAP_LOAD_FLAGS)) {
+          std::cout << "ERROR::ASSIMP::landscapeParse: " << parsed->lastError()
+                    << '\n';
+        }
+        return parsed;
+      });
+
   gbufferShader.emplace("shaders/vertex_gbuffer.glsl",
                         "shaders/fragment_gbuffer.glsl");
   lightingShader.emplace("shaders/vertex_present.glsl",
@@ -835,19 +853,27 @@ bool Graphics::load(int width, int height) {
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
+  // landscapeParse was launched at the top of load(); await it here. If the
+  // worker already finished, .get() is non-blocking. The GL-upload step then
+  // runs on the main thread (VAOs/VBOs require the main GL context).
+  renderLoadingFrame(std::string("Waiting on landscape parse: ") +
+                     std::string(shared::DEFAULT_MAP_PATH));
+  auto pump = [this] { pumpLoadingFrame(); };
+  auto parsedLandscape = landscapeParse.get();
   renderLoadingFrame(std::string("Loading map: ") +
                      std::string(shared::DEFAULT_MAP_PATH));
-  auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
+  auto mapModels = loadMapModels(*parsedLandscape, pump);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
     printf("Loaded map sub-model: %s\n", key.c_str());
+    pumpLoadingFrame();
   }
 
   for (const auto& sc : shared::SCENES) {
     std::string dir = std::string(sc.skyboxDirectory);
     if (skyboxes.find(dir) == skyboxes.end()) {
       renderLoadingFrame(std::string("Loading skybox: ") + dir);
-      skyboxes[dir] = loadSkybox(dir);
+      skyboxes[dir] = loadSkybox(dir, pump);
       printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
              dir.c_str());
     }
@@ -2073,25 +2099,27 @@ void Graphics::destroyLoadingScreen() {
 }
 
 void Graphics::renderLoadingFrame(const std::string& status) {
+  // Stage label changed (or this is the first call): always render so the
+  // user sees the new text immediately, regardless of pacing.
+  const bool stageChanged = status != loadingStatus;
+  loadingStatus = status;
   if (!window || !loadingShader || !loadingShader->valid() ||
       !loadingCubeIndexCount) {
     return;
   }
 
-  // Pace to a fixed cadence so the cube animates smoothly even when load()
-  // calls us in bursts. Vsync alone can't do this — back-to-back calls would
-  // still hammer the GPU within a single refresh interval, and longer single
-  // work items still let the next frame render immediately on return.
+  // Skip when we already drew a frame within the last 1/60 s. Loaders can
+  // call this freely (per-node, per-face) without paying a draw + swap each
+  // time; the first call past the deadline renders, the rest are cheap no-ops.
+  // This is what gets the loading screen to actual 60 fps inside long
+  // single-stage loads instead of freezing between named stages.
   constexpr double kInterval = 1.0 / kLoadingTargetFps;
   const double now = glfwGetTime();
-  if (loadingLastFrameTime > 0.0) {
-    const double dueAt = loadingLastFrameTime + kInterval;
-    if (now < dueAt) {
-      std::this_thread::sleep_for(
-          std::chrono::duration<double>(dueAt - now));
-    }
+  if (!stageChanged && loadingLastFrameTime > 0.0 &&
+      now < loadingLastFrameTime + kInterval) {
+    return;
   }
-  loadingLastFrameTime = glfwGetTime();
+  loadingLastFrameTime = now;
 
   glfwPollEvents();
   glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
@@ -2141,7 +2169,7 @@ void Graphics::renderLoadingFrame(const std::string& status) {
       ImGui::SetWindowFontScale(2.0f);
       ImGui::TextUnformatted("Loading...");
       ImGui::Separator();
-      ImGui::TextUnformatted(status.c_str());
+      ImGui::TextUnformatted(loadingStatus.c_str());
     }
     ImGui::End();
     ImGui::Render();
@@ -2149,6 +2177,12 @@ void Graphics::renderLoadingFrame(const std::string& status) {
   }
 
   glfwSwapBuffers(window);
+}
+
+void Graphics::pumpLoadingFrame() {
+  // Reuse the named-stage path with the cached status — the early-exit pacing
+  // inside renderLoadingFrame keeps repeated calls cheap.
+  renderLoadingFrame(loadingStatus);
 }
 
 Graphics::ServerMenuResult Graphics::renderServerMenuFrame(

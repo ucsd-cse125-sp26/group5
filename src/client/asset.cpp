@@ -179,7 +179,13 @@ static void extractBoneWeights(const aiMesh* mesh,
 // `model == nullptr` for paths that can't be skinned (map sub-models share a
 // VAO across nodes, so we skip bone extraction even if the source mesh has
 // bones — they'd alias across sub-models otherwise).
-static Mesh uploadMeshFromAi(const aiMesh* mesh, Model* model = nullptr) {
+static Mesh uploadMeshFromAi(const aiMesh* mesh, Model* model = nullptr,
+                             const AssetProgressFn& progress = {}) {
+  // For huge meshes (the 134k-face landscape) the CPU-side vertex and index
+  // packing alone takes tens of ms; ping the progress callback every 4k
+  // verts/faces so the loading cube keeps spinning at ≈60 fps inside this
+  // single call.
+  constexpr unsigned kProgressInterval = 4096;
   std::vector<Vertex> vertices;
   vertices.reserve(mesh->mNumVertices);
   for (unsigned int j = 0; j < mesh->mNumVertices; j++) {
@@ -198,6 +204,7 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh, Model* model = nullptr) {
       vertex.bitangent = glm::cross(vertex.normal, vertex.tangent);
     }
     vertices.push_back(vertex);
+    if (progress && (j % kProgressInterval) == 0) progress();
   }
 
   if (model && mesh->mNumBones > 0) {
@@ -211,6 +218,7 @@ static Mesh uploadMeshFromAi(const aiMesh* mesh, Model* model = nullptr) {
     for (unsigned int k = 0; k < face.mNumIndices; k++) {
       indices.push_back(face.mIndices[k]);
     }
+    if (progress && (j % kProgressInterval) == 0) progress();
   }
 
   return buildMesh(std::move(vertices), indices, mesh->mMaterialIndex);
@@ -339,8 +347,10 @@ static bool sampleDiffuseAt(const CpuDiffuse& d, glm::vec2 uv,
 // three vertices), and push one DiffuseSample per opaque hit weighted by
 // area/4. Triangles without UVs use the material's constant color.
 static void collectMeshSamples(const aiMesh* mesh, const CpuDiffuse& diffuse,
-                               std::vector<DiffuseSample>& out) {
+                               std::vector<DiffuseSample>& out,
+                               const AssetProgressFn& progress = {}) {
   if (!mesh || mesh->mNumFaces == 0) return;
+  constexpr unsigned kProgressInterval = 4096;
   const bool hasUV = mesh->mTextureCoords[0] != nullptr;
   for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
     const aiFace& face = mesh->mFaces[f];
@@ -370,6 +380,7 @@ static void collectMeshSamples(const aiMesh* mesh, const CpuDiffuse& diffuse,
         out.push_back({.color = c, .weight = perSampleWeight});
       }
     }
+    if (progress && (f % kProgressInterval) == 0) progress();
   }
 }
 
@@ -1288,7 +1299,8 @@ void buildSkyboxPalette(Skybox& skybox, int colors) {
 }
 
 static GLuint loadCubemap(const std::string& directory,
-                          std::vector<DiffuseSample>& outSamples) {
+                          std::vector<DiffuseSample>& outSamples,
+                          const AssetProgressFn& progress) {
   const std::string suffixes[] = {"px.png", "nx.png", "py.png",
                                   "ny.png", "pz.png", "nz.png"};
   // Fixed per-face sample budget — caps total samples at 6*N*N regardless of
@@ -1333,6 +1345,7 @@ static GLuint loadCubemap(const std::string& directory,
                    0, GL_RGBA, GL_UNSIGNED_BYTE, pink);
       GPU_MEM_TEX2D("SkyboxTextures", GL_SRGB8_ALPHA8, 1, 1);
     }
+    if (progress) progress();
   }
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -1365,7 +1378,8 @@ static const float skyboxVertices[] = {
 };
 // clang-format on
 
-Skybox loadSkybox(const std::string& directory) {
+Skybox loadSkybox(const std::string& directory,
+                  const AssetProgressFn& progress) {
   GLuint vao, vbo;
   glGenVertexArrays(1, &vao);
   glGenBuffers(1, &vbo);
@@ -1379,30 +1393,32 @@ Skybox loadSkybox(const std::string& directory) {
   glBindVertexArray(0);
 
   Skybox skybox{.vao = vao};
-  skybox.cubemapTexture = loadCubemap(directory, skybox.diffuseSamples);
+  skybox.cubemapTexture =
+      loadCubemap(directory, skybox.diffuseSamples, progress);
   return skybox;
 }
 
-std::vector<std::pair<std::string, Model*>> loadMapModels(
-    const std::string& filename) {
+// GL-upload step for loadMapModels; expects a pre-parsed scene. Free function
+// (not a member) so both `loadMapModels(filename, ...)` and the parsed-scene
+// overload can share it.
+static std::vector<std::pair<std::string, Model*>> uploadMapModels(
+    const shared::ParsedModel& parsed, const AssetProgressFn& progress) {
   std::vector<std::pair<std::string, Model*>> out;
-  const std::string fullPath = (exeDir() / filename).string();
-  shared::ParsedModel parsed;
-  if (!parsed.load(fullPath, shared::MAP_LOAD_FLAGS)) {
-    std::cout << "ERROR::ASSIMP::loadMapModels: " << parsed.lastError() << '\n';
-    return out;
-  }
   const aiScene* scene = parsed.scene();
+  if (!scene) return out;
 
   std::vector<Material> materials = buildMaterials(scene);
+  if (progress) progress();
 
   // Diffuse pixmaps shared across all sub-models — kept alive for the
   // duration of this load only; each per-node Model below collects its own
-  // weighted samples against them.
+  // weighted samples against them. Decoding each PNG can take tens of ms;
+  // ping progress between materials.
   std::vector<CpuDiffuse> pixmaps;
   pixmaps.reserve(scene->mNumMaterials);
   for (unsigned i = 0; i < scene->mNumMaterials; ++i) {
     pixmaps.push_back(decodeDiffuse(scene->mMaterials[i], scene));
+    if (progress) progress();
   }
 
   // glTF instancing: nodes can reuse the same aiMesh — share GL handles.
@@ -1412,7 +1428,8 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
     if (it == meshTable.end()) {
       it = meshTable
                .emplace(sceneMeshIndex,
-                        uploadMeshFromAi(scene->mMeshes[sceneMeshIndex]))
+                        uploadMeshFromAi(scene->mMeshes[sceneMeshIndex],
+                                         nullptr, progress))
                .first;
     }
     return it->second;
@@ -1431,12 +1448,29 @@ std::vector<std::pair<std::string, Model*>> loadMapModels(
       const aiMesh* aiM = scene->mMeshes[sceneMeshIndex];
       if (aiM->mMaterialIndex < pixmaps.size()) {
         collectMeshSamples(aiM, pixmaps[aiM->mMaterialIndex],
-                           model->diffuseSamples);
+                           model->diffuseSamples, progress);
       }
     }
     computeModelBounds(*model);
     out.emplace_back(std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
                      model);
+    if (progress) progress();
   });
   return out;
+}
+
+std::vector<std::pair<std::string, Model*>> loadMapModels(
+    const std::string& filename, const AssetProgressFn& progress) {
+  const std::string fullPath = (exeDir() / filename).string();
+  shared::ParsedModel parsed;
+  if (!parsed.load(fullPath, shared::MAP_LOAD_FLAGS)) {
+    std::cout << "ERROR::ASSIMP::loadMapModels: " << parsed.lastError() << '\n';
+    return {};
+  }
+  return uploadMapModels(parsed, progress);
+}
+
+std::vector<std::pair<std::string, Model*>> loadMapModels(
+    const shared::ParsedModel& parsed, const AssetProgressFn& progress) {
+  return uploadMapModels(parsed, progress);
 }

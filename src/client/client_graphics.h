@@ -188,6 +188,9 @@ struct Graphics {
   // from load() happen to be.
   double loadingLastFrameTime = 0.0;
   static constexpr double kLoadingTargetFps = 60.0;
+  // Last stage text passed to renderLoadingFrame, reused by pumpLoadingFrame
+  // (which loaders call mid-work without knowing the stage name).
+  std::string loadingStatus;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);
@@ -211,6 +214,10 @@ struct Graphics {
   void initLoadingScreen();
   void destroyLoadingScreen();
   void renderLoadingFrame(const std::string& status);
+  // Renders a frame using the last `status` text from renderLoadingFrame.
+  // Cheap no-op when called within the 1/60 s pacing window; safe to invoke
+  // from inside slow loaders (per-node, per-face) for actual 60 fps cadence.
+  void pumpLoadingFrame();
 
   // Server-select menu rendered after assets finish loading but before the
   // network connection is established. Caller owns the host buffer and port
