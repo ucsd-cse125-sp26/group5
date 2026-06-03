@@ -15,6 +15,7 @@
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "shared/assets.h"
 
 struct GLFWwindow;
 struct GLFWmonitor;
@@ -100,6 +101,11 @@ struct Graphics {
   GLuint ssaoBlurColor = 0;
   GLuint ssaoNoiseTex = 0;
   std::vector<glm::vec3> ssaoKernel;
+  // Dimensions the SSAO + blur FBOs are currently allocated at. May be
+  // smaller than renderWidth/renderHeight when settings.ssaoScale > 1.
+  int ssaoWidth = 0;
+  int ssaoHeight = 0;
+  int lastSsaoScale = 1;
 
   GraphicsSettings settings;
 
@@ -130,6 +136,12 @@ struct Graphics {
   // Tracks the active palette size so a change can trigger per-model
   // k-means rebuilds. The palette itself lives on each Model.
   int lastPaletteColors = 0;
+  // Same for the skybox palette — independent setting, independent rebuild.
+  int lastSkyboxPaletteColors = 0;
+  // Tracks the active scene so per-skybox quantize overrides only apply on
+  // scene change. Pointer identity is enough because SceneInfo entries are
+  // constexpr (stable address).
+  const shared::SceneInfo* lastAppliedScene = nullptr;
 
   // Skeletal animation. AnimationLibrary is built lazily once per skinned
   // model; Animator state lives per entity and is garbage-collected when
@@ -172,6 +184,14 @@ struct Graphics {
   GLuint loadingCubeEBO = 0;
   int loadingCubeIndexCount = 0;
   double loadingStartTime = 0.0;
+  // Wall clock of the previous renderLoadingFrame swap. Used to pace the
+  // loading screen to a fixed cadence regardless of how spread-out the calls
+  // from load() happen to be.
+  double loadingLastFrameTime = 0.0;
+  static constexpr double kLoadingTargetFps = 60.0;
+  // Last stage text passed to renderLoadingFrame, reused by pumpLoadingFrame
+  // (which loaders call mid-work without knowing the stage name).
+  std::string loadingStatus;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);
@@ -195,6 +215,21 @@ struct Graphics {
   void initLoadingScreen();
   void destroyLoadingScreen();
   void renderLoadingFrame(const std::string& status);
+  // Renders a frame using the last `status` text from renderLoadingFrame.
+  // Cheap no-op when called within the 1/60 s pacing window; safe to invoke
+  // from inside slow loaders (per-node, per-face) for actual 60 fps cadence.
+  void pumpLoadingFrame();
+
+  // Server-select menu rendered after assets finish loading but before the
+  // network connection is established. Caller owns the host buffer and port
+  // value; this just draws one frame and reports the user's action.
+  enum class ServerMenuResult {
+    None,
+    Connect,
+    Quit,
+  };
+  ServerMenuResult renderServerMenuFrame(char* host, size_t hostSize, int* port,
+                                         const char* statusMsg);
 
   void allocateDirShadowMap(int size);
   void allocatePointShadowMaps(int size);

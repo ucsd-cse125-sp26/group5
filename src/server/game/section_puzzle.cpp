@@ -5,6 +5,33 @@
 
 namespace section_puzzle {
 
+const char* sceneNameForSeason(shared::SectionSeasonMap season) {
+  switch (season) {
+    case shared::SectionSeasonMap::WINTER:
+      return "night";
+    case shared::SectionSeasonMap::SPRING:
+      return "morning";
+    case shared::SectionSeasonMap::SUMMER:
+      // No "afternoon" scene exists; "noon" is the closest match.
+      return "noon";
+    case shared::SectionSeasonMap::FALL:
+      return "sunset";
+  }
+  return "sunny";
+}
+
+void setActiveSeason(ServerGame& game, shared::SectionSeasonMap season) {
+  for (auto e : game.registry.view<shared::GameSection>()) {
+    game.registry.get<shared::GameSection>(e).currentActiveSeason = season;
+  }
+  const char* sceneName = sceneNameForSeason(season);
+  // Only update the overworld scene; MazeTag has its own Scene which stays
+  // whatever spawnDemoLight<MazeTag> set it to.
+  for (auto e : game.registry.view<shared::OverworldTag, shared::Scene>()) {
+    game.registry.get<shared::Scene>(e).name = sceneName;
+  }
+}
+
 entt::entity findSection(const ServerGame& game,
                          shared::SectionSeasonMap season) {
   auto view = game.registry.view<shared::SectionController>();
@@ -55,9 +82,9 @@ void completeSection(ServerGame& game, shared::SectionSeasonMap season) {
   for (auto ent : gameView) {
     auto& gs = gameView.get<shared::GameSection>(ent);
     if (gs.sectionsCompleted < 4) gs.sectionsCompleted++;
-    if (season == shared::SectionSeasonMap::FALL) {
-      gs.currentActiveSeason = shared::SectionSeasonMap::FALL;
-    }
+  }
+  if (season == shared::SectionSeasonMap::FALL) {
+    setActiveSeason(game, shared::SectionSeasonMap::FALL);
   }
   printf("[Section] %s section completed\n",
          season == shared::SectionSeasonMap::FALL ? "Fall" : "Season");

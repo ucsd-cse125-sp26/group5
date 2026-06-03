@@ -26,7 +26,7 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build
-        run: nix develop .#ci -c bash ./build-linux-gcc.sh
+        run: nix develop .#ci -c bash ./build-linux-gcc.sh -DCMAKE_BUILD_TYPE=Release
 
       - name: ctest
         working-directory: build-linux-gcc
@@ -69,7 +69,7 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Build
-        run: nix develop .#ci -c bash ./build-windows.sh
+        run: nix develop .#ci -c bash ./build-windows.sh -DCMAKE_BUILD_TYPE=Release
 
       - uses: actions/upload-artifact@v7
         with:
@@ -183,7 +183,7 @@ jobs:
         run: python -m pip install jinja2
 
       - name: Build
-        run: bash ./build.sh "-DPython_EXECUTABLE=$pythonLocation/bin/python"
+        run: bash ./build.sh "-DPython_EXECUTABLE=$pythonLocation/bin/python" -DCMAKE_BUILD_TYPE=Release
 
       - name: ctest
         working-directory: build
@@ -269,3 +269,70 @@ jobs:
             build/shaders/
           if-no-files-found: error
           retention-days: 1
+
+  release-publish:
+    name: release (publish to cse125)
+    needs: [linux-gcc-nix, windows-cross-nix, macos-native, windows-native]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Package per-platform release zips
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse --short HEAD)"
+          DATE="$(date -u +%Y%m%d)"
+          mkdir -p out stage
+          # Bundle binaries + shaders + the matching fetch-assets script (no
+          # assets — players run fetch-assets to pull the full bundle from cse125).
+          package() {
+            platform="$1"; artifact="$2"; fetch="$3"
+            name="cse125g5-${platform}-${DATE}-${SHA}"
+            dest="stage/${name}"
+            mkdir -p "$dest"
+            cp -r "artifacts/${artifact}/." "$dest/"
+            cp "scripts/dist/${fetch}" "$dest/"
+            {
+              echo "platform: ${platform}"
+              echo "git: $(git rev-parse HEAD)"
+              echo "branch: ${GITHUB_REF_NAME}"
+              echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "run: ${GITHUB_RUN_ID}"
+            } > "$dest/BUILD_INFO.txt"
+            (cd stage && zip -qr "../out/${name}.zip" "${name}")
+            echo "packaged out/${name}.zip"
+          }
+          package linux         linux-x64         fetch-assets.sh
+          package windows-mingw windows-x64-mingw fetch-assets.bat
+          package windows-msvc  windows-x64-msvc  fetch-assets.bat
+          package macos         macos-arm64       fetch-assets.sh
+          ls -lh out/
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.CSE125_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          cat > ~/.ssh/known_hosts <<'EOF'
+          [cse125.ucsd.edu]:222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDA9M+6Rkw/miToKdbN0V8HP4hY9dpXpvImW6Q+iVGauCCN1ERl+msefj2+CFfda13kPLcM9VcV5xmqgSlqUtQMWM2uRKnLzUrrwG5ibv2t8Iox/Yc1T3Ybcb0Yte7w6NHIL0SPfQ2GUi2fr+8XAOg/E4IJa5mvnSdztPw/wLfoNHcUba3SVRAYo8ZS6mj6R0DQjoW8P8lRXjiP1/4Jcbx822oYV7+GcxRw1986PDNKNxrr6eUe8sHyAf4OkZEiPbC3rfTRQv8CFzzyP6DZf9ruWD4r51dmTnJJCc1XX8ulr/n8HA9VqfvlsI+h9EII1SoU98xq6LxFWuhp/zeh1lAisv+HO5VpnuskHrPT/6P2GNIU+cy+xZyfkCbrUbsGKNXglga4/gy9BIsaSnWX2Bjf3i5sN+bn+6aqYm+o4MYDPII3tfVLxb+iNnAOluSlT12kIAfLUnYj4jZf9loqa0PEZLMI/owmxmUA02mMGBYZxa8Xyz3mwoqQl2V4mziQ3UU=
+          [cse125.ucsd.edu]:222 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBMbACmS5/2ZqE7fHppRE/00RlEFoLHz5DmJ1hIbc3wKF5B74OuSoIC+Mvlyz2AOF2Z364wQbrZHKsdANiQanM8=
+          [cse125.ucsd.edu]:222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTXKYBOS1sJKwPetUdOeK5alD3gB3MtIXXOtwnAJkPL
+          EOF
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload to cse125 builds/release
+        run: |
+          set -euo pipefail
+          REMOTE_DIR=/var/www/html/cse125/2026/cse125g5/builds/release
+          ssh -p 222 -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            jaroot@cse125.ucsd.edu "mkdir -p '$REMOTE_DIR'"
+          scp -P 222 -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            out/*.zip jaroot@cse125.ucsd.edu:"$REMOTE_DIR"/

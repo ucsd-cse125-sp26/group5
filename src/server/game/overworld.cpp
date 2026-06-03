@@ -5,6 +5,7 @@
 #include "server/game/fall_challenge.h"
 #include "server/game/maze.h"
 #include "server/game/section_puzzle.h"
+#include "server/game/summer_escape.h"
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
@@ -41,12 +42,8 @@ void MoveInMainMap(ServerGame& game, float dt) {
       break;
     }
   }
-  if (winterStillActive) {
-    auto gameSectionView = game.registry.view<shared::GameSection>();
-    for (auto entity : gameSectionView) {
-      auto& gameSection = gameSectionView.get<shared::GameSection>(entity);
-      gameSection.currentActiveSeason = shared::SectionSeasonMap::WINTER;
-    }
+  if (winterStillActive && !game.debugSeasonOverride) {
+    section_puzzle::setActiveSeason(game, shared::SectionSeasonMap::WINTER);
   }
 }
 
@@ -85,7 +82,7 @@ void ProcessFragmentPickups(ServerGame& game) {
         } else if (fragment.season == shared::SectionSeasonMap::FALL) {
           fall_challenge::CollectFallFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
-          // CollectSummerFragment(game);
+          summer_escape::CollectSummerFragment(game);
         } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
           if (!section_puzzle::isSectionCompleted(
                   game, shared::SectionSeasonMap::SPRING)) {
@@ -204,7 +201,5 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
         true;
   }
 
-  for (auto e : game.registry.view<shared::GameSection>()) {
-    game.registry.get<shared::GameSection>(e).currentActiveSeason = nextSeason;
-  }
+  section_puzzle::setActiveSeason(game, nextSeason);
 }

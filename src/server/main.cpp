@@ -31,11 +31,11 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
   // Static map / wall / marker entities are sent by SPAWN_ENTITY when a state
   // is entered or a client connects. Per-frame UPDATE_ENTITY should stay small:
   // only entities whose synced components can change every tick belong here.
-  return registry
-      .any_of<shared::PlayerInput, shared::Velocity, shared::PointLight,
-              shared::DirectionalLight, shared::Scene,
-              shared::FragmentComponent, shared::OverworldTangramPiece,
-              shared::FallChallengeState, shared::FallingObject>(ent);
+  return registry.any_of<
+      shared::PlayerInput, shared::Velocity, shared::PointLight,
+      shared::DirectionalLight, shared::Scene, shared::FragmentComponent,
+      shared::OverworldTangramPiece, shared::FallChallengeState,
+      shared::SummerEscapeState, shared::FallingObject>(ent);
 }
 
 }  // namespace
@@ -208,7 +208,7 @@ int main() {
   };
 
   auto previousTime = std::chrono::high_resolution_clock::now();
-  const float fixedDt = 1.0f / 60.0f;
+  const float fixedDt = 1.0f / 180.0f;
   float accumulator = 0.0f;
 
   while (true) {
