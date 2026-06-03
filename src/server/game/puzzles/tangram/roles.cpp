@@ -34,11 +34,15 @@ void setBodyLayer(ServerGame& game, entt::entity ent, JPH::ObjectLayer layer) {
 
 JPH::ObjectLayer pieceLayerFor(ServerGame& game, entt::entity ent,
                                uint8_t isolationStage) {
+  if (game.registry.all_of<shared::TangramPiece>(ent)) {
+    const auto& piece = game.registry.get<shared::TangramPiece>(ent);
+    if (piece.slotSnapped ||
+        tangram_puzzle::isPieceCorrectlyPlaced(game, ent)) {
+      return Layers::TANGRAM_SNAPPED;
+    }
+  }
   if (!shared::tangram_roles::pushCollisionIsolation(isolationStage)) {
     return Layers::MOVING;
-  }
-  if (tangram_puzzle::isPieceCorrectlyPlaced(game, ent)) {
-    return Layers::TANGRAM_SNAPPED;
   }
   return Layers::TANGRAM;
 }

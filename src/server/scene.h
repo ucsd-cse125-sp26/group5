@@ -82,10 +82,6 @@ void spawnFallingHazardZone(ServerGame& game, const glm::vec3& center,
   game.registry.template emplace<WorldTag>(entity);
   game.registry.template emplace<shared::FallingHazardZone>(
       entity, radius, spawnHeight, interval, 0.0f);
-  // Visible marker so you can see the zone center while tuning. Delete this
-  // line once you're happy with the placement to make the zone invisible.
-  game.registry.template emplace<shared::RenderInfo>(entity, "cube", 0.5f, 0.5f,
-                                                     0.5f);
 }
 
 template <typename WorldTag>

@@ -150,8 +150,8 @@ void loadLevel(ServerGame& game) {
   auto [summerFragmentID, summerFragment] = new_entity(game);
   game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f, 45.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
-  // for testing, fragments will be light cubes
-  game.registry.emplace<shared::RenderInfo>(summerFragment, "light_cube", 0.5f);
+  // RenderInfo omitted: summer fragment is invisible until the decrypt puzzle
+  // is solved (reveal + network spawn when that flow is wired up).
   game.registry.emplace<shared::FragmentComponent>(
       summerFragment, shared::SectionSeasonMap::SUMMER, false);
   game.registry.emplace<shared::OverworldTag>(summerFragment);

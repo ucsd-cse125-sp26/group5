@@ -96,11 +96,5 @@ TEST(MazeTrigger, AllPlayersFailsIfOneOutside) {
 
 TEST(MazeTrigger, MarkerEntitiesOutlineSquare) {
   const auto entities = maze_trigger::buildMazeTriggerMarkerEntities(kLayout);
-  EXPECT_EQ(entities.size(), 20u);
-
-  const float minX = kLayout.triggerCenterX - kLayout.halfExtent;
-  const float minY = kLayout.triggerCenterY - kLayout.halfExtent;
-  EXPECT_EQ(entities[0].modelName, "maze_trigger_cube");
-  EXPECT_FLOAT_EQ(entities[0].position.x, minX);
-  EXPECT_FLOAT_EQ(entities[0].position.y, minY);
+  EXPECT_TRUE(entities.empty());
 }

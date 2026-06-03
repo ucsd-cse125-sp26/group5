@@ -94,7 +94,46 @@ inline bool satOverlap(const std::vector<Vec2>& a, const std::vector<Vec2>& b,
   return testAxes(a) && testAxes(b);
 }
 
+inline float cyclicVertexMismatch(const std::vector<Vec2>& a,
+                                  const std::vector<Vec2>& b) {
+  if (a.size() != b.size() || a.empty()) return 1e9f;
+  const size_t n = a.size();
+  float best = 1e9f;
+  auto tryOffsets = [&](bool reverse) {
+    for (size_t off = 0; off < n; ++off) {
+      float mx = 0.0f;
+      for (size_t i = 0; i < n; ++i) {
+        const size_t j = reverse ? (off + n - i) % n : (i + off) % n;
+        mx = std::max(mx, std::hypot(a[i].x - b[j].x, a[i].y - b[j].y));
+      }
+      best = std::min(best, mx);
+    }
+  };
+  tryOffsets(false);
+  tryOffsets(true);
+  return best;
+}
+
 }  // namespace detail
+
+// True when yaw matches the slot and 2D footprints overlap (handles square
+// vertex winding — index-wise vertex distance falsely fails at 45°).
+[[nodiscard]] inline bool footprintsMatch(const tangram_puzzle::PieceDef& def,
+                                          float pieceRelX, float pieceRelY,
+                                          float pieceYawRad, float slotRelX,
+                                          float slotRelY, float slotYawRad,
+                                          float satEpsilon = 0.04f) {
+  const float qPiece = tangram_puzzle::quantizeYawToRotateStep(pieceYawRad);
+  const float qSlot = tangram_puzzle::quantizeYawToRotateStep(slotYawRad);
+  if (!tangram_puzzle::yawMatchesTarget(qPiece, qSlot)) {
+    return false;
+  }
+  const std::vector<detail::Vec2> piecePoly =
+      detail::worldPolygon(def, pieceRelX, pieceRelY, qPiece);
+  const std::vector<detail::Vec2> slotPoly =
+      detail::worldPolygon(def, slotRelX, slotRelY, qSlot);
+  return detail::satOverlap(piecePoly, slotPoly, satEpsilon);
+}
 
 [[nodiscard]] inline bool slotPosesOverlap(
     const std::array<tangram_slot::SlotPose, tangram_puzzle::kPieceCount>&
