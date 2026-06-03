@@ -17,7 +17,6 @@
 #include "shared/puzzles/maze/layout.h"
 #include "shared/simple_profiler.h"
 #include "shared/sound_constants.h"
-constexpr float kHeldKeyScaleFactor = 1.1f;
 
 namespace {
 
@@ -250,86 +249,6 @@ void render_model_change(ServerGame& game, float dt) {
                                /*update mass*/ false,
                                JPH::EActivation::Activate);
       }
-    }
-  }
-}
-
-// Demo: server-controlled point light orbiting the origin.
-void hardcoded_spinning_light(entt::registry& registry, float dt,
-                              uint32_t light_entity_id) {
-  bool brighten = false;
-  bool dim = false;
-
-  auto input_view = registry.view<shared::PlayerInput>();
-  for (auto entity : input_view) {
-    auto& input = input_view.get<shared::PlayerInput>(entity);
-    if (input.keys & KEY_LIGHT_BRIGHT) brighten = true;
-    if (input.keys & KEY_LIGHT_DIM) dim = true;
-  }
-
-  static float angle = 0.0f;
-  angle += dt;  // rad/sec
-
-  const float radius = 5.0f;
-  const float height = 3.0f;
-
-  auto view =
-      registry.view<shared::Position, shared::PointLight, shared::Entity>();
-  for (auto entity : view) {
-    auto& eid = view.get<shared::Entity>(entity);
-    if (eid.id != light_entity_id) continue;
-
-    auto& pos = view.get<shared::Position>(entity);
-    auto& light = view.get<shared::PointLight>(entity);
-
-    // Maze board is roughly [0,14] x [0,14]: keep a bright lamp over the
-    // center instead of orbiting the overworld origin (which leaves the maze in
-    // shadow).
-    if (registry.all_of<shared::MazeTag>(entity)) {
-      pos.x = 7.0f;
-      pos.y = 7.0f;
-      pos.z = 10.0f;
-      pos.qw = 1.0f;
-      pos.qx = 0.0f;
-      pos.qy = 0.0f;
-      pos.qz = 0.0f;
-      light.px = pos.x;
-      light.py = pos.y;
-      light.pz = pos.z;
-    } else {
-      pos.x = radius * std::cos(angle);
-      pos.y = radius * std::sin(angle);
-      pos.z = height;
-
-      // Orient the cube to face the origin
-      glm::vec3 p(pos.x, pos.y, pos.z);
-      glm::vec3 dir = glm::normalize(-p);
-      glm::quat q = glm::quatLookAt(dir, glm::vec3(0.0f, 0.0f, 1.0f));
-      pos.qw = q.w;
-      pos.qx = q.x;
-      pos.qy = q.y;
-      pos.qz = q.z;
-
-      light.px = pos.x;
-      light.py = pos.y;
-      light.pz = pos.z;
-    }
-
-    if (brighten) {
-      light.diffuseR *= kHeldKeyScaleFactor;
-      light.diffuseG *= kHeldKeyScaleFactor;
-      light.diffuseB *= kHeldKeyScaleFactor;
-      light.specularR *= kHeldKeyScaleFactor;
-      light.specularG *= kHeldKeyScaleFactor;
-      light.specularB *= kHeldKeyScaleFactor;
-    }
-    if (dim) {
-      light.diffuseR /= kHeldKeyScaleFactor;
-      light.diffuseG /= kHeldKeyScaleFactor;
-      light.diffuseB /= kHeldKeyScaleFactor;
-      light.specularR /= kHeldKeyScaleFactor;
-      light.specularG /= kHeldKeyScaleFactor;
-      light.specularB /= kHeldKeyScaleFactor;
     }
   }
 }

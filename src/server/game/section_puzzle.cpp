@@ -25,8 +25,8 @@ void setActiveSeason(ServerGame& game, shared::SectionSeasonMap season) {
     game.registry.get<shared::GameSection>(e).currentActiveSeason = season;
   }
   const char* sceneName = sceneNameForSeason(season);
-  // Only update the overworld scene; MazeTag has its own Scene which stays
-  // whatever spawnDemoLight<MazeTag> set it to.
+  // Only update the overworld scene; MazeTag has its own Scene anchor which
+  // stays whatever spawnSceneAnchor<MazeTag> set it to.
   for (auto e : game.registry.view<shared::OverworldTag, shared::Scene>()) {
     game.registry.get<shared::Scene>(e).name = sceneName;
   }

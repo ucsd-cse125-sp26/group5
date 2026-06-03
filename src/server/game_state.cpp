@@ -74,21 +74,6 @@ static void despawnTaggedEntities(ServerGame& game) {
   }
 }
 
-// Find the demo light by looking for a PointLight with a RenderInfo (the cube
-// marker). Map-loaded point lights have no RenderInfo, so this filter excludes
-// them — without it EnTT's newest-first iteration returns a map light and
-// hardcoded_spinning_light moves the wrong entity.
-template <typename Tag>
-static uint32_t findLightEntityId(ServerGame& game) {
-  auto view =
-      game.registry
-          .view<Tag, shared::PointLight, shared::RenderInfo, shared::Entity>();
-  for (auto e : view) {
-    return view.template get<shared::Entity>(e).id;
-  }
-  return kInvalidEntityId;
-}
-
 static void broadcastSpawn(ServerGame& game,
                            const std::vector<entt::entity>& entities) {
   if (entities.empty()) return;
@@ -253,17 +238,14 @@ GeneratedMazeData buildGeneratedMazeData() {
   return data;
 }
 
+// Per-world scene anchor: a tagged, replicated entity that just holds the
+// active Scene (skybox + directional light). setActiveSeason and
+// scene_cycle_system mutate its name; the client reads it to pick the scene.
+// It has no light or model of its own (this was formerly the demo "spinning
+// light", now stripped down to the anchor it doubled as).
 template <typename Tag>
-void spawnDemoLight(ServerGame& game, const char* sceneName) {
+void spawnSceneAnchor(ServerGame& game, const char* sceneName) {
   auto [eid, ent] = new_entity(game);
-  game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
-                                          0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f, 0.2f,
-                                            0.2f);
-  constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
-  game.registry.emplace<shared::PointLight>(
-      ent, 5.0f, 0.0f, 3.0f, kAtt.constant, kAtt.linear, kAtt.quadratic, 0.1f,
-      0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
   game.registry.emplace<shared::Scene>(ent, sceneName);
   game.registry.emplace<Tag>(ent);
 }
@@ -338,7 +320,7 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
 
 void initWorldEntities(ServerGame& game) {
   // --- Overworld ---
-  spawnDemoLight<shared::OverworldTag>(game, "sunny");
+  spawnSceneAnchor<shared::OverworldTag>(game, "sunny");
 
   // Hardcoded moon for the winter scene. Lives just past the northern
   // landscape edge at roughly main-map Z so it reads as a giant horizon moon.
@@ -512,7 +494,7 @@ void initWorldEntities(ServerGame& game) {
   }
 
   // --- Maze ---
-  spawnDemoLight<shared::MazeTag>(game, "night");
+  spawnSceneAnchor<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(game, buildGeneratedMazeEntities());
 
   // --- Pool slots ---
@@ -650,9 +632,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     movement_system(game, dt, StateType::OVERWORLD);
     tangram_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
-    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-    if (lightId != kInvalidEntityId)
-      hardcoded_spinning_light(game.registry, dt, lightId);
     scene_cycle_system(game.registry, StateType::OVERWORLD);
     return;
   }
@@ -661,9 +640,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
-    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-    if (lightId != kInvalidEntityId)
-      hardcoded_spinning_light(game.registry, dt, lightId);
     scene_cycle_system(game.registry, StateType::OVERWORLD);
     return;
   }
@@ -780,6 +756,39 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
+  // DEBUG: press F to reveal/spawn the fragment for the current active season.
+  // Mirrors the puzzle-solve reveal flow (emplace RenderInfo "fragment" +
+  // broadcast SPAWN_ENTITY); pick which fragment with the Y season-cycle key.
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
+    shared::SectionSeasonMap season = shared::SectionSeasonMap::WINTER;
+    auto gsView = game.registry.view<shared::GameSection>();
+    for (auto e : gsView) {
+      season = gsView.get<shared::GameSection>(e).currentActiveSeason;
+      break;
+    }
+    auto frags = game.registry.view<shared::FragmentComponent>();
+    for (auto fe : frags) {
+      if (frags.get<shared::FragmentComponent>(fe).season != season) continue;
+      if (game.registry.all_of<shared::RenderInfo>(fe)) {
+        printf("DEBUG: %s fragment already revealed\n",
+               section_puzzle::sceneNameForSeason(season));
+        break;
+      }
+      game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
+                                                0.25f);
+      auto buf =
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::SPAWN_ENTITY, {fe}, false);
+      net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+      printf("DEBUG: spawned %s fragment\n",
+             section_puzzle::sceneNameForSeason(season));
+      break;
+    }
+    break;
+  }
+
   // DEBUG: press V to snap all players onto the summer trigger pad (F2 debug
   // on).
   for (auto ent : inputView) {
@@ -829,9 +838,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
-  uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-  if (lightId != kInvalidEntityId)
-    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
 
@@ -902,8 +908,5 @@ void MazeState::update(ServerGame& game, float dt) {
   // here.
   render_model_change(game, dt);
 
-  uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
-  if (lightId != kInvalidEntityId)
-    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry, StateType::MAZE);
 }
