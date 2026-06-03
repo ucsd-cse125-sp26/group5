@@ -11,6 +11,7 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/lighting.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -91,6 +92,16 @@ void ProcessFragmentPickups(ServerGame& game) {
           (playerInput.keys_newly_pressed & KEY_PICKUP)) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
+        // Removing RenderInfo isn't diffed by the normal update path, so the
+        // client would keep drawing the fragment. Despawn it explicitly (same
+        // reason the barrier removal below sends DESPAWN_ENTITY). The entity
+        // lives on server-side for its FragmentComponent/pickup state.
+        {
+          shared::DespawnPacket despawn;
+          despawn.type = shared::PacketType::DESPAWN_ENTITY;
+          despawn.entityId = game.registry.get<shared::Entity>(fragEntity).id;
+          net::broadcastPacket(game.network->getHost(), despawn);
+        }
 
         // Delegate section completion to the appropriate puzzle collector.
         if (fragment.season == shared::SectionSeasonMap::WINTER) {
@@ -163,9 +174,36 @@ void ProcessFragmentPickups(ServerGame& game) {
   }
 }
 
+void SyncFragmentLights(ServerGame& game) {
+  auto view = game.registry.view<shared::FragmentComponent, shared::Position>();
+  for (auto e : view) {
+    const auto& frag = view.get<shared::FragmentComponent>(e);
+    const auto& pos = view.get<shared::Position>(e);
+    // "Revealed" == visible (has RenderInfo) and not yet collected.
+    const bool revealed =
+        !frag.isPickedUp && game.registry.all_of<shared::RenderInfo>(e);
+    const bool hasLight = game.registry.all_of<shared::PointLight>(e);
+    if (revealed && !hasLight) {
+      constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
+      // Lift the light above the fragment so its own mesh doesn't occlude the
+      // shadow cubemap in every direction (Z is up).
+      constexpr float kFragmentLightHeight = 2.5f;
+      // Color is overridden + animated client-side; these defaults are just a
+      // sane fallback. castsShadow=true so the fragment is the shadow caster.
+      game.registry.emplace<shared::PointLight>(
+          e, pos.x, pos.y, pos.z + kFragmentLightHeight, kAtt.constant,
+          kAtt.linear, kAtt.quadratic, 0.1f, 0.1f, 0.1f, 1.0f, 1.0f, 1.0f, 1.0f,
+          1.0f, 1.0f, true);
+    } else if (!revealed && hasLight) {
+      game.registry.remove<shared::PointLight>(e);
+    }
+  }
+}
+
 void tickOverworldGameLogic(ServerGame& game, float dt) {
   MoveInMainMap(game, dt);
   ProcessFragmentPickups(game);
+  SyncFragmentLights(game);
 }
 
 bool RestoreWinterColor(const ServerGame& game) {
