@@ -40,6 +40,50 @@ TEST(OverworldLogic, MoveInMainMapKeepsWinterSeasonWhenWinterNotCompleted) {
   EXPECT_EQ(section.currentActiveSeason, shared::SectionSeasonMap::WINTER);
 }
 
+TEST(OverworldLogic, CollectingFragmentAdvancesSeasonAndUnlocksNextSection) {
+  ServerGame game;
+
+  // Active-season tracker (drives the client skybox + directional light).
+  auto gameSection = game.registry.create();
+  game.registry.emplace<shared::GameSection>(
+      gameSection, shared::SectionSeasonMap::WINTER, static_cast<uint8_t>(0));
+
+  // Summer section being completed + spring section (the next in order).
+  auto summer = game.registry.create();
+  game.registry.emplace<shared::SectionController>(
+      summer, shared::SectionSeasonMap::SUMMER, 0u, /*unlocked=*/true,
+      /*completed=*/false);
+  auto spring = game.registry.create();
+  game.registry.emplace<shared::SectionController>(
+      spring, shared::SectionSeasonMap::SPRING, 0u, /*unlocked=*/false,
+      /*completed=*/false);
+
+  // A revealed summer fragment.
+  auto frag = game.registry.create();
+  game.registry.emplace<shared::Position>(frag, 10.0f, 10.0f, 0.0f, 1.0f, 0.0f,
+                                          0.0f, 0.0f);
+  game.registry.emplace<shared::FragmentComponent>(
+      frag, shared::SectionSeasonMap::SUMMER, false);
+  game.registry.emplace<shared::RenderInfo>(frag, "fragment", 0.5f);
+
+  // A player standing on the fragment, pressing pickup this tick.
+  auto player = game.registry.create();
+  game.registry.emplace<shared::Position>(player, 10.0f, 10.0f, 0.0f, 1.0f,
+                                          0.0f, 0.0f, 0.0f);
+  game.registry.emplace<shared::PlayerInput>(player, KEY_PICKUP,
+                                             static_cast<InputKeys>(0),
+                                             KEY_PICKUP, 0.0f, 0.0f);
+  game.registry.emplace<shared::OverworldTag>(player);
+
+  tickOverworldGameLogic(game, 0.016f);
+
+  EXPECT_TRUE(game.registry.get<shared::SectionController>(summer).completed);
+  EXPECT_EQ(
+      game.registry.get<shared::GameSection>(gameSection).currentActiveSeason,
+      shared::SectionSeasonMap::SPRING);
+  EXPECT_TRUE(game.registry.get<shared::SectionController>(spring).unlocked);
+}
+
 TEST(OverworldLogic, MoveInMainMapDoesNotMutateRunOrPuzzlePhase) {
   ServerGame game;
 

@@ -805,7 +805,7 @@ bool Graphics::load(int width, int height) {
     // before. The 10× emissive boost pushes these bodies well past the bloom
     // threshold so they glow hard on the skybox.
     bool celestialSphere =
-        asset.name == "moon" || asset.name.substr(0, 4) == "sun_";
+        asset.name == "moon" || asset.name.starts_with("sun_");
     Model* m =
         asset.cubeSpec
             ? (celestialSphere ? makeSphereModel(*asset.cubeSpec, 16, 28, 10.0f)
