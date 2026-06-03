@@ -26,6 +26,7 @@
 #include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/puzzles/tangram/roles.h"
 #include "shared/puzzles/tangram/slot_validate.h"
+#include "shared/sound_constants.h"
 
 namespace {
 
@@ -63,7 +64,7 @@ void slotRelPose(const ServerGame& game,
   }
   relX = def.targetRelX;
   relY = def.targetRelY;
-  rotRad = def.targetRotRad;
+  rotRad = shared::tangram_puzzle::quantizeYawToRotateStep(def.targetRotRad);
 }
 
 }  // namespace
@@ -112,6 +113,67 @@ float yawFromPosition(const shared::Position& pos) {
                     1.0f - 2.0f * (pos.qy * pos.qy + pos.qz * pos.qz));
 }
 
+float flattenedYaw(const shared::Position& pos) {
+  return shared::tangram_puzzle::quantizeYawToRotateStep(yawFromPosition(pos));
+}
+
+glm::quat flatQuatFromYaw(float yaw) {
+  return shared::tangram_puzzle::quatFromYawRad(
+      shared::tangram_puzzle::quantizeYawToRotateStep(yaw));
+}
+
+void flattenPieceRotation(ServerGame& game, entt::entity ent) {
+  if (!game.registry.all_of<shared::Position>(ent)) return;
+  auto& pos = game.registry.get<shared::Position>(ent);
+  const glm::quat q = flatQuatFromYaw(yawFromPosition(pos));
+  if (std::abs(pos.qx - q.x) < 1e-5f && std::abs(pos.qy - q.y) < 1e-5f &&
+      std::abs(pos.qw - q.w) < 1e-5f && std::abs(pos.qz - q.z) < 1e-5f) {
+    return;
+  }
+  pos.qw = q.w;
+  pos.qx = q.x;
+  pos.qy = q.y;
+  pos.qz = q.z;
+
+  if (!game.registry.all_of<shared::PhysicsBody>(ent)) return;
+  auto& bodyInterface = game.physics.getBodyInterface();
+  auto& pb = game.registry.get<shared::PhysicsBody>(ent);
+  JPH::BodyID body(pb.bodyId);
+  if (!bodyInterface.IsAdded(body)) return;
+  bodyInterface.SetRotation(body, JPH::Quat(q.x, q.y, q.z, q.w),
+                            JPH::EActivation::Activate);
+  bodyInterface.SetAngularVelocity(body, JPH::Vec3::sZero());
+}
+
+float pieceFootprintMismatch(const ServerGame& game,
+                             const shared::tangram_puzzle::PieceDef& def,
+                             const shared::Position& pos, float relX,
+                             float relY, float targetRot) {
+  const shared::tangram::ArenaLayout& layout = game.tangramArena;
+  const float pieceRelX = pos.x - layout.boardCenterX;
+  const float pieceRelY = pos.y - layout.boardCenterY;
+  const float pieceYaw = flattenedYaw(pos);
+  const float slotYaw =
+      shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
+
+  using shared::tangram_slot_validate::detail::Vec2;
+  using shared::tangram_slot_validate::detail::worldPolygon;
+  const std::vector<Vec2> slotPoly = worldPolygon(def, relX, relY, slotYaw);
+  const std::vector<Vec2> piecePoly =
+      worldPolygon(def, pieceRelX, pieceRelY, pieceYaw);
+  if (slotPoly.size() != piecePoly.size() || slotPoly.empty()) {
+    return 1e9f;
+  }
+
+  float maxDist = 0.0f;
+  for (size_t i = 0; i < slotPoly.size(); ++i) {
+    const float d = std::hypot(piecePoly[i].x - slotPoly[i].x,
+                               piecePoly[i].y - slotPoly[i].y);
+    maxDist = std::max(maxDist, d);
+  }
+  return maxDist;
+}
+
 bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
   if (!game.registry.all_of<shared::TangramPiece, shared::Position>(ent)) {
     return false;
@@ -127,14 +189,23 @@ bool pieceAlignedWithSlot(const ServerGame& game, entt::entity ent) {
   float targetRot = 0.0f;
   slotRelPose(game, *def, relX, relY, targetRot);
 
-  const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
-  const float reach = shared::tangram_puzzle::snapRadiusForPiece(*def) * 1.15f;
-  if (std::hypot(pos.x - slotPos.x, pos.y - slotPos.y) > reach) {
-    return false;
-  }
+  // Match the visible triangle footprint (not the physics AABB center).
+  return pieceFootprintMismatch(game, *def, pos, relX, relY, targetRot) <=
+         shared::tangram_puzzle::kWinFootprintMismatchMax;
+}
 
-  const float yaw = yawFromPosition(pos);
-  return shared::tangram_puzzle::yawMatchesTarget(yaw, targetRot);
+bool pieceIsNearSlot(const ServerGame& game,
+                     const shared::tangram_puzzle::PieceDef& def,
+                     const shared::Position& pos, float relX, float relY,
+                     float targetRot) {
+  const glm::vec3 slotPos = slotSnapWorldPos(game, def);
+  const float centerDist = std::hypot(pos.x - slotPos.x, pos.y - slotPos.y);
+  const float reach = shared::tangram_puzzle::snapRadiusForPiece(def);
+  if (centerDist <= reach) {
+    return true;
+  }
+  return pieceFootprintMismatch(game, def, pos, relX, relY, targetRot) <=
+         shared::tangram_puzzle::kSnapFootprintMismatchMax;
 }
 
 void applyPieceTransform(ServerGame& game, entt::entity ent,
@@ -174,9 +245,24 @@ void holdSnappedPieceAtSlot(ServerGame& game, entt::entity ent) {
 
   const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
   auto& pos = game.registry.get<shared::Position>(ent);
-  if (pos.x == slotPos.x && pos.y == slotPos.y && pos.z == slotPos.z) return;
+  float relX = 0.0f;
+  float relY = 0.0f;
+  float targetRot = 0.0f;
+  slotRelPose(game, *def, relX, relY, targetRot);
 
-  const glm::quat rot(pos.qw, pos.qx, pos.qy, pos.qz);
+  const float yaw = flattenedYaw(pos);
+  const float qTarget =
+      shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
+  glm::quat rot = flatQuatFromYaw(yaw);
+  if (shared::tangram_puzzle::yawMatchesTarget(yaw, qTarget)) {
+    rot = flatQuatFromYaw(qTarget);
+  }
+
+  if (pos.x == slotPos.x && pos.y == slotPos.y && pos.z == slotPos.z &&
+      std::abs(pos.qw - rot.w) < 1e-4f && std::abs(pos.qz - rot.z) < 1e-4f &&
+      std::abs(pos.qx) < 1e-4f && std::abs(pos.qy) < 1e-4f) {
+    return;
+  }
   applyPieceTransform(game, ent, slotPos, rot);
 }
 
@@ -199,14 +285,25 @@ void trySnapPiecesToSlots(ServerGame& game) {
     if (def == nullptr) continue;
 
     const auto& pos = view.get<shared::Position>(ent);
+    float relX = 0.0f;
+    float relY = 0.0f;
+    float targetRot = 0.0f;
+    slotRelPose(game, *def, relX, relY, targetRot);
+    if (!pieceIsNearSlot(game, *def, pos, relX, relY, targetRot)) {
+      continue;
+    }
+
     const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
-    const float reach = shared::tangram_puzzle::snapRadiusForPiece(*def);
-    if (std::hypot(pos.x - slotPos.x, pos.y - slotPos.y) > reach) continue;
 
     piece.slotSnapped = true;
-    // Lock XY to slot; random facing — use R to align each piece.
-    const float snapYaw = static_cast<float>(stepDist(tangramSnapRng())) *
-                          shared::tangram_puzzle::kRotateStepRad;
+    // Lock XY to slot; random wrong facing on the 45° grid — press R to align.
+    const float qTarget =
+        shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
+    int off = stepDist(tangramSnapRng());
+    if (off == 0) off = 1;
+    const float snapYaw = shared::tangram_puzzle::normalizeYawRad(
+        qTarget +
+        static_cast<float>(off) * shared::tangram_puzzle::kRotateStepRad);
     const glm::quat rot = shared::tangram_puzzle::quatFromYawRad(snapYaw);
     applyPieceTransform(game, ent, slotPos, rot);
 
@@ -316,22 +413,64 @@ void tryRotateNearbyPiece(ServerGame& game) {
     }
     if (best == entt::null) continue;
 
-    auto& pos = game.registry.get<shared::Position>(best);
-    const float yaw = yawFromPosition(pos);
-    const float newYaw = yaw + shared::tangram_puzzle::kRotateStepRad;
-    glm::quat q = glm::angleAxis(newYaw, glm::vec3(0.0f, 0.0f, 1.0f));
-    pos.qw = q.w;
-    pos.qx = q.x;
-    pos.qy = q.y;
-    pos.qz = q.z;
+    auto& piece = game.registry.get<shared::TangramPiece>(best);
+    const shared::tangram_puzzle::PieceDef* def =
+        shared::tangram_puzzle::pieceDefForId(piece.pieceId);
+    if (def == nullptr) continue;
 
-    auto& pb = game.registry.get<shared::PhysicsBody>(best);
-    JPH::BodyID body(pb.bodyId);
-    if (!bodyInterface.IsAdded(body)) continue;
-    bodyInterface.SetRotation(body, JPH::Quat(q.x, q.y, q.z, q.w),
-                              JPH::EActivation::Activate);
-    bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
-    bodyInterface.SetAngularVelocity(body, JPH::Vec3::sZero());
+    auto& pos = game.registry.get<shared::Position>(best);
+    float relX = 0.0f;
+    float relY = 0.0f;
+    float targetRot = 0.0f;
+    slotRelPose(game, *def, relX, relY, targetRot);
+    const float qTarget =
+        shared::tangram_puzzle::quantizeYawToRotateStep(targetRot);
+
+    float newYaw = flattenedYaw(pos);
+    if (piece.slotSnapped) {
+      const float rel =
+          shared::tangram_puzzle::normalizeYawRad(newYaw - qTarget);
+      int step = static_cast<int>(
+          std::lround(rel / shared::tangram_puzzle::kRotateStepRad));
+      step = ((step % shared::tangram_puzzle::kRotateStepCount) +
+              shared::tangram_puzzle::kRotateStepCount) %
+             shared::tangram_puzzle::kRotateStepCount;
+      const int nextStep =
+          (step + 1) % shared::tangram_puzzle::kRotateStepCount;
+      newYaw = shared::tangram_puzzle::normalizeYawRad(
+          qTarget + static_cast<float>(nextStep) *
+                        shared::tangram_puzzle::kRotateStepRad);
+    } else {
+      newYaw = shared::tangram_puzzle::quantizeYawToRotateStep(
+          newYaw + shared::tangram_puzzle::kRotateStepRad);
+    }
+
+    const glm::quat q = flatQuatFromYaw(newYaw);
+    if (piece.slotSnapped) {
+      const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
+      if (shared::tangram_puzzle::yawMatchesTarget(newYaw, qTarget)) {
+        applyPieceTransform(game, best, slotPos, flatQuatFromYaw(qTarget));
+        printf("[Tangram] Piece %u aligned with ghost slot\n",
+               static_cast<unsigned>(piece.pieceId));
+      } else {
+        applyPieceTransform(game, best, slotPos, q);
+      }
+    } else {
+      pos.qw = q.w;
+      pos.qx = q.x;
+      pos.qy = q.y;
+      pos.qz = q.z;
+
+      auto& pb = game.registry.get<shared::PhysicsBody>(best);
+      JPH::BodyID body(pb.bodyId);
+      if (!bodyInterface.IsAdded(body)) continue;
+      bodyInterface.SetRotation(body, JPH::Quat(q.x, q.y, q.z, q.w),
+                                JPH::EActivation::Activate);
+      bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
+      bodyInterface.SetAngularVelocity(body, JPH::Vec3::sZero());
+    }
+
+    tangram_role_server::syncPieceCollisionLayer(game, best, stage);
   }
 }
 
@@ -362,12 +501,73 @@ void rollRandomPieceSpawns(ServerGame& game) {
 
 bool allPiecesSolved(const ServerGame& game) {
   int count = 0;
+  int aligned = 0;
+  std::array<uint8_t, shared::tangram_puzzle::kPieceCount> missing{};
+  int missingCount = 0;
   auto view = game.registry.view<shared::TangramPiece, shared::Position>();
   for (auto ent : view) {
-    if (!pieceAlignedWithSlot(game, ent)) return false;
     ++count;
+    if (pieceAlignedWithSlot(game, ent)) {
+      ++aligned;
+      continue;
+    }
+    const auto& piece = view.get<shared::TangramPiece>(ent);
+    if (missingCount < static_cast<int>(missing.size())) {
+      missing[static_cast<size_t>(missingCount++)] = piece.pieceId;
+    }
   }
-  return count == shared::tangram_puzzle::kPieceCount;
+  if (count != shared::tangram_puzzle::kPieceCount) {
+    return false;
+  }
+  if (aligned == shared::tangram_puzzle::kPieceCount) {
+    return true;
+  }
+  static float logCooldown = 0.0f;
+  logCooldown -= 1.0f / 60.0f;
+  if (logCooldown <= 0.0f) {
+    logCooldown = 3.0f;
+    printf("[Tangram] Win progress: %d/%d aligned", aligned,
+           shared::tangram_puzzle::kPieceCount);
+    if (missingCount > 0) {
+      printf(" — still off:");
+      for (int i = 0; i < missingCount; ++i) {
+        const shared::tangram_puzzle::PieceDef* def =
+            shared::tangram_puzzle::pieceDefForId(
+                missing[static_cast<size_t>(i)]);
+        if (def == nullptr) continue;
+        entt::entity bad = entt::null;
+        for (auto ent : view) {
+          if (view.get<shared::TangramPiece>(ent).pieceId ==
+              missing[static_cast<size_t>(i)]) {
+            bad = ent;
+            break;
+          }
+        }
+        if (bad == entt::null) continue;
+        float relX = 0.0f;
+        float relY = 0.0f;
+        float targetRot = 0.0f;
+        slotRelPose(game, *def, relX, relY, targetRot);
+        const float mismatch = pieceFootprintMismatch(
+            game, *def, view.get<shared::Position>(bad), relX, relY, targetRot);
+        printf(" #%u(%.2fm)",
+               static_cast<unsigned>(missing[static_cast<size_t>(i)]),
+               mismatch);
+      }
+    }
+    printf("\n");
+  }
+  return false;
+}
+
+void lockAlignedPieces(ServerGame& game) {
+  auto view = game.registry.view<shared::TangramPiece, shared::Position>();
+  for (auto ent : view) {
+    if (!pieceAlignedWithSlot(game, ent)) continue;
+    auto& piece = view.get<shared::TangramPiece>(ent);
+    piece.slotSnapped = true;
+    holdSnappedPieceAtSlot(game, ent);
+  }
 }
 
 void tryCompletePuzzle(ServerGame& game) {
@@ -381,20 +581,44 @@ void tryCompletePuzzle(ServerGame& game) {
         shared::RunPhase::FINISHED;
   }
 
+  const shared::tangram::ArenaLayout& arena = game.tangramArena;
+  const float fragmentX = arena.triggerCenterX;
+  const float fragmentY = arena.triggerCenterY;
+  const float fragmentZ = arena.platformTopZ() + 2.0f;
+
   auto frags = game.registry.view<shared::FragmentComponent>();
   for (auto fe : frags) {
     if (frags.get<shared::FragmentComponent>(fe).season !=
         shared::SectionSeasonMap::SPRING)
       continue;
+    if (game.registry.all_of<shared::Position>(fe)) {
+      auto& fragPos = game.registry.get<shared::Position>(fe);
+      fragPos.x = fragmentX;
+      fragPos.y = fragmentY;
+      fragPos.z = fragmentZ;
+    }
     if (game.registry.all_of<shared::RenderInfo>(fe)) continue;
     game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::SPAWN_ENTITY, {fe}, false);
-    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+    if (game.network != nullptr) {
+      auto buf =
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::SPAWN_ENTITY, {fe}, false);
+      net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+    }
   }
+
+  if (game.network != nullptr) {
+    shared::SoundEventPacket soundPkt;
+    soundPkt.soundId = static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED);
+    soundPkt.volume = 1.0f;
+    soundPkt.positional = false;
+    net::broadcastPacket(game.network->getHost(), soundPkt);
+  }
+
   printf(
-      "[Tangram] All pieces in slots with correct rotation — spring fragment "
-      "revealed\n");
+      "[Tangram] Puzzle complete — spring fragment spawned at (%.1f, %.1f, "
+      "%.1f)\n",
+      fragmentX, fragmentY, fragmentZ);
   endPuzzle(game);
 }
 
@@ -531,13 +755,9 @@ void beginPuzzle(ServerGame& game) {
     float relY = 0.0f;
     float targetRot = 0.0f;
     slotRelPose(game, def, relX, relY, targetRot);
-    const float topZ = game.tangramArena.platformTopZ();
-    const glm::vec3 ghostPos(
-        game.tangramArena.boardCenterX + relX,
-        game.tangramArena.boardCenterY + relY,
-        topZ + shared::tangram_puzzle::kGhostSlotThickness * 0.5f + 0.02f);
-    const glm::quat ghostRot =
-        shared::tangram_puzzle::quatFromYawRad(targetRot);
+    const glm::vec3 ghostPos = slotSnapWorldPos(game, def);
+    const glm::quat ghostRot = shared::tangram_puzzle::quatFromYawRad(
+        shared::tangram_puzzle::quantizeYawToRotateStep(targetRot));
     auto [gid, ghostEnt] = new_entity(game);
     (void)gid;
     game.registry.emplace<shared::OverworldTag>(ghostEnt);
@@ -545,11 +765,9 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::Position>(ghostEnt, ghostPos.x, ghostPos.y,
                                             ghostPos.z, ghostRot.w, ghostRot.x,
                                             ghostRot.y, ghostRot.z);
-    constexpr float kGhostScale = 0.97f;
     game.registry.emplace<shared::RenderInfo>(
-        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id),
-        def.scaleX * kGhostScale, def.scaleY * kGhostScale,
-        shared::tangram_puzzle::kGhostSlotThickness);
+        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
+        def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
     game.overworldTangramGhostSlotEntities[static_cast<size_t>(i)] = ghostEnt;
     spawned.push_back(ghostEnt);
   }
@@ -636,6 +854,7 @@ void clampPieceToArena(ServerGame& game, entt::entity ent) {
     return;
   }
   if (game.registry.all_of<shared::TangramPiece>(ent)) {
+    flattenPieceRotation(game, ent);
     holdSnappedPieceAtSlot(game, ent);
     if (game.registry.get<shared::TangramPiece>(ent).slotSnapped) {
       return;
@@ -710,6 +929,7 @@ void updatePuzzle(ServerGame& game, float dt) {
 
   trySnapPiecesToSlots(game);
   tryRotateNearbyPiece(game);
+  lockAlignedPieces(game);
   tryCompletePuzzle(game);
 }
 

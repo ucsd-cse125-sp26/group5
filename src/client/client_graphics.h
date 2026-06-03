@@ -163,6 +163,7 @@ struct Graphics {
   bool keyF11Prev = false;
 
   bool settingsMenuOpen = false;
+  bool keySettingsMenuPrev = false;
   bool keyEscapePrev = false;
   bool prevSyncedMenuOpen = false;
 

@@ -47,8 +47,8 @@ bool isFallTypingAvailable(const ServerGame& game) {
 }
 
 bool canTriggerTangram(const ServerGame& game) {
-  return section_puzzle::isSectionUnlocked(game,
-                                           shared::SectionSeasonMap::SPRING);
+  return !section_puzzle::isSectionCompleted(game,
+                                             shared::SectionSeasonMap::SPRING);
 }
 
 glm::vec3 overworldSpawnPosition(const shared::tangram::ArenaLayout& layout,

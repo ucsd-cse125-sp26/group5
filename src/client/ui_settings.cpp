@@ -285,7 +285,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
     currentPresetIndex = 0;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Close (Esc)")) {
+  if (ImGui::Button("Close (H)")) {
     open = false;
   }
 
