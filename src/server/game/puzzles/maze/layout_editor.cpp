@@ -151,7 +151,7 @@ std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
                                glm::vec3(maxX, maxY, groundZ + kCornerLift)}) {
     entities.push_back(StaticEntityDesc{
         .position = pos,
-        .modelName = "goal_cube",
+        .modelName = "maze_trigger_cube",
         .scale = kCornerScale,
     });
   }
@@ -159,12 +159,12 @@ std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
   for (float x = minX + 1.0f; x < maxX; x += 2.0f) {
     entities.push_back(StaticEntityDesc{
         .position = glm::vec3(x, minY, groundZ + kBorderLift),
-        .modelName = "start_cube",
+        .modelName = "maze_trigger_cube",
         .scale = kBorderScale,
     });
     entities.push_back(StaticEntityDesc{
         .position = glm::vec3(x, maxY, groundZ + kBorderLift),
-        .modelName = "start_cube",
+        .modelName = "maze_trigger_cube",
         .scale = kBorderScale,
     });
   }
@@ -172,12 +172,12 @@ std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
   for (float y = minY + 1.0f; y < maxY; y += 2.0f) {
     entities.push_back(StaticEntityDesc{
         .position = glm::vec3(minX, y, groundZ + kBorderLift),
-        .modelName = "start_cube",
+        .modelName = "maze_trigger_cube",
         .scale = kBorderScale,
     });
     entities.push_back(StaticEntityDesc{
         .position = glm::vec3(maxX, y, groundZ + kBorderLift),
-        .modelName = "start_cube",
+        .modelName = "maze_trigger_cube",
         .scale = kBorderScale,
     });
   }

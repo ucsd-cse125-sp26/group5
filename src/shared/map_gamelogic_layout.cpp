@@ -8,6 +8,7 @@
 
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
+#include "shared/puzzles/tangram/puzzle_data.h"
 #include "shared/puzzles/tangram/slot_layout.h"
 #include "shared/puzzles/tangram/slot_validate.h"
 
@@ -369,7 +370,8 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
     }
     layout.slots[i].relX = x - boardCenterX;
     layout.slots[i].relY = y - boardCenterY;
-    layout.slots[i].rotRad = yaw;
+    layout.slots[i].rotRad =
+        shared::tangram_puzzle::quantizeYawToRotateStep(yaw);
     layout.slots[i].valid = true;
     ++found;
     printf("[MapGamelogic] %s -> rel (%.3f, %.3f) yaw %.3f\n", name,

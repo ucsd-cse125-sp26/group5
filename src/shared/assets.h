@@ -118,6 +118,17 @@ inline constexpr CubeSpec CUBE_GOAL_MARKER = {
     .emissive = {140, 50, 20, 255},
 };
 
+// Winter overworld trigger pad outline only (maze_layout_editor).
+inline constexpr CubeSpec CUBE_MAZE_TRIGGER_MARKER = {
+    .palette = {{0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+
 struct AssetInfo {
   std::string_view name;
   std::string_view filename;
@@ -154,6 +165,13 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_GOAL_MARKER},
+    {.name = "maze_trigger_cube",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_MAZE_TRIGGER_MARKER},
     {.name = "tangram_1",
      .filename = "",
      .qw = 1.0f,
