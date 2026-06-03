@@ -42,12 +42,8 @@ void MoveInMainMap(ServerGame& game, float dt) {
       break;
     }
   }
-  if (winterStillActive) {
-    auto gameSectionView = game.registry.view<shared::GameSection>();
-    for (auto entity : gameSectionView) {
-      auto& gameSection = gameSectionView.get<shared::GameSection>(entity);
-      gameSection.currentActiveSeason = shared::SectionSeasonMap::WINTER;
-    }
+  if (winterStillActive && !game.debugSeasonOverride) {
+    section_puzzle::setActiveSeason(game, shared::SectionSeasonMap::WINTER);
   }
 }
 
@@ -205,7 +201,5 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
         true;
   }
 
-  for (auto e : game.registry.view<shared::GameSection>()) {
-    game.registry.get<shared::GameSection>(e).currentActiveSeason = nextSeason;
-  }
+  section_puzzle::setActiveSeason(game, nextSeason);
 }

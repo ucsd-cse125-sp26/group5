@@ -8,12 +8,15 @@
 #include <stb_image.h>  // implementation lives in asset.cpp
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "backends/imgui_impl_glfw.h"
@@ -37,6 +40,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
+#include "shared/mesh_loader.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
@@ -383,13 +387,23 @@ static void uploadDirectionalLight(const Shader& shader, const ClientGame& game,
 }
 
 static void drawSkybox(const Shader& shader, const Skybox& skybox,
-                       const CameraState& camera, const glm::mat4& projection) {
+                       const CameraState& camera, const glm::mat4& projection,
+                       int quantizeLevels, bool flipZ, float softEdge) {
   glm::mat4 skyboxView = glm::mat4(glm::mat3(camera.view) * kCubemapToGame);
 
   glDepthFunc(GL_LEQUAL);
   shader.use();
   shader.setMat4("view", skyboxView);
   shader.setMat4("projection", projection);
+  shader.setInt("skyboxQuantizeLevels", quantizeLevels);
+  shader.setFloat("skyboxSoftEdge", softEdge);
+  shader.setInt("skyboxFlipZ", flipZ ? 1 : 0);
+  const int paletteSize = static_cast<int>(skybox.palette.size());
+  shader.setInt("skyboxPaletteSize", paletteSize);
+  if (paletteSize > 0) {
+    shader.setVec3Array("skyboxPalette", paletteSize,
+                        reinterpret_cast<const float*>(skybox.palette.data()));
+  }
 
   glBindVertexArray(skybox.vao);
   glActiveTexture(GL_TEXTURE0);
@@ -542,6 +556,15 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     }
     if (!shouldDrawTangramEntity(game, renderInfo.modelName)) continue;
 
+    // Hardcoded winter moon: never cast a shadow (a giant cube silhouette
+    // would tank the scene), and only render in the night scene (which is
+    // the WINTER season per sceneNameForSeason).
+    if (renderInfo.modelName == "moon") {
+      if (forShadowPass) continue;
+      auto* sc = currentScene(game);
+      if (!sc || sc->name != std::string_view("night")) continue;
+    }
+
     std::string modelKey = renderInfo.modelName;
     if (isTangramGhostModelName(renderInfo.modelName)) {
       modelKey = renderInfo.modelName + "_colored";
@@ -653,6 +676,22 @@ bool Graphics::load(int width, int height) {
   initLoadingScreen();
   renderLoadingFrame("Compiling shaders");
 
+  // Kick off a worker that parses the landscape glTF (the dominant single
+  // CPU cost in load()). All the small asset loads + shader compilation +
+  // FBO allocs run in parallel on the main thread; when we reach the map
+  // upload stage below, we just await the parsed scene and skip the parse.
+  std::future<std::shared_ptr<shared::ParsedModel>> landscapeParse =
+      std::async(std::launch::async, [] {
+        auto parsed = std::make_shared<shared::ParsedModel>();
+        const std::string fullPath =
+            (exeDir() / shared::DEFAULT_MAP_PATH).string();
+        if (!parsed->load(fullPath, shared::MAP_LOAD_FLAGS)) {
+          std::cout << "ERROR::ASSIMP::landscapeParse: " << parsed->lastError()
+                    << '\n';
+        }
+        return parsed;
+      });
+
   gbufferShader.emplace("shaders/vertex_gbuffer.glsl",
                         "shaders/fragment_gbuffer.glsl");
   lightingShader.emplace("shaders/vertex_present.glsl",
@@ -754,8 +793,15 @@ bool Graphics::load(int width, int height) {
   for (const auto& asset : shared::ASSETS) {
     renderLoadingFrame(std::string("Loading asset: ") +
                        std::string(asset.name));
-    Model* m = asset.cubeSpec ? makeCubeModel(*asset.cubeSpec)
-                              : loadModel(std::string(asset.filename));
+    // "moon" is the only procedural sphere asset; everything else with a
+    // CubeSpec is a cube. Mesh-backed assets go through loadModel as before.
+    // The 10× emissive boost pushes the moon well past the bloom threshold so
+    // it glows hard on the night skybox.
+    Model* m = asset.cubeSpec
+                   ? (asset.name == "moon"
+                          ? makeSphereModel(*asset.cubeSpec, 16, 28, 10.0f)
+                          : makeCubeModel(*asset.cubeSpec))
+                   : loadModel(std::string(asset.filename));
     if (!m) {
       fprintf(stderr, "Failed to load asset '%s' (%s)\n",
               std::string(asset.name).c_str(),
@@ -807,19 +853,27 @@ bool Graphics::load(int width, int height) {
   }
 
   // Per-node sub-models keyed to match RenderInfo.modelName from map_loader.
+  // landscapeParse was launched at the top of load(); await it here. If the
+  // worker already finished, .get() is non-blocking. The GL-upload step then
+  // runs on the main thread (VAOs/VBOs require the main GL context).
+  renderLoadingFrame(std::string("Waiting on landscape parse: ") +
+                     std::string(shared::DEFAULT_MAP_PATH));
+  auto pump = [this] { pumpLoadingFrame(); };
+  auto parsedLandscape = landscapeParse.get();
   renderLoadingFrame(std::string("Loading map: ") +
                      std::string(shared::DEFAULT_MAP_PATH));
-  auto mapModels = loadMapModels(shared::DEFAULT_MAP_PATH);
+  auto mapModels = loadMapModels(*parsedLandscape, pump);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
     printf("Loaded map sub-model: %s\n", key.c_str());
+    pumpLoadingFrame();
   }
 
   for (const auto& sc : shared::SCENES) {
     std::string dir = std::string(sc.skyboxDirectory);
     if (skyboxes.find(dir) == skyboxes.end()) {
       renderLoadingFrame(std::string("Loading skybox: ") + dir);
-      skyboxes[dir] = loadSkybox(dir);
+      skyboxes[dir] = loadSkybox(dir, pump);
       printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
              dir.c_str());
     }
@@ -966,15 +1020,23 @@ void Graphics::resizeBuffers(int width, int height) {
     }
   }
 
+  const int ssaoScale = std::max(1, settings.ssaoScale);
+  ssaoWidth = std::max(1, rw / ssaoScale);
+  ssaoHeight = std::max(1, rh / ssaoScale);
+  lastSsaoScale = ssaoScale;
+  // Bilinear when the lighting pass needs to upscale; NEAREST otherwise so
+  // single-pixel features stay crisp.
+  const GLint ssaoFilter = ssaoScale > 1 ? GL_LINEAR : GL_NEAREST;
+
   auto allocSsao = [&](GLuint& fbo, GLuint& tex) {
     if (!fbo) glGenFramebuffers(1, &fbo);
     if (!tex) glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, rw, rh, 0, GL_RED, GL_FLOAT,
-                 nullptr);
-    GPU_MEM_TEX2D("SSAO", GL_R16F, rw, rh);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, ssaoWidth, ssaoHeight, 0, GL_RED,
+                 GL_FLOAT, nullptr);
+    GPU_MEM_TEX2D("SSAO", GL_R16F, ssaoWidth, ssaoHeight);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, ssaoFilter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, ssaoFilter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -1317,6 +1379,19 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       isOverworldTangramPuzzleActive(game)
           ? pickTangramPieceAtScreenCenter(game, camera->view, projection)
           : 0;
+
+  // Per-skybox quantize overrides: when the active scene changes, push any
+  // non-sentinel values from SceneInfo onto the live GraphicsSettings. The
+  // palette-rebuild block below picks the new value up the same frame.
+  if (const auto* sc = currentScene(game); sc != lastAppliedScene) {
+    if (sc) {
+      if (sc->skyboxQuantizeLevels >= 0)
+        settings.skyboxQuantizeLevels = sc->skyboxQuantizeLevels;
+      if (sc->skyboxPaletteColors >= 0)
+        settings.skyboxPaletteColors = sc->skyboxPaletteColors;
+    }
+    lastAppliedScene = sc;
+  }
   if (settings.dirShadowMapSize != lastDirShadowSize) {
     allocateDirShadowMap(settings.dirShadowMapSize);
     lastDirShadowSize = settings.dirShadowMapSize;
@@ -1325,7 +1400,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     allocatePointShadowMaps(settings.pointShadowMapSize);
     lastPointShadowSize = settings.pointShadowMapSize;
   }
-  if (std::max(1, settings.pixelationScale) != lastPixelationScale) {
+  if (std::max(1, settings.pixelationScale) != lastPixelationScale ||
+      std::max(1, settings.ssaoScale) != lastSsaoScale) {
     resizeBuffers(fbWidth, fbHeight);
   }
   if (settings.paletteQuantizeColors != lastPaletteColors) {
@@ -1335,6 +1411,14 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       if (m) buildModelPalette(*m, colors);
     }
     lastPaletteColors = settings.paletteQuantizeColors;
+  }
+  if (settings.skyboxPaletteColors != lastSkyboxPaletteColors) {
+    const int colors =
+        std::min(settings.skyboxPaletteColors, shared::kMaxPaletteColors);
+    for (auto& [dir, sb] : skyboxes) {
+      buildSkyboxPalette(sb, colors);
+    }
+    lastSkyboxPaletteColors = settings.skyboxPaletteColors;
   }
   if (settings.shadowsEnabled != prevShadowsEnabled) {
     if (!settings.shadowsEnabled) clearShadowMaps();
@@ -1358,6 +1442,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   // on shadow-slot assignments.
   LightUpload lights[kMaxLightingShaderLights];
   int numLights = collectPointLights(game, lights);
+  if (!settings.pointShadowsEnabled) {
+    for (int i = 0; i < numLights; ++i) lights[i].shadowIdx = -1;
+  }
 
   lightSpaceMatrix = computeDirectionalLightMatrix(
       camera->position, directionalLightDir(game), settings.dirShadowHalfExtent,
@@ -1401,8 +1488,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   glm::vec3 pointPositions[kMaxPointLights];
   computePointShadowMatrices(lights, numLights, settings.pointShadowFarPlane,
                              pointMats, pointPositions);
-  if (settings.shadowsEnabled && shadowPointShader &&
-      shadowPointShader->valid() && numLights > 0) {
+  if (settings.shadowsEnabled && settings.pointShadowsEnabled &&
+      shadowPointShader && shadowPointShader->valid() && numLights > 0) {
     SIMPLE_PROFILE_SCOPE("ShadowPoint");
     GPU_PROFILE_SCOPE("ShadowPoint");
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
@@ -1455,7 +1542,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     SIMPLE_PROFILE_SCOPE("SSAO");
     GPU_PROFILE_SCOPE("SSAO");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-    glViewport(0, 0, renderWidth, renderHeight);
+    glViewport(0, 0, ssaoWidth, ssaoHeight);
     glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT);
     ssaoShader->use();
@@ -1473,15 +1560,16 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     ssaoShader->setInt("kernelSize", settings.ssaoKernelSize);
     ssaoShader->setFloat("radius", settings.ssaoRadius);
     ssaoShader->setFloat("bias", settings.ssaoBias);
-    ssaoShader->setVec2("noiseScale", static_cast<float>(renderWidth) / 4.0f,
-                        static_cast<float>(renderHeight) / 4.0f);
+    // Noise tile size is in the SSAO render's own pixel space.
+    ssaoShader->setVec2("noiseScale", static_cast<float>(ssaoWidth) / 4.0f,
+                        static_cast<float>(ssaoHeight) / 4.0f);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
   } else if (!settings.ssaoEnabled) {
     // Clear blurred SSAO to 1.0 so the lighting pass reads "no occlusion".
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glViewport(0, 0, renderWidth, renderHeight);
+    glViewport(0, 0, ssaoWidth, ssaoHeight);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     // Restore so a future pass that forgets to set its own clearColor before
@@ -1493,7 +1581,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     SIMPLE_PROFILE_SCOPE("SSAOBlur");
     GPU_PROFILE_SCOPE("SSAOBlur");
     glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glViewport(0, 0, renderWidth, renderHeight);
+    glViewport(0, 0, ssaoWidth, ssaoHeight);
     glDisable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT);
     ssaoBlurShader->use();
@@ -1604,7 +1692,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       std::string skyboxDir = std::string(sceneInfo->skyboxDirectory);
       auto it = skyboxes.find(skyboxDir);
       if (it != skyboxes.end()) {
-        drawSkybox(*skyboxShader, it->second, *camera, projection);
+        drawSkybox(*skyboxShader, it->second, *camera, projection,
+                   settings.skyboxQuantizeLevels, sceneInfo->skyboxFlipZ,
+                   settings.skyboxSoftEdge);
       }
     }
   }
@@ -2009,10 +2099,28 @@ void Graphics::destroyLoadingScreen() {
 }
 
 void Graphics::renderLoadingFrame(const std::string& status) {
+  // Stage label changed (or this is the first call): always render so the
+  // user sees the new text immediately, regardless of pacing.
+  const bool stageChanged = status != loadingStatus;
+  loadingStatus = status;
   if (!window || !loadingShader || !loadingShader->valid() ||
       !loadingCubeIndexCount) {
     return;
   }
+
+  // Skip when we already drew a frame within the last 1/60 s. Loaders can
+  // call this freely (per-node, per-face) without paying a draw + swap each
+  // time; the first call past the deadline renders, the rest are cheap no-ops.
+  // This is what gets the loading screen to actual 60 fps inside long
+  // single-stage loads instead of freezing between named stages.
+  constexpr double kInterval = 1.0 / kLoadingTargetFps;
+  const double now = glfwGetTime();
+  if (!stageChanged && loadingLastFrameTime > 0.0 &&
+      now < loadingLastFrameTime + kInterval) {
+    return;
+  }
+  loadingLastFrameTime = now;
+
   glfwPollEvents();
   glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
   if (fbWidth <= 0 || fbHeight <= 0) return;
@@ -2058,9 +2166,10 @@ void Graphics::renderLoadingFrame(const std::string& status) {
         ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoFocusOnAppearing |
         ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_AlwaysAutoResize;
     if (ImGui::Begin("##LoadingStatus", nullptr, flags)) {
+      ImGui::SetWindowFontScale(2.0f);
       ImGui::TextUnformatted("Loading...");
       ImGui::Separator();
-      ImGui::TextUnformatted(status.c_str());
+      ImGui::TextUnformatted(loadingStatus.c_str());
     }
     ImGui::End();
     ImGui::Render();
@@ -2070,11 +2179,107 @@ void Graphics::renderLoadingFrame(const std::string& status) {
   glfwSwapBuffers(window);
 }
 
+void Graphics::pumpLoadingFrame() {
+  // Reuse the named-stage path with the cached status — the early-exit pacing
+  // inside renderLoadingFrame keeps repeated calls cheap.
+  renderLoadingFrame(loadingStatus);
+}
+
+Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
+    char* host, size_t hostSize, int* port, const char* statusMsg) {
+  ServerMenuResult result = ServerMenuResult::None;
+  if (!window || !ImGui::GetCurrentContext()) return ServerMenuResult::Quit;
+
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return ServerMenuResult::None;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_BLEND);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+
+  ImGuiIO& io = ImGui::GetIO();
+  ImGui::SetNextWindowPos(
+      ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+      ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
+  ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                           ImGuiWindowFlags_NoCollapse;
+  if (ImGui::Begin("Connect to Server", nullptr, flags)) {
+    bool submit = false;
+
+    ImGui::TextUnformatted("Server IP / hostname");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::InputText("##host", host, hostSize,
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+      submit = true;
+    }
+
+    ImGui::TextUnformatted("Port");
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    // InputScalar (and so InputInt) asserts that EnterReturnsTrue is not set;
+    // detect Enter manually by watching for an Enter-press on the active item.
+    ImGui::InputInt("##port", port, 0, 0);
+    if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+      submit = true;
+    }
+    if (*port < 1) *port = 1;
+    if (*port > 65535) *port = 65535;
+
+    if (statusMsg && statusMsg[0] != '\0') {
+      ImGui::Spacing();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.55f, 0.45f, 1.0f));
+      ImGui::TextWrapped("%s", statusMsg);
+      ImGui::PopStyleColor();
+    }
+
+    ImGui::Spacing();
+    if (ImGui::Button("Connect", ImVec2(160.0f, 0.0f))) submit = true;
+    ImGui::SameLine();
+    if (ImGui::Button("Quit", ImVec2(160.0f, 0.0f))) {
+      result = ServerMenuResult::Quit;
+    }
+
+    if (submit) result = ServerMenuResult::Connect;
+  }
+  ImGui::End();
+
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+  glfwSwapBuffers(window);
+  return result;
+}
+
 void Graphics::shutdownImGui() {
   if (!ImGui::GetCurrentContext()) return;
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+}
+
+static void drawFPSOverlay() {
+  ImGuiIO& io = ImGui::GetIO();
+  ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.45f);
+  if (ImGui::Begin("##fps", nullptr,
+                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
+                       ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoSavedSettings)) {
+    ImGui::Text("%.0f FPS (%.2f ms)", io.Framerate,
+                io.Framerate > 0.0f ? 1000.0f / io.Framerate : 0.0f);
+  }
+  ImGui::End();
 }
 
 void Graphics::drawSettingsUIFrame(ClientGame& game) {
@@ -2083,6 +2288,7 @@ void Graphics::drawSettingsUIFrame(ClientGame& game) {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   drawPuzzleHUDs(game);
+  if (settings.showFPS) drawFPSOverlay();
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

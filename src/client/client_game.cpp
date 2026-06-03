@@ -382,6 +382,8 @@ void processInput(GLFWwindow* window, const ClientGame& game,
         keys |= KEY_DEBUG_PRINT_POS;
       if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS)
         keys |= KEY_DEBUG_SUMMER_PAD;
+      if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
+        keys |= KEY_DEBUG_CYCLE_SEASON;
     }
   }
 
