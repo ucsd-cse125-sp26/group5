@@ -236,9 +236,12 @@ void render_model_change(ServerGame& game, float dt) {
       shapeDirty = true;
     }
     if (shapeDirty) {
-      JPH::ShapeRefC newShape = game.physics.playerShapeForAsset(
-          renderInfo.modelName,
-          glm::vec3(renderInfo.sx, renderInfo.sy, renderInfo.sz));
+      const glm::vec3 newScale(renderInfo.sx, renderInfo.sy, renderInfo.sz);
+      JPH::ShapeRefC newShape =
+          game.physics.convexHullForAsset(renderInfo.modelName, newScale);
+      if (!newShape)
+        newShape = game.physics.playerShapeForAsset(renderInfo.modelName,
+                                                    newScale);
       // Don't recompute mass: a 14x11x18 bear box at default density is
       // ~2.7M kg, which combined with locked rotation DOFs produces
       // NaN/Inf in the next physics step.
