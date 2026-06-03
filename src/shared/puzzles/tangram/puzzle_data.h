@@ -161,8 +161,7 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
 
 [[nodiscard]] inline bool yawMatchesTarget(float yaw, float targetRad) {
   return std::abs(normalizeYawRad(quantizeYawToRotateStep(yaw) -
-                                  quantizeYawToRotateStep(targetRad))) <=
-         1e-3f;
+                                  quantizeYawToRotateStep(targetRad))) <= 1e-3f;
 }
 
 [[nodiscard]] inline glm::quat quatFromYawRad(float yaw) {

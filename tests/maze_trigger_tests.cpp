@@ -100,7 +100,7 @@ TEST(MazeTrigger, MarkerEntitiesOutlineSquare) {
 
   const float minX = kLayout.triggerCenterX - kLayout.halfExtent;
   const float minY = kLayout.triggerCenterY - kLayout.halfExtent;
-  EXPECT_EQ(entities[0].modelName, "goal_cube");
+  EXPECT_EQ(entities[0].modelName, "maze_trigger_cube");
   EXPECT_FLOAT_EQ(entities[0].position.x, minX);
   EXPECT_FLOAT_EQ(entities[0].position.y, minY);
 }

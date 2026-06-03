@@ -158,8 +158,7 @@ float pieceFootprintMismatch(const ServerGame& game,
 
   using shared::tangram_slot_validate::detail::Vec2;
   using shared::tangram_slot_validate::detail::worldPolygon;
-  const std::vector<Vec2> slotPoly =
-      worldPolygon(def, relX, relY, slotYaw);
+  const std::vector<Vec2> slotPoly = worldPolygon(def, relX, relY, slotYaw);
   const std::vector<Vec2> piecePoly =
       worldPolygon(def, pieceRelX, pieceRelY, pieceYaw);
   if (slotPoly.size() != piecePoly.size() || slotPoly.empty()) {
@@ -200,8 +199,7 @@ bool pieceIsNearSlot(const ServerGame& game,
                      const shared::Position& pos, float relX, float relY,
                      float targetRot) {
   const glm::vec3 slotPos = slotSnapWorldPos(game, def);
-  const float centerDist =
-      std::hypot(pos.x - slotPos.x, pos.y - slotPos.y);
+  const float centerDist = std::hypot(pos.x - slotPos.x, pos.y - slotPos.y);
   const float reach = shared::tangram_puzzle::snapRadiusForPiece(def);
   if (centerDist <= reach) {
     return true;
@@ -304,10 +302,9 @@ void trySnapPiecesToSlots(ServerGame& game) {
     int off = stepDist(tangramSnapRng());
     if (off == 0) off = 1;
     const float snapYaw = shared::tangram_puzzle::normalizeYawRad(
-        qTarget + static_cast<float>(off) *
-                      shared::tangram_puzzle::kRotateStepRad);
-    const glm::quat rot =
-        shared::tangram_puzzle::quatFromYawRad(snapYaw);
+        qTarget +
+        static_cast<float>(off) * shared::tangram_puzzle::kRotateStepRad);
+    const glm::quat rot = shared::tangram_puzzle::quatFromYawRad(snapYaw);
     applyPieceTransform(game, ent, slotPos, rot);
 
     printf("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
@@ -431,8 +428,8 @@ void tryRotateNearbyPiece(ServerGame& game) {
 
     float newYaw = flattenedYaw(pos);
     if (piece.slotSnapped) {
-      const float rel = shared::tangram_puzzle::normalizeYawRad(
-          newYaw - qTarget);
+      const float rel =
+          shared::tangram_puzzle::normalizeYawRad(newYaw - qTarget);
       int step = static_cast<int>(
           std::lround(rel / shared::tangram_puzzle::kRotateStepRad));
       step = ((step % shared::tangram_puzzle::kRotateStepCount) +
@@ -529,13 +526,14 @@ bool allPiecesSolved(const ServerGame& game) {
   logCooldown -= 1.0f / 60.0f;
   if (logCooldown <= 0.0f) {
     logCooldown = 3.0f;
-    printf("[Tangram] Win progress: %d/%d aligned",
-           aligned, shared::tangram_puzzle::kPieceCount);
+    printf("[Tangram] Win progress: %d/%d aligned", aligned,
+           shared::tangram_puzzle::kPieceCount);
     if (missingCount > 0) {
       printf(" — still off:");
       for (int i = 0; i < missingCount; ++i) {
         const shared::tangram_puzzle::PieceDef* def =
-            shared::tangram_puzzle::pieceDefForId(missing[static_cast<size_t>(i)]);
+            shared::tangram_puzzle::pieceDefForId(
+                missing[static_cast<size_t>(i)]);
         if (def == nullptr) continue;
         entt::entity bad = entt::null;
         for (auto ent : view) {
@@ -552,7 +550,8 @@ bool allPiecesSolved(const ServerGame& game) {
         slotRelPose(game, *def, relX, relY, targetRot);
         const float mismatch = pieceFootprintMismatch(
             game, *def, view.get<shared::Position>(bad), relX, relY, targetRot);
-        printf(" #%u(%.2fm)", static_cast<unsigned>(missing[static_cast<size_t>(i)]),
+        printf(" #%u(%.2fm)",
+               static_cast<unsigned>(missing[static_cast<size_t>(i)]),
                mismatch);
       }
     }
@@ -767,8 +766,8 @@ void beginPuzzle(ServerGame& game) {
                                             ghostPos.z, ghostRot.w, ghostRot.x,
                                             ghostRot.y, ghostRot.z);
     game.registry.emplace<shared::RenderInfo>(
-        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id),
-        def.scaleX, def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
+        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
+        def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
     game.overworldTangramGhostSlotEntities[static_cast<size_t>(i)] = ghostEnt;
     spawned.push_back(ghostEnt);
   }
