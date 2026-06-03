@@ -42,9 +42,9 @@ struct Layout {
   // Trigger pad: all connected players must stand inside this AABB to start.
   // padCenterZ is the marker's world height (and roughly the ground level the
   // players gather at); the pad test itself only uses XY.
-  float padCenterX = 162.350f;
-  float padCenterY = -92.372f;
-  float padCenterZ = 37.0f;   // trigger marker / pad collision height
+  float padCenterX = 132.058f;
+  float padCenterY = -80.416f;
+  float padCenterZ = 42.0f;   // trigger marker / pad collision height
   float playFloorZ = 50.0f;  // avatar Z on pad and on run scatter (above landscape)
   float padHalfExtent = 6.0f;
 
