@@ -6,6 +6,88 @@
 #include "imgui.h"
 #include "shared/components.h"
 #include "shared/puzzles/summer/layout.h"
+
+namespace {
+
+const char* mazeArrowForSlot(uint8_t slot) {
+  switch (slot) {
+    case 1:
+      return "\xe2\x86\x91";  // ↑
+    case 2:
+      return "\xe2\x86\x93";  // ↓
+    case 3:
+      return "\xe2\x86\x90";  // ←
+    case 4:
+      return "\xe2\x86\x92";  // →
+    default:
+      return "?";
+  }
+}
+
+void drawWinterMazeHelpHUD(const ClientGame& game) {
+  if (!isOverworldMazePuzzleActive(game) ||
+      isOverworldMazePuzzleComplete(game)) {
+    return;
+  }
+
+  constexpr float kPad = 14.0f;
+  ImGui::SetNextWindowPos(ImVec2(kPad, kPad), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.78f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.16f, 0.28f, 1.0f));
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.55f, 0.78f, 1.0f, 0.55f));
+
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+      ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
+      ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize;
+
+  if (!ImGui::Begin("##winter_maze_help", nullptr, flags)) {
+    ImGui::End();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(2);
+    return;
+  }
+
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const ImVec2 wmin = ImGui::GetWindowPos();
+  const ImVec2 wmax = ImVec2(wmin.x + ImGui::GetWindowWidth(),
+                             wmin.y + ImGui::GetWindowHeight());
+  dl->AddRect(wmin, wmax, IM_COL32(140, 200, 255, 90), 12.0f, 0, 2.0f);
+
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.82f, 0.93f, 1.0f, 1.0f));
+  ImGui::TextUnformatted("\xe2\x9d\x84 Winter maze");  // ❄
+  ImGui::PopStyleColor();
+  ImGui::Spacing();
+
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.94f, 0.98f, 1.0f));
+  ImGui::TextUnformatted("One green piece, four directions.");
+  ImGui::TextUnformatted("Arrow keys slide it on the board.");
+  ImGui::Spacing();
+  ImGui::TextUnformatted(
+      "P1 \xe2\x86\x91   P2 \xe2\x86\x93   P3 \xe2\x86\x90   P4 \xe2\x86\x92");
+  ImGui::TextUnformatted("Guide it to the orange goal.");
+  ImGui::Spacing();
+  ImGui::TextUnformatted("Q  leave early");
+
+  const uint8_t slot = localOverworldPlayerSlot(game);
+  if (slot >= 1 && slot <= 4) {
+    ImGui::Spacing();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.65f, 1.0f, 0.82f, 1.0f));
+    ImGui::Text("You: %s", mazeArrowForSlot(slot));
+    ImGui::PopStyleColor();
+  }
+  ImGui::PopStyleColor();
+
+  ImGui::End();
+  ImGui::PopStyleColor(2);
+  ImGui::PopStyleVar(2);
+}
+
+}  // namespace
+
 static void drawFallChallengeHUD(const shared::FallChallengeState& cs) {
   if (!cs.active) return;
 
@@ -157,6 +239,8 @@ static void drawSummerEscapeHUD(const shared::SummerEscapeState& s,
 }
 
 void drawPuzzleHUDs(const ClientGame& game) {
+  drawWinterMazeHelpHUD(game);
+
   auto v = game.renderRegistry.view<shared::FallChallengeState>();
   for (auto e : v) {
     drawFallChallengeHUD(v.get<shared::FallChallengeState>(e));
@@ -167,5 +251,4 @@ void drawPuzzleHUDs(const ClientGame& game) {
     drawSummerEscapeHUD(se.get<shared::SummerEscapeState>(e), game);
     break;  // single controller entity
   }
-  // Future puzzle HUDs hang off here.
 }

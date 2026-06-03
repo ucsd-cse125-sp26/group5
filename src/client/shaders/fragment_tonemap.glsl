@@ -17,6 +17,11 @@ uniform float colorRestorationEdgeWidth;
 uniform vec3 colorRestorationMin;
 uniform vec3 colorRestorationMax;
 
+// Tangram play area stays in full color regardless of restoration progress.
+uniform float tangramAlwaysColorEnabled;
+uniform vec3 tangramAlwaysColorMin;
+uniform vec3 tangramAlwaysColorMax;
+
 // Signed distance from p to the AABB [mn, mx]. Negative inside, positive
 // outside; smooth across the edge so we don't get a hard ring.
 float aabbSignedDistance(vec3 p, vec3 mn, vec3 mx) {
@@ -42,6 +47,11 @@ void main() {
                                    colorRestorationMax);
       float edge = max(colorRestorationEdgeWidth, 1e-4);
       float outsideAmt = smoothstep(0.0, edge, d);
+      if (tangramAlwaysColorEnabled > 0.5) {
+        float dTangram = aabbSignedDistance(pos.rgb, tangramAlwaysColorMin,
+                                            tangramAlwaysColorMax);
+        outsideAmt *= smoothstep(0.0, edge, dTangram);
+      }
       float gray = dot(mapped, vec3(0.299, 0.587, 0.114));
       mapped = mix(mapped, vec3(gray),
                    outsideAmt * colorRestorationStrength);
