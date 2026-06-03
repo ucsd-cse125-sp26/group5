@@ -90,7 +90,8 @@ static void drawSummerEscapeHUD(const shared::SummerEscapeState& s,
 
   char header[48];
   std::snprintf(header, sizeof(header), "Stay in the zone!  Wave %d/%d",
-                static_cast<int>(s.wave) + 1, shared::summer::Layout::kWaveCount);
+                static_cast<int>(s.wave) + 1,
+                shared::summer::Layout::kWaveCount);
   ImGui::TextUnformatted(header);
 
   ImVec2 p = ImGui::GetCursorScreenPos();
@@ -101,9 +102,15 @@ static void drawSummerEscapeHUD(const shared::SummerEscapeState& s,
   auto toScreen = [&](float wx, float wy) -> ImVec2 {
     float u = (wx - L.mapMinX) / mapW;
     float v = (wy - L.mapMinY) / mapH;
-    if (u < 0.0f) u = 0.0f; else if (u > 1.0f) u = 1.0f;
-    if (v < 0.0f) v = 0.0f; else if (v > 1.0f) v = 1.0f;
-    return ImVec2(ox + u * padInner, oy + (1.0f - v) * padInner);
+    if (u < 0.0f)
+      u = 0.0f;
+    else if (u > 1.0f)
+      u = 1.0f;
+    if (v < 0.0f)
+      v = 0.0f;
+    else if (v > 1.0f)
+      v = 1.0f;
+    return {ox + u * padInner, oy + (1.0f - v) * padInner};
   };
 
   // Map background + border.

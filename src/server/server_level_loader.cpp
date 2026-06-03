@@ -96,14 +96,15 @@ void loadLevel(ServerGame& game) {
   auto [summerSectionID, summerSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       summerSection, shared::SectionSeasonMap::SUMMER, puzzleDecryptID,
-      true,  // unlocked for escape-minigame testing (set false when gated on fall)
+      true,  // unlocked for escape-minigame testing (set false when gated on
+             // fall)
       false  // not completed yet
   );
   auto [springSectionID, springSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       springSection, shared::SectionSeasonMap::SPRING, puzzleTengramID,
       true,  // spring is 4th to unlock
-      false   // not completed yet
+      false  // not completed yet
   );
 
   // door entities for each season
