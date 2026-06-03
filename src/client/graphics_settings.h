@@ -39,9 +39,16 @@ struct GraphicsSettings {
   int ssaoKernelSize = 64;
   float ssaoRadius = 0.5f;
   float ssaoBias = 0.025f;
+  // SSAO render resolution = renderWidth / ssaoScale (1 = full, 2 = half,
+  // 4 = quarter). Lighting samples ssaoBlurColor through bilinear filtering
+  // when scale > 1.
+  int ssaoScale = 1;
 
   // FXAA
   bool fxaaEnabled = true;
+
+  // Top-left overlay showing ImGui's smoothed framerate.
+  bool showFPS = true;
 
   // Pixelation: render the entire 3D scene at fb/scale, then upscale with
   // GL_NEAREST in the present pass for a chunky-pixel look. 1 = off.
@@ -58,6 +65,7 @@ struct GraphicsSettings {
 
   // Shadows
   bool shadowsEnabled = true;
+  bool pointShadowsEnabled = false;
   // Map sizes — changing triggers FBO/texture reallocation.
   int dirShadowMapSize = 2048;
   int pointShadowMapSize = 512;
@@ -88,6 +96,18 @@ struct GraphicsSettings {
   // 0 = off, otherwise levels for HSV-V quantization of the final tonemapped
   // color in the present shader (after FXAA so band edges stay sharp).
   int postQuantizeLevels = 0;
+  // 0 = off, otherwise HSV-V quantization applied to the skybox fragment
+  // only, independent of texture/post quantize. Lets the sky posterize
+  // without affecting scene geometry.
+  int skyboxQuantizeLevels = 0;
+  // 0 = off, otherwise k-means palette over sampled cubemap face pixels.
+  // Same algorithm as paletteQuantizeColors but built per-skybox and bound
+  // only by the skybox fragment shader. Capped at shared::kMaxPaletteColors.
+  int skyboxPaletteColors = 0;
+  // 0 = off, 1 = max softening. Bayer 4×4 dither offset applied before
+  // skybox brightness quantize and palette snap, so hard plateau / region
+  // boundaries break into a stippled transition instead of a sharp line.
+  float skyboxSoftEdge = 0.0f;
   int celBands = 4;
   float celBandEpsilon = 0.02f;  // 0 = hard, ~0.1 = soft
   bool celHalfLambert = true;
@@ -97,7 +117,7 @@ struct GraphicsSettings {
   std::string celRampPath = "";  // empty → procedural
 
   // Outlines (post-process Sobel only)
-  OutlineMode outlineMode = OutlineMode::None;
+  OutlineMode outlineMode = OutlineMode::Cross;
   glm::vec3 outlineColor{0.0f};
   // Depth threshold is relative (Δd / d), normal threshold is sum of 4
   // neighbor (1 - dot(n, nNeighbor)).

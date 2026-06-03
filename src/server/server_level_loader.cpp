@@ -36,6 +36,14 @@ void loadLevel(ServerGame& game) {
   // this.
   game.registry.emplace<shared::OverworldTag>(fallChallenge);
 
+  // Summer "escape" shrinking-zone controller. OverworldTag so its
+  // SummerEscapeState replicates to clients (the overlay reads the region).
+  auto [summerEscapeID, summerEscape] = new_entity(game);
+  (void)summerEscapeID;
+  game.registry.emplace<shared::SummerEscapeState>(summerEscape);
+  game.registry.emplace<shared::OverworldTag>(summerEscape);
+  game.summerEscapeController = summerEscape;
+
   // entity holding game progress for each season
   // Shared memory spirit: visible green piece players move through the maze
   // toward the orange goal marker.
@@ -88,14 +96,15 @@ void loadLevel(ServerGame& game) {
   auto [summerSectionID, summerSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       summerSection, shared::SectionSeasonMap::SUMMER, puzzleDecryptID,
-      false,  // summer is 3rd to unlock
-      false   // not completed yet
+      true,  // unlocked for escape-minigame testing (set false when gated on
+             // fall)
+      false  // not completed yet
   );
   auto [springSectionID, springSection] = new_entity(game);
   game.registry.emplace<shared::SectionController>(
       springSection, shared::SectionSeasonMap::SPRING, puzzleTengramID,
-      false,  // spring is 4th to unlock
-      false   // not completed yet
+      true,  // spring is 4th to unlock
+      false  // not completed yet
   );
 
   // door entities for each season
@@ -150,8 +159,9 @@ void loadLevel(ServerGame& game) {
   auto [summerFragmentID, summerFragment] = new_entity(game);
   game.registry.emplace<shared::Position>(summerFragment, 105.0f, -40.0f, 45.0f,
                                           1.0f, 0.0f, 0.0f, 0.0f);
-  // RenderInfo omitted: summer fragment is invisible until the decrypt puzzle
-  // is solved (reveal + network spawn when that flow is wired up).
+  // RenderInfo omitted: summer fragment is invisible until the escape minigame
+  // is solved (summer_escape reveals it), then appears for pickup like the
+  // winter/fall/spring flow.
   game.registry.emplace<shared::FragmentComponent>(
       summerFragment, shared::SectionSeasonMap::SUMMER, false);
   game.registry.emplace<shared::OverworldTag>(summerFragment);

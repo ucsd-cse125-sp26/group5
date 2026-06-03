@@ -32,6 +32,11 @@ void shadingSection(GraphicsSettings& s) {
   // final lit color including shading and shadows, not just the source.
   ImGui::SliderInt("Post quantize", &s.postQuantizeLevels, 0, 32,
                    s.postQuantizeLevels < 2 ? "off" : "%d levels");
+  // Skybox-only HSV-V quantize, applied in the skybox fragment shader.
+  // Independent of texture/post quantize so the sky can posterize while
+  // scene geometry stays untouched (or vice versa).
+  ImGui::SliderInt("Skybox quantize", &s.skyboxQuantizeLevels, 0, 32,
+                   s.skyboxQuantizeLevels < 2 ? "off" : "%d levels");
   // Scene-color palette: k-means over sampled diffuse pixels. Albedo is
   // snapped to the nearest palette entry at G-buffer time so models that
   // aren't authored with flat colors still light like they are.
@@ -45,6 +50,20 @@ void shadingSection(GraphicsSettings& s) {
                    IM_ARRAYSIZE(paletteLabels))) {
     s.paletteQuantizeColors = paletteOptions[paletteIdx];
   }
+  // Skybox-only palette quantize. K-means built from sampled cubemap pixels
+  // at load time and rebuilt when this value changes.
+  int skyboxPaletteIdx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(paletteOptions); ++i) {
+    if (paletteOptions[i] == s.skyboxPaletteColors) skyboxPaletteIdx = i;
+  }
+  if (ImGui::Combo("Skybox palette", &skyboxPaletteIdx, paletteLabels,
+                   IM_ARRAYSIZE(paletteLabels))) {
+    s.skyboxPaletteColors = paletteOptions[skyboxPaletteIdx];
+  }
+  // Bayer ordered-dither strength for the skybox. Softens the hard plateau
+  // and Voronoi-region boundaries that brightness quantize + palette snap
+  // produce — 0 = crisp (default), 1 = full stipple.
+  ImGui::SliderFloat("Skybox soft edge", &s.skyboxSoftEdge, 0.0f, 1.0f, "%.2f");
   ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
   ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");
@@ -127,6 +146,16 @@ void ssaoSection(GraphicsSettings& s) {
   ImGui::SliderInt("Kernel size", &s.ssaoKernelSize, 8, 64);
   ImGui::SliderFloat("Radius", &s.ssaoRadius, 0.05f, 2.0f);
   ImGui::SliderFloat("Bias", &s.ssaoBias, 0.0f, 0.1f, "%.4f");
+  const int scales[] = {1, 2, 4};
+  const char* scaleLabels[] = {"Full", "Half", "Quarter"};
+  int scaleIdx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(scales); ++i) {
+    if (scales[i] == s.ssaoScale) scaleIdx = i;
+  }
+  if (ImGui::Combo("Resolution", &scaleIdx, scaleLabels,
+                   IM_ARRAYSIZE(scaleLabels))) {
+    s.ssaoScale = scales[scaleIdx];
+  }
   ImGui::EndDisabled();
 }
 
@@ -134,6 +163,7 @@ void shadowsSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Shadows")) return;
   ImGui::Checkbox("Shadows enabled", &s.shadowsEnabled);
   ImGui::BeginDisabled(!s.shadowsEnabled);
+  ImGui::Checkbox("Point shadows enabled", &s.pointShadowsEnabled);
 
   const int dirSizes[] = {512, 1024, 2048, 4096};
   int dirIdx = 0;
@@ -174,6 +204,11 @@ void shadowsSection(GraphicsSettings& s) {
 void antialiasingSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Antialiasing")) return;
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
+}
+
+void overlaySection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Overlays")) return;
+  ImGui::Checkbox("Show FPS", &s.showFPS);
 }
 
 void colorRestorationSection(GraphicsSettings& s) {
@@ -241,6 +276,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   antialiasingSection(s);
   pixelationSection(s);
   colorRestorationSection(s);
+  overlaySection(s);
 
   ImGui::Separator();
   if (ImGui::Button("Reset to Default")) {
