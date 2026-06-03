@@ -1253,14 +1253,13 @@ static void runWeightedKMeans(const std::vector<DiffuseSample>& samples,
   if (colors <= 0 || samples.empty()) return;
 
   const int maxColors = shared::kMaxPaletteColors;
-  const int k =
-      std::min({colors, maxColors, static_cast<int>(samples.size())});
+  const int k = std::min({colors, maxColors, static_cast<int>(samples.size())});
 
   std::vector<glm::vec3> centroids(k);
   const size_t stride = std::max<size_t>(1, samples.size() / k);
   for (int i = 0; i < k; ++i) {
-    centroids[i] = samples[(static_cast<size_t>(i) * stride) % samples.size()]
-                       .color;
+    centroids[i] =
+        samples[(static_cast<size_t>(i) * stride) % samples.size()].color;
   }
 
   std::vector<glm::vec3> sums(k);
@@ -1328,13 +1327,11 @@ static GLuint loadCubemap(const std::string& directory,
       const int sh = std::max(1, height / kSamplesPerFaceAxis);
       for (int py = 0; py < height; py += sh) {
         for (int px = 0; px < width; px += sw) {
-          const uint8_t* p =
-              data + (static_cast<size_t>(py) * width + px) * 4;
-          outSamples.push_back(
-              {.color = glm::vec3(srgbToLinear(p[0] / 255.0f),
-                                  srgbToLinear(p[1] / 255.0f),
-                                  srgbToLinear(p[2] / 255.0f)),
-               .weight = 1.0f});
+          const uint8_t* p = data + (static_cast<size_t>(py) * width + px) * 4;
+          outSamples.push_back({.color = glm::vec3(srgbToLinear(p[0] / 255.0f),
+                                                   srgbToLinear(p[1] / 255.0f),
+                                                   srgbToLinear(p[2] / 255.0f)),
+                                .weight = 1.0f});
         }
       }
       stbi_image_free(data);

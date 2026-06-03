@@ -2210,8 +2210,7 @@ Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
       ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
       ImGuiCond_Always, ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowSize(ImVec2(360.0f, 0.0f), ImGuiCond_Always);
-  ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize |
-                           ImGuiWindowFlags_NoMove |
+  ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                            ImGuiWindowFlags_NoCollapse;
   if (ImGui::Begin("Connect to Server", nullptr, flags)) {
     bool submit = false;
