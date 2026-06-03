@@ -311,4 +311,30 @@ struct FallHitWindow {
   float times[4] = {-1000.0f, -1000.0f, -1000.0f, -1000.0f};
   int head = 0;
 };
+
+// Summer "escape" minigame. One replicated controller entity holds the live
+// red survival region (instantaneous, shrinking) plus the next-wave target
+// (for an overlay preview). The client draws a top-down overlay from this;
+// player positions come from the already-replicated Position/RenderInfo.
+struct SummerEscapeState {
+  bool active = false;
+  bool completed = false;  // set true on solve; blocks re-triggering
+  uint8_t wave = 0;        // 0-based index of the wave currently shrinking
+  // Instantaneous survival region (world XY AABB) players must stay inside.
+  float regMinX = 0.0f;
+  float regMinY = 0.0f;
+  float regMaxX = 0.0f;
+  float regMaxY = 0.0f;
+  // Target region this wave is shrinking toward (overlay preview outline).
+  float tgtMinX = 0.0f;
+  float tgtMinY = 0.0f;
+  float tgtMaxX = 0.0f;
+  float tgtMaxY = 0.0f;
+
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.active, self.completed, self.wave, self.regMinX,
+                   self.regMinY, self.regMaxX, self.regMaxY, self.tgtMinX,
+                   self.tgtMinY, self.tgtMaxX, self.tgtMaxY);
+  }
+};
 }  // namespace shared
