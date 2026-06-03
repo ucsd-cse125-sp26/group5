@@ -937,8 +937,8 @@ Model* makeSphereModel(const shared::CubeSpec& spec, int rings, int segments,
   const int row = segments + 1;
   for (int r = 0; r < rings; ++r) {
     for (int s = 0; s < segments; ++s) {
-      GLuint a = static_cast<GLuint>(r * row + s);
-      GLuint c = static_cast<GLuint>((r + 1) * row + s);
+      auto a = static_cast<GLuint>(r * row + s);
+      auto c = static_cast<GLuint>((r + 1) * row + s);
       indices.push_back(a);
       indices.push_back(c);
       indices.push_back(c + 1);
