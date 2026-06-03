@@ -117,8 +117,7 @@ int main() {
     GPU_MEM_FRAME_END();
 
     // Esc releases the captured cursor so you can use the Mac mouse again.
-    bool escNow =
-        glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+    bool escNow = glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     if (escNow && !graphics.keyEscapePrev) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
