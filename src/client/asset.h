@@ -2,6 +2,7 @@
 
 #include <glad/gl.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -128,7 +129,12 @@ Model* makeTangramColoredGhostSlotModel(
     const shared::tangram_puzzle::PieceDef& def);
 // Player join order 1–4: same rainbow cube with digit 1–4 on the top face.
 Model* makePlayerSlotCubeModel(const shared::CubeSpec& spec, uint8_t slot);
-Skybox loadSkybox(const std::string& directory);
+// Optional callback fired periodically by long loaders so callers can pump
+// a loading-screen frame (≈60 fps). Cheap when called more often than the
+// renderer's pacing window — see Graphics::pumpLoadingFrame.
+using AssetProgressFn = std::function<void()>;
+Skybox loadSkybox(const std::string& directory,
+                  const AssetProgressFn& progress = {});
 void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
 // Skinned variant. `bones` points to `count` mat4 entries; pass count==0 to
@@ -140,7 +146,12 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
 // Local mesh transforms are identity; node world transform lives on the
 // server-spawned entity's Position + RenderInfo.scale.
 std::vector<std::pair<std::string, Model*>> loadMapModels(
-    const std::string& filename);
+    const std::string& filename, const AssetProgressFn& progress = {});
+// Overload that skips the (slow, CPU-only) Assimp parse and operates on a
+// pre-parsed scene. Used by Graphics::load to run the landscape parse on a
+// worker thread in parallel with the rest of the asset loading.
+std::vector<std::pair<std::string, Model*>> loadMapModels(
+    const shared::ParsedModel& parsed, const AssetProgressFn& progress = {});
 
 // Run weighted k-means on model.diffuseSamples and store the resulting
 // centroids in model.palette. colors <= 0, an empty sample buffer, or a
