@@ -240,8 +240,8 @@ void render_model_change(ServerGame& game, float dt) {
       JPH::ShapeRefC newShape =
           game.physics.convexHullForAsset(renderInfo.modelName, newScale);
       if (!newShape)
-        newShape = game.physics.playerShapeForAsset(renderInfo.modelName,
-                                                    newScale);
+        newShape =
+            game.physics.playerShapeForAsset(renderInfo.modelName, newScale);
       // Don't recompute mass: a 14x11x18 bear box at default density is
       // ~2.7M kg, which combined with locked rotation DOFs produces
       // NaN/Inf in the next physics step.
