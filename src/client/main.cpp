@@ -116,14 +116,22 @@ int main() {
     GPU_PROFILE_FRAME_END();
     GPU_MEM_FRAME_END();
 
-    // ESC toggles the settings menu (and the cursor follows menu state).
-    bool escNow = glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+    // Esc releases the captured cursor so you can use the Mac mouse again.
+    bool escNow =
+        glfwGetKey(graphics.window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     if (escNow && !graphics.keyEscapePrev) {
-      graphics.settingsMenuOpen = !graphics.settingsMenuOpen;
+      glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
     graphics.keyEscapePrev = escNow;
 
-    // Sync cursor mode whenever the menu state changes — whether from ESC or
+    // H toggles the graphics settings menu (cursor follows menu state).
+    bool menuKeyNow = glfwGetKey(graphics.window, GLFW_KEY_H) == GLFW_PRESS;
+    if (menuKeyNow && !graphics.keySettingsMenuPrev) {
+      graphics.settingsMenuOpen = !graphics.settingsMenuOpen;
+    }
+    graphics.keySettingsMenuPrev = menuKeyNow;
+
+    // Sync cursor mode whenever the menu state changes — whether from H or
     // the in-UI Close button (which flipped the flag during render).
     if (graphics.settingsMenuOpen != graphics.prevSyncedMenuOpen) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR,
