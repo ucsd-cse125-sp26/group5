@@ -452,64 +452,18 @@ void initWorldEntities(ServerGame& game) {
       /*radius=*/std::min(game.fallLayout.playHalfX, game.fallLayout.playHalfY),
       /*spawnHeight=*/game.fallLayout.spawnHeight,
       /*interval=*/0.4f);
+  // Autumn fall arena: one green play surface (collision). Orange rim/trigger
+  // markers removed — challenge bounds still use game.fallLayout floats.
   spawnStaticEntities<shared::OverworldTag>(
-      game,
-      {
-          StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.playCenterX,
-                                    game.fallLayout.playCenterY,
-                                    game.fallLayout.markerTopZ()),
-              .modelName = "start_cube",
-              .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
-                                 game.fallLayout.playHalfY * 2.0f, 1.2f),
-              .collision = CollisionShape::None,
-          },
-          StaticEntityDesc{
-              .position = glm::vec3(
-                  game.fallLayout.playCenterX - game.fallLayout.playHalfX,
-                  game.fallLayout.playCenterY - game.fallLayout.playHalfY,
-                  game.fallLayout.playCenterZ + 4.0f),
-              .modelName = "goal_cube",
-              .scale = glm::vec3(1.2f, 1.2f, 8.0f),
-              .collision = CollisionShape::None,
-          },
-          StaticEntityDesc{
-              .position = glm::vec3(
-                  game.fallLayout.playCenterX - game.fallLayout.playHalfX,
-                  game.fallLayout.playCenterY + game.fallLayout.playHalfY,
-                  game.fallLayout.playCenterZ + 4.0f),
-              .modelName = "goal_cube",
-              .scale = glm::vec3(1.2f, 1.2f, 8.0f),
-              .collision = CollisionShape::None,
-          },
-          StaticEntityDesc{
-              .position = glm::vec3(
-                  game.fallLayout.playCenterX + game.fallLayout.playHalfX,
-                  game.fallLayout.playCenterY - game.fallLayout.playHalfY,
-                  game.fallLayout.playCenterZ + 4.0f),
-              .modelName = "goal_cube",
-              .scale = glm::vec3(1.2f, 1.2f, 8.0f),
-              .collision = CollisionShape::None,
-          },
-          StaticEntityDesc{
-              .position = glm::vec3(
-                  game.fallLayout.playCenterX + game.fallLayout.playHalfX,
-                  game.fallLayout.playCenterY + game.fallLayout.playHalfY,
-                  game.fallLayout.playCenterZ + 4.0f),
-              .modelName = "goal_cube",
-              .scale = glm::vec3(1.2f, 1.2f, 8.0f),
-              .collision = CollisionShape::None,
-          },
-          StaticEntityDesc{
-              .position = glm::vec3(game.fallLayout.triggerCenterX,
-                                    game.fallLayout.triggerCenterY,
-                                    game.fallLayout.triggerCenterZ + 1.0f),
-              .modelName = "goal_cube",
-              .scale = glm::vec3(game.fallLayout.triggerHalfX * 2.0f,
-                                 game.fallLayout.triggerHalfY * 2.0f, 2.0f),
-              .collision = CollisionShape::None,
-          },
-      });
+      game, {StaticEntityDesc{
+                .position = glm::vec3(game.fallLayout.playCenterX,
+                                      game.fallLayout.playCenterY,
+                                      game.fallLayout.markerTopZ()),
+                .modelName = "start_cube",
+                .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
+                                   game.fallLayout.playHalfY * 2.0f, 1.2f),
+                .collision = CollisionShape::Box,
+            }});
 
   // Summer escape trigger pad: stand here (all players) to start the
   // shrinking-zone minigame. Flat marker, no collision.

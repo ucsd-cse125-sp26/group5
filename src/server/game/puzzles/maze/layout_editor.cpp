@@ -133,55 +133,10 @@ std::vector<StaticEntityDesc> buildPreviewEntities(
 
 std::vector<StaticEntityDesc> buildTriggerMarkerEntities(
     const shared::maze_layout::Config& layout) {
-  std::vector<StaticEntityDesc> entities;
-  const float minX = layout.triggerCenterX - layout.halfExtent;
-  const float maxX = layout.triggerCenterX + layout.halfExtent;
-  const float minY = layout.triggerCenterY - layout.halfExtent;
-  const float maxY = layout.triggerCenterY + layout.halfExtent;
-  // Use maze_trigger Empty height (not player_start — that is often lower).
-  const float groundZ = layout.triggerCenterZ;
-  constexpr float kBorderLift = 0.12f;
-  constexpr float kCornerLift = 0.55f;
-  constexpr glm::vec3 kBorderScale(0.45f, 0.45f, 0.16f);
-  constexpr glm::vec3 kCornerScale(0.55f, 0.55f, 1.6f);
-
-  for (const glm::vec3& pos : {glm::vec3(minX, minY, groundZ + kCornerLift),
-                               glm::vec3(minX, maxY, groundZ + kCornerLift),
-                               glm::vec3(maxX, minY, groundZ + kCornerLift),
-                               glm::vec3(maxX, maxY, groundZ + kCornerLift)}) {
-    entities.push_back(StaticEntityDesc{
-        .position = pos,
-        .modelName = "maze_trigger_cube",
-        .scale = kCornerScale,
-    });
-  }
-
-  for (float x = minX + 1.0f; x < maxX; x += 2.0f) {
-    entities.push_back(StaticEntityDesc{
-        .position = glm::vec3(x, minY, groundZ + kBorderLift),
-        .modelName = "maze_trigger_cube",
-        .scale = kBorderScale,
-    });
-    entities.push_back(StaticEntityDesc{
-        .position = glm::vec3(x, maxY, groundZ + kBorderLift),
-        .modelName = "maze_trigger_cube",
-        .scale = kBorderScale,
-    });
-  }
-
-  for (float y = minY + 1.0f; y < maxY; y += 2.0f) {
-    entities.push_back(StaticEntityDesc{
-        .position = glm::vec3(minX, y, groundZ + kBorderLift),
-        .modelName = "maze_trigger_cube",
-        .scale = kBorderScale,
-    });
-    entities.push_back(StaticEntityDesc{
-        .position = glm::vec3(maxX, y, groundZ + kBorderLift),
-        .modelName = "maze_trigger_cube",
-        .scale = kBorderScale,
-    });
-  }
-  return entities;
+  (void)layout;
+  // Trigger pad outline comes from landscape.glb (e.g. Maze fence*). Logic uses
+  // maze_trigger Empty coords only — no procedural maze_trigger_cube markers.
+  return {};
 }
 
 void despawnLayoutVisuals(ServerGame& game) {

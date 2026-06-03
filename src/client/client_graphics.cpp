@@ -1783,6 +1783,16 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       tonemapShader->setVec3("colorRestorationMin", restoreMin);
       tonemapShader->setVec3("colorRestorationMax", restoreMax);
 
+      const shared::tangram::ColorRestoreAabb tangramColor =
+          game.tangramArena.alwaysColorAabb();
+      tonemapShader->setFloat("tangramAlwaysColorEnabled", 1.0f);
+      tonemapShader->setVec3(
+          "tangramAlwaysColorMin",
+          glm::vec3(tangramColor.minX, tangramColor.minY, tangramColor.minZ));
+      tonemapShader->setVec3(
+          "tangramAlwaysColorMax",
+          glm::vec3(tangramColor.maxX, tangramColor.maxY, tangramColor.maxZ));
+
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
