@@ -429,16 +429,15 @@ void initWorldEntities(ServerGame& game) {
   // Autumn fall arena: one green play surface (collision). Orange rim/trigger
   // markers removed — challenge bounds still use game.fallLayout floats.
   spawnStaticEntities<shared::OverworldTag>(
-      game,
-      {StaticEntityDesc{
-          .position = glm::vec3(game.fallLayout.playCenterX,
-                                game.fallLayout.playCenterY,
-                                game.fallLayout.markerTopZ()),
-          .modelName = "start_cube",
-          .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
-                             game.fallLayout.playHalfY * 2.0f, 1.2f),
-          .collision = CollisionShape::Box,
-      }});
+      game, {StaticEntityDesc{
+                .position = glm::vec3(game.fallLayout.playCenterX,
+                                      game.fallLayout.playCenterY,
+                                      game.fallLayout.markerTopZ()),
+                .modelName = "start_cube",
+                .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
+                                   game.fallLayout.playHalfY * 2.0f, 1.2f),
+                .collision = CollisionShape::Box,
+            }});
 
   // Summer escape trigger pad: stand here (all players) to start the
   // shrinking-zone minigame. Flat marker, no collision.
