@@ -248,8 +248,8 @@ void CollectMazeFragment(ServerGame& game) {
         shared::SectionSeasonMap::WINTER)
       continue;
     if (!game.registry.all_of<shared::RenderInfo>(fragEnt)) {
-      game.registry.emplace<shared::RenderInfo>(fragEnt, "light_cube", 1.0f,
-                                                1.0f, 1.0f);
+      game.registry.emplace<shared::RenderInfo>(fragEnt, "fragment", 0.5f, 0.5f,
+                                                0.5f);
     }
     break;
   }

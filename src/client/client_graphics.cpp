@@ -88,22 +88,43 @@ struct LightUpload {
   int shadowIdx;  // -1 = non-shadow-casting
 };
 
+// Fully-saturated, full-value RGB for hue in [0, 1) — the HSV(h, 1, 1) edge.
+static glm::vec3 hueToRgb(float hue) {
+  float r = std::fabs(hue * 6.0f - 3.0f) - 1.0f;
+  float g = 2.0f - std::fabs(hue * 6.0f - 2.0f);
+  float b = 2.0f - std::fabs(hue * 6.0f - 4.0f);
+  return glm::clamp(glm::vec3(r, g, b), 0.0f, 1.0f);
+}
+
+// Only fragments act as point lights — every other point light (the demo
+// "spinning" light, map-authored lights) is intentionally skipped so the
+// scene's only point lights are the fragments. Their color cycles through the
+// rainbow over time, phased per entity. With kMaxPointLights == 1, just one
+// fragment casts point shadows.
 static int collectPointLights(const ClientGame& game,
                               LightUpload out[kMaxLightingShaderLights]) {
   int count = 0;
   int shadowSlot = 0;
+  const auto now = static_cast<float>(glfwGetTime());
   auto view = game.renderRegistry.view<shared::PointLight>();
   for (auto ent : view) {
     if (count >= kMaxLightingShaderLights) break;
+    const auto* ri = game.renderRegistry.try_get<shared::RenderInfo>(ent);
+    if (!ri || ri->modelName != "fragment") continue;
     const auto& pl = view.get<shared::PointLight>(ent);
     LightUpload& l = out[count++];
     l.position = glm::vec3(pl.px, pl.py, pl.pz);
     l.constant = pl.constant;
     l.linear = pl.linear;
     l.quadratic = pl.quadratic;
-    l.ambient = glm::vec3(pl.ambientR, pl.ambientG, pl.ambientB);
-    l.diffuse = glm::vec3(pl.diffuseR, pl.diffuseG, pl.diffuseB);
-    l.specular = glm::vec3(pl.specularR, pl.specularG, pl.specularB);
+    const auto* eid = game.renderRegistry.try_get<shared::Entity>(ent);
+    float phase = eid ? static_cast<float>(eid->id & 0xFFu) / 255.0f : 0.0f;
+    constexpr float kFragmentLightBrightness = 2.0f;
+    glm::vec3 c =
+        hueToRgb(glm::fract(now * 0.12f + phase)) * kFragmentLightBrightness;
+    l.ambient = c * 0.1f;
+    l.diffuse = c;
+    l.specular = c;
     l.shadowIdx =
         (pl.castsShadow && shadowSlot < kMaxPointLights) ? shadowSlot++ : -1;
   }
@@ -598,6 +619,23 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     glm::quat rotation = glm::quat(p.qw, p.qx, p.qy, p.qz);
     glm::vec3 scale(renderInfo.sx, renderInfo.sy, renderInfo.sz);
     glm::vec3 pos(p.x, p.y, p.z);
+
+    // Fragments: rainbow-tinted, bob up and down (Z is up), and exempt from the
+    // color-restoration recolor so they always read in full color. The suns are
+    // also exempt (a desaturated sun looks broken). Everything else (incl. the
+    // terrain) desaturates outside the player's box as normal. These per-draw
+    // uniforms are no-ops in the shadow pass (no such uniforms).
+    const bool isFragment = renderInfo.modelName == "fragment";
+    const bool isSun = renderInfo.modelName.starts_with("sun_");
+    shader.setInt("alwaysColor", (isFragment || isSun) ? 1 : 0);
+    shader.setFloat("rainbowStrength", isFragment ? 1.0f : 0.0f);
+    if (isFragment) {
+      const auto t = static_cast<float>(glfwGetTime());
+      shader.setFloat("rainbowTime", t);
+      // Phase by entity id so multiple fragments don't bob in lockstep.
+      pos.z +=
+          0.25f * std::sin(t * 2.0f + static_cast<float>(entity.id) * 0.7f);
+    }
 
     // Cheap sphere reject before composing the model matrix or touching GL.
     if (culler && modelAsset->localBoundsRadius > 0.0f) {
@@ -1754,6 +1792,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glActiveTexture(GL_TEXTURE2);
       glBindTexture(GL_TEXTURE_2D, gPosition);
       tonemapShader->setInt("gPosition", 2);
+      glActiveTexture(GL_TEXTURE3);
+      glBindTexture(GL_TEXTURE_2D, gAlbedo);
+      tonemapShader->setInt("gAlbedo", 3);
       tonemapShader->setFloat("exposure", settings.exposure);
       tonemapShader->setFloat("bloomStrength", settings.bloomEnabled
                                                    ? settings.bloomStrength
@@ -1780,6 +1821,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       tonemapShader->setFloat("colorRestorationStrength", restorationStrength);
       tonemapShader->setFloat("colorRestorationEdgeWidth",
                               settings.colorRestorationEdgeWidth);
+      tonemapShader->setFloat("colorRestorationLightStrength",
+                              settings.colorRestorationLightStrength);
       tonemapShader->setVec3("colorRestorationMin", restoreMin);
       tonemapShader->setVec3("colorRestorationMax", restoreMax);
 

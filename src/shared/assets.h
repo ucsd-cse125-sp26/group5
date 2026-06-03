@@ -232,6 +232,16 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_TANGRAM_7},
+    // Collectible season fragment. GLB authored Y-up, so rotate +90° about X
+    // to stand it upright in the Z-up world. Rendered rainbow + bobbing and
+    // exempt from color restoration (see renderEntities / fragment_gbuffer).
+    {.name = "fragment",
+     .filename = "assets/fragment1/fragment1.glb",
+     .qw = 0.70710678f,
+     .qx = 0.70710678f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = nullptr},
     {.name = "bear",
      .filename = "assets/bear/bear_full.obj",
      .qw = 0.0f,

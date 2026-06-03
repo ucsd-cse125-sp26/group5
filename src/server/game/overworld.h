@@ -31,5 +31,10 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
                      shared::SectionSeasonMap requiredSeason,
                      shared::SectionSeasonMap nextSeason);
 
+// Attaches a shadow-casting PointLight to each revealed fragment and removes it
+// once the fragment is picked up. The client filters point lights down to
+// fragments and animates their color (rainbow).
+void SyncFragmentLights(ServerGame& game);
+
 // Overworld-only rules (doors, section progress, etc.).
 void tickOverworldGameLogic(ServerGame& game, float dt);

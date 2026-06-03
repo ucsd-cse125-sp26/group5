@@ -157,6 +157,7 @@ void main() {
     result += ambient + (1.0 - shadow) * (diffuse + specular);
   }
 
+  vec3 pointResult = vec3(0.0);  // colored point-light contribution only
   for (int i = 0; i < numPointLights; ++i) {
     PointLight L = pointLights[i];
     vec3 toLight = L.position - worldPos;
@@ -176,7 +177,9 @@ void main() {
     diffuse *= attenuation;
     specular *= attenuation;
     float shadow = PointShadowFactor(L.shadowIdx, worldPos, L.position, norm);
-    result += ambient + (1.0 - shadow) * (diffuse + specular);
+    vec3 contribution = ambient + (1.0 - shadow) * (diffuse + specular);
+    result += contribution;
+    pointResult += contribution;
   }
 
   result += emissive;
@@ -185,7 +188,16 @@ void main() {
     result = mix(result, outlineColor, OutlineStrength(worldPos, norm));
   }
 
-  FragColor = vec4(result, 1.0);
+  // Fraction of this pixel's brightness from the (colored) point lights. The
+  // tonemap reads it from litColor.a to keep point-lit areas in color even
+  // where the B&W color-restoration transform would otherwise desaturate them.
+  // Value (max channel) of the colored point-light contribution — absolute and
+  // hue-independent, so color is kept only where the light actually reaches. A
+  // luminance *ratio* would blow up in dark areas far from the light and tint
+  // the wrong parts of the map.
+  float pointVal = max(pointResult.r, max(pointResult.g, pointResult.b));
+  float coloredLightKeep = smoothstep(0.04, 0.30, pointVal);
+  FragColor = vec4(result, coloredLightKeep);
 
   // Soft-knee bright-pass for bloom.
   float brightness = dot(result, vec3(0.2126, 0.7152, 0.0722));
