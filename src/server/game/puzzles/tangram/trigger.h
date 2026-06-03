@@ -22,7 +22,8 @@ namespace tangram_trigger {
 
 [[nodiscard]] bool isFallTypingAvailable(const ServerGame& game);
 
-// Tangram can replay after a win; only requires the section to be unlocked.
+// Tangram starts whenever four players gather on the spring trigger, unless
+// spring is already completed.
 [[nodiscard]] bool canTriggerTangram(const ServerGame& game);
 
 [[nodiscard]] glm::vec3 overworldSpawnPosition(

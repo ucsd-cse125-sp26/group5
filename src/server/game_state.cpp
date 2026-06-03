@@ -169,6 +169,56 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
         "maze_board_suggest=(%.3f, %.3f, %.3f)\n",
         static_cast<unsigned>(ri.playerSlot), pos.x, pos.y, pos.z, pos.x, pos.y,
         pos.z);
+
+    bool springUnlocked = false;
+    bool springCompleted = false;
+    auto sections = game.registry.view<shared::SectionController>();
+    for (auto sectionEnt : sections) {
+      const auto& section =
+          game.registry.get<shared::SectionController>(sectionEnt);
+      if (section.type != shared::SectionSeasonMap::SPRING) continue;
+      springUnlocked = section.unlocked;
+      springCompleted = section.completed;
+      break;
+    }
+
+    const auto& arena = game.tangramArena;
+    printf(
+        "[TangramDebug] unlocked=%d completed=%d active=%d armed=%d "
+        "focus=%.2f triggerCenter=(%.3f, %.3f) half=%.3f board=(%.3f, %.3f, "
+        "%.3f) spawn=(%.3f, %.3f, %.3f)\n",
+        springUnlocked ? 1 : 0, springCompleted ? 1 : 0,
+        game.overworldTangramActive ? 1 : 0,
+        game.overworldTangramTriggerArmed ? 1 : 0,
+        game.overworldTangramFocusTimer, arena.triggerCenterX,
+        arena.triggerCenterY, arena.halfExtent, arena.boardCenterX,
+        arena.boardCenterY, arena.boardCenterZ, arena.spawnBaseX,
+        arena.spawnBaseY, arena.spawnHeightZ);
+
+    int connected = 0;
+    int inside = 0;
+    for (const auto& [peer, slots] : game.active_players) {
+      (void)peer;
+      const entt::entity avatar = slots.overworld_avatar;
+      if (!game.registry.valid(avatar) ||
+          !game.registry.all_of<shared::Position, shared::RenderInfo>(avatar)) {
+        continue;
+      }
+      ++connected;
+      const auto& playerPos = game.registry.get<shared::Position>(avatar);
+      const auto& playerRender = game.registry.get<shared::RenderInfo>(avatar);
+      const bool inTrigger =
+          arena.isInsideTrigger(playerPos.x, playerPos.y);
+      if (inTrigger) ++inside;
+      printf(
+          "[TangramDebug] slot=%u pos=(%.3f, %.3f, %.3f) inTrigger=%d "
+          "dx=%.3f dy=%.3f\n",
+          static_cast<unsigned>(playerRender.playerSlot), playerPos.x,
+          playerPos.y, playerPos.z, inTrigger ? 1 : 0,
+          playerPos.x - arena.triggerCenterX, playerPos.y - arena.triggerCenterY);
+    }
+    printf("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
+           connected, inside);
   }
 }
 
