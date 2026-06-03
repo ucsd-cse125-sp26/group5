@@ -14,6 +14,7 @@
 #include "shared/map_gamelogic_layout.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/maze/layout.h"
+#include "shared/puzzles/summer/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/puzzles/tangram/slot_layout.h"
 class ServerNetwork;
@@ -109,6 +110,15 @@ struct ServerGame {
   shared::tangram::ArenaLayout tangramArena =
       shared::tangram::ArenaLayout::defaults();
   shared::tangram_slot::Config tangramSlotLayout{};
+
+  // Summer "escape" shrinking-zone minigame.
+  shared::summer::Layout summerLayout = shared::summer::Layout::defaults();
+  entt::entity summerEscapeController = entt::null;
+  float summerWaveElapsed = 0.0f;  // seconds into the current wave
+  float summerGrace = 0.0f;        // startup grace before "outside" can fail
+  // Region (minX,minY,maxX,maxY) at the start of the current wave; the live
+  // region interpolates from this toward the wave target.
+  glm::vec4 summerWaveStartRegion{0.0f};
 };
 
 // Installs the on_destroy<PhysicsBody> hook. Call once. After it runs,

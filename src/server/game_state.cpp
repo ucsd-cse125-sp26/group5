@@ -9,6 +9,7 @@
 #include "game/maze.h"
 #include "game/maze_generation.h"
 #include "game/overworld.h"
+#include "game/summer_escape.h"
 #include "map_loader.h"
 #include "scene.h"
 #include "server/game/puzzles/maze/camera.h"
@@ -484,6 +485,25 @@ void initWorldEntities(ServerGame& game) {
           },
       });
 
+  // Summer escape trigger pad: stand here (all players) to start the
+  // shrinking-zone minigame. Flat marker, no collision.
+  spawnStaticEntities<shared::OverworldTag>(
+      game,
+      {
+          StaticEntityDesc{
+              .position = glm::vec3(game.summerLayout.padCenterX,
+                                    game.summerLayout.padCenterY,
+                                    game.summerLayout.padCenterZ),
+              .modelName = "goal_cube",
+              .scale = glm::vec3(game.summerLayout.padHalfExtent * 2.0f,
+                                 game.summerLayout.padHalfExtent * 2.0f, 0.4f),
+              // Solid box so players can actually land/stand on the elevated
+              // pad (it floats at padCenterZ; None would let them fall
+              // through).
+              .collision = CollisionShape::Box,
+          },
+      });
+
   // Invisible map boundary walls — actual GLB bounds: X[-169,171] Y[-59,145]
   spawnInvisibleWall<shared::OverworldTag>(
       game, glm::vec3(1.0f, 103.0f, 0.0f),  // north  (Y=105 + buffer)
@@ -667,7 +687,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     return;
   }
 
-  if (tangram_trigger::canTriggerTangram(game)) {
+  if (!summer_escape::isActive(game) &&
+      tangram_trigger::canTriggerTangram(game)) {
     const bool allInTypingTrigger =
         tangram_trigger::allActivePlayersInTangramTrigger(game);
     if (!allInTypingTrigger) {
@@ -687,12 +708,13 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
   tickOverworldGameLogic(game, dt);
   fall_challenge::update(game, dt);
+  summer_escape::update(game, dt);
 
   const bool allInTrigger = maze_trigger::allActivePlayersInMazeTrigger(game);
   if (!allInTrigger) {
     game.overworldMazeTriggerArmed = true;
     game.overworldMazeFocusTimer = 0.0f;
-  } else if (game.overworldMazeTriggerArmed &&
+  } else if (!summer_escape::isActive(game) && game.overworldMazeTriggerArmed &&
              maze_trigger::canTriggerMaze(game)) {
     maze_camera::snapOverworldAvatarsFaceMazePreview(game);
     game.overworldMazeFocusTimer += dt;
@@ -773,6 +795,16 @@ void OverworldState::update(ServerGame& game, float dt) {
       colorizeSection(game, next);
       printf("DEBUG: cycled active season to %s\n",
              section_puzzle::sceneNameForSeason(next));
+      break;
+    }
+  }
+
+  // DEBUG: press V to snap all players onto the summer trigger pad (F2 debug
+  // on).
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (input.keys_newly_pressed & KEY_DEBUG_SUMMER_PAD) {
+      summer_escape::debugSnapAllPlayersToSummerPad(game);
       break;
     }
   }
