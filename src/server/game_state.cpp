@@ -207,15 +207,15 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
       ++connected;
       const auto& playerPos = game.registry.get<shared::Position>(avatar);
       const auto& playerRender = game.registry.get<shared::RenderInfo>(avatar);
-      const bool inTrigger =
-          arena.isInsideTrigger(playerPos.x, playerPos.y);
+      const bool inTrigger = arena.isInsideTrigger(playerPos.x, playerPos.y);
       if (inTrigger) ++inside;
       printf(
           "[TangramDebug] slot=%u pos=(%.3f, %.3f, %.3f) inTrigger=%d "
           "dx=%.3f dy=%.3f\n",
           static_cast<unsigned>(playerRender.playerSlot), playerPos.x,
           playerPos.y, playerPos.z, inTrigger ? 1 : 0,
-          playerPos.x - arena.triggerCenterX, playerPos.y - arena.triggerCenterY);
+          playerPos.x - arena.triggerCenterX,
+          playerPos.y - arena.triggerCenterY);
     }
     printf("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
            connected, inside);
