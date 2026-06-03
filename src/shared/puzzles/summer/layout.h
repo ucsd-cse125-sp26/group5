@@ -44,8 +44,9 @@ struct Layout {
   // players gather at); the pad test itself only uses XY.
   float padCenterX = 132.058f;
   float padCenterY = -80.416f;
-  float padCenterZ = 42.0f;   // trigger marker / pad collision height
-  float playFloorZ = 50.0f;  // avatar Z on pad and on run scatter (above landscape)
+  float padCenterZ = 42.0f;  // trigger marker / pad collision height
+  float playFloorZ =
+      50.0f;  // avatar Z on pad and on run scatter (above landscape)
   float padHalfExtent = 6.0f;
 
   // Start corners (world XY) on begin/restart — four corners of the play strip.

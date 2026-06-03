@@ -429,7 +429,8 @@ void initWorldEntities(ServerGame& game) {
               .scale = glm::vec3(game.summerLayout.padHalfExtent * 2.0f,
                                  game.summerLayout.padHalfExtent * 2.0f, 0.4f),
               // Solid box so players can actually land/stand on the elevated
-              // pad (it floats at padCenterZ; None would let them fall through).
+              // pad (it floats at padCenterZ; None would let them fall
+              // through).
               .collision = CollisionShape::Box,
           },
       });
@@ -616,7 +617,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     return;
   }
 
-  if (!summer_escape::isActive(game) && tangram_trigger::canTriggerTangram(game)) {
+  if (!summer_escape::isActive(game) &&
+      tangram_trigger::canTriggerTangram(game)) {
     const bool allInTypingTrigger =
         tangram_trigger::allActivePlayersInTangramTrigger(game);
     if (!allInTypingTrigger) {
@@ -687,7 +689,8 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
-  // DEBUG: press V to snap all players onto the summer trigger pad (F2 debug on).
+  // DEBUG: press V to snap all players onto the summer trigger pad (F2 debug
+  // on).
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_DEBUG_SUMMER_PAD) {

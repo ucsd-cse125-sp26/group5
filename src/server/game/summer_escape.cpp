@@ -82,7 +82,8 @@ void scatterPlayersToStartPositions(ServerGame& game) {
     }
     int idx = order % 4;
     if (game.registry.all_of<shared::RenderInfo>(avatar)) {
-      const uint8_t slot = game.registry.get<shared::RenderInfo>(avatar).playerSlot;
+      const uint8_t slot =
+          game.registry.get<shared::RenderInfo>(avatar).playerSlot;
       if (slot >= 1 && slot <= 4) idx = slot - 1;
     }
     auto& pos = game.registry.get<shared::Position>(avatar);
@@ -155,9 +156,8 @@ bool anyPlayerOutsideRegion(ServerGame& game,
       continue;
     }
     const auto& pos = game.registry.get<shared::Position>(avatar);
-    if (!shared::summer::Layout::isInsideRegion(pos.x, pos.y, s.regMinX,
-                                                s.regMinY, s.regMaxX,
-                                                s.regMaxY)) {
+    if (!shared::summer::Layout::isInsideRegion(
+            pos.x, pos.y, s.regMinX, s.regMinY, s.regMaxX, s.regMaxY)) {
       return true;
     }
   }
@@ -190,9 +190,8 @@ void revealSummerFragment(ServerGame& game) {
     }
     if (game.registry.all_of<shared::RenderInfo>(fe)) continue;
     game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
-    auto buf =
-        serializeEntities(game.registry, game.componentRegistry,
-                          shared::PacketType::SPAWN_ENTITY, {fe}, false);
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::SPAWN_ENTITY, {fe}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
 }
@@ -211,8 +210,8 @@ void solve(ServerGame& game, shared::SummerEscapeState& s) {
 void debugSnapAllPlayersToSummerPad(ServerGame& game) {
   auto& bodyInterface = game.physics.getBodyInterface();
   const auto& L = game.summerLayout;
-  static constexpr float kPadOffsets[4][2] = {{-2.5f, -2.5f}, {2.5f, -2.5f},
-                                              {-2.5f, 2.5f},  {2.5f, 2.5f}};
+  static constexpr float kPadOffsets[4][2] = {
+      {-2.5f, -2.5f}, {2.5f, -2.5f}, {-2.5f, 2.5f}, {2.5f, 2.5f}};
 
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
@@ -223,7 +222,8 @@ void debugSnapAllPlayersToSummerPad(ServerGame& game) {
     }
     int idx = 0;
     if (game.registry.all_of<shared::RenderInfo>(avatar)) {
-      const uint8_t slot = game.registry.get<shared::RenderInfo>(avatar).playerSlot;
+      const uint8_t slot =
+          game.registry.get<shared::RenderInfo>(avatar).playerSlot;
       if (slot >= 1 && slot <= 4) idx = slot - 1;
     }
     auto& pos = game.registry.get<shared::Position>(avatar);
