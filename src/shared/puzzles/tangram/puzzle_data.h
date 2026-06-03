@@ -40,6 +40,10 @@ inline constexpr float kShapeGoalHalfY = 3.75f;
 
 inline constexpr int kRequiredPlayersForStart = 4;
 
+// Footprint vertex distance thresholds (meters).
+inline constexpr float kSnapFootprintMismatchMax = 0.58f;
+inline constexpr float kWinFootprintMismatchMax = 0.38f;
+
 enum class PieceShape : uint8_t {
   LargeTriangle = 0,
   MediumTriangle = 1,
@@ -139,7 +143,7 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
 
 [[nodiscard]] inline float snapRadiusForPiece(const PieceDef& def) {
   const float footprint = std::min(def.scaleX, def.scaleY);
-  return std::clamp(footprint * 0.45f, 0.50f, 1.15f);
+  return std::clamp(footprint * 0.55f, 0.75f, 1.25f);
 }
 
 [[nodiscard]] inline float normalizeYawRad(float yaw) {
@@ -150,8 +154,14 @@ inline constexpr const char* kGhostModelNames[kPieceCount] = {
   return yaw - kPi;
 }
 
+// R key steps by kRotateStepRad; win checks use the same 45° grid.
+[[nodiscard]] inline float quantizeYawToRotateStep(float yaw) {
+  return normalizeYawRad(std::round(yaw / kRotateStepRad) * kRotateStepRad);
+}
+
 [[nodiscard]] inline bool yawMatchesTarget(float yaw, float targetRad) {
-  return std::abs(normalizeYawRad(yaw - targetRad)) <= kRotateStepRad * 0.51f;
+  return std::abs(normalizeYawRad(quantizeYawToRotateStep(yaw) -
+                                  quantizeYawToRotateStep(targetRad))) <= 1e-3f;
 }
 
 [[nodiscard]] inline glm::quat quatFromYawRad(float yaw) {
