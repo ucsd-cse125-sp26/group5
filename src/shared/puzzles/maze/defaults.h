@@ -18,8 +18,8 @@ namespace shared::maze_preview {
 constexpr float kSpawnBaseX = 57.294f;
 constexpr float kSpawnBaseY = 12.244f;
 constexpr float kSpawnHeightZ = 8.8f;
-constexpr float kSpawnOffsetX[4] = {-2.0f, 2.0f, -2.0f, 2.0f};
-constexpr float kSpawnOffsetY[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+constexpr float kSpawnOffsetX[4] = {-4.0f, 4.0f, -4.0f, 4.0f};
+constexpr float kSpawnOffsetY[4] = {-4.0f, -4.0f, 4.0f, 4.0f};
 
 // ── B) Trigger region (four players must stand inside to start puzzle) ───
 // Orange/green pad markers + isInsideTriggerRegion() use this AABB.

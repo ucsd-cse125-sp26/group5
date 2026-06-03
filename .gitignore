@@ -12,3 +12,4 @@ latex/
 /.mapsync.local.json
 __pycache__/
 node_modules
+*.zip

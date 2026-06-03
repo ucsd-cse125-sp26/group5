@@ -556,13 +556,20 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     }
     if (!shouldDrawTangramEntity(game, renderInfo.modelName)) continue;
 
-    // Hardcoded winter moon: never cast a shadow (a giant cube silhouette
-    // would tank the scene), and only render in the night scene (which is
-    // the WINTER season per sceneNameForSeason).
-    if (renderInfo.modelName == "moon") {
+    // Hardcoded celestial bodies (winter moon, per-scene suns): never cast a
+    // shadow (a giant silhouette would tank the scene), and only render in the
+    // scene they belong to.
+    std::string_view bodyScene;
+    if (renderInfo.modelName == "moon")
+      bodyScene = "night";
+    else if (renderInfo.modelName == "sun_morning")
+      bodyScene = "morning";
+    else if (renderInfo.modelName == "sun_sunset")
+      bodyScene = "sunset";
+    if (!bodyScene.empty()) {
       if (forShadowPass) continue;
       auto* sc = currentScene(game);
-      if (!sc || sc->name != std::string_view("night")) continue;
+      if (!sc || sc->name != bodyScene) continue;
     }
 
     std::string modelKey = renderInfo.modelName;
@@ -793,15 +800,17 @@ bool Graphics::load(int width, int height) {
   for (const auto& asset : shared::ASSETS) {
     renderLoadingFrame(std::string("Loading asset: ") +
                        std::string(asset.name));
-    // "moon" is the only procedural sphere asset; everything else with a
-    // CubeSpec is a cube. Mesh-backed assets go through loadModel as before.
-    // The 10× emissive boost pushes the moon well past the bloom threshold so
-    // it glows hard on the night skybox.
-    Model* m = asset.cubeSpec
-                   ? (asset.name == "moon"
-                          ? makeSphereModel(*asset.cubeSpec, 16, 28, 10.0f)
-                          : makeCubeModel(*asset.cubeSpec))
-                   : loadModel(std::string(asset.filename));
+    // The moon and the per-scene suns are procedural spheres; everything else
+    // with a CubeSpec is a cube. Mesh-backed assets go through loadModel as
+    // before. The 10× emissive boost pushes these bodies well past the bloom
+    // threshold so they glow hard on the skybox.
+    bool celestialSphere =
+        asset.name == "moon" || asset.name.starts_with("sun_");
+    Model* m =
+        asset.cubeSpec
+            ? (celestialSphere ? makeSphereModel(*asset.cubeSpec, 16, 28, 10.0f)
+                               : makeCubeModel(*asset.cubeSpec))
+            : loadModel(std::string(asset.filename));
     if (!m) {
       fprintf(stderr, "Failed to load asset '%s' (%s)\n",
               std::string(asset.name).c_str(),

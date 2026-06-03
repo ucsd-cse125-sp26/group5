@@ -3,6 +3,7 @@
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
+#include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
@@ -19,7 +20,11 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
                                             const glm::quat& rot,
                                             const glm::vec3& scale) {
   auto& bodyInterface = getBodyInterface();
-  JPH::ShapeRefC shape = playerShapeForAsset(modelName, scale);
+  // Mesh-based (convex hull) collision so the body hugs the model silhouette;
+  // procedural assets (no mesh, e.g. the spirit cube) fall back to the
+  // foot-aligned box.
+  JPH::ShapeRefC shape = convexHullForAsset(modelName, scale);
+  if (!shape) shape = playerShapeForAsset(modelName, scale);
 
   // Compute foot offset: distance from body origin down to shape bottom.
   // boxShapeForAsset with Z-only mask offsets box center up by
@@ -403,6 +408,60 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
     unscaled = buildMeshShape(std::move(tris), modelName.c_str());
     if (!unscaled) return nullptr;
     assetMeshCache_[modelName] = unscaled;
+  }
+  JPH::ScaledShapeSettings scaledSettings(unscaled,
+                                          JPH::Vec3(scale.x, scale.y, scale.z));
+  scaledSettings.SetEmbedded();
+  return scaledSettings.Create().Get();
+}
+
+JPH::ShapeRefC PhysicsEngine::convexHullForAsset(const std::string& modelName,
+                                                 const glm::vec3& scale) {
+  if (!isUsableScale(scale)) {
+    printf("convexHullForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+           scale.x, scale.y, scale.z, modelName.c_str());
+    return nullptr;
+  }
+  JPH::ShapeRefC unscaled;
+  if (auto it = assetHullCache_.find(modelName); it != assetHullCache_.end()) {
+    unscaled = it->second;
+  } else {
+    const auto* asset = shared::findAsset(modelName);
+    if (!asset || asset->filename.empty()) return nullptr;  // procedural
+    glm::quat orient(asset->qw, asset->qx, asset->qy, asset->qz);
+    shared::ParsedModel parsed;
+    if (!parsed.load(std::string(asset->filename),
+                     aiProcess_Triangulate | aiProcess_JoinIdenticalVertices)) {
+      printf("convexHullForAsset: failed to load %s for %s — no hull\n",
+             std::string(asset->filename).c_str(), modelName.c_str());
+      return nullptr;
+    }
+    // Bake the asset orientation into the points (same as boxShapeForAsset) so
+    // the body's rotation can stay equal to the entity's rotation. Points are
+    // in mesh-origin space, so the hull is foot-aligned for free: its lowest
+    // vertex sits at the model's lowest vertex above the body origin.
+    JPH::Array<JPH::Vec3> points;
+    parsed.forEachMeshNode([&](const aiNode& node, const aiMatrix4x4& world) {
+      for (unsigned m = 0; m < node.mNumMeshes; ++m) {
+        const aiMesh* mesh = parsed.scene()->mMeshes[node.mMeshes[m]];
+        for (unsigned v = 0; v < mesh->mNumVertices; ++v) {
+          aiVector3D wp = world * mesh->mVertices[v];
+          glm::vec3 p = orient * glm::vec3(wp.x, wp.y, wp.z);
+          points.push_back(JPH::Vec3(p.x, p.y, p.z));
+        }
+      }
+    });
+    if (points.empty()) return nullptr;
+    JPH::ConvexHullShapeSettings settings(points);
+    settings.SetEmbedded();
+    JPH::Shape::ShapeResult res = settings.Create();
+    if (res.HasError()) {
+      printf("convexHullForAsset: hull build failed for %s: %s — no hull\n",
+             modelName.c_str(), res.GetError().c_str());
+      return nullptr;
+    }
+    unscaled = res.Get();
+    assetHullCache_[modelName] = unscaled;
   }
   JPH::ScaledShapeSettings scaledSettings(unscaled,
                                           JPH::Vec3(scale.x, scale.y, scale.z));

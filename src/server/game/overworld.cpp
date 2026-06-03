@@ -25,6 +25,22 @@ bool seasonCompleted(const ServerGame& game, shared::SectionSeasonMap season) {
   return false;
 }
 
+// Overworld progression order: winter → fall → summer → spring. Spring is the
+// last, so it maps to itself (collecting the final fragment doesn't wrap).
+shared::SectionSeasonMap nextSeasonInOrder(shared::SectionSeasonMap season) {
+  switch (season) {
+    case shared::SectionSeasonMap::WINTER:
+      return shared::SectionSeasonMap::FALL;
+    case shared::SectionSeasonMap::FALL:
+      return shared::SectionSeasonMap::SUMMER;
+    case shared::SectionSeasonMap::SUMMER:
+      return shared::SectionSeasonMap::SPRING;
+    case shared::SectionSeasonMap::SPRING:
+      return shared::SectionSeasonMap::SPRING;
+  }
+  return season;
+}
+
 }  // namespace
 
 void MoveInMainMap(ServerGame& game, float dt) {
@@ -103,6 +119,21 @@ void ProcessFragmentPickups(ServerGame& game) {
         }
         if (shouldRestore) {
           colorizeSection(game, fragment.season);
+          // Drive progression off the fragment (the door/switch system that
+          // used to do this is never run): advance to the next season, swap
+          // the overworld scene (skybox + directional light), and unlock the
+          // next section. The final season (spring) maps to itself.
+          const shared::SectionSeasonMap next =
+              nextSeasonInOrder(fragment.season);
+          if (next != fragment.season) {
+            const entt::entity nextSection =
+                section_puzzle::findSection(game, next);
+            if (nextSection != entt::null) {
+              game.registry.get<shared::SectionController>(nextSection)
+                  .unlocked = true;
+            }
+          }
+          section_puzzle::setActiveSeason(game, next);
         }
 
         // Permanently remove barriers for this season.
