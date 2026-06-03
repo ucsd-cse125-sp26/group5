@@ -32,6 +32,17 @@ inline constexpr CubeSpec CUBE_WHITE_EMISSIVE = {
     .emissive = {255, 255, 255, 255},
 };
 
+// Emissive yellow sun disc, shared by every daytime scene (see ASSETS sun_*).
+inline constexpr CubeSpec CUBE_SUN_EMISSIVE = {
+    .palette = {{255, 221, 0, 255},
+                {255, 221, 0, 255},
+                {255, 221, 0, 255},
+                {255, 221, 0, 255},
+                {255, 221, 0, 255},
+                {255, 221, 0, 255}},
+    .emissive = {255, 221, 0, 255},
+};
+
 // Tangram pieces — bright fall palette (matte).
 // Match tangram_puzzle_data.h swan reference colors.
 inline constexpr CubeSpec CUBE_TANGRAM_1 = {
@@ -277,6 +288,24 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_WHITE_EMISSIVE},
+    // Decorative emissive suns, one per daytime scene. Same procedural-sphere
+    // treatment as the moon; the client filters each to its scene and skips
+    // the shadow pass. Positions live in initWorldEntities, derived from the
+    // matching SceneInfo dir so the sun sits along the incoming light ray.
+    {.name = "sun_morning",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_SUN_EMISSIVE},
+    {.name = "sun_sunset",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_SUN_EMISSIVE},
 };
 
 // Models a player avatar can take. Index 0 is the spawn default; pressing
