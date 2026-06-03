@@ -46,8 +46,8 @@ int main() {
   bool connected = false;
   while (!glfwWindowShouldClose(graphics.window)) {
     glfwPollEvents();
-    auto result = graphics.renderServerMenuFrame(
-        hostBuf, sizeof(hostBuf), &portValue, statusMsg.c_str());
+    auto result = graphics.renderServerMenuFrame(hostBuf, sizeof(hostBuf),
+                                                 &portValue, statusMsg.c_str());
     if (result == Graphics::ServerMenuResult::Quit) break;
     if (result != Graphics::ServerMenuResult::Connect) continue;
 

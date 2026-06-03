@@ -16,11 +16,11 @@
 #include "server/game/puzzles/maze/layout_editor.h"
 #include "server/game/puzzles/maze/puzzle.h"
 #include "server/game/puzzles/maze/trigger.h"
-#include "server/game/section_puzzle.h"
 #include "server/game/puzzles/tangram/camera.h"
 #include "server/game/puzzles/tangram/layout_editor.h"
 #include "server/game/puzzles/tangram/puzzle.h"
 #include "server/game/puzzles/tangram/trigger.h"
+#include "server/game/section_puzzle.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_memory_system.h"
@@ -542,8 +542,7 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity,
-        std::string(shared::PLAYER_MODEL_CYCLE[0]),
+        game, overworldEntity, std::string(shared::PLAYER_MODEL_CYCLE[0]),
         shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
                                                   game.tangramArena, slot),
         glm::vec3(1.0f));
