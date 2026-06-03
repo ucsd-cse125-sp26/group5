@@ -244,6 +244,13 @@ int main() {
           maze_puzzle::clampPieceToBoard(game);
         }
         if (game.registry.all_of<shared::OverworldTangramPiece>(ent)) {
+          if (!game.registry.all_of<shared::PlayerInput>(ent)) {
+            JPH::Quat jr = bi.GetRotation(id);
+            pos.qw = jr.GetW();
+            pos.qx = jr.GetX();
+            pos.qy = jr.GetY();
+            pos.qz = jr.GetZ();
+          }
           tangram_puzzle::clampPieceToArena(game, ent);
           JPH::Vec3 v = bi.GetLinearVelocity(id);
           constexpr float kStopEps = 0.045f;
@@ -284,7 +291,8 @@ int main() {
           grid.gx = static_cast<int8_t>(std::clamp(gxCell, 0, 16));
           grid.gy = static_cast<int8_t>(std::clamp(gyCell, 0, 16));
         }
-        if (!game.registry.all_of<shared::PlayerInput>(ent)) {
+        if (!game.registry.all_of<shared::PlayerInput>(ent) &&
+            !game.registry.all_of<shared::OverworldTangramPiece>(ent)) {
           JPH::Quat jr = bi.GetRotation(id);
           pos.qw = jr.GetW();
           pos.qx = jr.GetX();
