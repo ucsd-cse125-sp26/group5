@@ -37,12 +37,12 @@ struct GraphicsSettings {
   // SSAO
   bool ssaoEnabled = true;
   int ssaoKernelSize = 64;
-  float ssaoRadius = 0.5f;
+  float ssaoRadius = 0.25f;
   float ssaoBias = 0.025f;
   // SSAO render resolution = renderWidth / ssaoScale (1 = full, 2 = half,
   // 4 = quarter). Lighting samples ssaoBlurColor through bilinear filtering
   // when scale > 1.
-  int ssaoScale = 1;
+  int ssaoScale = 2;
 
   // FXAA
   bool fxaaEnabled = true;
@@ -57,18 +57,21 @@ struct GraphicsSettings {
   // Color restoration: desaturate fragments outside the local player's
   // shared::ColorBoundingBox in the tonemap pass. The server grows the box
   // as sections are completed, so "restored color" tracks game progress.
-  bool colorRestorationEnabled = false;
+  bool colorRestorationEnabled = true;
   // 0 = no effect, 1 = full grayscale outside the box.
   float colorRestorationStrength = 1.0f;
   // Soft edge in world units to avoid a hard color/gray boundary.
   float colorRestorationEdgeWidth = 1.0f;
+  // Colored point lights (fragments) keep their lit area in color even in
+  // restored-to-grayscale regions. 0 = off, 1 = full.
+  float colorRestorationLightStrength = 1.0f;
 
   // Shadows
   bool shadowsEnabled = true;
-  bool pointShadowsEnabled = false;
+  bool pointShadowsEnabled = true;
   // Map sizes — changing triggers FBO/texture reallocation.
-  int dirShadowMapSize = 2048;
-  int pointShadowMapSize = 512;
+  int dirShadowMapSize = 4096;
+  int pointShadowMapSize = 2048;
   // Directional ortho frustum + depth range.
   float dirShadowHalfExtent = 400.0f;
   float dirShadowBackDistance = 600.0f;

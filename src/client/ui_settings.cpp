@@ -219,6 +219,8 @@ void colorRestorationSection(GraphicsSettings& s) {
                      1.0f);
   ImGui::SliderFloat("Edge width (world)", &s.colorRestorationEdgeWidth, 0.0f,
                      20.0f);
+  ImGui::SliderFloat("Colored light keep", &s.colorRestorationLightStrength,
+                     0.0f, 1.0f);
   ImGui::EndDisabled();
 }
 

@@ -5,7 +5,7 @@
 
 namespace shared {
 
-inline constexpr int kMaxPointLights = 2;  // shadow-casting cap
+inline constexpr int kMaxPointLights = 1;  // shadow-casting cap
 inline constexpr int kMaxLightingShaderLights = 32;
 inline constexpr int kPointShadowLayers = kMaxPointLights * 6;
 
