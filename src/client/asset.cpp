@@ -707,6 +707,8 @@ Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
   material.shininess = 12.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -733,6 +735,8 @@ Model* makeTangramPieceMuteModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
   material.shininess = 8.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -761,6 +765,8 @@ Model* makeTangramColoredGhostSlotModel(
   fillMat.specular = {.constant = glm::vec3(0.0f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = tint * 0.28f, .texture = diffuseTex};
+  fillMat.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                    .texture = defaultFlatNormalTexture()};
   fillMat.shininess = 4.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -789,6 +795,8 @@ Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def) {
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = glm::vec3(0.45f, 0.38f, 0.55f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  fillMat.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                    .texture = defaultFlatNormalTexture()};
   fillMat.shininess = 2.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));

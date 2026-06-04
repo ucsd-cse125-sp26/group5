@@ -272,7 +272,8 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::Velocity>(entity, 0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::RenderInfo>(entity, modelName, scale.x, scale.y,
                                             scale.z);
-  game.registry.emplace<shared::Camera>(entity, 0.0f, 1.0f);
+  game.registry.emplace<shared::Camera>(entity, 0.0f,
+                                          shared::kDefaultPlayerCameraHeight);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
@@ -545,6 +546,18 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
   return existing;
 }
 
+static bool shouldSkipTangramDevInitialEntity(ServerGame& game,
+                                              entt::entity ent) {
+  if (shared::dev_spawn::kOverworldSpawn !=
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    return false;
+  }
+
+  if (!game.registry.all_of<shared::RenderInfo>(ent)) return false;
+  const auto& render = game.registry.get<shared::RenderInfo>(ent);
+  return render.modelName.rfind("map:", 0) == 0;
+}
+
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
@@ -610,7 +623,11 @@ entt::entity OverworldState::getClientAvatar(const PlayerAvatars& slots) const {
 
 std::vector<entt::entity> OverworldState::getStateEntities(
     ServerGame& game) const {
-  return getEntitiesHelper<shared::OverworldTag>(game);
+  auto entities = getEntitiesHelper<shared::OverworldTag>(game);
+  std::erase_if(entities, [&](entt::entity ent) {
+    return shouldSkipTangramDevInitialEntity(game, ent);
+  });
+  return entities;
 }
 
 void OverworldState::update(ServerGame& game, float dt) {

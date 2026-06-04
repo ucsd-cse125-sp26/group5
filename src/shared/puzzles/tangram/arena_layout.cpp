@@ -6,17 +6,30 @@
 
 namespace shared::tangram {
 
-ArenaLayout ArenaLayout::defaults() { return ArenaLayout{}; }
+ArenaLayout ArenaLayout::defaults() {
+  ArenaLayout layout{};
+  layout.syncTriggerFromPlatform();
+  layout.syncBoardFromTrigger();
+  return layout;
+}
+
+void ArenaLayout::syncTriggerFromPlatform() {
+  triggerCenterX = platformCenterX;
+  triggerCenterY = platformCenterY;
+  halfExtent = std::min(platformScaleX, platformScaleY) * 0.5f;
+}
 
 void ArenaLayout::syncBoardFromTrigger() {
   boardCenterX = triggerCenterX;
-  boardCenterY = triggerCenterY + halfExtent + 2.0f;
+  boardCenterY = triggerCenterY;
   boardCenterZ = platformTopZ();
 }
 
 bool ArenaLayout::isInsideTrigger(float x, float y) const {
-  return x >= triggerCenterX - halfExtent && x <= triggerCenterX + halfExtent &&
-         y >= triggerCenterY - halfExtent && y <= triggerCenterY + halfExtent;
+  const float hx = platformScaleX * 0.5f;
+  const float hy = platformScaleY * 0.5f;
+  return x >= platformCenterX - hx && x <= platformCenterX + hx &&
+         y >= platformCenterY - hy && y <= platformCenterY + hy;
 }
 
 ColorRestoreAabb ArenaLayout::alwaysColorAabb() const {

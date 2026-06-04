@@ -53,6 +53,9 @@ struct Camera {
   float ht;
 };
 
+// Eye height above avatar origin (world Z). Used for all overworld players.
+inline constexpr float kDefaultPlayerCameraHeight = 1.85f;
+
 struct Entity {
   uint32_t id;
 };

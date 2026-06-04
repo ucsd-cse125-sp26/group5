@@ -279,7 +279,9 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
 
   const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
-  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
+  const float eyeHeight =
+      std::max(cam.ht, shared::kDefaultPlayerCameraHeight);
+  glm::vec3 pos = glm::vec3(p.x, p.y, p.z + eyeHeight);
 
   // Maze mode: detected by the replicated MazeSpiritGrid component, which
   // only exists on the maze world's spirit cube. Gating on modelName or a
@@ -566,14 +568,21 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     }
 
     std::string modelKey = renderInfo.modelName;
-    if (isTangramGhostModelName(renderInfo.modelName)) {
-      modelKey = renderInfo.modelName + "_colored";
-    } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
+    if (isOverworldTangramPuzzleActive(game)) {
       const uint8_t stage = tangramRoleIsolationStage(game);
       const uint8_t slot = localOverworldPlayerSlot(game);
-      if (shared::tangram_roles::colorRestricted(stage) &&
-          !shared::tangram_roles::canSeeColor(stage, slot)) {
-        modelKey = renderInfo.modelName + "_mute";
+      if (isTangramGhostModelName(renderInfo.modelName)) {
+        // Slot role (P3): per-piece colored ghosts; hidden for everyone else.
+        if (!shared::tangram_roles::rolesActive(stage) ||
+            shared::tangram_roles::canSeeSlots(stage, slot)) {
+          modelKey = renderInfo.modelName + "_colored";
+        }
+      } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
+        // Color role (P2): full piece colors; others see grey slabs.
+        if (shared::tangram_roles::rolesActive(stage) &&
+            !shared::tangram_roles::canSeeColor(stage, slot)) {
+          modelKey = renderInfo.modelName + "_mute";
+        }
       }
     }
     if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&

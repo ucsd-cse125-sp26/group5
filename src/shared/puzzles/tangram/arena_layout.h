@@ -43,6 +43,9 @@ struct ArenaLayout {
 
   static ArenaLayout defaults();
 
+  // Trigger pad = entire platform footprint (grey board).
+  void syncTriggerFromPlatform();
+
   void syncBoardFromTrigger();
 
   [[nodiscard]] bool isInsideTrigger(float x, float y) const;

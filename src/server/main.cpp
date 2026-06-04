@@ -316,7 +316,10 @@ int main() {
         auto buf = serializeEntities(game.registry, game.componentRegistry,
                                      shared::PacketType::UPDATE_ENTITY, allEnts,
                                      false);
-        net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+        // Keep high-frequency state off the reliable/control channel so
+        // connect-time spawn/assign packets are not blocked by frame updates.
+        net::broadcastRaw(network.getHost(), buf.data(), buf.size(),
+                          /*reliable=*/false, /*channel=*/1);
       }
       SIMPLE_PROFILE_FRAME_END("Server");
       SIMPLE_PROFILE_FRAME_START();

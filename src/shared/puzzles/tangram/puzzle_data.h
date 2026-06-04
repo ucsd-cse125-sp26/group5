@@ -35,8 +35,8 @@ inline constexpr const char* kTargetShapeName = "Memory Swan";
 inline constexpr const char* kTargetShapeHint =
     "Push all 7 pieces into the colored ghost swan on the goal board.";
 
-inline constexpr float kShapeGoalHalfX = 2.65f;
-inline constexpr float kShapeGoalHalfY = 3.75f;
+inline constexpr float kShapeGoalHalfX = 4.0f;
+inline constexpr float kShapeGoalHalfY = 5.6f;
 
 inline constexpr int kRequiredPlayersForStart = 4;
 
@@ -68,24 +68,23 @@ struct PieceDef {
   uint8_t colorB;
 };
 
-// Swan layout — pieces ~12% smaller, centers spread from centroid so adjacent
-// slots leave walk/push gaps (~0.45m) while keeping the swan silhouette.
+// Swan layout — larger pieces with extra spacing between slot centers.
 // SAT-verified: no footprint overlap (tangram_slot_validate.h).
 inline constexpr PieceDef kPieces[kPieceCount] = {
-    {1, "tangram_1", "Orange wing", PieceShape::LargeTriangle, 2.112f, 2.112f,
-     kPieceThickness, -2.25f, -0.15f, 2.3561945f, 235, 145, 55},
-    {2, "tangram_2", "Blue base", PieceShape::LargeTriangle, 2.112f, 2.112f,
-     kPieceThickness, -0.10f, -2.29f, 1.5707963f, 58, 118, 195},
-    {3, "tangram_3", "Pink body", PieceShape::MediumTriangle, 1.496f, 1.496f,
-     kPieceThickness, 1.26f, -0.73f, 4.71238898f, 235, 130, 155},
-    {4, "tangram_4", "Red tail", PieceShape::SmallTriangle, 1.056f, 1.056f,
-     kPieceThickness, 1.46f, 0.44f, 3.92699082f, 195, 65, 75},
-    {5, "tangram_5", "Purple head", PieceShape::SmallTriangle, 1.056f, 1.056f,
-     kPieceThickness, 1.85f, 2.19f, std::numbers::pi_v<float>, 145, 95, 185},
-    {6, "tangram_6", "Green chest", PieceShape::Square, 0.924f, 0.924f,
-     kPieceThickness, -0.10f, 1.22f, 0.78539816f, 75, 165, 95},
-    {7, "tangram_7", "Yellow neck", PieceShape::Parallelogram, 1.144f, 1.672f,
-     kPieceThickness, 0.29f, 2.78f, 1.5707963f, 238, 205, 55},
+    {1, "tangram_1", "Orange wing", PieceShape::LargeTriangle, 2.58f, 2.58f,
+     kPieceThickness, -2.70f, -0.18f, 2.3561945f, 235, 145, 55},
+    {2, "tangram_2", "Blue base", PieceShape::LargeTriangle, 2.58f, 2.58f,
+     kPieceThickness, -0.12f, -2.75f, 1.5707963f, 58, 118, 195},
+    {3, "tangram_3", "Pink body", PieceShape::MediumTriangle, 1.82f, 1.82f,
+     kPieceThickness, 1.51f, -0.88f, 4.71238898f, 235, 130, 155},
+    {4, "tangram_4", "Red tail", PieceShape::SmallTriangle, 1.29f, 1.29f,
+     kPieceThickness, 1.75f, 0.53f, 3.92699082f, 195, 65, 75},
+    {5, "tangram_5", "Purple head", PieceShape::SmallTriangle, 1.29f, 1.29f,
+     kPieceThickness, 2.22f, 2.63f, std::numbers::pi_v<float>, 145, 95, 185},
+    {6, "tangram_6", "Green chest", PieceShape::Square, 1.13f, 1.13f,
+     kPieceThickness, -0.12f, 1.46f, 0.78539816f, 75, 165, 95},
+    {7, "tangram_7", "Yellow neck", PieceShape::Parallelogram, 1.40f, 2.04f,
+     kPieceThickness, 0.35f, 3.34f, 1.5707963f, 238, 205, 55},
 };
 
 [[nodiscard]] inline const PieceDef* pieceDefForId(uint8_t id) {

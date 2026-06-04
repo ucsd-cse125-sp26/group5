@@ -431,7 +431,7 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     mouseInit = false;  // re-prime on next capture
   }
 
-  if (keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f ||
+  if (keys != 0 || keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f ||
       rotateTargetId != prevRotateTargetId ||
       (tangramActive && (keys & KEY_ROTATE_PIECE))) {
     shared::InputPacket pkt;

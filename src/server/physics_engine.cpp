@@ -410,8 +410,42 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
   return scaledSettings.Create().Get();
 }
 
+namespace {
+
+bool isPlayerAvatarModel(const std::string& modelName) {
+  for (size_t i = 0; i < shared::PLAYER_MODEL_CYCLE_COUNT; ++i) {
+    if (modelName == shared::PLAYER_MODEL_CYCLE[i]) return true;
+  }
+  return false;
+}
+
+JPH::ShapeRefC compactPlayerAvatarShape(const glm::vec3& scale) {
+  const glm::vec3 center(0.0f, 0.0f, 0.28f);
+  const glm::vec3 half(0.32f, 0.32f, 0.5f);
+  glm::vec3 halfExtents = half * scale;
+  glm::vec3 offset = center * scale * glm::vec3(0.0f, 0.0f, 1.0f);
+  JPH::BoxShapeSettings boxSettings(
+      JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+  boxSettings.SetEmbedded();
+  JPH::ShapeRefC shape = boxSettings.Create().Get();
+  if (glm::dot(offset, offset) > 1e-12f) {
+    JPH::RotatedTranslatedShapeSettings rt(JPH::Vec3(offset.x, offset.y, offset.z),
+                                           JPH::Quat::sIdentity(), shape);
+    rt.SetEmbedded();
+    shape = rt.Create().Get();
+  }
+  return shape;
+}
+
+}  // namespace
+
 JPH::ShapeRefC PhysicsEngine::playerShapeForAsset(const std::string& modelName,
                                                   const glm::vec3& scale) {
+  // GLB avatars (gurf/rat/etc.) often have huge mesh AABBs that block pushing
+  // tangram pieces. Use a tight box instead of raw mesh bounds.
+  if (isPlayerAvatarModel(modelName)) {
+    return compactPlayerAvatarShape(scale);
+  }
   // Z-only center offset: aligns the asset's mesh-origin feet with the box
   // bottom. Without it the bear settles 9 units above the floor (and a
   // previous floor-penetration segfaulted Jolt's contact resolver). XY

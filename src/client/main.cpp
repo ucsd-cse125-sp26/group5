@@ -96,6 +96,9 @@ int main() {
 
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {
+    applyPreset(graphics.settings, GraphicsPreset::Performance);
+    graphics.settings.shadowsEnabled = false;
+    graphics.settings.outlineMode = OutlineMode::None;
     printf("[DevSpawn] Client fallback camera: tangram pad\n");
   } else {
     printf("[DevSpawn] Client fallback camera: winter maze\n");

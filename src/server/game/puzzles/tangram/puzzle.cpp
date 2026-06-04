@@ -72,7 +72,7 @@ void slotRelPose(const ServerGame& game,
 
 namespace tangram_puzzle {
 
-void endPuzzle(ServerGame& game);
+void endPuzzle(ServerGame& game, bool releasePlayers);
 
 namespace {
 
@@ -527,15 +527,17 @@ void rollRandomPieceSpawns(ServerGame& game) {
   // board).
   static constexpr glm::vec2
       kSpawnOffsets[shared::tangram_puzzle::kPieceCount] = {
-          {-6.0f, -7.5f},  {-2.0f, -8.5f}, {2.0f, -8.5f},  {6.0f, -7.5f},
-          {-4.0f, -10.5f}, {0.0f, -11.0f}, {4.0f, -10.5f},
+          {-7.2f, -9.0f},  {-2.4f, -10.2f}, {2.4f, -10.2f}, {7.2f, -9.0f},
+          {-4.8f, -12.6f}, {0.0f, -13.2f},  {4.8f, -12.6f},
       };
 
   for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
     glm::vec2 pos = kSpawnOffsets[i] + glm::vec2(tcx, tcy);
     if (!layout.isInsideTrigger(pos.x, pos.y) ||
         shared::tangram_puzzle::isInsideShapeGoalZone(pos.x, pos.y, bcx, bcy)) {
-      pos = glm::vec2(tcx, tcy - layout.halfExtent * 0.55f);
+      pos = glm::vec2(layout.platformCenterX,
+                      layout.platformCenterY - layout.platformScaleY * 0.5f +
+                          3.0f);
     }
     game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)] = pos;
   }
@@ -544,18 +546,11 @@ void rollRandomPieceSpawns(ServerGame& game) {
 bool allPiecesSolved(const ServerGame& game) {
   int count = 0;
   int aligned = 0;
-  std::array<uint8_t, shared::tangram_puzzle::kPieceCount> missing{};
-  int missingCount = 0;
   auto view = game.registry.view<shared::TangramPiece, shared::Position>();
   for (auto ent : view) {
     ++count;
     if (pieceAlignedWithSlot(game, ent)) {
       ++aligned;
-      continue;
-    }
-    const auto& piece = view.get<shared::TangramPiece>(ent);
-    if (missingCount < static_cast<int>(missing.size())) {
-      missing[static_cast<size_t>(missingCount++)] = piece.pieceId;
     }
   }
   if (count != shared::tangram_puzzle::kPieceCount) {
@@ -563,41 +558,6 @@ bool allPiecesSolved(const ServerGame& game) {
   }
   if (aligned == shared::tangram_puzzle::kPieceCount) {
     return true;
-  }
-  static float logCooldown = 0.0f;
-  logCooldown -= 1.0f / 60.0f;
-  if (logCooldown <= 0.0f) {
-    logCooldown = 3.0f;
-    printf("[Tangram] Win progress: %d/%d aligned", aligned,
-           shared::tangram_puzzle::kPieceCount);
-    if (missingCount > 0) {
-      printf(" — still off:");
-      for (int i = 0; i < missingCount; ++i) {
-        const shared::tangram_puzzle::PieceDef* def =
-            shared::tangram_puzzle::pieceDefForId(
-                missing[static_cast<size_t>(i)]);
-        if (def == nullptr) continue;
-        entt::entity bad = entt::null;
-        for (auto ent : view) {
-          if (view.get<shared::TangramPiece>(ent).pieceId ==
-              missing[static_cast<size_t>(i)]) {
-            bad = ent;
-            break;
-          }
-        }
-        if (bad == entt::null) continue;
-        float relX = 0.0f;
-        float relY = 0.0f;
-        float targetRot = 0.0f;
-        slotRelPose(game, *def, relX, relY, targetRot);
-        const float mismatch = pieceFootprintMismatch(
-            game, *def, view.get<shared::Position>(bad), relX, relY, targetRot);
-        printf(" #%u(%.2fm)",
-               static_cast<unsigned>(missing[static_cast<size_t>(i)]),
-               mismatch);
-      }
-    }
-    printf("\n");
   }
   return false;
 }
@@ -658,10 +618,10 @@ void tryCompletePuzzle(ServerGame& game) {
   }
 
   printf(
-      "[Tangram] Puzzle complete — spring fragment spawned at (%.1f, %.1f, "
-      "%.1f)\n",
+      "[Tangram] Puzzle complete — spring fragment spawned at trigger (%.1f, "
+      "%.1f, %.1f). Pick it up to restore spring.\n",
       fragmentX, fragmentY, fragmentZ);
-  endPuzzle(game);
+  endPuzzle(game, /*releasePlayers=*/false);
 }
 
 }  // namespace
@@ -853,7 +813,7 @@ void beginPuzzle(ServerGame& game) {
   }
 }
 
-void endPuzzle(ServerGame& game) {
+void endPuzzle(ServerGame& game, bool releasePlayers) {
   if (!game.overworldTangramActive) return;
 
   game.overworldTangramActive = false;
@@ -886,8 +846,13 @@ void endPuzzle(ServerGame& game) {
   // instant restart).
   game.overworldTangramTriggerArmed = false;
   game.overworldTangramFocusTimer = 0.0f;
-  releasePlayersAfterExit(game);
-  printf("[Tangram] Puzzle ended — walk onto green pad to play again\n");
+  if (releasePlayers) {
+    releasePlayersAfterExit(game);
+    printf("[Tangram] Puzzle ended — walk onto green pad to play again\n");
+  } else {
+    printf("[Tangram] Puzzle complete — players stay on board; pick up the "
+           "fragment to restore spring\n");
+  }
 }
 
 void clampPieceToArena(ServerGame& game, entt::entity ent) {
@@ -964,7 +929,7 @@ void updatePuzzle(ServerGame& game, float dt) {
     if (game.registry.all_of<shared::OverworldTangramPiece>(ent)) continue;
     const auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_EXIT_MINIGAME) {
-      endPuzzle(game);
+      endPuzzle(game, /*releasePlayers=*/true);
       return;
     }
   }

@@ -214,6 +214,9 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     layout.spawnBaseY = layout.triggerCenterY - layout.halfExtent - 2.0f;
   }
 
+  if (foundTrigger) {
+    layout.syncTriggerFromPlatform();
+  }
   if (!foundZone && foundTrigger) {
     layout.syncBoardFromTrigger();
   }

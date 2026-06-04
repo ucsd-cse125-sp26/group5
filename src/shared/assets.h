@@ -108,6 +108,35 @@ inline constexpr CubeSpec CUBE_START_MARKER = {
     .emissive = {40, 120, 60, 255},
 };
 
+// Tangram arena debug geometry (layout_editor only).
+inline constexpr CubeSpec CUBE_TANGRAM_TABLE = {
+    .palette = {{118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_PAD_BLACK = {
+    .palette = {{0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255},
+                {0, 0, 0, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+inline constexpr CubeSpec CUBE_TANGRAM_PAD_GRAY = {
+    .palette = {{118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255},
+                {118, 118, 128, 255}},
+    .emissive = {0, 0, 0, 255},
+};
+
 inline constexpr CubeSpec CUBE_GOAL_MARKER = {
     .palette = {{255, 110, 40, 255},
                 {255, 110, 40, 255},
@@ -172,6 +201,27 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.0f,
      .qz = 0.0f,
      .cubeSpec = &CUBE_MAZE_TRIGGER_MARKER},
+    {.name = "tangram_table",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_TABLE},
+    {.name = "tangram_pad_black",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_PAD_BLACK},
+    {.name = "tangram_pad_gray",
+     .filename = "",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = &CUBE_TANGRAM_PAD_GRAY},
     {.name = "tangram_1",
      .filename = "",
      .qw = 1.0f,
