@@ -9,6 +9,8 @@ latex/
 /assets/
 .DS_Store
 /maps/
+# Bundled copies for local dist/deploy — too large for GitHub (use rsync / asset zip).
+/scripts/dist/
 /.mapsync.local.json
 __pycache__/
 node_modules
