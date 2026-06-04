@@ -84,6 +84,17 @@ struct Graphics {
   GLuint pingFBO[2] = {0, 0};
   GLuint pingColor[2] = {0, 0};
 
+  // Optional mip-chain (dual-filter) bloom pyramid, allocated lazily the first
+  // frame settings.bloomMipChain is used. Each level is half the previous size.
+  static constexpr int kBloomMips = 6;
+  GLuint bloomMipFBO[kBloomMips] = {};
+  GLuint bloomMipTex[kBloomMips] = {};
+  int bloomMipW[kBloomMips] = {};
+  int bloomMipH[kBloomMips] = {};
+  int bloomMipCount = 0;
+  int bloomMipBaseW = 0;
+  int bloomMipBaseH = 0;
+
   GLuint ldrFBO = 0;
   GLuint ldrColor = 0;
 
@@ -96,6 +107,8 @@ struct Graphics {
   std::string lastCelRampPath = "";
 
   std::optional<Shader> blurShader;
+  std::optional<Shader> bloomDownShader;
+  std::optional<Shader> bloomUpShader;
   std::optional<Shader> tonemapShader;
   std::optional<Shader> ssaoShader;
   std::optional<Shader> ssaoBlurShader;
@@ -219,6 +232,8 @@ struct Graphics {
   ~Graphics();
 
   void resizeBuffers(int width, int height);
+  // Allocates/reuses the mip-chain bloom pyramid for the current render size.
+  void ensureBloomMips();
   void reloadShaders();
   void initShaderUniforms();
   void toggleFullscreen();

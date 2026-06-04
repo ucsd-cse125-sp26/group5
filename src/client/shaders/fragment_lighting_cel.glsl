@@ -71,6 +71,11 @@ const vec3 sampleOffsetDirections[20] = vec3[](
   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
 );
 
+// Directional PCF kernel half-width (1 = 3x3) and tap-spacing multiplier;
+// defaults (1, 1.0) reproduce the original hard-ish 9-tap shadow.
+uniform int dirPcfRadius;
+uniform float dirShadowSoftness;
+
 float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
   vec4 fragPosLightSpace = camera.lightSpaceMatrix * vec4(worldPos, 1.0);
   vec3 proj = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -78,15 +83,17 @@ float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
   if (proj.z > 1.0) return 0.0;
   float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
   float refDepth = proj.z - bias;
-  vec2 texelSize = 1.0 / vec2(textureSize(dirShadowMap, 0));
+  vec2 texelSize = dirShadowSoftness / vec2(textureSize(dirShadowMap, 0));
   float visibility = 0.0;
-  for (int x = -1; x <= 1; ++x) {
-    for (int y = -1; y <= 1; ++y) {
+  float taps = 0.0;
+  for (int x = -dirPcfRadius; x <= dirPcfRadius; ++x) {
+    for (int y = -dirPcfRadius; y <= dirPcfRadius; ++y) {
       visibility += texture(
           dirShadowMap, vec3(proj.xy + vec2(x, y) * texelSize, refDepth));
+      taps += 1.0;
     }
   }
-  return 1.0 - visibility / 9.0;
+  return 1.0 - visibility / max(taps, 1.0);
 }
 
 float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,

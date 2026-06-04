@@ -134,17 +134,37 @@ static int collectPointLights(const ClientGame& game,
 
 static void uploadPointLights(const Shader& shader, const LightUpload* lights,
                               int count) {
+  // Uniform member names are built once and reused every frame — the old path
+  // heap-allocated `pointLights[i].member` strings per light per frame. The
+  // Shader location cache already keys on these names, so behavior is
+  // identical; only the per-frame allocations are gone.
+  struct Names {
+    std::string position, constant, linear, quadratic, ambient, diffuse,
+        specular, shadowIdx;
+  };
+  static const std::vector<Names> names = [] {
+    std::vector<Names> n(kMaxLightingShaderLights);
+    for (int i = 0; i < kMaxLightingShaderLights; ++i) {
+      const std::string base = "pointLights[" + std::to_string(i) + "].";
+      n[i] = {base + "position",  base + "constant", base + "linear",
+              base + "quadratic", base + "ambient",  base + "diffuse",
+              base + "specular",  base + "shadowIdx"};
+    }
+    return n;
+  }();
+
   shader.setInt("numPointLights", count);
-  for (int i = 0; i < count; ++i) {
-    std::string base = "pointLights[" + std::to_string(i) + "].";
-    shader.setVec3(base + "position", lights[i].position);
-    shader.setFloat(base + "constant", lights[i].constant);
-    shader.setFloat(base + "linear", lights[i].linear);
-    shader.setFloat(base + "quadratic", lights[i].quadratic);
-    shader.setVec3(base + "ambient", lights[i].ambient);
-    shader.setVec3(base + "diffuse", lights[i].diffuse);
-    shader.setVec3(base + "specular", lights[i].specular);
-    shader.setInt(base + "shadowIdx", lights[i].shadowIdx);
+  const int n = std::min(count, kMaxLightingShaderLights);
+  for (int i = 0; i < n; ++i) {
+    const Names& nm = names[i];
+    shader.setVec3(nm.position, lights[i].position);
+    shader.setFloat(nm.constant, lights[i].constant);
+    shader.setFloat(nm.linear, lights[i].linear);
+    shader.setFloat(nm.quadratic, lights[i].quadratic);
+    shader.setVec3(nm.ambient, lights[i].ambient);
+    shader.setVec3(nm.diffuse, lights[i].diffuse);
+    shader.setVec3(nm.specular, lights[i].specular);
+    shader.setInt(nm.shadowIdx, lights[i].shadowIdx);
   }
 }
 
@@ -594,22 +614,38 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       if (!sc || sc->name != bodyScene) continue;
     }
 
-    std::string modelKey = renderInfo.modelName;
+    // Compute any name variant once (only allocates when a variant applies).
+    // With cacheModelLookup on, the common no-variant case references
+    // renderInfo.modelName directly instead of copying it into a key string
+    // each frame; off reproduces the original always-copy path. Output is
+    // identical either way.
+    std::string variantKey;
+    bool variant = false;
     if (isTangramGhostModelName(renderInfo.modelName)) {
-      modelKey = renderInfo.modelName + "_colored";
+      variantKey = renderInfo.modelName + "_colored";
+      variant = true;
     } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
       const uint8_t stage = tangramRoleIsolationStage(game);
       const uint8_t slot = localOverworldPlayerSlot(game);
       if (shared::tangram_roles::colorRestricted(stage) &&
           !shared::tangram_roles::canSeeColor(stage, slot)) {
-        modelKey = renderInfo.modelName + "_mute";
+        variantKey = renderInfo.modelName + "_mute";
+        variant = true;
       }
     }
     if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
         renderInfo.modelName == "cube") {
-      modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+      variantKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+      variant = true;
     }
-    auto it = models.find(modelKey);
+    const std::string* keyPtr;
+    if (gfx.settings.cacheModelLookup) {
+      keyPtr = variant ? &variantKey : &renderInfo.modelName;
+    } else {
+      if (!variant) variantKey = renderInfo.modelName;
+      keyPtr = &variantKey;
+    }
+    auto it = models.find(*keyPtr);
     Model* modelAsset = it != models.end() ? it->second : nullptr;
     if (!modelAsset) {
       auto fallbackIt = models.find(renderInfo.modelName);
@@ -757,6 +793,13 @@ bool Graphics::load(int width, int height) {
                         "shaders/fragment_fxaa.glsl");
   blurShader.emplace("shaders/vertex_present.glsl",
                      "shaders/fragment_blur.glsl");
+  // Optional mip-chain bloom shaders — not in the required[] list below, so a
+  // compile failure leaves the renderer fully functional (the toggle just
+  // falls back to the Gaussian path).
+  bloomDownShader.emplace("shaders/vertex_present.glsl",
+                          "shaders/fragment_bloom_down.glsl");
+  bloomUpShader.emplace("shaders/vertex_present.glsl",
+                        "shaders/fragment_bloom_up.glsl");
   tonemapShader.emplace("shaders/vertex_present.glsl",
                         "shaders/fragment_tonemap.glsl");
   ssaoShader.emplace("shaders/vertex_present.glsl",
@@ -1179,6 +1222,45 @@ void Graphics::resizeBuffers(int width, int height) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Graphics::ensureBloomMips() {
+  // Already sized for the current render resolution.
+  if (bloomMipCount > 0 && bloomMipBaseW == renderWidth &&
+      bloomMipBaseH == renderHeight) {
+    return;
+  }
+  bloomMipBaseW = renderWidth;
+  bloomMipBaseH = renderHeight;
+  GPU_MEM_CLEAR("BloomMip");
+  int w = std::max(1, renderWidth / 2);
+  int h = std::max(1, renderHeight / 2);
+  bloomMipCount = 0;
+  for (int i = 0; i < kBloomMips; ++i) {
+    if (w < 2 || h < 2) break;
+    if (!bloomMipFBO[i]) glGenFramebuffers(1, &bloomMipFBO[i]);
+    if (!bloomMipTex[i]) glGenTextures(1, &bloomMipTex[i]);
+    glBindTexture(GL_TEXTURE_2D, bloomMipTex[i]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT,
+                 nullptr);
+    GPU_MEM_TEX2D("BloomMip", GL_RGBA16F, w, h);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           bloomMipTex[i], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      fprintf(stderr, "bloomMipFBO[%d] incomplete\n", i);
+    }
+    bloomMipW[i] = w;
+    bloomMipH[i] = h;
+    ++bloomMipCount;
+    w = std::max(1, w / 2);
+    h = std::max(1, h / 2);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
   for (auto* s :
@@ -1223,6 +1305,14 @@ void Graphics::reloadShaders() {
       {.slot = blurShader,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_blur.glsl",
+       .geom = ""},
+      {.slot = bloomDownShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_bloom_down.glsl",
+       .geom = ""},
+      {.slot = bloomUpShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_bloom_up.glsl",
        .geom = ""},
       {.slot = tonemapShader,
        .vert = "shaders/vertex_present.glsl",
@@ -1795,6 +1885,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       lighting->setFloat("bloomThreshold", settings.bloomEnabled
                                                ? settings.bloomThreshold
                                                : 1e9f);
+      lighting->setInt("dirPcfRadius", std::max(1, settings.shadowPcfRadius));
+      lighting->setFloat("dirShadowSoftness", settings.shadowSoftness);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, gPosition);
       lighting->setInt("gPosition", 0);
@@ -1927,9 +2019,57 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   }
 
   GLuint finalBloomColor = brightColor;
+  const bool mipBloom = settings.bloomEnabled && settings.bloomMipChain &&
+                        bloomDownShader && bloomDownShader->valid() &&
+                        bloomUpShader && bloomUpShader->valid();
+  // Gaussian path only runs when mip-chain is off (or unavailable).
   const int effectiveBloomIters =
-      settings.bloomEnabled ? settings.bloomBlurIterations : 0;
-  if (blurShader && blurShader->valid() && effectiveBloomIters > 0) {
+      (settings.bloomEnabled && !mipBloom) ? settings.bloomBlurIterations : 0;
+  if (mipBloom) {
+    SIMPLE_PROFILE_SCOPE("Bloom");
+    GPU_PROFILE_SCOPE("Bloom");
+    ensureBloomMips();
+    if (bloomMipCount > 0) {
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+      glBindVertexArray(fullscreenVAO);
+      glActiveTexture(GL_TEXTURE0);
+
+      // Downsample brightColor through the pyramid (13-tap each step).
+      bloomDownShader->use();
+      bloomDownShader->setInt("src", 0);
+      for (int i = 0; i < bloomMipCount; ++i) {
+        const int srcW = i == 0 ? renderWidth : bloomMipW[i - 1];
+        const int srcH = i == 0 ? renderHeight : bloomMipH[i - 1];
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i]);
+        glViewport(0, 0, bloomMipW[i], bloomMipH[i]);
+        glBindTexture(GL_TEXTURE_2D, i == 0 ? brightColor : bloomMipTex[i - 1]);
+        bloomDownShader->setVec2("srcTexel", 1.0f / static_cast<float>(srcW),
+                                 1.0f / static_cast<float>(srcH));
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+      }
+
+      // Upsample + additively accumulate back up the pyramid (9-tap tent).
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE);
+      glBlendEquation(GL_FUNC_ADD);
+      bloomUpShader->use();
+      bloomUpShader->setInt("src", 0);
+      bloomUpShader->setFloat("filterRadius", 1.0f);
+      for (int i = bloomMipCount - 1; i > 0; --i) {
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i - 1]);
+        glViewport(0, 0, bloomMipW[i - 1], bloomMipH[i - 1]);
+        glBindTexture(GL_TEXTURE_2D, bloomMipTex[i]);
+        bloomUpShader->setVec2("srcTexel",
+                               1.0f / static_cast<float>(bloomMipW[i]),
+                               1.0f / static_cast<float>(bloomMipH[i]));
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+      }
+      glDisable(GL_BLEND);
+      glBindVertexArray(0);
+      finalBloomColor = bloomMipTex[0];
+    }
+  } else if (blurShader && blurShader->valid() && effectiveBloomIters > 0) {
     SIMPLE_PROFILE_SCOPE("Bloom");
     GPU_PROFILE_SCOPE("Bloom");
     glDisable(GL_DEPTH_TEST);

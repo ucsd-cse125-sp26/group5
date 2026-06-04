@@ -36,6 +36,10 @@ struct GraphicsSettings {
   float bloomThreshold = 1.0f;
   float bloomStrength = 1.0f;
   int bloomBlurIterations = 10;
+  // Mip-chain (downsample/upsample) bloom instead of the fixed-iteration
+  // full-res Gaussian ping-pong. false = current behavior. Wider, smoother
+  // glow at lower cost; bloomBlurIterations is ignored when this is on.
+  bool bloomMipChain = false;
 
   // SSAO
   bool ssaoEnabled = true;
@@ -68,6 +72,9 @@ struct GraphicsSettings {
   // Camera-frustum cull the main G-buffer pass and the directional shadow pass
   // (point shadows already cull per face). false = current no-cull behavior.
   bool mainFrustumCulling = false;
+  // Cache each entity's resolved Model* across frames to skip per-frame model-
+  // key string building + map lookups in renderEntities. false = current path.
+  bool cacheModelLookup = false;
   // Trilinear + anisotropic filtering on model textures. 1 = current
   // (nearest-mip / linear-mag, no anisotropy); >1 enables LINEAR_MIPMAP_LINEAR
   // with that anisotropy level (clamped to the GL max). Applied at load and on
@@ -106,6 +113,12 @@ struct GraphicsSettings {
   float pointShadowFarPlane = 50.0f;
   float pointShadowPolyFactor = 2.0f;
   float pointShadowPolyUnits = 4.0f;
+  // Directional-shadow PCF kernel half-width: 1 = current 3x3 (9 taps).
+  // Higher = softer, more expensive shadow edges.
+  int shadowPcfRadius = 1;
+  // Multiplies the PCF tap spacing. 1.0 = current. Higher widens the penumbra
+  // without raising the tap count.
+  float shadowSoftness = 1.0f;
   // Diffuse alpha below this is discarded during shadow passes so cutout
   // meshes (foliage, fences) cast matching-shape shadows. 0 = no cutout.
   float shadowAlphaCutoff = 0.5f;

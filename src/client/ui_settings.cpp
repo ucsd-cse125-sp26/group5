@@ -156,7 +156,10 @@ void tonemapBloomSection(GraphicsSettings& s) {
   ImGui::BeginDisabled(!s.bloomEnabled);
   ImGui::SliderFloat("Threshold", &s.bloomThreshold, 0.0f, 5.0f);
   ImGui::SliderFloat("Strength", &s.bloomStrength, 0.0f, 5.0f);
+  ImGui::Checkbox("Mip-chain", &s.bloomMipChain);
+  ImGui::BeginDisabled(s.bloomMipChain);
   ImGui::SliderInt("Blur iterations", &s.bloomBlurIterations, 0, 30);
+  ImGui::EndDisabled();
   ImGui::EndDisabled();
 }
 
@@ -221,6 +224,8 @@ void shadowsSection(GraphicsSettings& s) {
                      10.0f);
   ImGui::SliderFloat("Point bias units", &s.pointShadowPolyUnits, 0.0f, 20.0f);
   ImGui::SliderFloat("Alpha cutoff", &s.shadowAlphaCutoff, 0.0f, 1.0f);
+  ImGui::SliderInt("PCF radius", &s.shadowPcfRadius, 1, 4);
+  ImGui::SliderFloat("Softness", &s.shadowSoftness, 1.0f, 4.0f, "%.2f");
   ImGui::EndDisabled();
 }
 
@@ -243,6 +248,8 @@ void performanceSection(GraphicsSettings& s) {
   // Cull the main G-buffer + directional shadow passes to the camera/light
   // frustum. Off reproduces the current (cull-nothing) behavior.
   ImGui::Checkbox("Main-pass frustum culling", &s.mainFrustumCulling);
+  // Cache resolved Model* per entity to skip per-frame key string building.
+  ImGui::Checkbox("Cache model lookups", &s.cacheModelLookup);
 }
 
 void colorRestorationSection(GraphicsSettings& s) {

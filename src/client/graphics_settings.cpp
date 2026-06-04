@@ -72,6 +72,8 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.ditherStrength = 1.0f;
       s.ssaoBilateralBlur = true;
       s.mainFrustumCulling = true;
+      s.cacheModelLookup = true;
+      s.bloomMipChain = true;
       break;
     case GraphicsPreset::HighQualityNew:
       applyPreset(s, GraphicsPreset::HighQuality);
@@ -80,10 +82,15 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.ditherStrength = 1.0f;
       s.ssaoBilateralBlur = true;
       s.mainFrustumCulling = true;
+      s.cacheModelLookup = true;
+      s.bloomMipChain = true;
+      s.shadowPcfRadius = 2;
+      s.shadowSoftness = 1.5f;
       break;
     case GraphicsPreset::PerformanceNew:
       applyPreset(s, GraphicsPreset::Performance);
       s.mainFrustumCulling = true;
+      s.cacheModelLookup = true;
       break;
     case GraphicsPreset::CelShadedNew:
       applyPreset(s, GraphicsPreset::CelShaded);
@@ -91,6 +98,7 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.textureAnisotropy = 8;
       s.ditherStrength = 1.0f;
       s.mainFrustumCulling = true;
+      s.cacheModelLookup = true;
       s.celRimStrength = 0.5f;
       break;
     case GraphicsPreset::Count:
