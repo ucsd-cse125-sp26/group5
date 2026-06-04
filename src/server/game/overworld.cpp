@@ -96,7 +96,8 @@ void ProcessFragmentPickups(ServerGame& game) {
         // client would keep drawing the fragment. Despawn it explicitly (same
         // reason the barrier removal below sends DESPAWN_ENTITY). The entity
         // lives on server-side for its FragmentComponent/pickup state.
-        {
+        if (game.network != nullptr &&
+            game.registry.all_of<shared::Entity>(fragEntity)) {
           shared::DespawnPacket despawn;
           despawn.type = shared::PacketType::DESPAWN_ENTITY;
           despawn.entityId = game.registry.get<shared::Entity>(fragEntity).id;
@@ -159,10 +160,13 @@ void ProcessFragmentPickups(ServerGame& game) {
           }
         }
         for (auto barrier : barriersToRemove) {
-          shared::DespawnPacket pkt;
-          pkt.type = shared::PacketType::DESPAWN_ENTITY;
-          pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
-          net::broadcastPacket(game.network->getHost(), pkt);
+          if (game.network != nullptr &&
+              game.registry.all_of<shared::Entity>(barrier)) {
+            shared::DespawnPacket pkt;
+            pkt.type = shared::PacketType::DESPAWN_ENTITY;
+            pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
+            net::broadcastPacket(game.network->getHost(), pkt);
+          }
 
           game.registry.destroy(
               barrier);  // on_destroy<PhysicsBody> hook cleans up the body
