@@ -268,7 +268,14 @@ inline constexpr AssetInfo ASSETS[] = {
      .qz = 0.70710678f,
      .cubeSpec = nullptr},
     {.name = "dog",
-     .filename = "assets/dog/dog-rigged-orange-backup.glb",
+     .filename = "assets/dog/dog-rigged-textured.glb",
+     .qw = 0.0f,
+     .qx = 0.0f,
+     .qy = 0.70710678f,
+     .qz = 0.70710678f,
+     .cubeSpec = nullptr},
+    {.name = "goose",
+     .filename = "assets/goose-rigged/goose-rigged-textured.glb",
      .qw = 0.0f,
      .qx = 0.0f,
      .qy = 0.70710678f,
@@ -320,8 +327,8 @@ inline constexpr AssetInfo ASSETS[] = {
 
 // Models a player avatar can take. Index 0 is the spawn default; pressing
 // KEY_SWAP_MODEL advances to the next entry (wrapping).
-inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {"gurf", "rat",
-                                                          "playerbase", "dog"};
+inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {"gurf", "rat", "goose",
+                                                          "dog"};
 inline constexpr std::size_t PLAYER_MODEL_CYCLE_COUNT =
     sizeof(PLAYER_MODEL_CYCLE) / sizeof(PLAYER_MODEL_CYCLE[0]);
 

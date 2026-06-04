@@ -531,7 +531,10 @@ Model* loadModel(const std::string& filename) {
     }
   });
 
-  model->skinned = model->boneCount > 0 && scene->mNumAnimations > 0;
+  // Skinned if the mesh has bones, even without animation clips: such models
+  // (e.g. the rat/goose) still render through the skinning path so a rest-pose
+  // bone hierarchy + neck look-pitch override can drive head movement.
+  model->skinned = model->boneCount > 0;
   model->parsed = std::move(parsed);
   if (model->boneCount > MAX_BONES) {
     std::fprintf(stderr,

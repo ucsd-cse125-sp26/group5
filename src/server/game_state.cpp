@@ -258,8 +258,11 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(entity, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(entity, modelName, scale.x, scale.y,
-                                            scale.z);
+  {
+    auto& ri = game.registry.emplace<shared::RenderInfo>(
+        entity, modelName, scale.x, scale.y, scale.z);
+    ri.colorExempt = true;
+  }
   game.registry.emplace<shared::Camera>(entity, 0.0f, 2.0f);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
