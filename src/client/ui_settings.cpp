@@ -135,6 +135,9 @@ void outlinesSection(GraphicsSettings& s) {
 
 void dirLightSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Directional Light")) return;
+  // Image-based-ambient approximation (skybox average tint). 0 = flat ambient.
+  ImGui::SliderFloat("Sky ambient (IBL)", &s.iblAmbientStrength, 0.0f, 1.0f,
+                     "%.2f");
   ImGui::Checkbox("Override scene light", &s.overrideDirLight);
   ImGui::BeginDisabled(!s.overrideDirLight);
   ImGui::DragFloat3("Direction", &s.dirLightDirection.x, 0.01f, -1.0f, 1.0f);
@@ -232,6 +235,11 @@ void shadowsSection(GraphicsSettings& s) {
 void antialiasingSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Antialiasing")) return;
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
+  ImGui::BeginDisabled(!s.fxaaEnabled);
+  const char* fxaaQualities[] = {"Standard", "High"};
+  ImGui::Combo("FXAA quality", &s.fxaaQuality, fxaaQualities,
+               IM_ARRAYSIZE(fxaaQualities));
+  ImGui::EndDisabled();
   // Ordered dither to break HDR->8-bit banding; independent of FXAA.
   ImGui::SliderFloat("Dither", &s.ditherStrength, 0.0f, 1.0f, "%.2f");
 }

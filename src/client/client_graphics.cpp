@@ -1887,6 +1887,13 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
                                                : 1e9f);
       lighting->setInt("dirPcfRadius", std::max(1, settings.shadowPcfRadius));
       lighting->setFloat("dirShadowSoftness", settings.shadowSoftness);
+      glm::vec3 iblColor(0.2f);
+      if (const auto* sc = currentScene(game)) {
+        auto sbIt = skyboxes.find(std::string(sc->skyboxDirectory));
+        if (sbIt != skyboxes.end()) iblColor = sbIt->second.averageColor;
+      }
+      lighting->setVec3("iblAmbientColor", iblColor);
+      lighting->setFloat("iblAmbientStrength", settings.iblAmbientStrength);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, gPosition);
       lighting->setInt("gPosition", 0);
@@ -2197,6 +2204,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glBindTexture(GL_TEXTURE_2D, finalLDR);
       presentShader->setInt("src", 0);
       presentShader->setInt("fxaaEnabled", settings.fxaaEnabled ? 1 : 0);
+      presentShader->setInt("fxaaQuality", settings.fxaaQuality);
       presentShader->setInt("postQuantizeLevels", settings.postQuantizeLevels);
       presentShader->setFloat("ditherStrength", settings.ditherStrength);
       glBindVertexArray(fullscreenVAO);

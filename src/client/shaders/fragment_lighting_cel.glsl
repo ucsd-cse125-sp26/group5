@@ -44,6 +44,11 @@ struct DirLight {
 };
 uniform DirLight dirLight;
 
+// Image-based-ambient approximation: skybox average color, blended into the
+// global ambient by iblAmbientStrength (0 = flat dirLight.ambient, unchanged).
+uniform vec3 iblAmbientColor;
+uniform float iblAmbientStrength;
+
 // Cross-mode outlines, same as in fragment_lighting_deferred.glsl.
 uniform int outlineCross;
 uniform vec3 outlineColor;
@@ -187,7 +192,9 @@ void main() {
     float diffFactor = celDiffuseFactor(norm, lightDir);
     vec3 halfway = normalize(lightDir + viewDir);
     float specFactor = celSpecFactor(norm, halfway, shininess);
-    vec3 ambient = dirLight.ambient * albedo * ssaoFactor;
+    vec3 iblAmbient = iblAmbientColor * (0.5 + 0.5 * norm.z);
+    vec3 ambientSrc = mix(dirLight.ambient, iblAmbient, iblAmbientStrength);
+    vec3 ambient = ambientSrc * albedo * ssaoFactor;
     vec3 diffuse = dirLight.diffuse * diffFactor * albedo;
     vec3 specular = dirLight.specular * specFactor * specularTint;
     float shadow = DirShadowFactor(worldPos, norm, lightDir);

@@ -74,6 +74,8 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.mainFrustumCulling = true;
       s.cacheModelLookup = true;
       s.bloomMipChain = true;
+      s.fxaaQuality = 1;
+      s.iblAmbientStrength = 0.25f;
       break;
     case GraphicsPreset::HighQualityNew:
       applyPreset(s, GraphicsPreset::HighQuality);
@@ -86,6 +88,8 @@ void applyPreset(GraphicsSettings& s, GraphicsPreset p) {
       s.bloomMipChain = true;
       s.shadowPcfRadius = 2;
       s.shadowSoftness = 1.5f;
+      s.fxaaQuality = 1;
+      s.iblAmbientStrength = 0.4f;
       break;
     case GraphicsPreset::PerformanceNew:
       applyPreset(s, GraphicsPreset::Performance);

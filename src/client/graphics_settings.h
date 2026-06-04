@@ -59,6 +59,11 @@ struct GraphicsSettings {
 
   // FXAA
   bool fxaaEnabled = true;
+  // FXAA quality: 0 = current minimal 3x3 blend, 1 = high (adds diagonal taps
+  // + a stronger directional blend for cleaner long edges). Only used when
+  // fxaaEnabled. (True SMAA needs its AreaTex/SearchTex LUT assets, which are
+  // not bundled here — this is the no-asset upgrade in that slot.)
+  int fxaaQuality = 0;
   // Ordered (Bayer 4x4) dither applied in the present pass to break up
   // HDR->8-bit banding on smooth gradients. 0 = off (current), 1 = ~1 LSB.
   float ditherStrength = 0.0f;
@@ -170,6 +175,12 @@ struct GraphicsSettings {
   float outlineSobelWidth = 1.0f;
   float outlineDepthThreshold = 0.05f;
   float outlineNormalThreshold = 0.5f;
+
+  // Image-based-ambient approximation: tint the global ambient by the current
+  // skybox's average color, modulated by world-up so sky-facing surfaces read
+  // brighter. 0 = current flat ambient (no change). A robust, orientation-free
+  // stand-in for full SH irradiance IBL.
+  float iblAmbientStrength = 0.0f;
 
   // Directional-light override (off → scene/ECS values used)
   bool overrideDirLight = false;

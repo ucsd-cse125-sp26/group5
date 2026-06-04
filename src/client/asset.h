@@ -106,6 +106,9 @@ struct Skybox {
   std::vector<DiffuseSample> diffuseSamples;
   // Current k-means centroids; empty when skybox palette quantization is off.
   std::vector<glm::vec3> palette;
+  // Mean linear-RGB of the sampled cubemap pixels — the ambient tint used by
+  // the image-based-ambient approximation (settings.iblAmbientStrength).
+  glm::vec3 averageColor{0.2f};
 };
 
 class Shader;

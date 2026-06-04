@@ -1459,6 +1459,13 @@ Skybox loadSkybox(const std::string& directory,
   Skybox skybox{.vao = vao};
   skybox.cubemapTexture =
       loadCubemap(directory, skybox.diffuseSamples, progress);
+  // Mean linear-RGB of the sampled cubemap pixels for the IBL-ambient tint.
+  if (!skybox.diffuseSamples.empty()) {
+    glm::vec3 sum(0.0f);
+    for (const auto& s : skybox.diffuseSamples) sum += s.color;
+    skybox.averageColor =
+        sum / static_cast<float>(skybox.diffuseSamples.size());
+  }
   return skybox;
 }
 

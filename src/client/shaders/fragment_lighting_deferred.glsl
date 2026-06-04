@@ -32,6 +32,11 @@ struct DirLight {
 };
 uniform DirLight dirLight;
 
+// Image-based-ambient approximation: skybox average color, blended into the
+// global ambient by iblAmbientStrength (0 = flat dirLight.ambient, unchanged).
+uniform vec3 iblAmbientColor;
+uniform float iblAmbientStrength;
+
 // Cross-mode outlines (folded into the lighting pass rather than a separate
 // post-process). 0 = off. Thresholds are shared with the Sobel mode so the
 // outline tab in the settings UI tunes both.
@@ -158,7 +163,10 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 halfway = normalize(lightDir + viewDir);
     float spec = pow(max(dot(norm, halfway), 0.0), shininess);
-    vec3 ambient = dirLight.ambient * albedo * ssaoFactor;
+    // World-up (Z) modulates the sky tint so up-facing surfaces read brighter.
+    vec3 iblAmbient = iblAmbientColor * (0.5 + 0.5 * norm.z);
+    vec3 ambientSrc = mix(dirLight.ambient, iblAmbient, iblAmbientStrength);
+    vec3 ambient = ambientSrc * albedo * ssaoFactor;
     vec3 diffuse = dirLight.diffuse * diff * albedo;
     vec3 specular = dirLight.specular * spec * specularTint;
     float shadow = DirShadowFactor(worldPos, norm, lightDir);
