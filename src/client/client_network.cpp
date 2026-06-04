@@ -107,3 +107,14 @@ void ClientNetwork::drainInputQueue(
     enet_host_flush(client_);
   }
 }
+
+void ClientNetwork::drainDebugQueue(
+    SpscQueue<shared::DebugCommandPacket, 64>& debugQueue) {
+  shared::DebugCommandPacket pkt;
+  while (debugQueue.tryPop(pkt)) {
+    send(pkt);  // reliable: a dropped demo command must not silently no-op
+  }
+  if (client_) {
+    enet_host_flush(client_);
+  }
+}

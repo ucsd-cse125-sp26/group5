@@ -64,6 +64,91 @@ void MoveInMainMap(ServerGame& game, float dt) {
   }
 }
 
+void CompleteFragmentPickup(ServerGame& game, entt::entity fragEntity) {
+  if (!game.registry.valid(fragEntity) ||
+      !game.registry.all_of<shared::FragmentComponent>(fragEntity)) {
+    return;
+  }
+  auto& fragment = game.registry.get<shared::FragmentComponent>(fragEntity);
+  fragment.isPickedUp = true;
+  game.registry.remove<shared::RenderInfo>(fragEntity);
+  // Removing RenderInfo isn't diffed by the normal update path, so the client
+  // would keep drawing the fragment. Despawn it explicitly (same reason the
+  // barrier removal below sends DESPAWN_ENTITY). The entity lives on
+  // server-side for its FragmentComponent/pickup state.
+  if (game.network != nullptr &&
+      game.registry.all_of<shared::Entity>(fragEntity)) {
+    shared::DespawnPacket despawn;
+    despawn.type = shared::PacketType::DESPAWN_ENTITY;
+    despawn.entityId = game.registry.get<shared::Entity>(fragEntity).id;
+    net::broadcastPacket(game.network->getHost(), despawn);
+  }
+
+  // Delegate section completion to the appropriate puzzle collector.
+  if (fragment.season == shared::SectionSeasonMap::WINTER) {
+    CollectMazeFragment(game);
+  } else if (fragment.season == shared::SectionSeasonMap::FALL) {
+    fall_challenge::CollectFallFragment(game);
+  } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
+    summer_escape::CollectSummerFragment(game);
+  } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
+    if (!section_puzzle::isSectionCompleted(game,
+                                            shared::SectionSeasonMap::SPRING)) {
+      section_puzzle::completeSection(game, shared::SectionSeasonMap::SPRING);
+    }
+  }
+
+  bool shouldRestore = false;
+  if (fragment.season == shared::SectionSeasonMap::WINTER) {
+    shouldRestore = RestoreWinterColor(game);
+  } else if (fragment.season == shared::SectionSeasonMap::FALL) {
+    shouldRestore = RestoreFallColor(game);
+  } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
+    shouldRestore = RestoreSummerColor(game);
+  } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
+    shouldRestore = RestoreSpringColor(game);
+  }
+  if (shouldRestore) {
+    colorizeSection(game, fragment.season);
+    // Drive progression off the fragment (the door/switch system that used to
+    // do this is never run): advance to the next season, swap the overworld
+    // scene (skybox + directional light), and unlock the next section. The
+    // final season (spring) maps to itself.
+    const shared::SectionSeasonMap next = nextSeasonInOrder(fragment.season);
+    if (next != fragment.season) {
+      const entt::entity nextSection = section_puzzle::findSection(game, next);
+      if (nextSection != entt::null) {
+        game.registry.get<shared::SectionController>(nextSection).unlocked =
+            true;
+      }
+    }
+    section_puzzle::setActiveSeason(game, next);
+  }
+
+  // Permanently remove barriers for this season.
+  std::vector<entt::entity> barriersToRemove;
+  auto barrierView =
+      game.registry.view<shared::SectionBarrierTag, shared::OverworldTag>();
+  for (auto barrier : barrierView) {
+    if (barrierView.get<shared::SectionBarrierTag>(barrier).season ==
+        fragment.season) {
+      barriersToRemove.push_back(barrier);
+    }
+  }
+  for (auto barrier : barriersToRemove) {
+    if (game.network != nullptr &&
+        game.registry.all_of<shared::Entity>(barrier)) {
+      shared::DespawnPacket pkt;
+      pkt.type = shared::PacketType::DESPAWN_ENTITY;
+      pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
+      net::broadcastPacket(game.network->getHost(), pkt);
+    }
+
+    game.registry.destroy(
+        barrier);  // on_destroy<PhysicsBody> hook cleans up the body
+  }
+}
+
 void ProcessFragmentPickups(ServerGame& game) {
   constexpr float PICKUP_RADIUS_SQR = 4.0f * 4.0f;
 
@@ -90,88 +175,7 @@ void ProcessFragmentPickups(ServerGame& game) {
       float distSqr = (dx * dx) + (dy * dy) + (dz * dz);
       if (distSqr <= PICKUP_RADIUS_SQR &&
           (playerInput.keys_newly_pressed & KEY_PICKUP)) {
-        fragment.isPickedUp = true;
-        game.registry.remove<shared::RenderInfo>(fragEntity);
-        // Removing RenderInfo isn't diffed by the normal update path, so the
-        // client would keep drawing the fragment. Despawn it explicitly (same
-        // reason the barrier removal below sends DESPAWN_ENTITY). The entity
-        // lives on server-side for its FragmentComponent/pickup state.
-        if (game.network != nullptr &&
-            game.registry.all_of<shared::Entity>(fragEntity)) {
-          shared::DespawnPacket despawn;
-          despawn.type = shared::PacketType::DESPAWN_ENTITY;
-          despawn.entityId = game.registry.get<shared::Entity>(fragEntity).id;
-          net::broadcastPacket(game.network->getHost(), despawn);
-        }
-
-        // Delegate section completion to the appropriate puzzle collector.
-        if (fragment.season == shared::SectionSeasonMap::WINTER) {
-          CollectMazeFragment(game);
-        } else if (fragment.season == shared::SectionSeasonMap::FALL) {
-          fall_challenge::CollectFallFragment(game);
-        } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
-          summer_escape::CollectSummerFragment(game);
-        } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
-          if (!section_puzzle::isSectionCompleted(
-                  game, shared::SectionSeasonMap::SPRING)) {
-            section_puzzle::completeSection(game,
-                                            shared::SectionSeasonMap::SPRING);
-          }
-        }
-
-        bool shouldRestore = false;
-        if (fragment.season == shared::SectionSeasonMap::WINTER) {
-          shouldRestore = RestoreWinterColor(game);
-        } else if (fragment.season == shared::SectionSeasonMap::FALL) {
-          shouldRestore = RestoreFallColor(game);
-        } else if (fragment.season == shared::SectionSeasonMap::SUMMER) {
-          shouldRestore = RestoreSummerColor(game);
-        } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
-          shouldRestore = RestoreSpringColor(game);
-        }
-        if (shouldRestore) {
-          colorizeSection(game, fragment.season);
-          // Drive progression off the fragment (the door/switch system that
-          // used to do this is never run): advance to the next season, swap
-          // the overworld scene (skybox + directional light), and unlock the
-          // next section. The final season (spring) maps to itself.
-          const shared::SectionSeasonMap next =
-              nextSeasonInOrder(fragment.season);
-          if (next != fragment.season) {
-            const entt::entity nextSection =
-                section_puzzle::findSection(game, next);
-            if (nextSection != entt::null) {
-              game.registry.get<shared::SectionController>(nextSection)
-                  .unlocked = true;
-            }
-          }
-          section_puzzle::setActiveSeason(game, next);
-        }
-
-        // Permanently remove barriers for this season.
-        std::vector<entt::entity> barriersToRemove;
-        auto barrierView =
-            game.registry
-                .view<shared::SectionBarrierTag, shared::OverworldTag>();
-        for (auto barrier : barrierView) {
-          if (barrierView.get<shared::SectionBarrierTag>(barrier).season ==
-              fragment.season) {
-            barriersToRemove.push_back(barrier);
-          }
-        }
-        for (auto barrier : barriersToRemove) {
-          if (game.network != nullptr &&
-              game.registry.all_of<shared::Entity>(barrier)) {
-            shared::DespawnPacket pkt;
-            pkt.type = shared::PacketType::DESPAWN_ENTITY;
-            pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
-            net::broadcastPacket(game.network->getHost(), pkt);
-          }
-
-          game.registry.destroy(
-              barrier);  // on_destroy<PhysicsBody> hook cleans up the body
-        }
-
+        CompleteFragmentPickup(game, fragEntity);
         break;
       }
     }

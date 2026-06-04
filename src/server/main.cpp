@@ -15,6 +15,7 @@
 #include "server/game/puzzles/tangram/puzzle.h"
 #include "server/game/puzzles/tangram/roles.h"
 #include "server/game/puzzles/tangram/trigger.h"
+#include "server_debug.h"
 #include "server_game.h"
 #include "server_level_loader.h"
 #include "server_network.h"
@@ -228,6 +229,10 @@ int main() {
   while (true) {
     network.poll(game);
 
+    // Run any debug-panel commands received this poll on the game thread,
+    // before the fixed-step update consumes the resulting state.
+    server_debug::processPendingCommands(game);
+
     auto currentTime = std::chrono::high_resolution_clock::now();
     float dt = std::chrono::duration<float>(currentTime - previousTime).count();
     previousTime = currentTime;
@@ -320,17 +325,30 @@ int main() {
       maze_puzzle::tryCompleteOnGoal(game);
       accumulator -= fixedDt;
 
-      SIMPLE_PROFILE_SCOPE("Broadcast State");
-      std::vector<entt::entity> allEnts =
-          game.gameStateManager.currentState()->getStateEntities(game);
-      std::erase_if(allEnts, [&](entt::entity ent) {
-        return !shouldSendFrameUpdate(game.registry, ent);
-      });
-      if (!allEnts.empty()) {
-        auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                     shared::PacketType::UPDATE_ENTITY, allEnts,
-                                     false);
-        net::broadcastRaw(network.getHost(), buf.data(), buf.size());
+      {
+        // Keep this scope tight: the ScopeTimer must destruct before
+        // SIMPLE_PROFILE_FRAME_END below, otherwise the 60-frame stats print
+        // (blocking terminal I/O) gets billed to "Broadcast State".
+        SIMPLE_PROFILE_SCOPE("Broadcast State");
+        std::vector<entt::entity> allEnts =
+            game.gameStateManager.currentState()->getStateEntities(game);
+        std::erase_if(allEnts, [&](entt::entity ent) {
+          return !shouldSendFrameUpdate(game.registry, ent);
+        });
+        if (!allEnts.empty()) {
+          auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                       shared::PacketType::UPDATE_ENTITY,
+                                       allEnts, false);
+          // Per-tick full snapshots are newest-wins: send unreliable (ENet
+          // flag=0 is unreliable-sequenced, so stale/out-of-order snapshots
+          // are dropped on the receiver). Sending these reliably head-of-line
+          // blocks the channel on any lost fragment, causing client stutter
+          // and an intermittent server-side enqueue spike as the reliable
+          // queue backs up. Channel 1 keeps this stream off the reliable
+          // control channel (0).
+          net::broadcastRaw(network.getHost(), buf.data(), buf.size(),
+                            /*reliable=*/false, /*channel=*/1);
+        }
       }
       SIMPLE_PROFILE_FRAME_END("Server");
       SIMPLE_PROFILE_FRAME_START();

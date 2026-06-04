@@ -24,6 +24,7 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
 #include "client/client_game.h"
+#include "client/debug_panel.h"
 #include "client/puzzle_hud.h"
 #include "client/ui_settings.h"
 #include "client_network.h"
@@ -794,7 +795,8 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
         boneCount = std::min(modelAsset->boneCount, MAX_BONES);
       }
     }
-    Draw(shader, *modelAsset, model, bones, boneCount);
+    Draw(shader, *modelAsset, model, bones, boneCount,
+         /*depthOnly=*/forShadowPass);
     if (!forShadowPass) ++shared::draw_stats::entitiesDrawn;
   }
 }
@@ -3024,6 +3026,7 @@ void Graphics::drawSettingsUIFrame(ClientGame& game) {
   if (settings.showFPS) drawFPSOverlay();
   if (settings.showPerfHUD) drawPerfHUDWindow();
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);
+  drawDebugPanel(*this, game, debugPanelOpen);
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

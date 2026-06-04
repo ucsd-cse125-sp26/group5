@@ -187,7 +187,14 @@ struct Graphics {
   bool settingsMenuOpen = false;
   bool keySettingsMenuPrev = false;
   bool keyEscapePrev = false;
+  // Tracks the combined "any cursor-freeing menu open" state (settings OR debug
+  // panel) so the cursor capture sync only fires on a real change.
   bool prevSyncedMenuOpen = false;
+
+  // Demo debug control panel: opened by the Ctrl+Shift+\ chord, drawn in
+  // drawSettingsUIFrame. Large buttons drive game state for the demo.
+  bool debugPanelOpen = false;
+  bool keyDebugPanelPrev = false;
 
   DebugChannel debugChannel = DebugChannel::Off;
   // Which CSM cascade layer the DirShadowMap debug overlay samples (F3 cycles).

@@ -32,7 +32,7 @@ struct GraphicsSettings {
   // Tonemap operator: 0 = exponential `1-exp(-x)` (current/default), 1 = ACES
   // (Narkowicz), 2 = AgX. Applied in the tonemap pass before gamma.
   int tonemapMode = 0;
-  bool bloomEnabled = true;
+  bool bloomEnabled = false;
   float bloomThreshold = 1.0f;
   float bloomStrength = 1.0f;
   int bloomBlurIterations = 10;
@@ -52,7 +52,7 @@ struct GraphicsSettings {
   int ssaoScale = 2;
   // Depth-aware (bilateral) SSAO blur instead of the plain 4x4 box. false =
   // current box blur. Removes occlusion haloing across depth discontinuities.
-  bool ssaoBilateralBlur = false;
+  bool ssaoBilateralBlur = true;
   // Exponent applied to the SSAO term (was a hardcoded 2.0). Higher = darker,
   // more contrasty AO. 2.0 reproduces current behavior.
   float ssaoPower = 2.0f;
@@ -75,8 +75,12 @@ struct GraphicsSettings {
   bool showPerfHUD = false;
 
   // Camera-frustum cull the main G-buffer pass and the directional shadow pass
-  // (point shadows already cull per face). false = current no-cull behavior.
-  bool mainFrustumCulling = false;
+  // (point shadows already cull per face). The directional shadow pass is
+  // submission-bound (re-submits all geometry once per cascade); per-cascade
+  // culling rejects most chunks from the near cascades, so this is the primary
+  // ShadowDir win. The map is split into per-node entities with bounds, so even
+  // the terrain culls well.
+  bool mainFrustumCulling = true;
   // Cache each entity's resolved Model* across frames to skip per-frame model-
   // key string building + map lookups in renderEntities. false = current path.
   bool cacheModelLookup = false;
@@ -104,7 +108,7 @@ struct GraphicsSettings {
 
   // Shadows
   bool shadowsEnabled = true;
-  bool pointShadowsEnabled = true;
+  bool pointShadowsEnabled = false;
   // Map sizes — changing triggers FBO/texture reallocation.
   int dirShadowMapSize = 4096;
   int pointShadowMapSize = 2048;
@@ -112,7 +116,12 @@ struct GraphicsSettings {
   // shared::kShadowCascadeCount layers; each cascade fits a view-frustum slice
   // for sharp near shadows and full coverage to the far plane.
   bool cascadedShadows = true;      // off → single stabilized map over shadowDistance
-  float shadowDistance = 500.0f;    // clamped to farPlane; cascades cover near..this
+  // Cascades cover near..shadowDistance. Kept well under farPlane (500): distant
+  // shadows are tiny on screen, and a tighter range means each cascade's ortho
+  // frustum is smaller, so per-cascade culling rejects far more geometry AND the
+  // same texels cover less area (crisper near shadows). Raise toward farPlane if
+  // long-range shadows are needed.
+  float shadowDistance = 250.0f;    // clamped to farPlane; cascades cover near..this
   float shadowNearOffset = 2.0f;    // split-scheme near, decoupled from camera near
   float cascadeSplitLambda = 0.7f;  // 0 = uniform splits, 1 = logarithmic
   float cascadeCasterPullback = 50.0f;  // light-space depth for off-slice casters

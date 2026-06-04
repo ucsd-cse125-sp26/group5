@@ -1275,16 +1275,32 @@ void Draw(const Shader& shader, const Model& model,
   Draw(shader, model, transform, nullptr, 0);
 }
 
+// Depth-only mesh draw for shadow passes. The dir/point depth shaders sample
+// only material.diffuse (alpha cutout), so skip the other four samplers and
+// material.shininess that the main-pass Draw(mesh, material) binds.
+static void DrawDepth(const Shader& shader, const Mesh& mesh,
+                      const Material& material) {
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, material.diffuse.texture);
+  shader.setInt("material.diffuse", 0);
+  glBindVertexArray(mesh.vao);
+  glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
+  glBindVertexArray(0);
+}
+
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
-          const glm::mat4* bones, int count) {
+          const glm::mat4* bones, int count, bool depthOnly) {
   // Per-model palette uniform — paletteSize == 0 short-circuits the
-  // quantizer in fragment_gbuffer.glsl. Setting these on shaders that
-  // don't declare the uniforms (shadow/outline) is a cached -1 no-op.
-  const int paletteSize = static_cast<int>(model.palette.size());
-  shader.setInt("paletteSize", paletteSize);
-  if (paletteSize > 0) {
-    shader.setVec3Array("palette", paletteSize,
-                        reinterpret_cast<const float*>(model.palette.data()));
+  // quantizer in fragment_gbuffer.glsl. Depth shaders don't declare it, so the
+  // shadow path skips it entirely (the old code spent a string-hashed setInt to
+  // a cached -1 location per draw).
+  if (!depthOnly) {
+    const int paletteSize = static_cast<int>(model.palette.size());
+    shader.setInt("paletteSize", paletteSize);
+    if (paletteSize > 0) {
+      shader.setVec3Array("palette", paletteSize,
+                          reinterpret_cast<const float*>(model.palette.data()));
+    }
   }
 
   // useSkinning gates the bone path in the vertex shader. We only upload
@@ -1304,10 +1320,16 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
     // space; applying the per-mesh node transform on top double-applies the
     // skeleton's root scale/rotation.
     glm::mat4 final = useSkinning ? transform : transform * instanceTransform;
-    glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
     shader.setMat4("model", final);
-    shader.setMat3("normalMatrix", normalMatrix);
-    Draw(shader, mesh, material);
+    if (depthOnly) {
+      // Shadow vertex shaders have no normalMatrix; skip the per-mesh 3x3
+      // inverse (it was computed and uploaded every cascade for nothing).
+      DrawDepth(shader, mesh, material);
+    } else {
+      glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
+      shader.setMat3("normalMatrix", normalMatrix);
+      Draw(shader, mesh, material);
+    }
   }
 }
 

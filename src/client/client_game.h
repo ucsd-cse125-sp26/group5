@@ -47,6 +47,9 @@ struct ClientGame {
   std::atomic<bool> serverLost = false;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
+  // Demo debug-panel commands, produced on the render thread (button clicks in
+  // the debug control panel) and drained on the network thread (see main.cpp).
+  SpscQueue<shared::DebugCommandPacket, 64> debugQueue;
   // Server-driven video play/stop requests, produced on the network thread and
   // consumed on the render thread (see main.cpp).
   SpscQueue<VideoRequest, 8> videoQueue;
@@ -78,7 +81,7 @@ void registerClientHandlers(ClientNetwork& network);
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys, bool debugMode);
+                  InputKeys& prevKeys);
 void updateWinterMazeWindowTitle(GLFWwindow* window, const ClientGame& game);
 void printEntityPositions(const ClientGame& game);
 void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,

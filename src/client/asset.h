@@ -147,8 +147,11 @@ void Draw(const Shader& shader, const Mesh& mesh, const Material& material);
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform);
 // Skinned variant. `bones` points to `count` mat4 entries; pass count==0 to
 // fall back to the non-skinned path (sets useSkinning=0 in the shader).
+// `depthOnly` selects the shadow-pass fast path: the depth shaders only sample
+// material.diffuse (alpha cutout) and read neither the palette nor the normal
+// matrix, so those uploads + the four other texture binds are skipped.
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
-          const glm::mat4* bones, int count);
+          const glm::mat4* bones, int count, bool depthOnly = false);
 
 // One Model per mesh-bearing glTF node, keyed by MAP_MODEL_PREFIX + name.
 // Local mesh transforms are identity; node world transform lives on the
