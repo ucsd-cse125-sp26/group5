@@ -2995,7 +2995,7 @@ static void drawPerfHUDWindow() {
     } else {
       std::vector<std::pair<std::string, double>> rows(stats.begin(),
                                                        stats.end());
-      std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+      std::ranges::sort(rows, [](const auto& a, const auto& b) {
         return a.second > b.second;
       });
       double passSum = 0.0;

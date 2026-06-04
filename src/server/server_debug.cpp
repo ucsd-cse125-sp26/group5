@@ -391,7 +391,7 @@ void processPendingCommands(ServerGame& game) {
   std::vector<shared::DebugCommandPacket> cmds;
   cmds.swap(game.pendingDebugCommands);
   for (const auto& c : cmds) {
-    const Season season = static_cast<Season>(c.arg & 0x3u);
+    const auto season = static_cast<Season>(c.arg & 0x3u);
     switch (c.cmd) {
       case SET_SEASON:
         setSeason(game, season);
