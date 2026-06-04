@@ -81,9 +81,28 @@ int main() {
     peer->data = (void*)"Client information";
     PlayerAvatars slots = g.unused_player_slots.back();
     g.unused_player_slots.pop_back();
-    g.active_players[peer] = slots;
 
-    const uint8_t slot = g.nextPlayerJoinSlot++;
+    // Reuse the lowest free display slot (1–4) among connected players so a
+    // reconnect re-fills the vacated slot instead of climbing past 4. A slot>4
+    // breaks tangram roles (push/rotate) and maze direction bindings.
+    bool slotUsed[5] = {};
+    for (const auto& [otherPeer, otherSlots] : g.active_players) {
+      (void)otherPeer;
+      const entt::entity av = otherSlots.overworld_avatar;
+      if (g.registry.valid(av) && g.registry.all_of<shared::RenderInfo>(av)) {
+        const uint8_t used = g.registry.get<shared::RenderInfo>(av).playerSlot;
+        if (used >= 1 && used <= 4) slotUsed[used] = true;
+      }
+    }
+    uint8_t slot = 1;
+    for (uint8_t i = 1; i <= 4; ++i) {
+      if (!slotUsed[i]) {
+        slot = i;
+        break;
+      }
+    }
+
+    g.active_players[peer] = slots;
     for (entt::entity av : {slots.overworld_avatar, slots.maze_avatar}) {
       if (g.registry.valid(av) && g.registry.all_of<shared::RenderInfo>(av)) {
         g.registry.get<shared::RenderInfo>(av).playerSlot = slot;
@@ -199,9 +218,6 @@ int main() {
     }
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
-    if (g.active_players.empty()) {
-      g.nextPlayerJoinSlot = 1;
-    }
     peer->data = nullptr;
   };
 

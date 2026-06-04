@@ -12,6 +12,20 @@ class ParsedModel;
 
 namespace map_gamelogic_layout {
 
+// World-space AABB around the "Fallen house" landmark. Sized from the node's
+// mesh vertices at load (scale is (1,1,1), so extents can't come from scale).
+// Used as the end-game gather region: when all players are inside, credits
+// roll.
+struct FallenHouseRegion {
+  bool valid = false;
+  float minX = 0.0f, minY = 0.0f, minZ = 0.0f;
+  float maxX = 0.0f, maxY = 0.0f, maxZ = 0.0f;
+  [[nodiscard]] bool contains(float x, float y, float z) const {
+    return valid && x >= minX && x <= maxX && y >= minY && y <= maxY &&
+           z >= minZ && z <= maxZ;
+  }
+};
+
 struct FallLayout {
   float triggerCenterX = 50.0f;
   float triggerCenterY = -16.0f;
@@ -26,6 +40,9 @@ struct FallLayout {
   float spawnHeight = 20.0f;
   float markerTopZ() const { return playCenterZ + 0.6f; }
 };
+
+// End-game landmark mesh node in the landscape (Blender object name).
+inline constexpr const char* kFallenHouseNode = "Fallen house";
 
 inline constexpr const char* kMazeTriggerNode = "maze_trigger";
 inline constexpr const char* kMazeBoardNode = "maze_board";
@@ -65,6 +82,11 @@ bool tryApplyTangramArenaFromMapFile(const std::string& path,
 // Missing nodes keep the current defaults.
 bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout);
 bool tryApplyFallLayoutFromMapFile(const std::string& path, FallLayout& layout);
+
+// End-game gather region: world-space AABB of the "Fallen house" node, padded.
+// Returns false (region.valid stays false) when the node is missing.
+bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
+                                      FallenHouseRegion& region);
 
 // Reads spring_tangram_slot_1 .. spring_tangram_slot_7 empties (position +
 // yaw). relX/relY are offsets from boardCenter; falls back to code defaults if

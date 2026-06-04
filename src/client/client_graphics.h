@@ -12,6 +12,7 @@
 #include "client/client_game.h"
 #include "client/graphics_settings.h"
 #include "client/shaders.h"
+#include "client/video_player.h"
 #include "glad/gl.h"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/ext/vector_float3.hpp"
@@ -53,6 +54,10 @@ struct Graphics {
   std::optional<Shader> skyboxShader;
   std::optional<Shader> presentShader;
   std::optional<Shader> debugOverlay;
+  // YUV->RGB video: videoYuv = fullscreen overlay (vertex_present), videoQuad =
+  // in-world screen (vertex_video_quad). Both use fragment_video_yuv.
+  std::optional<Shader> videoYuvShader;
+  std::optional<Shader> videoQuadShader;
   std::unordered_map<std::string, Model*> models;
   std::unordered_map<std::string, Skybox> skyboxes;
   glm::mat4 projection{1.0f};
@@ -161,6 +166,8 @@ struct Graphics {
   bool keyF2Prev = false;
   bool keyF5Prev = false;
   bool keyF11Prev = false;
+  bool keyF8Prev = false;    // dev: play a video locally
+  bool keySkipPrev = false;  // dismiss an active fullscreen cutscene
 
   bool settingsMenuOpen = false;
   bool keySettingsMenuPrev = false;
@@ -174,6 +181,16 @@ struct Graphics {
 
   // CameraBlock UBO at binding=0; mirrored by CameraUBOData in the .cpp.
   GLuint cameraUBO = 0;
+
+  // Video playback (render-thread owned). One active clip at a time.
+  enum class VideoMode { None, Fullscreen, InWorld };
+  std::optional<VideoPlayer> videoPlayer;
+  VideoMode videoMode = VideoMode::None;
+  uint32_t videoTargetEntityId = 0;  // in-world screen entity (0 = fixed quad)
+  // Unit quad (XY plane, z=0) for the in-world screen; pos@0, uv@2.
+  GLuint videoQuadVAO = 0;
+  GLuint videoQuadVBO = 0;
+  GLuint videoQuadEBO = 0;
 
   // Tiny self-contained loading scene: standalone cube VAO/VBO/EBO + a
   // minimal shader that only reads position + normal. None of the main
@@ -192,6 +209,9 @@ struct Graphics {
   // Last stage text passed to renderLoadingFrame, reused by pumpLoadingFrame
   // (which loaders call mid-work without knowing the stage name).
   std::string loadingStatus;
+  // Wall clock when the credits roll started; -1 = not started. Reset to -1 on
+  // dismiss so the scroll restarts from the bottom next time credits play.
+  double creditsStartTime = -1.0;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);
@@ -206,6 +226,9 @@ struct Graphics {
   void processDebugKeys();
   void drawDebugOverlay();
 
+  // Creates/replaces (or stops) the active video on the render/GL thread.
+  void handleVideoRequest(const VideoRequest& req);
+
   void initImGui();
   void shutdownImGui();
   void drawSettingsUIFrame(ClientGame& game);
@@ -219,6 +242,14 @@ struct Graphics {
   // Cheap no-op when called within the 1/60 s pacing window; safe to invoke
   // from inside slow loaders (per-node, per-face) for actual 60 fps cadence.
   void pumpLoadingFrame();
+
+  // Full-screen scrolling-text credits roll. Drawn instead of the 3D world
+  // while the client is in the CREDITS state. Does not swap buffers.
+  void renderCreditsScreen(ClientGame& game);
+
+  // Full-screen overlay shown when the server connection drops. Drawn instead
+  // of the 3D world; does not swap buffers.
+  void renderLostConnectionScreen(ClientGame& game);
 
   // Server-select menu rendered after assets finish loading but before the
   // network connection is established. Caller owns the host buffer and port

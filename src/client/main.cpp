@@ -20,6 +20,7 @@
 #include "shared/map_gamelogic_layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/simple_profiler.h"
+#include "shared/sound_constants.h"
 #include "shared/util.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
@@ -75,6 +76,7 @@ int main() {
   glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
   InputKeys prevKeys = 0;
+  bool creditsDismissPrev = false;
   std::thread networkThread(runNetworkLoop, std::ref(game), std::ref(network));
 
   shared::map_gamelogic_layout::tryApplyMazeLayoutFromMapFile(
@@ -133,6 +135,11 @@ int main() {
     game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
     updateSoundEmitters(game, lx, ly, lz, dt);  // pass dt
 
+    // Apply any server-driven video requests on the render/GL thread.
+    VideoRequest videoReq;
+    while (game.videoQueue.tryPop(videoReq))
+      graphics.handleVideoRequest(videoReq);
+
     graphics.render(game, network);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");
@@ -155,6 +162,19 @@ int main() {
       graphics.settingsMenuOpen = !graphics.settingsMenuOpen;
     }
     graphics.keySettingsMenuPrev = menuKeyNow;
+
+    // Enter dismisses the credits roll back to the overworld view. The server
+    // never froze gameplay, so this is a purely local view/music swap.
+    bool dismissNow = glfwGetKey(graphics.window, GLFW_KEY_ENTER) == GLFW_PRESS;
+    if (dismissNow && !creditsDismissPrev &&
+        game.currentGameState == shared::GameStateType::CREDITS) {
+      game.currentGameState = shared::GameStateType::OVERWORLD;
+      graphics.creditsStartTime = -1.0;
+      game.audio.stopAllGlobalLoops();
+      game.audio.playGlobalLoop(
+          static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
+    }
+    creditsDismissPrev = dismissNow;
 
     // Sync cursor mode whenever the menu state changes — whether from H or
     // the in-UI Close button (which flipped the flag during render).

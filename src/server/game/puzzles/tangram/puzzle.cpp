@@ -774,8 +774,11 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::TangramPiece>(ent, def.id, false);
     game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f,
                                             0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, def.modelName, def.scaleX,
-                                              def.scaleY, pieceZ);
+    {
+      auto& ri = game.registry.emplace<shared::RenderInfo>(
+          ent, def.modelName, def.scaleX, def.scaleY, pieceZ);
+      ri.colorExempt = true;
+    }
     game.registry.emplace<shared::Velocity>(ent, 0.0f, 0.0f, 0.0f);
 
     const uint8_t stage = shared::tangram_roles::kIsolationStage;
@@ -808,9 +811,12 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::Position>(ghostEnt, ghostPos.x, ghostPos.y,
                                             ghostPos.z, ghostRot.w, ghostRot.x,
                                             ghostRot.y, ghostRot.z);
-    game.registry.emplace<shared::RenderInfo>(
-        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
-        def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
+    {
+      auto& ri = game.registry.emplace<shared::RenderInfo>(
+          ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
+          def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
+      ri.colorExempt = true;
+    }
     game.overworldTangramGhostSlotEntities[static_cast<size_t>(i)] = ghostEnt;
     spawned.push_back(ghostEnt);
   }
@@ -860,6 +866,17 @@ void endPuzzle(ServerGame& game) {
   game.overworldTangramActive = false;
   tangram_role_server::revertCollisionRoles(game);
   setActiveFlag(game, false);
+
+  // The controller carries no per-frame-synced component, so it never rides the
+  // tick UPDATE_ENTITY broadcast; push it explicitly or clients keep
+  // OverworldTangramPuzzleState.active == true forever (stuck crosshair / R).
+  if (game.network != nullptr &&
+      game.registry.valid(game.overworldTangramController)) {
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::UPDATE_ENTITY,
+                                 {game.overworldTangramController}, false);
+    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+  }
 
   auto despawnEnt = [&](entt::entity ent) {
     if (!game.registry.valid(ent)) return;

@@ -233,6 +233,7 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
+        game.currentGameState = pkt.state;
         game.audio.stopAllGlobalLoops();
         if (pkt.state == shared::GameStateType::OVERWORLD) {
           game.audio.playGlobalLoop(
@@ -240,7 +241,28 @@ void registerClientHandlers(ClientNetwork& network) {
         } else if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::CREDITS) {
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
         }
+      });
+
+  // Runs on the network thread — GL is invalid here, so only enqueue a request
+  // for the render thread (main.cpp) to act on.
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_PLAY,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::VideoPlayPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.videoQueue.tryPush(VideoRequest{pkt.videoId, pkt.mode, pkt.loop,
+                                             pkt.targetEntityId,
+                                             /*stop=*/false});
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_STOP,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        game.videoQueue.tryPush(VideoRequest{0, 0, 0, 0, /*stop=*/true});
       });
 }
 
@@ -356,6 +378,22 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys, bool debugMode) {
+  // Freeze the avatar while the credits roll: send one zero-input packet to
+  // stop movement, then ignore keyboard/mouse until credits are dismissed.
+  if (game.currentGameState == shared::GameStateType::CREDITS) {
+    if (prevKeys != 0) {
+      shared::InputPacket pkt;
+      pkt.type = shared::PacketType::INPUT;
+      pkt.keys = 0;
+      pkt.mouseDx = 0.0f;
+      pkt.mouseDy = 0.0f;
+      pkt.rotateTargetId = 0;
+      inputQueue.tryPush(pkt);
+    }
+    prevKeys = 0;
+    return;
+  }
+
   InputKeys keys = 0;
   const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
 

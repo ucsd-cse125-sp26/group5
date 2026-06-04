@@ -47,7 +47,11 @@ void falling_objects_system(ServerGame& game, float dt) {
     auto [id, ent] = new_entity(game);
     game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f,
                                             0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, "cube", 0.5f, 0.5f, 0.5f);
+    {
+      auto& ri = game.registry.emplace<shared::RenderInfo>(ent, "cube", 0.5f,
+                                                           0.5f, 0.5f);
+      ri.colorExempt = true;
+    }
     game.registry.emplace<shared::OverworldTag>(
         ent);  // REQUIRED to sync/render
     game.registry.emplace<shared::FallingObject>(ent);

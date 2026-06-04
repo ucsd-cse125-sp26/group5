@@ -627,7 +627,8 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     // uniforms are no-ops in the shadow pass (no such uniforms).
     const bool isFragment = renderInfo.modelName == "fragment";
     const bool isSun = renderInfo.modelName.starts_with("sun_");
-    shader.setInt("alwaysColor", (isFragment || isSun) ? 1 : 0);
+    shader.setInt("alwaysColor",
+                  (isFragment || isSun || renderInfo.colorExempt) ? 1 : 0);
     shader.setFloat("rainbowStrength", isFragment ? 1.0f : 0.0f);
     if (isFragment) {
       const auto t = static_cast<float>(glfwGetTime());
@@ -763,6 +764,10 @@ bool Graphics::load(int width, int height) {
                             "shaders/fragment_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
+  videoYuvShader.emplace("shaders/vertex_present.glsl",
+                         "shaders/fragment_video_yuv.glsl");
+  videoQuadShader.emplace("shaders/vertex_video_quad.glsl",
+                          "shaders/fragment_video_yuv.glsl");
 
   // Shader ctor failures are silent at runtime so F5 hot-reload can keep
   // the previous program — at startup there is no previous program, so
@@ -789,6 +794,32 @@ bool Graphics::load(int width, int height) {
   // Empty VAO for fullscreen-triangle draws; positions synthesized from
   // gl_VertexID in vertex_present.glsl.
   glGenVertexArrays(1, &fullscreenVAO);
+
+  // Unit quad (XY plane, z=0) for the in-world video screen. pos@0, uv@2 to
+  // match vertex_video_quad.glsl.
+  {
+    const float quadVerts[] = {
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,
+        0.5f,  0.5f,  0.0f, 1.0f, 1.0f, -0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+    };
+    const unsigned int quadIdx[] = {0, 1, 2, 0, 2, 3};
+    glGenVertexArrays(1, &videoQuadVAO);
+    glGenBuffers(1, &videoQuadVBO);
+    glGenBuffers(1, &videoQuadEBO);
+    glBindVertexArray(videoQuadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, videoQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, videoQuadEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIdx), quadIdx,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void*)nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+  }
 
   glGenBuffers(1, &cameraUBO);
   glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
@@ -1146,7 +1177,7 @@ void Graphics::resizeBuffers(int width, int height) {
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
   for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
-                  &outlineSobelShader, &ssaoShader}) {
+                  &outlineSobelShader, &ssaoShader, &videoQuadShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -1210,6 +1241,14 @@ void Graphics::reloadShaders() {
       {.slot = debugOverlay,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_debug_overlay.glsl",
+       .geom = ""},
+      {.slot = videoYuvShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_video_yuv.glsl",
+       .geom = ""},
+      {.slot = videoQuadShader,
+       .vert = "shaders/vertex_video_quad.glsl",
+       .frag = "shaders/fragment_video_yuv.glsl",
        .geom = ""},
   };
   for (auto& r : reloads) {
@@ -1305,6 +1344,41 @@ void Graphics::processDebugKeys() {
   keyF2Prev = f2;
   keyF5Prev = f5;
   keyF11Prev = f11;
+
+  // F8: play the first clip fullscreen locally (no server needed) for testing.
+  bool f8 = glfwGetKey(window, GLFW_KEY_F8) == GLFW_PRESS;
+  if (f8 && !keyF8Prev) handleVideoRequest(VideoRequest{0, 0, 0, 0, false});
+  keyF8Prev = f8;
+
+  // Enter dismisses an active fullscreen cutscene.
+  bool skip = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
+  if (skip && !keySkipPrev && videoMode == VideoMode::Fullscreen) {
+    if (videoPlayer) videoPlayer->stop();
+    videoMode = VideoMode::None;
+  }
+  keySkipPrev = skip;
+}
+
+void Graphics::handleVideoRequest(const VideoRequest& req) {
+  if (req.stop) {
+    if (videoPlayer) videoPlayer->stop();
+    videoMode = VideoMode::None;
+    return;
+  }
+  const std::string path = videoPathFor(req.videoId);
+  if (path.empty()) {
+    fprintf(stderr, "handleVideoRequest: unknown videoId %u\n", req.videoId);
+    return;
+  }
+  videoPlayer
+      .emplace();  // destroys any previous player (frees its GL textures)
+  if (!videoPlayer->open(path, req.loop != 0)) {
+    videoPlayer.reset();
+    videoMode = VideoMode::None;
+    return;
+  }
+  videoMode = (req.mode == 1) ? VideoMode::InWorld : VideoMode::Fullscreen;
+  videoTargetEntityId = req.targetEntityId;
 }
 
 void Graphics::drawDebugOverlay() {
@@ -1419,6 +1493,17 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
 void Graphics::render(ClientGame& game, ClientNetwork& network) {
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
+
+  if (game.serverLost.load(std::memory_order_acquire)) {
+    renderLostConnectionScreen(game);
+    return;
+  }
+
+  if (game.currentGameState == shared::GameStateType::CREDITS) {
+    renderCreditsScreen(game);
+    return;
+  }
+
   auto camera = computeCamera(game);
   if (!camera) return;
 
@@ -1478,6 +1563,13 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   const float dt =
       lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
   lastFrameTime = now;
+  if (videoPlayer && videoPlayer->isPlaying()) {
+    videoPlayer->update(dt);
+    // A finished non-looping cutscene clears itself.
+    if (!videoPlayer->isPlaying() && videoMode == VideoMode::Fullscreen) {
+      videoMode = VideoMode::None;
+    }
+  }
   updateAnimators(*this, game, dt);
 
   projection = glm::perspective(
@@ -1746,6 +1838,48 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     }
   }
 
+  // In-world video screen: forward draw into the HDR litFBO (still bound; the
+  // skybox pass blitted g-buffer depth into litDepth and left depth-test on).
+  // Emissive, depth-tested, written to litColor only (COLOR_ATTACHMENT0).
+  if (videoMode == VideoMode::InWorld && videoPlayer &&
+      videoPlayer->isPlaying() && videoQuadShader && videoQuadShader->valid() &&
+      videoQuadVAO) {
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+
+    // Screen transform: from the target entity's Position if present, else a
+    // fixed quad. Orientation/scale likely need tuning per real placement.
+    float h = 3.0f;
+    float w = h * videoPlayer->aspect();
+    glm::vec3 center(0.0f, 5.0f, 0.0f);
+    auto it = game.renderEntityMap.find(videoTargetEntityId);
+    if (videoTargetEntityId != 0 && it != game.renderEntityMap.end() &&
+        game.renderRegistry.valid(it->second) &&
+        game.renderRegistry.all_of<shared::Position>(it->second)) {
+      const auto& p = game.renderRegistry.get<shared::Position>(it->second);
+      center = glm::vec3(p.x, p.y, p.z);
+    }
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), center) *
+                      glm::scale(glm::mat4(1.0f), glm::vec3(w, h, 1.0f));
+
+    videoQuadShader->use();
+    videoQuadShader->setMat4("model", model);
+    videoPlayer->bindPlanes(0, 1, 2);
+    videoQuadShader->setInt("texY", 0);
+    videoQuadShader->setInt("texCb", 1);
+    videoQuadShader->setInt("texCr", 2);
+    videoQuadShader->setVec2("texScale", videoPlayer->texScaleX(),
+                             videoPlayer->texScaleY());
+    videoQuadShader->setVec2("fit", 1.0f, 1.0f);
+    videoQuadShader->setInt("linearize", 1);
+    videoQuadShader->setFloat("emissiveBoost", 1.5f);
+    glBindVertexArray(videoQuadVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+    glActiveTexture(GL_TEXTURE0);
+  }
+
   GLuint finalBloomColor = brightColor;
   const int effectiveBloomIters =
       settings.bloomEnabled ? settings.bloomBlurIterations : 0;
@@ -1826,16 +1960,6 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       tonemapShader->setVec3("colorRestorationMin", restoreMin);
       tonemapShader->setVec3("colorRestorationMax", restoreMax);
 
-      const shared::tangram::ColorRestoreAabb tangramColor =
-          game.tangramArena.alwaysColorAabb();
-      tonemapShader->setFloat("tangramAlwaysColorEnabled", 1.0f);
-      tonemapShader->setVec3(
-          "tangramAlwaysColorMin",
-          glm::vec3(tangramColor.minX, tangramColor.minY, tangramColor.minZ));
-      tonemapShader->setVec3(
-          "tangramAlwaysColorMax",
-          glm::vec3(tangramColor.maxX, tangramColor.maxY, tangramColor.maxZ));
-
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -1899,6 +2023,38 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     if (shared::tangram_roles::canRotate(stage, slot)) {
       drawTangramCrosshair(fbWidth, fbHeight);
     }
+  }
+
+  // Fullscreen video overlay: drawn over the finished (post-tonemap) frame, so
+  // it outputs display-referred RGB directly. Game keeps running underneath;
+  // Enter dismisses (see processDebugKeys).
+  if (videoMode == VideoMode::Fullscreen && videoPlayer &&
+      videoPlayer->isPlaying() && videoYuvShader && videoYuvShader->valid() &&
+      fullscreenVAO) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    videoYuvShader->use();
+    videoPlayer->bindPlanes(0, 1, 2);
+    videoYuvShader->setInt("texY", 0);
+    videoYuvShader->setInt("texCb", 1);
+    videoYuvShader->setInt("texCr", 2);
+    videoYuvShader->setVec2("texScale", videoPlayer->texScaleX(),
+                            videoPlayer->texScaleY());
+    const float winAspect =
+        fbHeight > 0 ? static_cast<float>(fbWidth) / fbHeight : 1.0f;
+    const float vidAspect = videoPlayer->aspect();
+    const glm::vec2 fit = (winAspect > vidAspect)
+                              ? glm::vec2(winAspect / vidAspect, 1.0f)
+                              : glm::vec2(1.0f, vidAspect / winAspect);
+    videoYuvShader->setVec2("fit", fit.x, fit.y);
+    videoYuvShader->setInt("linearize", 0);
+    videoYuvShader->setFloat("emissiveBoost", 1.0f);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glActiveTexture(GL_TEXTURE0);
   }
 
   drawDebugOverlay();
@@ -2245,6 +2401,133 @@ void Graphics::pumpLoadingFrame() {
   // Reuse the named-stage path with the cached status — the early-exit pacing
   // inside renderLoadingFrame keeps repeated calls cheap.
   renderLoadingFrame(loadingStatus);
+}
+
+void Graphics::renderCreditsScreen(ClientGame& game) {
+  (void)game;
+  if (!window) return;
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  if (!ImGui::GetCurrentContext()) return;
+
+  const double now = glfwGetTime();
+  if (creditsStartTime < 0.0) creditsStartTime = now;
+  const auto elapsed = static_cast<float>(now - creditsStartTime);
+
+  // Edit these lines to credit the team.
+  static const char* kCreditsLines[] = {
+      "Thanks for playing",
+      "",
+      "",
+      "A CSE 125 Production",
+      "",
+      "Programming",
+      "The Team",
+      "",
+      "Art & World",
+      "The Team",
+      "",
+      "Audio",
+      "The Team",
+      "",
+      "",
+      "See you next season",
+  };
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  ImGuiIO& io = ImGui::GetIO();
+
+  ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(io.DisplaySize);
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoSavedSettings;
+  if (ImGui::Begin("##Credits", nullptr, flags)) {
+    ImGui::SetWindowFontScale(2.4f);
+    const float lineH = ImGui::GetTextLineHeightWithSpacing();
+    const float scrollSpeed = 70.0f;  // pixels per second, bottom -> top
+    float y = io.DisplaySize.y - elapsed * scrollSpeed;
+    for (const char* line : kCreditsLines) {
+      if (line[0] != '\0') {
+        const float textW = ImGui::CalcTextSize(line).x;
+        ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - textW) * 0.5f, y));
+        ImGui::TextUnformatted(line);
+      }
+      y += lineH;
+    }
+
+    // Dismiss hint pinned at the bottom (does not scroll).
+    ImGui::SetWindowFontScale(1.2f);
+    const char* hint = "Press Enter to return";
+    const float hintW = ImGui::CalcTextSize(hint).x;
+    ImGui::SetCursorPos(
+        ImVec2((io.DisplaySize.x - hintW) * 0.5f, io.DisplaySize.y - 40.0f));
+    ImGui::TextUnformatted(hint);
+  }
+  ImGui::End();
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  // No buffer swap here — the main loop calls graphics.swap() after render().
+}
+
+void Graphics::renderLostConnectionScreen(ClientGame& game) {
+  (void)game;
+  if (!window) return;
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  if (!ImGui::GetCurrentContext()) return;
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  ImGuiIO& io = ImGui::GetIO();
+
+  ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(io.DisplaySize);
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoSavedSettings;
+  if (ImGui::Begin("##LostConnection", nullptr, flags)) {
+    ImGui::SetWindowFontScale(2.4f);
+    const char* title = "Lost connection to server";
+    const float titleW = ImGui::CalcTextSize(title).x;
+    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - titleW) * 0.5f,
+                               io.DisplaySize.y * 0.5f - 40.0f));
+    ImGui::TextUnformatted(title);
+
+    ImGui::SetWindowFontScale(1.2f);
+    const char* hint = "Close the window to exit, then relaunch to reconnect";
+    const float hintW = ImGui::CalcTextSize(hint).x;
+    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - hintW) * 0.5f,
+                               io.DisplaySize.y * 0.5f + 20.0f));
+    ImGui::TextUnformatted(hint);
+  }
+  ImGui::End();
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  // No buffer swap here — the main loop calls graphics.swap() after render().
 }
 
 Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
