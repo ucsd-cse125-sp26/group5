@@ -872,10 +872,9 @@ void endPuzzle(ServerGame& game) {
   // OverworldTangramPuzzleState.active == true forever (stuck crosshair / R).
   if (game.network != nullptr &&
       game.registry.valid(game.overworldTangramController)) {
-    auto buf = serializeEntities(
-        game.registry, game.componentRegistry,
-        shared::PacketType::UPDATE_ENTITY, {game.overworldTangramController},
-        false);
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::UPDATE_ENTITY,
+                                 {game.overworldTangramController}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
 

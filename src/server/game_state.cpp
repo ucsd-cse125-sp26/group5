@@ -5,9 +5,9 @@
 #include <memory>
 #include <vector>
 
+#include "game/credits_trigger.h"
 #include "game/fall_challenge.h"
 #include "game/maze.h"
-#include "game/credits_trigger.h"
 #include "game/maze_generation.h"
 #include "game/overworld.h"
 #include "game/summer_escape.h"

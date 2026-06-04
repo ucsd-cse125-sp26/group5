@@ -6,8 +6,9 @@
 // game event (e.g. a puzzle-completion site) to play a clip on every client.
 namespace net {
 
-inline void broadcastVideoPlay(ENetHost* host, uint16_t videoId, uint8_t mode = 0,
-                               bool loop = false, uint32_t targetEntityId = 0) {
+inline void broadcastVideoPlay(ENetHost* host, uint16_t videoId,
+                               uint8_t mode = 0, bool loop = false,
+                               uint32_t targetEntityId = 0) {
   shared::VideoPlayPacket pkt;
   pkt.videoId = videoId;
   pkt.mode = mode;

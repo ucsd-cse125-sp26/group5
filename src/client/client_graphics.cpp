@@ -1370,7 +1370,8 @@ void Graphics::handleVideoRequest(const VideoRequest& req) {
     fprintf(stderr, "handleVideoRequest: unknown videoId %u\n", req.videoId);
     return;
   }
-  videoPlayer.emplace();  // destroys any previous player (frees its GL textures)
+  videoPlayer
+      .emplace();  // destroys any previous player (frees its GL textures)
   if (!videoPlayer->open(path, req.loop != 0)) {
     videoPlayer.reset();
     videoMode = VideoMode::None;
@@ -2461,8 +2462,7 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
     for (const char* line : kCreditsLines) {
       if (line[0] != '\0') {
         const float textW = ImGui::CalcTextSize(line).x;
-        ImGui::SetCursorPos(
-            ImVec2((io.DisplaySize.x - textW) * 0.5f, y));
+        ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - textW) * 0.5f, y));
         ImGui::TextUnformatted(line);
       }
       y += lineH;
@@ -2472,8 +2472,8 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
     ImGui::SetWindowFontScale(1.2f);
     const char* hint = "Press Enter to return";
     const float hintW = ImGui::CalcTextSize(hint).x;
-    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - hintW) * 0.5f,
-                               io.DisplaySize.y - 40.0f));
+    ImGui::SetCursorPos(
+        ImVec2((io.DisplaySize.x - hintW) * 0.5f, io.DisplaySize.y - 40.0f));
     ImGui::TextUnformatted(hint);
   }
   ImGui::End();

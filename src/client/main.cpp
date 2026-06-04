@@ -18,9 +18,9 @@
 #include "shared/hello.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
-#include "shared/sound_constants.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/simple_profiler.h"
+#include "shared/sound_constants.h"
 #include "shared/util.h"
 
 void runNetworkLoop(ClientGame& game, ClientNetwork& network);
@@ -137,7 +137,8 @@ int main() {
 
     // Apply any server-driven video requests on the render/GL thread.
     VideoRequest videoReq;
-    while (game.videoQueue.tryPop(videoReq)) graphics.handleVideoRequest(videoReq);
+    while (game.videoQueue.tryPop(videoReq))
+      graphics.handleVideoRequest(videoReq);
 
     graphics.render(game, network);
     {

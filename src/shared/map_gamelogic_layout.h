@@ -14,7 +14,8 @@ namespace map_gamelogic_layout {
 
 // World-space AABB around the "Fallen house" landmark. Sized from the node's
 // mesh vertices at load (scale is (1,1,1), so extents can't come from scale).
-// Used as the end-game gather region: when all players are inside, credits roll.
+// Used as the end-game gather region: when all players are inside, credits
+// roll.
 struct FallenHouseRegion {
   bool valid = false;
   float minX = 0.0f, minY = 0.0f, minZ = 0.0f;
