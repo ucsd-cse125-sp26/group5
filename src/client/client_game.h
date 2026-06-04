@@ -39,6 +39,8 @@ struct ClientGame {
       shared::tangram::ArenaLayout::defaults();
   // Entity id under screen-center reticle (updated each frame during tangram).
   uint32_t tangramCrosshairTargetId = 0;
+  // Latest game state from the server (drives the credits screen / music).
+  shared::GameStateType currentGameState = shared::GameStateType::OVERWORLD;
   AudioEngine audio;
 };
 

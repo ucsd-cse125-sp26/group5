@@ -1419,6 +1419,12 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
 void Graphics::render(ClientGame& game, ClientNetwork& network) {
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
+
+  if (game.currentGameState == shared::GameStateType::CREDITS) {
+    renderCreditsScreen(game);
+    return;
+  }
+
   auto camera = computeCamera(game);
   if (!camera) return;
 
@@ -2245,6 +2251,86 @@ void Graphics::pumpLoadingFrame() {
   // Reuse the named-stage path with the cached status — the early-exit pacing
   // inside renderLoadingFrame keeps repeated calls cheap.
   renderLoadingFrame(loadingStatus);
+}
+
+void Graphics::renderCreditsScreen(ClientGame& game) {
+  (void)game;
+  if (!window) return;
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  if (!ImGui::GetCurrentContext()) return;
+
+  const double now = glfwGetTime();
+  if (creditsStartTime < 0.0) creditsStartTime = now;
+  const float elapsed = static_cast<float>(now - creditsStartTime);
+
+  // Edit these lines to credit the team.
+  static const char* kCreditsLines[] = {
+      "Thanks for playing",
+      "",
+      "",
+      "A CSE 125 Production",
+      "",
+      "Programming",
+      "The Team",
+      "",
+      "Art & World",
+      "The Team",
+      "",
+      "Audio",
+      "The Team",
+      "",
+      "",
+      "See you next season",
+  };
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  ImGuiIO& io = ImGui::GetIO();
+
+  ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(io.DisplaySize);
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoSavedSettings;
+  if (ImGui::Begin("##Credits", nullptr, flags)) {
+    ImGui::SetWindowFontScale(2.4f);
+    const float lineH = ImGui::GetTextLineHeightWithSpacing();
+    const float scrollSpeed = 70.0f;  // pixels per second, bottom -> top
+    float y = io.DisplaySize.y - elapsed * scrollSpeed;
+    for (const char* line : kCreditsLines) {
+      if (line[0] != '\0') {
+        const float textW = ImGui::CalcTextSize(line).x;
+        ImGui::SetCursorPos(
+            ImVec2((io.DisplaySize.x - textW) * 0.5f, y));
+        ImGui::TextUnformatted(line);
+      }
+      y += lineH;
+    }
+
+    // Dismiss hint pinned at the bottom (does not scroll).
+    ImGui::SetWindowFontScale(1.2f);
+    const char* hint = "Press Enter to return";
+    const float hintW = ImGui::CalcTextSize(hint).x;
+    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - hintW) * 0.5f,
+                               io.DisplaySize.y - 40.0f));
+    ImGui::TextUnformatted(hint);
+  }
+  ImGui::End();
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  // No buffer swap here — the main loop calls graphics.swap() after render().
 }
 
 Graphics::ServerMenuResult Graphics::renderServerMenuFrame(

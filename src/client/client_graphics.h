@@ -192,6 +192,9 @@ struct Graphics {
   // Last stage text passed to renderLoadingFrame, reused by pumpLoadingFrame
   // (which loaders call mid-work without knowing the stage name).
   std::string loadingStatus;
+  // Wall clock when the credits roll started; -1 = not started. Reset to -1 on
+  // dismiss so the scroll restarts from the bottom next time credits play.
+  double creditsStartTime = -1.0;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);
@@ -219,6 +222,10 @@ struct Graphics {
   // Cheap no-op when called within the 1/60 s pacing window; safe to invoke
   // from inside slow loaders (per-node, per-face) for actual 60 fps cadence.
   void pumpLoadingFrame();
+
+  // Full-screen scrolling-text credits roll. Drawn instead of the 3D world
+  // while the client is in the CREDITS state. Does not swap buffers.
+  void renderCreditsScreen(ClientGame& game);
 
   // Server-select menu rendered after assets finish loading but before the
   // network connection is established. Caller owns the host buffer and port

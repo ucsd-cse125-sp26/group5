@@ -7,6 +7,7 @@
 
 #include "game/fall_challenge.h"
 #include "game/maze.h"
+#include "game/credits_trigger.h"
 #include "game/maze_generation.h"
 #include "game/overworld.h"
 #include "game/summer_escape.h"
@@ -691,6 +692,10 @@ void OverworldState::update(ServerGame& game, float dt) {
     //     net::broadcastPacket(game.network->getHost(), pkt);
     // }
   }
+
+  // End-game: roll credits once all players gather in the Fallen house.
+  credits_trigger::checkCreditsTrigger(game);
+
   render_model_change(game, dt);
 
   auto inputView = game.registry.view<shared::PlayerInput>();

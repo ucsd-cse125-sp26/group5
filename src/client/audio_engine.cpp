@@ -42,6 +42,9 @@ bool AudioEngine::init() {
             "assets/sounds/angelll.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
             "assets/sounds/yaku.mp3");
+  // Placeholder credits track — swap for a dedicated file when available.
+  loadSound(static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC),
+            "assets/sounds/angelll.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
             "assets/sounds/oof.mp3");  // temporary, reuses jump sound
 

@@ -99,6 +99,12 @@ struct ServerGame {
       shared::maze_layout::Config::defaults();
   shared::map_gamelogic_layout::FallLayout fallLayout{};
 
+  // End-game: gather region around the "Fallen house" landmark. When all active
+  // players are inside, clients roll the credits. `armed` re-arms once players
+  // leave so re-entry can re-trigger (and avoids per-tick broadcast spam).
+  shared::map_gamelogic_layout::FallenHouseRegion fallenHouseRegion{};
+  bool creditsTriggerArmed = true;
+
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
   bool overworldTangramActive = false;
   bool overworldTangramTriggerArmed = true;

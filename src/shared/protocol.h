@@ -19,6 +19,7 @@ enum class PacketType : uint8_t {
 enum class GameStateType : uint8_t {
   OVERWORLD,
   MAZE,
+  CREDITS,
 };
 
 struct StateChangePacket {

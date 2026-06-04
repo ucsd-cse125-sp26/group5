@@ -134,6 +134,8 @@ bool loadMap(ServerGame& game, const std::string& path,
   shared::map_gamelogic_layout::tryApplyTangramSlotsFromMap(
       parsed, game.tangramArena.boardCenterX, game.tangramArena.boardCenterY,
       game.tangramSlotLayout);
+  shared::map_gamelogic_layout::tryApplyFallenHouseRegionFromMap(
+      parsed, game.fallenHouseRegion);
 
   printf(
       "loadMap: \"%s\" — spawned %u mesh entities, %u point lights "
