@@ -194,9 +194,8 @@ int main() {
     // (H) or the debug panel — whether toggled by key or by an in-UI Close box.
     bool anyMenuOpen = graphics.settingsMenuOpen || graphics.debugPanelOpen;
     if (anyMenuOpen != graphics.prevSyncedMenuOpen) {
-      glfwSetInputMode(
-          graphics.window, GLFW_CURSOR,
-          anyMenuOpen ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+      glfwSetInputMode(graphics.window, GLFW_CURSOR,
+                       anyMenuOpen ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
       graphics.prevSyncedMenuOpen = anyMenuOpen;
     }
 

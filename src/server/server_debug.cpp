@@ -38,8 +38,8 @@ using Season = shared::SectionSeasonMap;
 // avatar; `targetForSlot` returns the destination for a 1..4 join slot. Modeled
 // on summer_escape::debugSnapAllPlayersToSummerPad. Position updates ride the
 // next per-tick UPDATE_ENTITY broadcast.
-void teleportAllPlayers(ServerGame& game,
-                        const std::function<glm::vec3(uint8_t)>& targetForSlot) {
+void teleportAllPlayers(
+    ServerGame& game, const std::function<glm::vec3(uint8_t)>& targetForSlot) {
   auto& bi = game.physics.getBodyInterface();
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
@@ -50,7 +50,8 @@ void teleportAllPlayers(ServerGame& game,
     }
     uint8_t slot = 1;
     if (game.registry.all_of<shared::RenderInfo>(avatar)) {
-      const uint8_t s = game.registry.get<shared::RenderInfo>(avatar).playerSlot;
+      const uint8_t s =
+          game.registry.get<shared::RenderInfo>(avatar).playerSlot;
       if (s >= 1 && s <= 4) slot = s;
     }
     const glm::vec3 t = targetForSlot(slot);
@@ -86,7 +87,8 @@ void revealFragmentForSeason(ServerGame& game, Season season) {
   auto frags = game.registry.view<shared::FragmentComponent>();
   for (auto fe : frags) {
     if (frags.get<shared::FragmentComponent>(fe).season != season) continue;
-    if (game.registry.all_of<shared::RenderInfo>(fe)) return;  // already revealed
+    if (game.registry.all_of<shared::RenderInfo>(fe))
+      return;  // already revealed
     game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
                                               0.25f);
     if (game.network != nullptr) {
@@ -111,11 +113,21 @@ void setSeason(ServerGame& game, Season season) {
 void cycleSeason(ServerGame& game) {
   Season next;
   switch (currentActiveSeason(game)) {
-    case Season::WINTER: next = Season::SPRING; break;
-    case Season::SPRING: next = Season::SUMMER; break;
-    case Season::SUMMER: next = Season::FALL; break;
-    case Season::FALL: next = Season::WINTER; break;
-    default: next = Season::WINTER; break;
+    case Season::WINTER:
+      next = Season::SPRING;
+      break;
+    case Season::SPRING:
+      next = Season::SUMMER;
+      break;
+    case Season::SUMMER:
+      next = Season::FALL;
+      break;
+    case Season::FALL:
+      next = Season::WINTER;
+      break;
+    default:
+      next = Season::WINTER;
+      break;
   }
   setSeason(game, next);
 }
@@ -141,10 +153,16 @@ void teleportToFallZone(ServerGame& game) {
 
 void startPuzzle(ServerGame& game, Season season) {
   switch (season) {
-    case Season::WINTER: maze_puzzle::beginPuzzle(game); break;
-    case Season::SPRING: tangram_puzzle::beginPuzzle(game); break;
+    case Season::WINTER:
+      maze_puzzle::beginPuzzle(game);
+      break;
+    case Season::SPRING:
+      tangram_puzzle::beginPuzzle(game);
+      break;
     // Fall/summer auto-activate from their update() once players are in-zone.
-    case Season::FALL: teleportToFallZone(game); break;
+    case Season::FALL:
+      teleportToFallZone(game);
+      break;
     case Season::SUMMER:
       summer_escape::debugSnapAllPlayersToSummerPad(game);
       break;
@@ -176,10 +194,10 @@ void tearDownMinigame(ServerGame& game, Season season) {
   }
 }
 
-// "Finish" — pretend the puzzle minigame was just won: end the minigame and make
-// its fragment appear (with the solved fanfare), WITHOUT collecting it. The
-// fragment then sits in the world ready to be picked up (organically or via the
-// Pickup Fragment button).
+// "Finish" — pretend the puzzle minigame was just won: end the minigame and
+// make its fragment appear (with the solved fanfare), WITHOUT collecting it.
+// The fragment then sits in the world ready to be picked up (organically or via
+// the Pickup Fragment button).
 void finishPuzzle(ServerGame& game, Season season) {
   tearDownMinigame(game, season);
 
@@ -217,7 +235,8 @@ void finishPuzzle(ServerGame& game, Season season) {
 
 // "Pickup Fragment" — run the EXACT organic pickup chain for this season's
 // fragment, so the section completes, color restores, the season advances, the
-// next section unlocks, and barriers drop — identical to a real fragment pickup.
+// next section unlocks, and barriers drop — identical to a real fragment
+// pickup.
 void pickupFragment(ServerGame& game, Season season) {
   tearDownMinigame(game, season);
   for (auto fe : game.registry.view<shared::FragmentComponent>()) {
@@ -281,9 +300,8 @@ void teleportToPuzzle(ServerGame& game, Season season) {
 
 // Toggle Jolt collision on the overworld section barriers (old B-key action).
 void toggleBarrierCollision(ServerGame& game) {
-  auto view =
-      game.registry.view<shared::SectionBarrierTag, shared::OverworldTag,
-                         shared::PhysicsBody>();
+  auto view = game.registry.view<shared::SectionBarrierTag,
+                                 shared::OverworldTag, shared::PhysicsBody>();
   auto& bi = game.physics.getBodyInterface();
   for (auto barrier : view) {
     JPH::BodyID id(view.get<shared::PhysicsBody>(barrier).bodyId);
@@ -319,9 +337,9 @@ void toggleBarrierVisibility(ServerGame& game) {
     despawn.entityId = eid;
     net::broadcastPacket(game.network->getHost(), despawn);
     std::vector<entt::entity> toRespawn = {barrier};
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::SPAWN_ENTITY, toRespawn,
-                                 false);
+    auto buf =
+        serializeEntities(game.registry, game.componentRegistry,
+                          shared::PacketType::SPAWN_ENTITY, toRespawn, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
   printf("[DebugPanel] toggled barrier visibility\n");
@@ -351,14 +369,14 @@ void printPositions(ServerGame& game) {
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
     const entt::entity a = slots.overworld_avatar;
-    if (!game.registry.valid(a) ||
-        !game.registry.all_of<shared::Position>(a)) {
+    if (!game.registry.valid(a) || !game.registry.all_of<shared::Position>(a)) {
       continue;
     }
     const auto& pos = game.registry.get<shared::Position>(a);
-    const uint8_t slot = game.registry.all_of<shared::RenderInfo>(a)
-                             ? game.registry.get<shared::RenderInfo>(a).playerSlot
-                             : 0;
+    const uint8_t slot =
+        game.registry.all_of<shared::RenderInfo>(a)
+            ? game.registry.get<shared::RenderInfo>(a).playerSlot
+            : 0;
     printf("[DebugPanel] slot=%u pos=(%.2f, %.2f, %.2f)\n",
            static_cast<unsigned>(slot), pos.x, pos.y, pos.z);
   }
@@ -375,26 +393,48 @@ void processPendingCommands(ServerGame& game) {
   for (const auto& c : cmds) {
     const Season season = static_cast<Season>(c.arg & 0x3u);
     switch (c.cmd) {
-      case SET_SEASON: setSeason(game, season); break;
-      case CYCLE_SEASON: cycleSeason(game); break;
+      case SET_SEASON:
+        setSeason(game, season);
+        break;
+      case CYCLE_SEASON:
+        cycleSeason(game);
+        break;
       case SPAWN_FRAGMENT_CURRENT:
         revealFragmentForSeason(game, currentActiveSeason(game));
         break;
       case SPAWN_FRAGMENT_ALL:
-        for (Season s : {Season::WINTER, Season::FALL, Season::SUMMER,
-                         Season::SPRING}) {
+        for (Season s :
+             {Season::WINTER, Season::FALL, Season::SUMMER, Season::SPRING}) {
           revealFragmentForSeason(game, s);
         }
         break;
-      case START_PUZZLE: startPuzzle(game, season); break;
-      case FINISH_PUZZLE: finishPuzzle(game, season); break;
-      case PICKUP_FRAGMENT: pickupFragment(game, season); break;
-      case TELEPORT_TO_PUZZLE: teleportToPuzzle(game, season); break;
-      case TOGGLE_BARRIER_COLLISION: toggleBarrierCollision(game); break;
-      case TOGGLE_BARRIER_VISIBILITY: toggleBarrierVisibility(game); break;
-      case RESET_TO_OVERWORLD_SPAWN: resetPlayersToOverworldSpawn(game); break;
-      case TRIGGER_CREDITS: triggerCredits(game); break;
-      case PRINT_POSITIONS: printPositions(game); break;
+      case START_PUZZLE:
+        startPuzzle(game, season);
+        break;
+      case FINISH_PUZZLE:
+        finishPuzzle(game, season);
+        break;
+      case PICKUP_FRAGMENT:
+        pickupFragment(game, season);
+        break;
+      case TELEPORT_TO_PUZZLE:
+        teleportToPuzzle(game, season);
+        break;
+      case TOGGLE_BARRIER_COLLISION:
+        toggleBarrierCollision(game);
+        break;
+      case TOGGLE_BARRIER_VISIBILITY:
+        toggleBarrierVisibility(game);
+        break;
+      case RESET_TO_OVERWORLD_SPAWN:
+        resetPlayersToOverworldSpawn(game);
+        break;
+      case TRIGGER_CREDITS:
+        triggerCredits(game);
+        break;
+      case PRINT_POSITIONS:
+        printPositions(game);
+        break;
     }
   }
 }

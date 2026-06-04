@@ -356,8 +356,8 @@ void registerServerHandlers(ServerNetwork& network) {
       });
 
   // Demo debug control panel. Deferred: just record the command; the fixed-step
-  // loop drains pendingDebugCommands via server_debug::processPendingCommands so
-  // game logic runs on the game thread at a safe point.
+  // loop drains pendingDebugCommands via server_debug::processPendingCommands
+  // so game logic runs on the game thread at a safe point.
   network.dispatcher().on(
       shared::PacketType::DEBUG_COMMAND,
       [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {

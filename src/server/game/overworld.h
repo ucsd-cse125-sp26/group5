@@ -32,10 +32,10 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
                      shared::SectionSeasonMap nextSeason);
 
 // Runs the full organic "fragment picked up" chain for one fragment entity:
-// marks it collected, despawns the mesh, completes the season's section, restores
-// color, advances the season + unlocks the next section, and removes that
-// season's barriers. Shared by the normal proximity pickup and the debug panel's
-// force-finish so both paths progress identically.
+// marks it collected, despawns the mesh, completes the season's section,
+// restores color, advances the season + unlocks the next section, and removes
+// that season's barriers. Shared by the normal proximity pickup and the debug
+// panel's force-finish so both paths progress identically.
 void CompleteFragmentPickup(ServerGame& game, entt::entity fragEntity);
 
 // Attaches a shadow-casting PointLight to each revealed fragment and removes it

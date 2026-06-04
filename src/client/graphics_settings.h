@@ -115,18 +115,23 @@ struct GraphicsSettings {
   // Cascaded shadow maps (directional). dirShadowMap is a texture array with
   // shared::kShadowCascadeCount layers; each cascade fits a view-frustum slice
   // for sharp near shadows and full coverage to the far plane.
-  bool cascadedShadows = true;      // off → single stabilized map over shadowDistance
-  // Cascades cover near..shadowDistance. Kept well under farPlane (500): distant
-  // shadows are tiny on screen, and a tighter range means each cascade's ortho
-  // frustum is smaller, so per-cascade culling rejects far more geometry AND the
-  // same texels cover less area (crisper near shadows). Raise toward farPlane if
-  // long-range shadows are needed.
-  float shadowDistance = 250.0f;    // clamped to farPlane; cascades cover near..this
-  float shadowNearOffset = 2.0f;    // split-scheme near, decoupled from camera near
+  bool cascadedShadows =
+      true;  // off → single stabilized map over shadowDistance
+  // Cascades cover near..shadowDistance. Kept well under farPlane (500):
+  // distant shadows are tiny on screen, and a tighter range means each
+  // cascade's ortho frustum is smaller, so per-cascade culling rejects far more
+  // geometry AND the same texels cover less area (crisper near shadows). Raise
+  // toward farPlane if long-range shadows are needed.
+  float shadowDistance =
+      250.0f;  // clamped to farPlane; cascades cover near..this
+  float shadowNearOffset =
+      2.0f;  // split-scheme near, decoupled from camera near
   float cascadeSplitLambda = 0.7f;  // 0 = uniform splits, 1 = logarithmic
-  float cascadeCasterPullback = 50.0f;  // light-space depth for off-slice casters
-  float cascadeBlendBand = 0.0f;    // 0 = hard switch; fraction of range to blend
-  bool visualizeCascades = false;   // tint each cascade band in the lighting pass
+  float cascadeCasterPullback =
+      50.0f;                      // light-space depth for off-slice casters
+  float cascadeBlendBand = 0.0f;  // 0 = hard switch; fraction of range to blend
+  bool visualizeCascades =
+      false;  // tint each cascade band in the lighting pass
   float dirShadowPolyFactor = 2.0f;
   float dirShadowPolyUnits = 4.0f;
   // Point shadow projection + bias.

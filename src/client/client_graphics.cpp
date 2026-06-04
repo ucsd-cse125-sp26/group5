@@ -56,9 +56,10 @@
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
 // std140 layout — must match the CameraBlock uniform block in all shaders that
-// declare it: fragment_lighting_deferred, fragment_lighting_cel, vertex_gbuffer,
-// fragment_ssao, fragment_ssao_blur, fragment_outline_sobel, vertex_video_quad.
-// (Layout is computed per-shader, so every copy must stay byte-identical.)
+// declare it: fragment_lighting_deferred, fragment_lighting_cel,
+// vertex_gbuffer, fragment_ssao, fragment_ssao_blur, fragment_outline_sobel,
+// vertex_video_quad. (Layout is computed per-shader, so every copy must stay
+// byte-identical.)
 struct alignas(16) CameraUBOData {
   glm::mat4 view;
   glm::mat4 projection;
@@ -262,7 +263,8 @@ static void computePointShadowMatrices(
 // sphere is rotation-invariant, so the ortho box size doesn't change as the
 // camera turns — then texel-snaps the projected sphere centre so it doesn't
 // swim as the camera translates. The slice shape (hence its sphere radius)
-// depends only on fov/aspect/splits, so the texel size is stable frame to frame.
+// depends only on fov/aspect/splits, so the texel size is stable frame to
+// frame.
 //
 // outSplits[c] is the FAR view-space depth of cascade c (positive forward
 // distance), which the fragment shader compares against -(view*worldPos).z to
@@ -273,10 +275,12 @@ static void computeCascadeMatrices(
     float camFar, float shadowNear, float shadowFar, float lambda,
     float pullback, const glm::vec3& lightDir, int mapSize, int activeCascades,
     glm::mat4 outMatrices[shared::kShadowCascadeCount], glm::vec4& outSplits) {
-  const int n = std::max(1, std::min(activeCascades, shared::kShadowCascadeCount));
+  const int n =
+      std::max(1, std::min(activeCascades, shared::kShadowCascadeCount));
 
   // Inverse of the REAL camera view-projection so unprojected corners match the
-  // camera frustum exactly. GL clip-z is [-1, 1] (no GLM_FORCE_DEPTH_ZERO_TO_ONE).
+  // camera frustum exactly. GL clip-z is [-1, 1] (no
+  // GLM_FORCE_DEPTH_ZERO_TO_ONE).
   const glm::mat4 invVP = glm::inverse(
       glm::perspective(glm::radians(fovDeg), aspect, camNear, camFar) * view);
   glm::vec3 nearC[4];
@@ -319,8 +323,9 @@ static void computeCascadeMatrices(
     glm::vec3 corners[8];
     glm::vec3 center(0.0f);
     for (int i = 0; i < 4; ++i) {
-      // World position varies affinely along each frustum edge, so a world-space
-      // lerp lands exactly on the slice corner at the given view-space depth.
+      // World position varies affinely along each frustum edge, so a
+      // world-space lerp lands exactly on the slice corner at the given
+      // view-space depth.
       corners[i] = nearC[i] + (farC[i] - nearC[i]) * tNear;
       corners[i + 4] = nearC[i] + (farC[i] - nearC[i]) * tFar;
       center += corners[i] + corners[i + 4];
@@ -340,8 +345,8 @@ static void computeCascadeMatrices(
     glm::mat4 lightProj = glm::ortho(-radius, radius, -radius, radius, 0.0f,
                                      2.0f * radius + pullback);
 
-    // Texel-snap: round the projected centre to the shadow-map grid and fold the
-    // rounding delta back into the ortho translation (proj[3].xy).
+    // Texel-snap: round the projected centre to the shadow-map grid and fold
+    // the rounding delta back into the ortho translation (proj[3].xy).
     glm::vec4 originLS = lightProj * lightView * glm::vec4(center, 1.0f);
     glm::vec2 originTexels = glm::vec2(originLS) * half;  // ortho → w == 1
     glm::vec2 rounded(std::round(originTexels.x), std::round(originTexels.y));
@@ -2021,9 +2026,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       lighting->setFloat("dirShadowSoftness", settings.shadowSoftness);
       lighting->setInt("cascadeDebug", settings.visualizeCascades ? 1 : 0);
       // No cross-cascade blend in single-map mode (the other layers are stale).
-      lighting->setFloat(
-          "cascadeBlendBand",
-          settings.cascadedShadows ? settings.cascadeBlendBand : 0.0f);
+      lighting->setFloat("cascadeBlendBand", settings.cascadedShadows
+                                                 ? settings.cascadeBlendBand
+                                                 : 0.0f);
       glm::vec3 iblColor(0.2f);
       if (const auto* sc = currentScene(game)) {
         auto sbIt = skyboxes.find(std::string(sc->skyboxDirectory));
@@ -2409,8 +2414,8 @@ Graphics::~Graphics() {
 }
 
 void Graphics::allocateDirShadowMap(int size) {
-  // Cascaded shadow maps: one GL_TEXTURE_2D_ARRAY with kShadowCascadeCount depth
-  // layers, each rendered/sampled as a separate cascade.
+  // Cascaded shadow maps: one GL_TEXTURE_2D_ARRAY with kShadowCascadeCount
+  // depth layers, each rendered/sampled as a separate cascade.
   if (!dirShadowFBO) glGenFramebuffers(1, &dirShadowFBO);
   if (!dirShadowMap) glGenTextures(1, &dirShadowMap);
   glBindTexture(GL_TEXTURE_2D_ARRAY, dirShadowMap);
@@ -2433,16 +2438,17 @@ void Graphics::allocateDirShadowMap(int size) {
   float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
   glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, white);
   glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
-  // Attach layer 0 for the completeness check; the render loop rebinds per layer.
-  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, dirShadowMap, 0,
-                            0);
+  // Attach layer 0 for the completeness check; the render loop rebinds per
+  // layer.
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, dirShadowMap,
+                            0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     fprintf(stderr, "dirShadowFBO incomplete\n");
   }
-  // Initialize every layer to depth=1.0 so a sample before the first shadow pass
-  // returns "fully lit" instead of undefined.
+  // Initialize every layer to depth=1.0 so a sample before the first shadow
+  // pass returns "fully lit" instead of undefined.
   for (int layer = 0; layer < shared::kShadowCascadeCount; ++layer) {
     glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, dirShadowMap,
                               0, layer);

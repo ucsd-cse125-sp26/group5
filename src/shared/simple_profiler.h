@@ -64,8 +64,8 @@ class AsyncLogger {
 // and the network thread (ClientNetwork::poll, deserializeComponents). A
 // concurrent operator[] + clear() walks freed bucket nodes and SIGSEGVs.
 struct ScopeStat {
-  double sum = 0.0;   // total ms over the reporting window (for the average)
-  double max = 0.0;   // worst single-scope ms in the window (catches stalls)
+  double sum = 0.0;  // total ms over the reporting window (for the average)
+  double max = 0.0;  // worst single-scope ms in the window (catches stalls)
 };
 inline std::mutex frame_stats_mutex;
 inline std::unordered_map<std::string, ScopeStat> frame_stats;
