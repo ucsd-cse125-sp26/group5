@@ -9,6 +9,15 @@ inline constexpr int kMaxPointLights = 1;  // shadow-casting cap
 inline constexpr int kMaxLightingShaderLights = 32;
 inline constexpr int kPointShadowLayers = kMaxPointLights * 6;
 
+// Directional cascaded-shadow-map cascade count. The directional shadow map is
+// a GL_TEXTURE_2D_ARRAY with this many layers; both lighting shaders and the
+// CameraBlock UBO size depend on it. Keep <= 4 (cascadeSplits is a single
+// vec4). Each cascade is a full re-submission of all shadow casters, so
+// ShadowDir cost is ~linear in this. 3 covers near..shadowDistance with little
+// visible loss vs 4; bump back to 4 if mid-distance cascade banding is
+// noticeable.
+inline constexpr int kShadowCascadeCount = 3;
+
 // Linear-depth range; writer and reader must agree.
 inline constexpr float kPointShadowNear = 0.1f;
 inline constexpr float kPointShadowFar = 50.0f;

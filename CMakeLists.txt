@@ -180,6 +180,7 @@ target_sources(client PRIVATE
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
     src/client/puzzle_hud.cpp
+    src/client/debug_panel.cpp
     src/client/video_player.cpp
 )
 target_link_libraries(client PRIVATE shared
@@ -212,6 +213,7 @@ endif()
 add_library(server_lib STATIC
     src/server/server_network.cpp
     src/server/server_game.cpp
+    src/server/server_debug.cpp
     src/server/game_state.cpp
     src/server/game/maze_generation.cpp
     src/server/game/section_puzzle.cpp

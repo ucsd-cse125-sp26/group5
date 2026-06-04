@@ -64,6 +64,17 @@ void shadingSection(GraphicsSettings& s) {
   // and Voronoi-region boundaries that brightness quantize + palette snap
   // produce — 0 = crisp (default), 1 = full stipple.
   ImGui::SliderFloat("Skybox soft edge", &s.skyboxSoftEdge, 0.0f, 1.0f, "%.2f");
+  // Texture filtering: 1 = current (nearest-mip), >1 = trilinear + anisotropy.
+  const int anisoOptions[] = {1, 2, 4, 8, 16};
+  const char* anisoLabels[] = {"Off (1x)", "2x", "4x", "8x", "16x"};
+  int anisoIdx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(anisoOptions); ++i) {
+    if (anisoOptions[i] == s.textureAnisotropy) anisoIdx = i;
+  }
+  if (ImGui::Combo("Texture filtering", &anisoIdx, anisoLabels,
+                   IM_ARRAYSIZE(anisoLabels))) {
+    s.textureAnisotropy = anisoOptions[anisoIdx];
+  }
   ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
   ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");
@@ -87,6 +98,13 @@ void shadingSection(GraphicsSettings& s) {
     s.celRampPath = rampPathBuf;
     rampPathLastApplied = s.celRampPath;
   }
+  ImGui::EndDisabled();
+  ImGui::SeparatorText("Rim light");
+  ImGui::SliderFloat("Rim strength", &s.celRimStrength, 0.0f, 2.0f, "%.2f");
+  ImGui::BeginDisabled(s.celRimStrength <= 0.0f);
+  ImGui::ColorEdit3("Rim color", &s.celRimColor.x);
+  ImGui::SliderFloat("Rim power", &s.celRimPower, 0.5f, 16.0f, "%.2f");
+  ImGui::SliderFloat("Rim threshold", &s.celRimThreshold, 0.0f, 1.0f, "%.2f");
   ImGui::EndDisabled();
   ImGui::EndDisabled();
 }
@@ -117,6 +135,9 @@ void outlinesSection(GraphicsSettings& s) {
 
 void dirLightSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Directional Light")) return;
+  // Image-based-ambient approximation (skybox average tint). 0 = flat ambient.
+  ImGui::SliderFloat("Sky ambient (IBL)", &s.iblAmbientStrength, 0.0f, 1.0f,
+                     "%.2f");
   ImGui::Checkbox("Override scene light", &s.overrideDirLight);
   ImGui::BeginDisabled(!s.overrideDirLight);
   ImGui::DragFloat3("Direction", &s.dirLightDirection.x, 0.01f, -1.0f, 1.0f);
@@ -131,11 +152,17 @@ void tonemapBloomSection(GraphicsSettings& s) {
                                ImGuiTreeNodeFlags_DefaultOpen))
     return;
   ImGui::SliderFloat("Exposure", &s.exposure, 0.1f, 5.0f);
+  const char* tonemapModes[] = {"Exponential", "ACES", "AgX"};
+  ImGui::Combo("Tonemap", &s.tonemapMode, tonemapModes,
+               IM_ARRAYSIZE(tonemapModes));
   ImGui::Checkbox("Bloom", &s.bloomEnabled);
   ImGui::BeginDisabled(!s.bloomEnabled);
   ImGui::SliderFloat("Threshold", &s.bloomThreshold, 0.0f, 5.0f);
   ImGui::SliderFloat("Strength", &s.bloomStrength, 0.0f, 5.0f);
+  ImGui::Checkbox("Mip-chain", &s.bloomMipChain);
+  ImGui::BeginDisabled(s.bloomMipChain);
   ImGui::SliderInt("Blur iterations", &s.bloomBlurIterations, 0, 30);
+  ImGui::EndDisabled();
   ImGui::EndDisabled();
 }
 
@@ -156,6 +183,8 @@ void ssaoSection(GraphicsSettings& s) {
                    IM_ARRAYSIZE(scaleLabels))) {
     s.ssaoScale = scales[scaleIdx];
   }
+  ImGui::Checkbox("Bilateral blur", &s.ssaoBilateralBlur);
+  ImGui::SliderFloat("Power", &s.ssaoPower, 1.0f, 4.0f, "%.2f");
   ImGui::EndDisabled();
 }
 
@@ -187,10 +216,13 @@ void shadowsSection(GraphicsSettings& s) {
     s.pointShadowMapSize = pointSizes[pointIdx];
   }
 
-  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f, 1000.0f);
-  ImGui::SliderFloat("Dir back distance", &s.dirShadowBackDistance, 10.0f,
-                     1500.0f);
-  ImGui::SliderFloat("Dir far plane", &s.dirShadowFarPlane, 50.0f, 4000.0f);
+  ImGui::Checkbox("Cascaded shadows", &s.cascadedShadows);
+  ImGui::SliderFloat("Shadow distance", &s.shadowDistance, 50.0f, 500.0f);
+  ImGui::SliderFloat("Cascade split lambda", &s.cascadeSplitLambda, 0.0f, 1.0f);
+  ImGui::SliderFloat("Cascade pullback", &s.cascadeCasterPullback, 0.0f,
+                     200.0f);
+  ImGui::SliderFloat("Cascade blend", &s.cascadeBlendBand, 0.0f, 0.5f);
+  ImGui::Checkbox("Visualize cascades", &s.visualizeCascades);
   ImGui::SliderFloat("Dir bias factor", &s.dirShadowPolyFactor, 0.0f, 10.0f);
   ImGui::SliderFloat("Dir bias units", &s.dirShadowPolyUnits, 0.0f, 20.0f);
   ImGui::SliderFloat("Point far plane", &s.pointShadowFarPlane, 5.0f, 200.0f);
@@ -198,17 +230,37 @@ void shadowsSection(GraphicsSettings& s) {
                      10.0f);
   ImGui::SliderFloat("Point bias units", &s.pointShadowPolyUnits, 0.0f, 20.0f);
   ImGui::SliderFloat("Alpha cutoff", &s.shadowAlphaCutoff, 0.0f, 1.0f);
+  ImGui::SliderInt("PCF radius", &s.shadowPcfRadius, 1, 4);
+  ImGui::SliderFloat("Softness", &s.shadowSoftness, 1.0f, 4.0f, "%.2f");
   ImGui::EndDisabled();
 }
 
 void antialiasingSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Antialiasing")) return;
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
+  ImGui::BeginDisabled(!s.fxaaEnabled);
+  const char* fxaaQualities[] = {"Standard", "High"};
+  ImGui::Combo("FXAA quality", &s.fxaaQuality, fxaaQualities,
+               IM_ARRAYSIZE(fxaaQualities));
+  ImGui::EndDisabled();
+  // Ordered dither to break HDR->8-bit banding; independent of FXAA.
+  ImGui::SliderFloat("Dither", &s.ditherStrength, 0.0f, 1.0f, "%.2f");
 }
 
 void overlaySection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Overlays")) return;
   ImGui::Checkbox("Show FPS", &s.showFPS);
+  // Per-pass GPU timing HUD. Issues GL timer queries only while enabled.
+  ImGui::Checkbox("GPU perf HUD", &s.showPerfHUD);
+}
+
+void performanceSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Performance")) return;
+  // Cull the main G-buffer + directional shadow passes to the camera/light
+  // frustum. Off reproduces the current (cull-nothing) behavior.
+  ImGui::Checkbox("Main-pass frustum culling", &s.mainFrustumCulling);
+  // Cache resolved Model* per entity to skip per-frame key string building.
+  ImGui::Checkbox("Cache model lookups", &s.cacheModelLookup);
 }
 
 void colorRestorationSection(GraphicsSettings& s) {
@@ -278,6 +330,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   antialiasingSection(s);
   pixelationSection(s);
   colorRestorationSection(s);
+  performanceSection(s);
   overlaySection(s);
 
   ImGui::Separator();

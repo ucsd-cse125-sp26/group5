@@ -377,7 +377,7 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys, bool debugMode) {
+                  InputKeys& prevKeys) {
   // Freeze the avatar while the credits roll: send one zero-input packet to
   // stop movement, then ignore keyboard/mouse until credits are dismissed.
   if (game.currentGameState == shared::GameStateType::CREDITS) {
@@ -403,26 +403,12 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
-    if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS) keys |= KEY_MODEL_SMALLER;
-    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) keys |= KEY_MODEL_BIGGER;
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
-    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
-    if (debugMode) {
-      if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
-        keys |= KEY_DEBUG_COMPLETE_SECTION;
-      if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
-        keys |= KEY_DEBUG_TOGGLE_BARRIERS;
-      if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
-        keys |= KEY_DEBUG_PRINT_POS;
-      if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS)
-        keys |= KEY_DEBUG_SUMMER_PAD;
-      if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
-        keys |= KEY_DEBUG_CYCLE_SEASON;
-      if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-        keys |= KEY_DEBUG_SPAWN_FRAGMENT;
-    }
+    // Gameplay debug shortcuts (B/N/G/V/Y/F) were removed in favor of the demo
+    // debug control panel (Ctrl+Shift+\); those actions now travel over the
+    // DEBUG_COMMAND packet instead of the input bitfield.
   }
 
   if (mazeBoardControl) {

@@ -29,10 +29,17 @@ struct GraphicsSettings {
 
   // Tonemap / bloom
   float exposure = 1.0f;
-  bool bloomEnabled = true;
+  // Tonemap operator: 0 = exponential `1-exp(-x)` (current/default), 1 = ACES
+  // (Narkowicz), 2 = AgX. Applied in the tonemap pass before gamma.
+  int tonemapMode = 0;
+  bool bloomEnabled = false;
   float bloomThreshold = 1.0f;
   float bloomStrength = 1.0f;
   int bloomBlurIterations = 10;
+  // Mip-chain (downsample/upsample) bloom instead of the fixed-iteration
+  // full-res Gaussian ping-pong. false = current behavior. Wider, smoother
+  // glow at lower cost; bloomBlurIterations is ignored when this is on.
+  bool bloomMipChain = false;
 
   // SSAO
   bool ssaoEnabled = true;
@@ -43,12 +50,45 @@ struct GraphicsSettings {
   // 4 = quarter). Lighting samples ssaoBlurColor through bilinear filtering
   // when scale > 1.
   int ssaoScale = 2;
+  // Depth-aware (bilateral) SSAO blur instead of the plain 4x4 box. false =
+  // current box blur. Removes occlusion haloing across depth discontinuities.
+  bool ssaoBilateralBlur = true;
+  // Exponent applied to the SSAO term (was a hardcoded 2.0). Higher = darker,
+  // more contrasty AO. 2.0 reproduces current behavior.
+  float ssaoPower = 2.0f;
 
   // FXAA
   bool fxaaEnabled = true;
+  // FXAA quality: 0 = current minimal 3x3 blend, 1 = high (adds diagonal taps
+  // + a stronger directional blend for cleaner long edges). Only used when
+  // fxaaEnabled. (True SMAA needs its AreaTex/SearchTex LUT assets, which are
+  // not bundled here — this is the no-asset upgrade in that slot.)
+  int fxaaQuality = 0;
+  // Ordered (Bayer 4x4) dither applied in the present pass to break up
+  // HDR->8-bit banding on smooth gradients. 0 = off (current), 1 = ~1 LSB.
+  float ditherStrength = 0.0f;
 
   // Top-left overlay showing ImGui's smoothed framerate.
   bool showFPS = true;
+  // On-screen per-pass GPU timing HUD (reuses the gpu_profiler scopes). When
+  // off, no GL timer queries are issued. false = current (off).
+  bool showPerfHUD = false;
+
+  // Camera-frustum cull the main G-buffer pass and the directional shadow pass
+  // (point shadows already cull per face). The directional shadow pass is
+  // submission-bound (re-submits all geometry once per cascade); per-cascade
+  // culling rejects most chunks from the near cascades, so this is the primary
+  // ShadowDir win. The map is split into per-node entities with bounds, so even
+  // the terrain culls well.
+  bool mainFrustumCulling = true;
+  // Cache each entity's resolved Model* across frames to skip per-frame model-
+  // key string building + map lookups in renderEntities. false = current path.
+  bool cacheModelLookup = false;
+  // Trilinear + anisotropic filtering on model textures. 1 = current
+  // (nearest-mip / linear-mag, no anisotropy); >1 enables LINEAR_MIPMAP_LINEAR
+  // with that anisotropy level (clamped to the GL max). Applied at load and on
+  // change via a re-apply pass over loaded textures.
+  int textureAnisotropy = 1;
 
   // Pixelation: render the entire 3D scene at fb/scale, then upscale with
   // GL_NEAREST in the present pass for a chunky-pixel look. 1 = off.
@@ -68,20 +108,42 @@ struct GraphicsSettings {
 
   // Shadows
   bool shadowsEnabled = true;
-  bool pointShadowsEnabled = true;
+  bool pointShadowsEnabled = false;
   // Map sizes — changing triggers FBO/texture reallocation.
   int dirShadowMapSize = 4096;
   int pointShadowMapSize = 2048;
-  // Directional ortho frustum + depth range.
-  float dirShadowHalfExtent = 400.0f;
-  float dirShadowBackDistance = 600.0f;
-  float dirShadowFarPlane = 1600.0f;
+  // Cascaded shadow maps (directional). dirShadowMap is a texture array with
+  // shared::kShadowCascadeCount layers; each cascade fits a view-frustum slice
+  // for sharp near shadows and full coverage to the far plane.
+  bool cascadedShadows =
+      true;  // off → single stabilized map over shadowDistance
+  // Cascades cover near..shadowDistance. Kept well under farPlane (500):
+  // distant shadows are tiny on screen, and a tighter range means each
+  // cascade's ortho frustum is smaller, so per-cascade culling rejects far more
+  // geometry AND the same texels cover less area (crisper near shadows). Raise
+  // toward farPlane if long-range shadows are needed.
+  float shadowDistance =
+      250.0f;  // clamped to farPlane; cascades cover near..this
+  float shadowNearOffset =
+      2.0f;  // split-scheme near, decoupled from camera near
+  float cascadeSplitLambda = 0.7f;  // 0 = uniform splits, 1 = logarithmic
+  float cascadeCasterPullback =
+      50.0f;                      // light-space depth for off-slice casters
+  float cascadeBlendBand = 0.0f;  // 0 = hard switch; fraction of range to blend
+  bool visualizeCascades =
+      false;  // tint each cascade band in the lighting pass
   float dirShadowPolyFactor = 2.0f;
   float dirShadowPolyUnits = 4.0f;
   // Point shadow projection + bias.
   float pointShadowFarPlane = 50.0f;
   float pointShadowPolyFactor = 2.0f;
   float pointShadowPolyUnits = 4.0f;
+  // Directional-shadow PCF kernel half-width: 1 = current 3x3 (9 taps).
+  // Higher = softer, more expensive shadow edges.
+  int shadowPcfRadius = 1;
+  // Multiplies the PCF tap spacing. 1.0 = current. Higher widens the penumbra
+  // without raising the tap count.
+  float shadowSoftness = 1.0f;
   // Diffuse alpha below this is discarded during shadow passes so cutout
   // meshes (foliage, fences) cast matching-shape shadows. 0 = no cutout.
   float shadowAlphaCutoff = 0.5f;
@@ -118,6 +180,12 @@ struct GraphicsSettings {
   float celSpecularEpsilon = 0.05f;
   bool celUseRampTexture = false;
   std::string celRampPath = "";  // empty → procedural
+  // Stylized Fresnel rim light for the cel path only (Phong is untouched).
+  // 0 = off (current). The rim is hard-edged (stepped) to match cel shading.
+  float celRimStrength = 0.0f;
+  glm::vec3 celRimColor{1.0f};
+  float celRimPower = 4.0f;
+  float celRimThreshold = 0.6f;
 
   // Outlines (post-process Sobel only)
   OutlineMode outlineMode = OutlineMode::Cross;
@@ -127,6 +195,12 @@ struct GraphicsSettings {
   float outlineSobelWidth = 1.0f;
   float outlineDepthThreshold = 0.05f;
   float outlineNormalThreshold = 0.5f;
+
+  // Image-based-ambient approximation: tint the global ambient by the current
+  // skybox's average color, modulated by world-up so sky-facing surfaces read
+  // brighter. 0 = current flat ambient (no change). A robust, orientation-free
+  // stand-in for full SH irradiance IBL.
+  float iblAmbientStrength = 0.0f;
 
   // Directional-light override (off → scene/ECS values used)
   bool overrideDirLight = false;
@@ -141,6 +215,14 @@ enum class GraphicsPreset {
   HighQuality,
   Performance,
   CelShaded,
+  // Parallel "(New)" presets: each mirrors the base preset above and then
+  // opts into the new toggleable graphics features tuned for that tier. The
+  // base presets and per-field defaults are never changed, so selecting a
+  // base preset reproduces today's look exactly.
+  DefaultNew,
+  HighQualityNew,
+  PerformanceNew,
+  CelShadedNew,
   Count,
 };
 

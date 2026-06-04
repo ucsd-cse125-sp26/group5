@@ -354,6 +354,19 @@ void registerServerHandlers(ServerNetwork& network) {
         playerInput.mouseDy += pkt.mouseDy;
         playerInput.rotateTargetId = pkt.rotateTargetId;
       });
+
+  // Demo debug control panel. Deferred: just record the command; the fixed-step
+  // loop drains pendingDebugCommands via server_debug::processPendingCommands
+  // so game logic runs on the game thread at a safe point.
+  network.dispatcher().on(
+      shared::PacketType::DEBUG_COMMAND,
+      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+        (void)sender;
+        if (len < sizeof(shared::DebugCommandPacket)) return;
+        shared::DebugCommandPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.pendingDebugCommands.push_back(pkt);
+      });
 }
 
 // ── Entity serialization ─────────────────────────────────
