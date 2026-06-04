@@ -8,6 +8,47 @@ permalink: /project-spec/jacob-root-individual-report/
 
 ## Weekly Notes
 
+### Week 10 (May 04)
+
+1. What were your concrete goals for the week?
+
+- finish game
+
+1. What goals were you able to accomplish?
+
+- start menu with server selection
+- test on demo machines twice
+- skybox rendering and fixes
+- "c" (39938bcbabe689396595a97a335a865765ca9fa4, 5d16e468c8a35533dc952576dd8ab9b8c5bb936a 92d17542146cd898e77760270b99a90f25f28faa, 69dca3e88d5ab7ce2e4579645b96780993879ab6)
+- nicer looking fragments
+- hosted a game server on my homelab so people could test without being on the same lan
+- a bunch of build infra to make sure we would have working executables before the demo
+- add rat (mouse), goose, fix float above ground issue
+- end credits
+- fixed some hypothetical stability issues
+- infra for video playback
+- misc graphics performance tuning
+- misc gameplay fixes
+- misc graphics improvements
+
+1. If the week went differently than you had planned, what were the reasons?
+
+game not done; will be done by friday probably
+
+1. What are your specific goals for the next week?
+
+- eat free food
+- finish game
+- practice demo game
+- demo game
+- ~~sleep~~/play video games/finish the PAs nominally due friday but actually due saturday
+
+1. What is your individual morale (which might be different from the overall group morale)?
+the quality of cse 123 this quarter was regrettable. I suppose this is what happens when things get underfunded, oh well. at least I can say I graduated having taken a networking class so when I talk about the internet at a job they will believe me.
+
+off-topic from what I use this slot for, but "issok all cse 125 work happens in the last week anyways" - former cse125er \
+this is true
+
 ### Week 8 (May 28)
 
 1. What were your concrete goals for the week?
