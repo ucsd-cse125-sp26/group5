@@ -28,12 +28,10 @@ bool allActivePlayersInFallenHouse(const ServerGame& game) {
 }
 
 void checkCreditsTrigger(ServerGame& game) {
-  if (!allActivePlayersInFallenHouse(game)) {
-    game.creditsTriggerArmed = true;
-    return;
-  }
-  if (!game.creditsTriggerArmed) return;
-  game.creditsTriggerArmed = false;
+  // Credits roll exactly once per server lifetime.
+  if (game.creditsRolled) return;
+  if (!allActivePlayersInFallenHouse(game)) return;
+  game.creditsRolled = true;
 
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::CREDITS;
