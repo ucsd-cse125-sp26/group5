@@ -96,12 +96,10 @@ int main() {
             StateType::OVERWORLD) {
       if (g.registry.valid(slots.overworld_avatar) &&
           g.registry.all_of<shared::Position>(slots.overworld_avatar)) {
-        const glm::vec3 spawn = shared::dev_spawn::overworldSpawnPosition(
-            g.mazeLayout, g.tangramArena, slot);
+        // Keep the avatar at its spawned-in position (where this pool slot
+        // was created and has settled) instead of teleporting every login to
+        // the same join-slot spawn point.
         auto& pos = g.registry.get<shared::Position>(slots.overworld_avatar);
-        pos.x = spawn.x;
-        pos.y = spawn.y;
-        pos.z = spawn.z;
         if (shared::dev_spawn::kOverworldSpawn ==
             shared::dev_spawn::OverworldSpawn::Tangram) {
           tangram_camera::snapOverworldAvatarFaceTangramBoard(

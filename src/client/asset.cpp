@@ -424,8 +424,8 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     glBindTexture(GL_TEXTURE_2D, id);
     if (pixels) {
       glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, pixelOrder,
-                   GL_UNSIGNED_BYTE, pixels);
-      glGenerateMipmap(GL_TEXTURE_2D);
+                 GL_UNSIGNED_BYTE, pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
       GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
     } else {
       std::fprintf(stderr,

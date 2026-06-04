@@ -11,6 +11,7 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/lighting.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -23,6 +24,22 @@ bool seasonCompleted(const ServerGame& game, shared::SectionSeasonMap season) {
     if (sc.type == season && sc.completed) return true;
   }
   return false;
+}
+
+// Overworld progression order: winter → fall → summer → spring. Spring is the
+// last, so it maps to itself (collecting the final fragment doesn't wrap).
+shared::SectionSeasonMap nextSeasonInOrder(shared::SectionSeasonMap season) {
+  switch (season) {
+    case shared::SectionSeasonMap::WINTER:
+      return shared::SectionSeasonMap::FALL;
+    case shared::SectionSeasonMap::FALL:
+      return shared::SectionSeasonMap::SUMMER;
+    case shared::SectionSeasonMap::SUMMER:
+      return shared::SectionSeasonMap::SPRING;
+    case shared::SectionSeasonMap::SPRING:
+      return shared::SectionSeasonMap::SPRING;
+  }
+  return season;
 }
 
 }  // namespace
@@ -75,6 +92,17 @@ void ProcessFragmentPickups(ServerGame& game) {
           (playerInput.keys_newly_pressed & KEY_PICKUP)) {
         fragment.isPickedUp = true;
         game.registry.remove<shared::RenderInfo>(fragEntity);
+        // Removing RenderInfo isn't diffed by the normal update path, so the
+        // client would keep drawing the fragment. Despawn it explicitly (same
+        // reason the barrier removal below sends DESPAWN_ENTITY). The entity
+        // lives on server-side for its FragmentComponent/pickup state.
+        if (game.network != nullptr &&
+            game.registry.all_of<shared::Entity>(fragEntity)) {
+          shared::DespawnPacket despawn;
+          despawn.type = shared::PacketType::DESPAWN_ENTITY;
+          despawn.entityId = game.registry.get<shared::Entity>(fragEntity).id;
+          net::broadcastPacket(game.network->getHost(), despawn);
+        }
 
         // Delegate section completion to the appropriate puzzle collector.
         if (fragment.season == shared::SectionSeasonMap::WINTER) {
@@ -103,6 +131,21 @@ void ProcessFragmentPickups(ServerGame& game) {
         }
         if (shouldRestore) {
           colorizeSection(game, fragment.season);
+          // Drive progression off the fragment (the door/switch system that
+          // used to do this is never run): advance to the next season, swap
+          // the overworld scene (skybox + directional light), and unlock the
+          // next section. The final season (spring) maps to itself.
+          const shared::SectionSeasonMap next =
+              nextSeasonInOrder(fragment.season);
+          if (next != fragment.season) {
+            const entt::entity nextSection =
+                section_puzzle::findSection(game, next);
+            if (nextSection != entt::null) {
+              game.registry.get<shared::SectionController>(nextSection)
+                  .unlocked = true;
+            }
+          }
+          section_puzzle::setActiveSeason(game, next);
         }
 
         // Permanently remove barriers for this season.
@@ -117,10 +160,13 @@ void ProcessFragmentPickups(ServerGame& game) {
           }
         }
         for (auto barrier : barriersToRemove) {
-          shared::DespawnPacket pkt;
-          pkt.type = shared::PacketType::DESPAWN_ENTITY;
-          pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
-          net::broadcastPacket(game.network->getHost(), pkt);
+          if (game.network != nullptr &&
+              game.registry.all_of<shared::Entity>(barrier)) {
+            shared::DespawnPacket pkt;
+            pkt.type = shared::PacketType::DESPAWN_ENTITY;
+            pkt.entityId = game.registry.get<shared::Entity>(barrier).id;
+            net::broadcastPacket(game.network->getHost(), pkt);
+          }
 
           game.registry.destroy(
               barrier);  // on_destroy<PhysicsBody> hook cleans up the body
@@ -132,9 +178,36 @@ void ProcessFragmentPickups(ServerGame& game) {
   }
 }
 
+void SyncFragmentLights(ServerGame& game) {
+  auto view = game.registry.view<shared::FragmentComponent, shared::Position>();
+  for (auto e : view) {
+    const auto& frag = view.get<shared::FragmentComponent>(e);
+    const auto& pos = view.get<shared::Position>(e);
+    // "Revealed" == visible (has RenderInfo) and not yet collected.
+    const bool revealed =
+        !frag.isPickedUp && game.registry.all_of<shared::RenderInfo>(e);
+    const bool hasLight = game.registry.all_of<shared::PointLight>(e);
+    if (revealed && !hasLight) {
+      constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
+      // Lift the light above the fragment so its own mesh doesn't occlude the
+      // shadow cubemap in every direction (Z is up).
+      constexpr float kFragmentLightHeight = 2.5f;
+      // Color is overridden + animated client-side; these defaults are just a
+      // sane fallback. castsShadow=true so the fragment is the shadow caster.
+      game.registry.emplace<shared::PointLight>(
+          e, pos.x, pos.y, pos.z + kFragmentLightHeight, kAtt.constant,
+          kAtt.linear, kAtt.quadratic, 0.1f, 0.1f, 0.1f, 1.0f, 1.0f, 1.0f, 1.0f,
+          1.0f, 1.0f, true);
+    } else if (!revealed && hasLight) {
+      game.registry.remove<shared::PointLight>(e);
+    }
+  }
+}
+
 void tickOverworldGameLogic(ServerGame& game, float dt) {
   MoveInMainMap(game, dt);
   ProcessFragmentPickups(game);
+  SyncFragmentLights(game);
 }
 
 bool RestoreWinterColor(const ServerGame& game) {

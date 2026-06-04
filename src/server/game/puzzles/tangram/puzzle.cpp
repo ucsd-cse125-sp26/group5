@@ -600,7 +600,8 @@ void tryCompletePuzzle(ServerGame& game) {
       fragPos.z = fragmentZ;
     }
     if (game.registry.all_of<shared::RenderInfo>(fe)) continue;
-    game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
+    game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
+                                              0.25f);
     if (game.network != nullptr) {
       auto buf =
           serializeEntities(game.registry, game.componentRegistry,

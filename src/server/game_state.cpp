@@ -74,21 +74,6 @@ static void despawnTaggedEntities(ServerGame& game) {
   }
 }
 
-// Find the demo light by looking for a PointLight with a RenderInfo (the cube
-// marker). Map-loaded point lights have no RenderInfo, so this filter excludes
-// them — without it EnTT's newest-first iteration returns a map light and
-// hardcoded_spinning_light moves the wrong entity.
-template <typename Tag>
-static uint32_t findLightEntityId(ServerGame& game) {
-  auto view =
-      game.registry
-          .view<Tag, shared::PointLight, shared::RenderInfo, shared::Entity>();
-  for (auto e : view) {
-    return view.template get<shared::Entity>(e).id;
-  }
-  return kInvalidEntityId;
-}
-
 static void broadcastSpawn(ServerGame& game,
                            const std::vector<entt::entity>& entities) {
   if (entities.empty()) return;
@@ -124,17 +109,22 @@ static void addPhysicsBodies(ServerGame& game) {
   auto view = game.registry.view<Tag, shared::PhysicsBody>();
   auto& bodyInterface = game.physics.getBodyInterface();
   for (auto ent : view) {
-    // Unassigned pool avatars (playerSlot==0) stay out of the sim until
-    // connect.
+    // Unassigned pool avatars (playerSlot==0) are idle placeholders with no
+    // controller. Add them activated so gravity settles them onto the ground
+    // (otherwise they hover at their spawn height); assigned avatars wake on
+    // their first input.
+    bool unassignedPool = false;
     if (game.registry.all_of<shared::PlayerInput, shared::RenderInfo>(ent)) {
       const uint8_t slot =
           game.registry.get<shared::RenderInfo>(ent).playerSlot;
-      if (slot == 0) continue;
+      unassignedPool = (slot == 0);
     }
     auto& phys = view.template get<shared::PhysicsBody>(ent);
     JPH::BodyID bodyId(phys.bodyId);
     if (!bodyInterface.IsAdded(bodyId)) {
-      bodyInterface.AddBody(bodyId, JPH::EActivation::DontActivate);
+      bodyInterface.AddBody(bodyId, unassignedPool
+                                        ? JPH::EActivation::Activate
+                                        : JPH::EActivation::DontActivate);
     }
     // Prime wasGrounded=true so the first grounded tick doesn't look like a
     // landing
@@ -248,17 +238,14 @@ GeneratedMazeData buildGeneratedMazeData() {
   return data;
 }
 
+// Per-world scene anchor: a tagged, replicated entity that just holds the
+// active Scene (skybox + directional light). setActiveSeason and
+// scene_cycle_system mutate its name; the client reads it to pick the scene.
+// It has no light or model of its own (this was formerly the demo "spinning
+// light", now stripped down to the anchor it doubled as).
 template <typename Tag>
-void spawnDemoLight(ServerGame& game, const char* sceneName) {
+void spawnSceneAnchor(ServerGame& game, const char* sceneName) {
   auto [eid, ent] = new_entity(game);
-  game.registry.emplace<shared::Position>(ent, 5.0f, 0.0f, 3.0f, 1.0f, 0.0f,
-                                          0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(ent, "light_cube", 0.2f, 0.2f,
-                                            0.2f);
-  constexpr auto kAtt = shared::kDefaultPointLightAttenuation;
-  game.registry.emplace<shared::PointLight>(
-      ent, 5.0f, 0.0f, 3.0f, kAtt.constant, kAtt.linear, kAtt.quadratic, 0.1f,
-      0.1f, 0.1f, 0.8f, 0.8f, 0.8f, 1.0f, 1.0f, 1.0f);
   game.registry.emplace<shared::Scene>(ent, sceneName);
   game.registry.emplace<Tag>(ent);
 }
@@ -334,7 +321,7 @@ std::vector<StaticEntityDesc> buildGeneratedMazeEntities() {
 
 void initWorldEntities(ServerGame& game) {
   // --- Overworld ---
-  spawnDemoLight<shared::OverworldTag>(game, "sunny");
+  spawnSceneAnchor<shared::OverworldTag>(game, "sunny");
 
   // Hardcoded moon for the winter scene. Lives just past the northern
   // landscape edge at roughly main-map Z so it reads as a giant horizon moon.
@@ -349,6 +336,27 @@ void initWorldEntities(ServerGame& game) {
     game.registry.emplace<shared::RenderInfo>(moonEnt, "moon", 200.0f, 200.0f,
                                               200.0f);
     game.registry.emplace<shared::OverworldTag>(moonEnt);
+  }
+
+  // Hardcoded suns, one per daytime scene. Like the moon, each is always in
+  // the registry and the client filters it to its scene. Positions sit at
+  // -normalize(dir) * ~385 so the sun lands on the incoming light ray of the
+  // matching SceneInfo (morning / noon / sunset) — keep them in sync with
+  // those dirX/Y/Z values.
+  struct SunSpawn {
+    const char* model;
+    float x, y, z;
+  };
+  for (const SunSpawn& sun : {
+           SunSpawn{"sun_morning", -336.1f, -168.0f, 84.0f},
+           SunSpawn{"sun_sunset", 353.2f, -98.1f, 117.7f},
+       }) {
+    auto [sunId, sunEnt] = new_entity(game);
+    game.registry.emplace<shared::Position>(sunEnt, sun.x, sun.y, sun.z, 1.0f,
+                                            0.0f, 0.0f, 0.0f);
+    game.registry.emplace<shared::RenderInfo>(sunEnt, sun.model, 200.0f, 200.0f,
+                                              200.0f);
+    game.registry.emplace<shared::OverworldTag>(sunEnt);
   }
 
   game.tangramArena = shared::tangram::ArenaLayout::defaults();
@@ -487,7 +495,7 @@ void initWorldEntities(ServerGame& game) {
   }
 
   // --- Maze ---
-  spawnDemoLight<shared::MazeTag>(game, "night");
+  spawnSceneAnchor<shared::MazeTag>(game, "night");
   spawnStaticEntities<shared::MazeTag>(game, buildGeneratedMazeEntities());
 
   // --- Pool slots ---
@@ -497,7 +505,9 @@ void initWorldEntities(ServerGame& game) {
 
     auto [overworldEntityId, overworldEntity] = new_entity(game);
     spawnPlayerAvatar<shared::OverworldTag>(
-        game, overworldEntity, std::string(shared::PLAYER_MODEL_CYCLE[0]),
+        game, overworldEntity,
+        std::string(
+            shared::PLAYER_MODEL_CYCLE[i % shared::PLAYER_MODEL_CYCLE_COUNT]),
         shared::dev_spawn::overworldSpawnPosition(game.mazeLayout,
                                                   game.tangramArena, slot),
         glm::vec3(1.0f));
@@ -639,9 +649,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     movement_system(game, dt, StateType::OVERWORLD);
     tangram_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
-    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-    if (lightId != kInvalidEntityId)
-      hardcoded_spinning_light(game.registry, dt, lightId);
     scene_cycle_system(game.registry, StateType::OVERWORLD);
     return;
   }
@@ -650,9 +657,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
-    uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-    if (lightId != kInvalidEntityId)
-      hardcoded_spinning_light(game.registry, dt, lightId);
     scene_cycle_system(game.registry, StateType::OVERWORLD);
     return;
   }
@@ -769,6 +773,39 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
+  // DEBUG: press F to reveal/spawn the fragment for the current active season.
+  // Mirrors the puzzle-solve reveal flow (emplace RenderInfo "fragment" +
+  // broadcast SPAWN_ENTITY); pick which fragment with the Y season-cycle key.
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
+    shared::SectionSeasonMap season = shared::SectionSeasonMap::WINTER;
+    auto gsView = game.registry.view<shared::GameSection>();
+    for (auto e : gsView) {
+      season = gsView.get<shared::GameSection>(e).currentActiveSeason;
+      break;
+    }
+    auto frags = game.registry.view<shared::FragmentComponent>();
+    for (auto fe : frags) {
+      if (frags.get<shared::FragmentComponent>(fe).season != season) continue;
+      if (game.registry.all_of<shared::RenderInfo>(fe)) {
+        printf("DEBUG: %s fragment already revealed\n",
+               section_puzzle::sceneNameForSeason(season));
+        break;
+      }
+      game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
+                                                0.25f);
+      auto buf =
+          serializeEntities(game.registry, game.componentRegistry,
+                            shared::PacketType::SPAWN_ENTITY, {fe}, false);
+      net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+      printf("DEBUG: spawned %s fragment\n",
+             section_puzzle::sceneNameForSeason(season));
+      break;
+    }
+    break;
+  }
+
   // DEBUG: press V to snap all players onto the summer trigger pad (F2 debug
   // on).
   for (auto ent : inputView) {
@@ -818,9 +855,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
-  uint32_t lightId = findLightEntityId<shared::OverworldTag>(game);
-  if (lightId != kInvalidEntityId)
-    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
 
@@ -891,8 +925,5 @@ void MazeState::update(ServerGame& game, float dt) {
   // here.
   render_model_change(game, dt);
 
-  uint32_t lightId = findLightEntityId<shared::MazeTag>(game);
-  if (lightId != kInvalidEntityId)
-    hardcoded_spinning_light(game.registry, dt, lightId);
   scene_cycle_system(game.registry, StateType::MAZE);
 }

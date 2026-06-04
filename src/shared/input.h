@@ -11,8 +11,6 @@ constexpr InputKeys KEY_JUMP = 1 << 4;
 constexpr InputKeys KEY_SWAP_MODEL = 1 << 5;
 constexpr InputKeys KEY_MODEL_SMALLER = 1 << 6;
 constexpr InputKeys KEY_MODEL_BIGGER = 1 << 7;
-constexpr InputKeys KEY_LIGHT_DIM = 1 << 8;
-constexpr InputKeys KEY_LIGHT_BRIGHT = 1 << 9;
 constexpr InputKeys KEY_CYCLE_SCENE = 1 << 10;
 constexpr InputKeys KEY_ENTER_MAZE = 1 << 11;
 constexpr InputKeys KEY_EXIT_MINIGAME = 1 << 12;
@@ -33,3 +31,5 @@ constexpr InputKeys KEY_DEBUG_TOGGLE_BARRIERS = 1 << 22;
 constexpr InputKeys KEY_DEBUG_SUMMER_PAD = 1 << 23;
 // Debug: cycle the active season (Y key). Advances winter→spring→summer→fall.
 constexpr InputKeys KEY_DEBUG_CYCLE_SEASON = 1 << 24;
+// Debug: reveal/spawn the fragment for the current active season (F key).
+constexpr InputKeys KEY_DEBUG_SPAWN_FRAGMENT = 1 << 25;

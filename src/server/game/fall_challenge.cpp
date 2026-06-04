@@ -340,7 +340,8 @@ void fall_challenge_system(ServerGame& game, float dt) {
         continue;
       if (game.registry.all_of<shared::RenderInfo>(fe))
         continue;  // already shown
-      game.registry.emplace<shared::RenderInfo>(fe, "light_cube", 0.5f);
+      game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
+                                                0.25f);
       auto buf =
           serializeEntities(game.registry, game.componentRegistry,
                             shared::PacketType::SPAWN_ENTITY, {fe}, false);
