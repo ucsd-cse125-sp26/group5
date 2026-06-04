@@ -763,6 +763,10 @@ bool Graphics::load(int width, int height) {
                             "shaders/fragment_shadow_point.glsl");
   debugOverlay.emplace("shaders/vertex_present.glsl",
                        "shaders/fragment_debug_overlay.glsl");
+  videoYuvShader.emplace("shaders/vertex_present.glsl",
+                         "shaders/fragment_video_yuv.glsl");
+  videoQuadShader.emplace("shaders/vertex_video_quad.glsl",
+                          "shaders/fragment_video_yuv.glsl");
 
   // Shader ctor failures are silent at runtime so F5 hot-reload can keep
   // the previous program — at startup there is no previous program, so
@@ -789,6 +793,32 @@ bool Graphics::load(int width, int height) {
   // Empty VAO for fullscreen-triangle draws; positions synthesized from
   // gl_VertexID in vertex_present.glsl.
   glGenVertexArrays(1, &fullscreenVAO);
+
+  // Unit quad (XY plane, z=0) for the in-world video screen. pos@0, uv@2 to
+  // match vertex_video_quad.glsl.
+  {
+    const float quadVerts[] = {
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.0f,
+        0.5f,  0.5f,  0.0f, 1.0f, 1.0f, -0.5f, 0.5f,  0.0f, 0.0f, 1.0f,
+    };
+    const unsigned int quadIdx[] = {0, 1, 2, 0, 2, 3};
+    glGenVertexArrays(1, &videoQuadVAO);
+    glGenBuffers(1, &videoQuadVBO);
+    glGenBuffers(1, &videoQuadEBO);
+    glBindVertexArray(videoQuadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, videoQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVerts), quadVerts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, videoQuadEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIdx), quadIdx,
+                 GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+  }
 
   glGenBuffers(1, &cameraUBO);
   glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
@@ -1146,7 +1176,7 @@ void Graphics::resizeBuffers(int width, int height) {
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
   for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
-                  &outlineSobelShader, &ssaoShader}) {
+                  &outlineSobelShader, &ssaoShader, &videoQuadShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -1210,6 +1240,14 @@ void Graphics::reloadShaders() {
       {.slot = debugOverlay,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_debug_overlay.glsl",
+       .geom = ""},
+      {.slot = videoYuvShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_video_yuv.glsl",
+       .geom = ""},
+      {.slot = videoQuadShader,
+       .vert = "shaders/vertex_video_quad.glsl",
+       .frag = "shaders/fragment_video_yuv.glsl",
        .geom = ""},
   };
   for (auto& r : reloads) {
@@ -1305,6 +1343,40 @@ void Graphics::processDebugKeys() {
   keyF2Prev = f2;
   keyF5Prev = f5;
   keyF11Prev = f11;
+
+  // F8: play the first clip fullscreen locally (no server needed) for testing.
+  bool f8 = glfwGetKey(window, GLFW_KEY_F8) == GLFW_PRESS;
+  if (f8 && !keyF8Prev) handleVideoRequest(VideoRequest{0, 0, 0, 0, false});
+  keyF8Prev = f8;
+
+  // Enter dismisses an active fullscreen cutscene.
+  bool skip = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
+  if (skip && !keySkipPrev && videoMode == VideoMode::Fullscreen) {
+    if (videoPlayer) videoPlayer->stop();
+    videoMode = VideoMode::None;
+  }
+  keySkipPrev = skip;
+}
+
+void Graphics::handleVideoRequest(const VideoRequest& req) {
+  if (req.stop) {
+    if (videoPlayer) videoPlayer->stop();
+    videoMode = VideoMode::None;
+    return;
+  }
+  const std::string path = videoPathFor(req.videoId);
+  if (path.empty()) {
+    fprintf(stderr, "handleVideoRequest: unknown videoId %u\n", req.videoId);
+    return;
+  }
+  videoPlayer.emplace();  // destroys any previous player (frees its GL textures)
+  if (!videoPlayer->open(path, req.loop != 0)) {
+    videoPlayer.reset();
+    videoMode = VideoMode::None;
+    return;
+  }
+  videoMode = (req.mode == 1) ? VideoMode::InWorld : VideoMode::Fullscreen;
+  videoTargetEntityId = req.targetEntityId;
 }
 
 void Graphics::drawDebugOverlay() {
@@ -1489,6 +1561,13 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   const float dt =
       lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
   lastFrameTime = now;
+  if (videoPlayer && videoPlayer->isPlaying()) {
+    videoPlayer->update(dt);
+    // A finished non-looping cutscene clears itself.
+    if (!videoPlayer->isPlaying() && videoMode == VideoMode::Fullscreen) {
+      videoMode = VideoMode::None;
+    }
+  }
   updateAnimators(*this, game, dt);
 
   projection = glm::perspective(
@@ -1757,6 +1836,48 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     }
   }
 
+  // In-world video screen: forward draw into the HDR litFBO (still bound; the
+  // skybox pass blitted g-buffer depth into litDepth and left depth-test on).
+  // Emissive, depth-tested, written to litColor only (COLOR_ATTACHMENT0).
+  if (videoMode == VideoMode::InWorld && videoPlayer &&
+      videoPlayer->isPlaying() && videoQuadShader && videoQuadShader->valid() &&
+      videoQuadVAO) {
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+
+    // Screen transform: from the target entity's Position if present, else a
+    // fixed quad. Orientation/scale likely need tuning per real placement.
+    float h = 3.0f;
+    float w = h * videoPlayer->aspect();
+    glm::vec3 center(0.0f, 5.0f, 0.0f);
+    auto it = game.renderEntityMap.find(videoTargetEntityId);
+    if (videoTargetEntityId != 0 && it != game.renderEntityMap.end() &&
+        game.renderRegistry.valid(it->second) &&
+        game.renderRegistry.all_of<shared::Position>(it->second)) {
+      const auto& p = game.renderRegistry.get<shared::Position>(it->second);
+      center = glm::vec3(p.x, p.y, p.z);
+    }
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), center) *
+                      glm::scale(glm::mat4(1.0f), glm::vec3(w, h, 1.0f));
+
+    videoQuadShader->use();
+    videoQuadShader->setMat4("model", model);
+    videoPlayer->bindPlanes(0, 1, 2);
+    videoQuadShader->setInt("texY", 0);
+    videoQuadShader->setInt("texCb", 1);
+    videoQuadShader->setInt("texCr", 2);
+    videoQuadShader->setVec2("texScale", videoPlayer->texScaleX(),
+                             videoPlayer->texScaleY());
+    videoQuadShader->setVec2("fit", 1.0f, 1.0f);
+    videoQuadShader->setInt("linearize", 1);
+    videoQuadShader->setFloat("emissiveBoost", 1.5f);
+    glBindVertexArray(videoQuadVAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+    glActiveTexture(GL_TEXTURE0);
+  }
+
   GLuint finalBloomColor = brightColor;
   const int effectiveBloomIters =
       settings.bloomEnabled ? settings.bloomBlurIterations : 0;
@@ -1910,6 +2031,38 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     if (shared::tangram_roles::canRotate(stage, slot)) {
       drawTangramCrosshair(fbWidth, fbHeight);
     }
+  }
+
+  // Fullscreen video overlay: drawn over the finished (post-tonemap) frame, so
+  // it outputs display-referred RGB directly. Game keeps running underneath;
+  // Enter dismisses (see processDebugKeys).
+  if (videoMode == VideoMode::Fullscreen && videoPlayer &&
+      videoPlayer->isPlaying() && videoYuvShader && videoYuvShader->valid() &&
+      fullscreenVAO) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    videoYuvShader->use();
+    videoPlayer->bindPlanes(0, 1, 2);
+    videoYuvShader->setInt("texY", 0);
+    videoYuvShader->setInt("texCb", 1);
+    videoYuvShader->setInt("texCr", 2);
+    videoYuvShader->setVec2("texScale", videoPlayer->texScaleX(),
+                            videoPlayer->texScaleY());
+    const float winAspect =
+        fbHeight > 0 ? static_cast<float>(fbWidth) / fbHeight : 1.0f;
+    const float vidAspect = videoPlayer->aspect();
+    const glm::vec2 fit = (winAspect > vidAspect)
+                              ? glm::vec2(winAspect / vidAspect, 1.0f)
+                              : glm::vec2(1.0f, vidAspect / winAspect);
+    videoYuvShader->setVec2("fit", fit.x, fit.y);
+    videoYuvShader->setInt("linearize", 0);
+    videoYuvShader->setFloat("emissiveBoost", 1.0f);
+    glBindVertexArray(fullscreenVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glActiveTexture(GL_TEXTURE0);
   }
 
   drawDebugOverlay();

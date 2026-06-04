@@ -246,6 +246,24 @@ void registerClientHandlers(ClientNetwork& network) {
               static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
         }
       });
+
+  // Runs on the network thread — GL is invalid here, so only enqueue a request
+  // for the render thread (main.cpp) to act on.
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_PLAY,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::VideoPlayPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.videoQueue.tryPush(VideoRequest{pkt.videoId, pkt.mode, pkt.loop,
+                                             pkt.targetEntityId,
+                                             /*stop=*/false});
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_STOP,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        game.videoQueue.tryPush(VideoRequest{0, 0, 0, 0, /*stop=*/true});
+      });
 }
 
 void syncToRender(ClientGame& game) {

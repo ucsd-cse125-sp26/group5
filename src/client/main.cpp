@@ -135,6 +135,10 @@ int main() {
     game.audio.setListenerPosition(lx, ly, lz, fwdX, fwdY, fwdZ);
     updateSoundEmitters(game, lx, ly, lz, dt);  // pass dt
 
+    // Apply any server-driven video requests on the render/GL thread.
+    VideoRequest videoReq;
+    while (game.videoQueue.tryPop(videoReq)) graphics.handleVideoRequest(videoReq);
+
     graphics.render(game, network);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");

@@ -44,6 +44,9 @@ target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
 add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE lib/stb)
 
+add_library(pl_mpeg INTERFACE)
+target_include_directories(pl_mpeg INTERFACE lib/pl_mpeg)
+
 target_link_libraries(shared PUBLIC zpp_bits assimp)
 
 # Path to glad directory
@@ -177,9 +180,10 @@ target_sources(client PRIVATE
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
     src/client/puzzle_hud.cpp
+    src/client/video_player.cpp
 )
-target_link_libraries(client PRIVATE shared 
-    glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud
+target_link_libraries(client PRIVATE shared
+    glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud pl_mpeg
 )
 
 add_custom_command(TARGET client POST_BUILD
