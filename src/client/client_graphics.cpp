@@ -813,7 +813,7 @@ bool Graphics::load(int width, int height) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIdx), quadIdx,
                  GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                          (void*)0);
+                          (void*)nullptr);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void*)(3 * sizeof(float)));
@@ -1875,7 +1875,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     videoQuadShader->setInt("linearize", 1);
     videoQuadShader->setFloat("emissiveBoost", 1.5f);
     glBindVertexArray(videoQuadVAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
     glActiveTexture(GL_TEXTURE0);
   }
@@ -2420,7 +2420,7 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
 
   const double now = glfwGetTime();
   if (creditsStartTime < 0.0) creditsStartTime = now;
-  const float elapsed = static_cast<float>(now - creditsStartTime);
+  const auto elapsed = static_cast<float>(now - creditsStartTime);
 
   // Edit these lines to credit the team.
   static const char* kCreditsLines[] = {

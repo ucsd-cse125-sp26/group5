@@ -134,6 +134,6 @@ float VideoPlayer::aspect() const {
 }
 
 std::string videoPathFor(uint16_t id) {
-  if (id >= sizeof(kVideoPaths) / sizeof(kVideoPaths[0])) return std::string();
+  if (id >= sizeof(kVideoPaths) / sizeof(kVideoPaths[0])) return {};
   return (exeDir() / kVideoPaths[id]).string();
 }
