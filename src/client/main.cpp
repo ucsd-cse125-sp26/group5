@@ -71,6 +71,11 @@ int main() {
     return EXIT_SUCCESS;
   }
 
+  // Init audio before the network thread so SEASON_MUSIC on connect is heard.
+  if (!game.audio.init()) {
+    printf("Audio init failed; continuing without audio\n");
+  }
+
   // Back to mouselook for gameplay.
   glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -83,16 +88,6 @@ int main() {
       (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.tangramArena);
   game.mazeLayout.applyHeightBoost();
   game.tangramArena.applyHeightBoost();
-
-  // if (!game.audio.init()) {
-  //   game.running.store(false, std::memory_order_release);
-  //   networkThread.join();
-  //   return EXIT_FAILURE;
-  // }
-
-  if (!game.audio.init()) {
-    printf("Audio init failed; continuing without audio\n");
-  }
 
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {

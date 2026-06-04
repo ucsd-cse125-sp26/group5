@@ -112,11 +112,17 @@ if(NOT MSVC)
 endif()
 
 target_compile_definitions(soloud PUBLIC
-    WITH_MINIAUDIO 
+    WITH_MINIAUDIO
     #MA_DEBUG_OUTPUT
     #MA_NO_RUNTIME_LINKING
     MA_NO_JACK
 )
+
+if(APPLE)
+    target_sources(soloud PRIVATE
+        lib/soloud/src/backend/coreaudio/soloud_coreaudio.cpp)
+    target_compile_definitions(soloud PUBLIC WITH_COREAUDIO)
+endif()
 
 # if(UNIX AND NOT APPLE)
 #     target_compile_definitions(soloud PUBLIC

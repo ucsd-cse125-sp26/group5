@@ -6,7 +6,8 @@
 #include "server/game/maze.h"
 #include "server/game/section_puzzle.h"
 #include "server/game/summer_escape.h"
-#include "server/server_game.h"
+#include "server/server_game.h"  // serializeEntities
+#include <vector>
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
 #include "shared/components.h"
@@ -14,6 +15,8 @@
 #include "shared/lighting.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/dev_spawn.h"
+#include "shared/sound_constants.h"  // music_config, SoundId
 
 namespace {
 
@@ -129,7 +132,14 @@ void ProcessFragmentPickups(ServerGame& game) {
         } else if (fragment.season == shared::SectionSeasonMap::SPRING) {
           shouldRestore = RestoreSpringColor(game);
         }
+        // Music test only: allow pickup progression without puzzle completion.
+        // Production: shouldRestore stays false until the section is finished.
+        if (shared::dev_spawn::kMusicFragmentPickupTest) {
+          shouldRestore = true;
+        }
         if (shouldRestore) {
+          // Season music (Winter→Fall→Summer→Spring→AfterSpring) for both test
+          // and production — same syncOverworldSeasonMusic path.
           colorizeSection(game, fragment.season);
           // Drive progression off the fragment (the door/switch system that
           // used to do this is never run): advance to the next season, swap
@@ -146,6 +156,12 @@ void ProcessFragmentPickups(ServerGame& game) {
             }
           }
           section_puzzle::setActiveSeason(game, next);
+          syncOverworldSeasonMusic(
+              game, fragment.season == shared::SectionSeasonMap::SPRING);
+          if (shared::dev_spawn::kMusicFragmentPickupTest &&
+              fragment.season != shared::SectionSeasonMap::SPRING) {
+            debugRevealActiveSeasonFragmentNearPlayer(game, playerEntity);
+          }
         }
 
         // Permanently remove barriers for this season.
@@ -275,4 +291,100 @@ void OpenSectionDoor(ServerGame& game, entt::entity doorEnt,
   }
 
   section_puzzle::setActiveSeason(game, nextSeason);
+}
+
+namespace {
+
+shared::SoundId soundIdForActiveSeason(shared::SectionSeasonMap season) {
+  switch (season) {
+    case shared::SectionSeasonMap::WINTER:
+      return shared::SoundId::SECTION_WINTER_AMBIENT;
+    case shared::SectionSeasonMap::FALL:
+      return shared::SoundId::SECTION_FALL_AMBIENT;
+    case shared::SectionSeasonMap::SUMMER:
+      return shared::SoundId::SECTION_SUMMER_AMBIENT;
+    case shared::SectionSeasonMap::SPRING:
+      return shared::SoundId::SECTION_SPRING_AMBIENT;
+  }
+  return shared::SoundId::SECTION_WINTER_AMBIENT;
+}
+
+}  // namespace
+
+void syncOverworldSeasonMusic(ServerGame& game,
+                              bool afterSpringFragmentPickup) {
+  if (game.network == nullptr) return;
+
+  shared::SoundId soundId = shared::SoundId::SECTION_WINTER_AMBIENT;
+  if (afterSpringFragmentPickup) {
+    soundId = shared::SoundId::SECTION_AFTER_SPRING_AMBIENT;
+  } else {
+    auto gsView = game.registry.view<shared::GameSection>();
+    for (auto e : gsView) {
+      soundId = soundIdForActiveSeason(
+          gsView.get<shared::GameSection>(e).currentActiveSeason);
+      break;
+    }
+  }
+
+  shared::SeasonMusicPacket pkt;
+  pkt.soundId = static_cast<uint32_t>(soundId);
+  pkt.volume = shared::music_config::kSeasonMusicVolume;
+  net::broadcastPacket(game.network->getHost(), pkt);
+}
+
+void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
+                                               entt::entity player) {
+  if (player == entt::null || !game.registry.all_of<shared::Position>(player)) {
+    return;
+  }
+
+  shared::SectionSeasonMap season = shared::SectionSeasonMap::WINTER;
+  auto gsView = game.registry.view<shared::GameSection>();
+  for (auto e : gsView) {
+    season = gsView.get<shared::GameSection>(e).currentActiveSeason;
+    break;
+  }
+
+  const auto& playerPos = game.registry.get<shared::Position>(player);
+  entt::entity fragEnt = entt::null;
+  auto frags = game.registry.view<shared::FragmentComponent>();
+  for (auto fe : frags) {
+    const auto& frag = frags.get<shared::FragmentComponent>(fe);
+    if (frag.season != season || frag.isPickedUp) continue;
+    fragEnt = fe;
+    break;
+  }
+  if (fragEnt == entt::null) {
+    printf("DEBUG: no %s fragment left to reveal\n",
+           section_puzzle::sceneNameForSeason(season));
+    return;
+  }
+
+  auto& pos = game.registry.get<shared::Position>(fragEnt);
+  pos.x = playerPos.x + 3.0f;
+  pos.y = playerPos.y;
+  pos.z = playerPos.z;
+
+  const bool needsSpawn = !game.registry.all_of<shared::RenderInfo>(fragEnt);
+  if (needsSpawn) {
+    game.registry.emplace<shared::RenderInfo>(fragEnt, "fragment", 0.25f, 0.25f,
+                                              0.25f);
+  }
+  if (game.network == nullptr) return;
+
+  if (needsSpawn) {
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::SPAWN_ENTITY, {fragEnt},
+                                 false);
+    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+  } else {
+    auto buf = serializeEntities(game.registry, game.componentRegistry,
+                                 shared::PacketType::UPDATE_ENTITY, {fragEnt},
+                                 false);
+    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+  }
+  printf(
+      "DEBUG: %s fragment beside you (F2 then F to respawn; E to pick up)\n",
+      section_puzzle::sceneNameForSeason(season));
 }

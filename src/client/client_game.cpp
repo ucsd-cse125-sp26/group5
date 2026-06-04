@@ -234,13 +234,19 @@ void registerClientHandlers(ClientNetwork& network) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.audio.stopAllGlobalLoops();
-        if (pkt.state == shared::GameStateType::OVERWORLD) {
-          game.audio.playGlobalLoop(
-              static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
-        } else if (pkt.state == shared::GameStateType::MAZE) {
+        if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         }
+        // Overworld seasonal music arrives via SEASON_MUSIC.
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::SEASON_MUSIC,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::SeasonMusicPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.audio.playGlobalLoop(pkt.soundId, pkt.volume);
       });
 }
 
@@ -371,7 +377,10 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
+    // Music test (server kMusicFragmentPickupTest): press F2 once, then F.
     if (debugMode) {
+      if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+        keys |= KEY_DEBUG_SPAWN_FRAGMENT;
       if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
         keys |= KEY_DEBUG_COMPLETE_SECTION;
       if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS)
@@ -382,8 +391,6 @@ void processInput(GLFWwindow* window, const ClientGame& game,
         keys |= KEY_DEBUG_SUMMER_PAD;
       if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS)
         keys |= KEY_DEBUG_CYCLE_SEASON;
-      if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-        keys |= KEY_DEBUG_SPAWN_FRAGMENT;
     }
   }
 

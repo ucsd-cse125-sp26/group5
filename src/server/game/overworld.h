@@ -38,3 +38,12 @@ void SyncFragmentLights(ServerGame& game);
 
 // Overworld-only rules (doors, section progress, etc.).
 void tickOverworldGameLogic(ServerGame& game, float dt);
+
+// Broadcast the overworld seasonal music track matching GameSection (or
+// AfterSpring when afterSpringFragmentPickup is true).
+void syncOverworldSeasonMusic(ServerGame& game,
+                              bool afterSpringFragmentPickup = false);
+
+// Reveal the fragment for the current active season beside the player (~3 m).
+void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
+                                                entt::entity player);

@@ -612,6 +612,7 @@ void OverworldState::onEnter(ServerGame& game) {
   }
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
+  syncOverworldSeasonMusic(game);
 }
 
 void OverworldState::onExit(ServerGame& game) {
@@ -767,18 +768,24 @@ void OverworldState::update(ServerGame& game, float dt) {
       // Resize every player's ColorBoundingBox to match the new season so
       // color restoration tracks the cycle (Y key is desat-region debug too).
       colorizeSection(game, next);
+      syncOverworldSeasonMusic(game);
       printf("DEBUG: cycled active season to %s\n",
              section_puzzle::sceneNameForSeason(next));
       break;
     }
   }
 
-  // DEBUG: press F to reveal/spawn the fragment for the current active season.
-  // Mirrors the puzzle-solve reveal flow (emplace RenderInfo "fragment" +
-  // broadcast SPAWN_ENTITY); pick which fragment with the Y season-cycle key.
+  // DEBUG: F2 on client enables debug, then F spawns one fragment (music test).
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
+    if (!game.registry.all_of<shared::Position>(ent)) break;
+
+    if (shared::dev_spawn::kMusicFragmentPickupTest) {
+      debugRevealActiveSeasonFragmentNearPlayer(game, ent);
+      break;
+    }
+
     shared::SectionSeasonMap season = shared::SectionSeasonMap::WINTER;
     auto gsView = game.registry.view<shared::GameSection>();
     for (auto e : gsView) {

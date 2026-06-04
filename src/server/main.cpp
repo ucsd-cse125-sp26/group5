@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "game_state.h"
+#include "server/game/overworld.h"
 #include "server/game/puzzles/maze/camera.h"
 #include "server/game/puzzles/maze/puzzle.h"
 #include "server/game/puzzles/maze/trigger.h"
@@ -151,6 +152,9 @@ int main() {
       statePkt.state = shared::GameStateType::MAZE;
     }
     net::sendPacket(peer, statePkt);
+    if (statePkt.state == shared::GameStateType::OVERWORLD) {
+      syncOverworldSeasonMusic(g);
+    }
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {

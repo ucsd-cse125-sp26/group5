@@ -16,6 +16,7 @@ enum class SoundId : uint32_t {
   SECTION_FALL_AMBIENT,
   SECTION_SUMMER_AMBIENT,
   SECTION_SPRING_AMBIENT,
+  SECTION_AFTER_SPRING_AMBIENT,
   // Puzzle event sounds
   PUZZLE_SWITCH_FLIP,
   PUZZLE_DOOR_OPEN,
@@ -29,4 +30,13 @@ enum class SoundId : uint32_t {
   FOOTSTEP_4,
 };
 
-}
+// Overworld seasonal loop playback (client AudioEngine).
+// Each season track is one file looped continuously (setLooping).
+namespace music_config {
+// AfterSpring.wav: start / loop from this timestamp (seconds).
+// 1:12 => 72. Edit here if you re-export the WAV.
+inline constexpr float kAfterSpringLoopStartSeconds = 72.0f;
+inline constexpr float kSeasonMusicVolume = 0.35f;
+}  // namespace music_config
+
+}  // namespace shared
