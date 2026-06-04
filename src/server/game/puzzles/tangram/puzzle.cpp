@@ -861,6 +861,18 @@ void endPuzzle(ServerGame& game) {
   tangram_role_server::revertCollisionRoles(game);
   setActiveFlag(game, false);
 
+  // The controller carries no per-frame-synced component, so it never rides the
+  // tick UPDATE_ENTITY broadcast; push it explicitly or clients keep
+  // OverworldTangramPuzzleState.active == true forever (stuck crosshair / R).
+  if (game.network != nullptr &&
+      game.registry.valid(game.overworldTangramController)) {
+    auto buf = serializeEntities(
+        game.registry, game.componentRegistry,
+        shared::PacketType::UPDATE_ENTITY, {game.overworldTangramController},
+        false);
+    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
+  }
+
   auto despawnEnt = [&](entt::entity ent) {
     if (!game.registry.valid(ent)) return;
     if (game.network != nullptr) {

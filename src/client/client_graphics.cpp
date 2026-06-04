@@ -1420,6 +1420,11 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
 
+  if (game.serverLost.load(std::memory_order_acquire)) {
+    renderLostConnectionScreen(game);
+    return;
+  }
+
   if (game.currentGameState == shared::GameStateType::CREDITS) {
     renderCreditsScreen(game);
     return;
@@ -2325,6 +2330,54 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
     const float hintW = ImGui::CalcTextSize(hint).x;
     ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - hintW) * 0.5f,
                                io.DisplaySize.y - 40.0f));
+    ImGui::TextUnformatted(hint);
+  }
+  ImGui::End();
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  // No buffer swap here — the main loop calls graphics.swap() after render().
+}
+
+void Graphics::renderLostConnectionScreen(ClientGame& game) {
+  (void)game;
+  if (!window) return;
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  if (fbWidth <= 0 || fbHeight <= 0) return;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, fbWidth, fbHeight);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
+  glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  if (!ImGui::GetCurrentContext()) return;
+
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  ImGuiIO& io = ImGui::GetIO();
+
+  ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(io.DisplaySize);
+  const ImGuiWindowFlags flags =
+      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoSavedSettings;
+  if (ImGui::Begin("##LostConnection", nullptr, flags)) {
+    ImGui::SetWindowFontScale(2.4f);
+    const char* title = "Lost connection to server";
+    const float titleW = ImGui::CalcTextSize(title).x;
+    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - titleW) * 0.5f,
+                               io.DisplaySize.y * 0.5f - 40.0f));
+    ImGui::TextUnformatted(title);
+
+    ImGui::SetWindowFontScale(1.2f);
+    const char* hint = "Close the window to exit, then relaunch to reconnect";
+    const float hintW = ImGui::CalcTextSize(hint).x;
+    ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - hintW) * 0.5f,
+                               io.DisplaySize.y * 0.5f + 20.0f));
     ImGui::TextUnformatted(hint);
   }
   ImGui::End();

@@ -31,6 +31,9 @@ struct ClientGame {
   std::mutex snapshotMutex;
   std::atomic<bool> snapshotDirty = false;
   std::atomic<bool> running = true;
+  // Set by the network thread on server disconnect; the render thread shows a
+  // "lost connection" overlay instead of a frozen world.
+  std::atomic<bool> serverLost = false;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
   shared::maze_layout::Config mazeLayout =

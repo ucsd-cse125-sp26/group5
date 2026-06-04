@@ -227,6 +227,10 @@ struct Graphics {
   // while the client is in the CREDITS state. Does not swap buffers.
   void renderCreditsScreen(ClientGame& game);
 
+  // Full-screen overlay shown when the server connection drops. Drawn instead
+  // of the 3D world; does not swap buffers.
+  void renderLostConnectionScreen(ClientGame& game);
+
   // Server-select menu rendered after assets finish loading but before the
   // network connection is established. Caller owns the host buffer and port
   // value; this just draws one frame and reports the user's action.

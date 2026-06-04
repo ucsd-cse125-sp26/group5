@@ -11,6 +11,7 @@
 #include "shared/util.h"
 
 bool AudioEngine::init() {
+  std::lock_guard<std::mutex> lock(mutex_);
   soloud_ = new SoLoud::Soloud();
   printf("AudioEngine: attempting init...\n");
 
@@ -39,12 +40,12 @@ bool AudioEngine::init() {
             "assets/sounds/scattered.wav");
   // uncomment when you have the files:
   loadSound(static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC),
-            "assets/sounds/angelll.mp3");
+            "assets/sounds/angel.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
             "assets/sounds/yaku.mp3");
   // Placeholder credits track — swap for a dedicated file when available.
   loadSound(static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC),
-            "assets/sounds/angelll.mp3");
+            "assets/sounds/angel.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
             "assets/sounds/oof.mp3");  // temporary, reuses jump sound
 
@@ -81,6 +82,7 @@ bool AudioEngine::init() {
 }
 
 void AudioEngine::shutdown() {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (soloud_) {
     soloud_->deinit();
     delete soloud_;
@@ -90,15 +92,20 @@ void AudioEngine::shutdown() {
   sounds_.clear();
 }
 
-void AudioEngine::update(float dt) { soloud_->update3dAudio(); }
+void AudioEngine::update(float dt) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  soloud_->update3dAudio();
+}
 
 void AudioEngine::setMasterVolume(float volume) {
+  std::lock_guard<std::mutex> lock(mutex_);
   masterVolume_ = std::clamp(volume, 0.0f, 1.0f);
   soloud_->setGlobalVolume(masterVolume_);
 }
 
 void AudioEngine::playSound(uint32_t soundId, float x, float y, float z,
                             float volume, float pitch) {
+  std::lock_guard<std::mutex> lock(mutex_);
   auto it = sounds_.find(soundId);
   if (it == sounds_.end()) return;
   SoLoud::handle h = soloud_->play3d(*it->second, x, y, z);
@@ -108,6 +115,7 @@ void AudioEngine::playSound(uint32_t soundId, float x, float y, float z,
 
 void AudioEngine::playNonPositionalSound(uint32_t soundId, float volume,
                                          float pitch) {
+  std::lock_guard<std::mutex> lock(mutex_);
   auto it = sounds_.find(soundId);
   if (it == sounds_.end()) return;
   SoLoud::handle h = soloud_->play(*it->second);
@@ -117,6 +125,7 @@ void AudioEngine::playNonPositionalSound(uint32_t soundId, float volume,
 
 void AudioEngine::setListenerPosition(float x, float y, float z, float forwardX,
                                       float forwardY, float forwardZ) {
+  std::lock_guard<std::mutex> lock(mutex_);
   soloud_->set3dListenerPosition(x, y, z);
   soloud_->set3dListenerAt(forwardX, forwardY, forwardZ);
   soloud_->set3dListenerUp(0.0f, 0.0f, 1.0f);
@@ -140,6 +149,7 @@ void AudioEngine::updateEmitter(uint32_t entityId,
                                 const shared::SoundEmitter& emitter, float x,
                                 float y, float z, float lx, float ly, float lz,
                                 float dt) {
+  std::lock_guard<std::mutex> lock(mutex_);
   float dist = std::sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) +
                          (z - lz) * (z - lz));
 
@@ -188,6 +198,7 @@ void AudioEngine::updateEmitter(uint32_t entityId,
 }
 
 void AudioEngine::stopAllForEntity(uint32_t entityId) {
+  std::lock_guard<std::mutex> lock(mutex_);
   auto it = activeHandles_.find(entityId);
   if (it == activeHandles_.end()) return;
   for (auto& [soundId, handle] : it->second) {
@@ -230,6 +241,7 @@ bool AudioEngine::isLayerActive(uint32_t entityId, uint32_t soundId) const {
 }
 
 void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
+  std::lock_guard<std::mutex> lock(mutex_);
   auto it = sounds_.find(soundId);
   if (it == sounds_.end()) return;
   it->second->setLooping(true);
@@ -239,6 +251,7 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
 }
 
 void AudioEngine::stopGlobalLoop(uint32_t soundId) {
+  std::lock_guard<std::mutex> lock(mutex_);
   auto it = globalHandles_.find(soundId);
   if (it == globalHandles_.end()) return;
   soloud_->stop(it->second);
@@ -246,6 +259,7 @@ void AudioEngine::stopGlobalLoop(uint32_t soundId) {
 }
 
 void AudioEngine::stopAllGlobalLoops() {
+  std::lock_guard<std::mutex> lock(mutex_);
   for (auto& [soundId, handle] : globalHandles_) {
     soloud_->stop(handle);
   }

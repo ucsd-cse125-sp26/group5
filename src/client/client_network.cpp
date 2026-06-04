@@ -88,6 +88,7 @@ void ClientNetwork::poll(ClientGame& game) {
         printf("Disconnected from server.\n");
         event.peer->data = nullptr;
         peer_ = nullptr;
+        game.serverLost.store(true, std::memory_order_release);
         break;
 
       default:
