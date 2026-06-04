@@ -5,6 +5,20 @@ permalink: /project-spec/phillip-mai-individual-report/
 ---
 
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
+## Week 9
+1. What were your concrete goals for the week?  
+I don't think I had any concrete goals, mainly just do whatever work needed doing so we could get our game in a fully working state end to end
+2. What goals were you able to accomplish?  
+I was able to hook up Alain's puzzle to the fragments and barrier/color restoration logic, as well as make audio non-fatal because I figured you should still be able to play the game silently if your audio isn't working
+3. If the week went differently than you had planned, what were the reasons?  
+The week was just extremely busy since I had a lot of final projects and presentations and demos and assignments to do for other classes in week 10. I wasn't able to do much other than the things mentioned above. 
+4. What are your specific goals for the next week?  
+I just want to see the game in a working state, where you can play it end to end.
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+I don't think I learned anything new this week. 
+6. What is your individual morale (which might be different from the overall group morale)?  
+My morale is low, just because its week 10 and I am so tired and ready to be done with everything. I just have a lot on my mind and on my plate this week. I want to be done but alas, I have final exams and a few more assignments left to do. 
+
 ## Week 8
 1. What were your concrete goals for the week?  
 Main goals were just to get barrier logic finished up, like adding in barriers around the whole map and for each season section.
