@@ -133,8 +133,9 @@ struct Graphics {
   bool prevShadowsEnabled = true;
 
   GLuint dirShadowFBO = 0;
+  // GL_TEXTURE_2D_ARRAY with shared::kShadowCascadeCount depth layers (one per
+  // cascade). Per-cascade light matrices live in the CameraBlock UBO.
   GLuint dirShadowMap = 0;
-  glm::mat4 lightSpaceMatrix{1.0f};
   std::optional<Shader> shadowDirShader;
 
   // 4 cubemaps × 6 faces = 24 layers populated via multi-pass per-face
@@ -177,6 +178,7 @@ struct Graphics {
   int windowedH = 0;
 
   bool keyF2Prev = false;
+  bool keyF3Prev = false;  // cycles the CSM cascade layer in the debug overlay
   bool keyF5Prev = false;
   bool keyF11Prev = false;
   bool keyF8Prev = false;    // dev: play a video locally
@@ -188,6 +190,8 @@ struct Graphics {
   bool prevSyncedMenuOpen = false;
 
   DebugChannel debugChannel = DebugChannel::Off;
+  // Which CSM cascade layer the DirShadowMap debug overlay samples (F3 cycles).
+  int debugCascadeLayer = 0;
 
   // Bound for fullscreen-triangle draws; positions come from gl_VertexID.
   GLuint fullscreenVAO = 0;

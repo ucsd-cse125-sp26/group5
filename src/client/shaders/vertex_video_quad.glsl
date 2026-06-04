@@ -10,7 +10,8 @@ out vec2 vUV;
 layout(std140) uniform CameraBlock {
   mat4 view;
   mat4 projection;
-  mat4 lightSpaceMatrix;
+  mat4 lightSpaceMatrices[K_SHADOW_CASCADE_COUNT];
+  vec4 cascadeSplits;
   vec3 viewPos;
   float pointFarPlane;
 } camera;

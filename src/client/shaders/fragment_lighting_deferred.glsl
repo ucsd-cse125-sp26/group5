@@ -13,13 +13,14 @@ uniform sampler2D gEmissive;
 uniform sampler2D ssao;
 // Hardware-PCF shadow samplers (COMPARE_REF_TO_TEXTURE + LEQUAL).
 // texture() returns visibility in [0,1] — 1.0 = lit, 0.0 = in shadow.
-uniform sampler2DShadow dirShadowMap;
+uniform sampler2DArrayShadow dirShadowMap;
 uniform samplerCubeArrayShadow pointShadowMaps;
 
 layout(std140) uniform CameraBlock {
   mat4 view;
   mat4 projection;
-  mat4 lightSpaceMatrix;
+  mat4 lightSpaceMatrices[K_SHADOW_CASCADE_COUNT];
+  vec4 cascadeSplits;  // per-cascade FAR view-space depth (positive)
   vec3 viewPos;
   float pointFarPlane;
 } camera;
@@ -70,28 +71,73 @@ const vec3 sampleOffsetDirections[20] = vec3[](
 // defaults (1, 1.0) reproduce the original hard-ish 9-tap shadow.
 uniform int dirPcfRadius;
 uniform float dirShadowSoftness;
+// Cascaded shadow maps: dirShadowMap is a depth texture ARRAY, one layer per
+// cascade. cascadeDebug tints each cascade band; cascadeBlendBand (0 = hard
+// switch) cross-fades shadow visibility across cascade boundaries.
+uniform int cascadeDebug;
+uniform float cascadeBlendBand;
 
-float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
-  vec4 fragPosLightSpace = camera.lightSpaceMatrix * vec4(worldPos, 1.0);
+// First cascade whose far split is in front of this fragment. viewDepth is the
+// positive forward distance: glm::lookAt builds a right-handed view looking
+// down -Z, so -(view*worldPos).z is > 0 in front of the camera and matches the
+// positive, strictly-increasing camera.cascadeSplits.
+int selectCascade(float viewDepth) {
+  for (int i = 0; i < K_SHADOW_CASCADE_COUNT; ++i) {
+    if (viewDepth < camera.cascadeSplits[i]) return i;
+  }
+  return K_SHADOW_CASCADE_COUNT - 1;
+}
+
+float sampleCascade(int cascade, vec3 worldPos, vec3 normal, vec3 lightDir) {
+  vec4 fragPosLightSpace =
+      camera.lightSpaceMatrices[cascade] * vec4(worldPos, 1.0);
   vec3 proj = fragPosLightSpace.xyz / fragPosLightSpace.w;
   proj = proj * 0.5 + 0.5;
-  if (proj.z > 1.0) return 0.0;
+  if (proj.z > 1.0) return 0.0;  // beyond this cascade's far → treat as lit
   // Slope-scaled bias — grazing surfaces need more.
   float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
   float refDepth = proj.z - bias;
   // (2R+1)² grid × 2×2 hardware PCF. dirPcfRadius 1 + dirShadowSoftness 1.0
-  // reproduces the original 3×3 / 9-tap result exactly.
-  vec2 texelSize = dirShadowSoftness / vec2(textureSize(dirShadowMap, 0));
+  // reproduces the original 3×3 / 9-tap result exactly. textureSize on a
+  // sampler2DArrayShadow is ivec3 (w,h,layers) → take .xy for the texel size.
+  vec2 texelSize = dirShadowSoftness / vec2(textureSize(dirShadowMap, 0).xy);
   float visibility = 0.0;
   float taps = 0.0;
   for (int x = -dirPcfRadius; x <= dirPcfRadius; ++x) {
     for (int y = -dirPcfRadius; y <= dirPcfRadius; ++y) {
+      // vec4(uv, layer, compareRef): .z = array layer, .w = depth ref.
       visibility += texture(
-          dirShadowMap, vec3(proj.xy + vec2(x, y) * texelSize, refDepth));
+          dirShadowMap,
+          vec4(proj.xy + vec2(x, y) * texelSize, float(cascade), refDepth));
       taps += 1.0;
     }
   }
   return 1.0 - visibility / max(taps, 1.0);
+}
+
+float DirShadowFactor(vec3 worldPos, vec3 normal, vec3 lightDir) {
+  float viewDepth = -(camera.view * vec4(worldPos, 1.0)).z;
+  int cascade = selectCascade(viewDepth);
+  float shadow = sampleCascade(cascade, worldPos, normal, lightDir);
+  // Optional cross-cascade blend hides the resolution seam at the boundary.
+  if (cascadeBlendBand > 0.0 && cascade < K_SHADOW_CASCADE_COUNT - 1) {
+    float farSplit = camera.cascadeSplits[cascade];
+    float nearSplit = cascade == 0 ? 0.0 : camera.cascadeSplits[cascade - 1];
+    float band = cascadeBlendBand * (farSplit - nearSplit);
+    float t = clamp((viewDepth - (farSplit - band)) / max(band, 1e-4), 0.0, 1.0);
+    if (t > 0.0) {
+      shadow = mix(shadow,
+                   sampleCascade(cascade + 1, worldPos, normal, lightDir), t);
+    }
+  }
+  return shadow;
+}
+
+// Distinct tint per cascade for the visualize-cascades debug toggle.
+vec3 cascadeTint(vec3 worldPos) {
+  vec3 tints[4] = vec3[](vec3(1.0, 0.3, 0.3), vec3(0.3, 1.0, 0.3),
+                         vec3(0.3, 0.3, 1.0), vec3(1.0, 1.0, 0.3));
+  return tints[selectCascade(-(camera.view * vec4(worldPos, 1.0)).z)];
 }
 
 float PointShadowFactor(int shadowIdx, vec3 worldPos, vec3 lightPos,
@@ -202,6 +248,10 @@ void main() {
 
   if (outlineCross != 0) {
     result = mix(result, outlineColor, OutlineStrength(worldPos, norm));
+  }
+
+  if (cascadeDebug != 0) {
+    result = mix(result, cascadeTint(worldPos), 0.25);
   }
 
   // Fraction of this pixel's brightness from the (colored) point lights. The

@@ -216,10 +216,12 @@ void shadowsSection(GraphicsSettings& s) {
     s.pointShadowMapSize = pointSizes[pointIdx];
   }
 
-  ImGui::SliderFloat("Dir half-extent", &s.dirShadowHalfExtent, 10.0f, 1000.0f);
-  ImGui::SliderFloat("Dir back distance", &s.dirShadowBackDistance, 10.0f,
-                     1500.0f);
-  ImGui::SliderFloat("Dir far plane", &s.dirShadowFarPlane, 50.0f, 4000.0f);
+  ImGui::Checkbox("Cascaded shadows", &s.cascadedShadows);
+  ImGui::SliderFloat("Shadow distance", &s.shadowDistance, 50.0f, 500.0f);
+  ImGui::SliderFloat("Cascade split lambda", &s.cascadeSplitLambda, 0.0f, 1.0f);
+  ImGui::SliderFloat("Cascade pullback", &s.cascadeCasterPullback, 0.0f, 200.0f);
+  ImGui::SliderFloat("Cascade blend", &s.cascadeBlendBand, 0.0f, 0.5f);
+  ImGui::Checkbox("Visualize cascades", &s.visualizeCascades);
   ImGui::SliderFloat("Dir bias factor", &s.dirShadowPolyFactor, 0.0f, 10.0f);
   ImGui::SliderFloat("Dir bias units", &s.dirShadowPolyUnits, 0.0f, 20.0f);
   ImGui::SliderFloat("Point far plane", &s.pointShadowFarPlane, 5.0f, 200.0f);
