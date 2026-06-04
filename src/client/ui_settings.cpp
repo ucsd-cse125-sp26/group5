@@ -64,6 +64,17 @@ void shadingSection(GraphicsSettings& s) {
   // and Voronoi-region boundaries that brightness quantize + palette snap
   // produce — 0 = crisp (default), 1 = full stipple.
   ImGui::SliderFloat("Skybox soft edge", &s.skyboxSoftEdge, 0.0f, 1.0f, "%.2f");
+  // Texture filtering: 1 = current (nearest-mip), >1 = trilinear + anisotropy.
+  const int anisoOptions[] = {1, 2, 4, 8, 16};
+  const char* anisoLabels[] = {"Off (1x)", "2x", "4x", "8x", "16x"};
+  int anisoIdx = 0;
+  for (int i = 0; i < IM_ARRAYSIZE(anisoOptions); ++i) {
+    if (anisoOptions[i] == s.textureAnisotropy) anisoIdx = i;
+  }
+  if (ImGui::Combo("Texture filtering", &anisoIdx, anisoLabels,
+                   IM_ARRAYSIZE(anisoLabels))) {
+    s.textureAnisotropy = anisoOptions[anisoIdx];
+  }
   ImGui::BeginDisabled(s.shadingMode != ShadingMode::Cel);
   ImGui::SliderInt("Cel bands", &s.celBands, 2, 8);
   ImGui::SliderFloat("Band epsilon", &s.celBandEpsilon, 0.0f, 0.2f, "%.3f");
@@ -87,6 +98,13 @@ void shadingSection(GraphicsSettings& s) {
     s.celRampPath = rampPathBuf;
     rampPathLastApplied = s.celRampPath;
   }
+  ImGui::EndDisabled();
+  ImGui::SeparatorText("Rim light");
+  ImGui::SliderFloat("Rim strength", &s.celRimStrength, 0.0f, 2.0f, "%.2f");
+  ImGui::BeginDisabled(s.celRimStrength <= 0.0f);
+  ImGui::ColorEdit3("Rim color", &s.celRimColor.x);
+  ImGui::SliderFloat("Rim power", &s.celRimPower, 0.5f, 16.0f, "%.2f");
+  ImGui::SliderFloat("Rim threshold", &s.celRimThreshold, 0.0f, 1.0f, "%.2f");
   ImGui::EndDisabled();
   ImGui::EndDisabled();
 }
@@ -131,6 +149,9 @@ void tonemapBloomSection(GraphicsSettings& s) {
                                ImGuiTreeNodeFlags_DefaultOpen))
     return;
   ImGui::SliderFloat("Exposure", &s.exposure, 0.1f, 5.0f);
+  const char* tonemapModes[] = {"Exponential", "ACES", "AgX"};
+  ImGui::Combo("Tonemap", &s.tonemapMode, tonemapModes,
+               IM_ARRAYSIZE(tonemapModes));
   ImGui::Checkbox("Bloom", &s.bloomEnabled);
   ImGui::BeginDisabled(!s.bloomEnabled);
   ImGui::SliderFloat("Threshold", &s.bloomThreshold, 0.0f, 5.0f);
@@ -156,6 +177,8 @@ void ssaoSection(GraphicsSettings& s) {
                    IM_ARRAYSIZE(scaleLabels))) {
     s.ssaoScale = scales[scaleIdx];
   }
+  ImGui::Checkbox("Bilateral blur", &s.ssaoBilateralBlur);
+  ImGui::SliderFloat("Power", &s.ssaoPower, 1.0f, 4.0f, "%.2f");
   ImGui::EndDisabled();
 }
 
@@ -204,11 +227,22 @@ void shadowsSection(GraphicsSettings& s) {
 void antialiasingSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Antialiasing")) return;
   ImGui::Checkbox("FXAA", &s.fxaaEnabled);
+  // Ordered dither to break HDR->8-bit banding; independent of FXAA.
+  ImGui::SliderFloat("Dither", &s.ditherStrength, 0.0f, 1.0f, "%.2f");
 }
 
 void overlaySection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Overlays")) return;
   ImGui::Checkbox("Show FPS", &s.showFPS);
+  // Per-pass GPU timing HUD. Issues GL timer queries only while enabled.
+  ImGui::Checkbox("GPU perf HUD", &s.showPerfHUD);
+}
+
+void performanceSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Performance")) return;
+  // Cull the main G-buffer + directional shadow passes to the camera/light
+  // frustum. Off reproduces the current (cull-nothing) behavior.
+  ImGui::Checkbox("Main-pass frustum culling", &s.mainFrustumCulling);
 }
 
 void colorRestorationSection(GraphicsSettings& s) {
@@ -278,6 +312,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   antialiasingSection(s);
   pixelationSection(s);
   colorRestorationSection(s);
+  performanceSection(s);
   overlaySection(s);
 
   ImGui::Separator();

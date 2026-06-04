@@ -29,6 +29,66 @@
 #include "shared/shader_constants.h"
 #include "shared/util.h"
 
+// EXT/ARB anisotropic-filtering tokens (absent from the GL 4.1 core headers).
+#ifndef GL_TEXTURE_MAX_ANISOTROPY
+#define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
+#endif
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY 0x84FF
+#endif
+
+namespace {
+// Anisotropy level last applied to model textures. 1 == current behavior
+// (nearest-mipmap-linear min filter, no anisotropy).
+int g_modelTextureAnisotropy = 1;
+// Model textures that own a full mip chain (the success path below). Only
+// these are touched by the runtime re-apply pass, so procedural / 1x1 fallback
+// textures never become mip-incomplete.
+std::vector<GLuint> g_mippedModelTextures;
+
+float maxSupportedAnisotropy() {
+  static float maxA = -1.0f;
+  if (maxA < 0.0f) {
+    maxA = 1.0f;
+    while (glGetError() != GL_NO_ERROR) {
+    }
+    GLfloat v = 1.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &v);
+    if (glGetError() == GL_NO_ERROR && v > 1.0f) maxA = v;
+    while (glGetError() != GL_NO_ERROR) {
+    }
+  }
+  return maxA;
+}
+
+// level>1: trilinear + anisotropy. level<=1: the GL default
+// nearest-mipmap-linear / linear (today's look). Binds tex to GL_TEXTURE_2D.
+void applyMippedFilter(GLuint tex, int level) {
+  glBindTexture(GL_TEXTURE_2D, tex);
+  if (level > 1) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    const float maxA = maxSupportedAnisotropy();
+    if (maxA > 1.0f) {
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY,
+                      std::min(static_cast<float>(level), maxA));
+    }
+  } else {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  }
+}
+}  // namespace
+
+void setModelTextureAnisotropy(int level) {
+  level = std::max(1, level);
+  if (level == g_modelTextureAnisotropy) return;
+  g_modelTextureAnisotropy = level;
+  for (GLuint tex : g_mippedModelTextures) applyMippedFilter(tex, level);
+}
+
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
   return {v.x, v.y, v.z};
 }
@@ -427,6 +487,10 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
                    GL_UNSIGNED_BYTE, pixels);
       glGenerateMipmap(GL_TEXTURE_2D);
       GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
+      // Register for runtime anisotropy re-apply and set the current level
+      // (level 1 reproduces the GL-default filtering used before this change).
+      g_mippedModelTextures.push_back(id);
+      applyMippedFilter(id, g_modelTextureAnisotropy);
     } else {
       std::fprintf(stderr,
                    "loadMaterial: failed to decode texture \"%s\" "

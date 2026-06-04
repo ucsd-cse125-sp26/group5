@@ -22,6 +22,12 @@ uniform float celSpecularThreshold;
 uniform float celSpecularEpsilon;
 uniform int useRampTexture;
 
+// Stylized Fresnel rim light; celRimStrength 0 = off (default).
+uniform float celRimStrength;
+uniform vec3 celRimColor;
+uniform float celRimPower;
+uniform float celRimThreshold;
+
 layout(std140) uniform CameraBlock {
   mat4 view;
   mat4 projection;
@@ -206,6 +212,13 @@ void main() {
   }
 
   result += emissive;
+
+  // Hard-edged Fresnel rim to match the cel look (cel path only).
+  if (celRimStrength > 0.0) {
+    float rim = pow(1.0 - max(dot(norm, viewDir), 0.0), celRimPower);
+    rim = step(celRimThreshold, rim);
+    result += celRimColor * rim * celRimStrength;
+  }
 
   if (outlineCross != 0) {
     result = mix(result, outlineColor, OutlineStrength(worldPos, norm));

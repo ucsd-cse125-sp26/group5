@@ -110,6 +110,11 @@ struct Skybox {
 
 class Shader;
 
+// Sets trilinear + anisotropic filtering (level>1) or restores the default
+// nearest-mipmap-linear look (level<=1) on all mip-mapped model textures.
+// Cheap no-op when the level is unchanged.
+void setModelTextureAnisotropy(int level);
+
 Model* loadModel(const std::string& filename);
 Model* makeCubeModel(const shared::CubeSpec& spec);
 // Procedural UV sphere (lat/long grid) using the spec's emissive color as a

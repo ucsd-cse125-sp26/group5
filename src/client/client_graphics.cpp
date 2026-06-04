@@ -37,6 +37,7 @@
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
+#include "shared/draw_stats.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
@@ -646,7 +647,10 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       float maxScale =
           std::max({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
       float worldRadius = modelAsset->localBoundsRadius * maxScale;
-      if (culler->reject(worldCenter, worldRadius)) continue;
+      if (culler->reject(worldCenter, worldRadius)) {
+        if (!forShadowPass) ++shared::draw_stats::entitiesCulled;
+        continue;
+      }
     }
 
     auto model = glm::identity<glm::mat4>();
@@ -669,6 +673,7 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       }
     }
     Draw(shader, *modelAsset, model, bones, boneCount);
+    if (!forShadowPass) ++shared::draw_stats::entitiesDrawn;
   }
 }
 
@@ -1176,8 +1181,9 @@ void Graphics::resizeBuffers(int width, int height) {
 
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
-  for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
-                  &outlineSobelShader, &ssaoShader, &videoQuadShader}) {
+  for (auto* s :
+       {&gbufferShader, &lightingShader, &lightingCelShader,
+        &outlineSobelShader, &ssaoShader, &ssaoBlurShader, &videoQuadShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -1491,6 +1497,14 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
 }
 
 void Graphics::render(ClientGame& game, ClientNetwork& network) {
+  // Gate GPU timer queries: always on in a profiling build, otherwise only
+  // while the on-screen perf HUD is enabled (zero cost when off).
+#ifdef ENABLE_PROFILING
+  shared::gpu_profiler::g_active = true;
+#else
+  shared::gpu_profiler::g_active = settings.showPerfHUD;
+#endif
+  shared::draw_stats::reset();
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
 
@@ -1556,6 +1570,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     if (!settings.shadowsEnabled) clearShadowMaps();
     prevShadowsEnabled = settings.shadowsEnabled;
   }
+  // Re-applies trilinear/anisotropic filtering to model textures only when the
+  // level changes; cheap no-op otherwise.
+  setModelTextureAnisotropy(settings.textureAnisotropy);
 
   // Advance per-entity animators using real wallclock dt (independent of the
   // server tick). Only animated, skinned entities pay any work here.
@@ -1577,6 +1594,14 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight),
       settings.nearPlane, settings.farPlane);
 
+  // Camera-frustum culler for the main G-buffer pass. Reuses the same
+  // sphere-vs-frustum machinery the point-shadow faces already use. Null
+  // (cull nothing) unless explicitly enabled, so default behavior is exact.
+  ShadowCuller camCuller;
+  extractFrustumPlanes(projection * camera->view, camCuller.planes);
+  const ShadowCuller* mainCuller =
+      settings.mainFrustumCulling ? &camCuller : nullptr;
+
   // Collect lights up front so shadow passes and the lighting pass agree
   // on shadow-slot assignments.
   LightUpload lights[kMaxLightingShaderLights];
@@ -1589,6 +1614,13 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       camera->position, directionalLightDir(game), settings.dirShadowHalfExtent,
       settings.dirShadowBackDistance, settings.dirShadowFarPlane,
       settings.dirShadowMapSize);
+
+  // Directional-shadow caster culler (the ortho light frustum). Same gate as
+  // the main pass; null preserves the current draw-everything behavior.
+  ShadowCuller dirShadowCuller;
+  extractFrustumPlanes(lightSpaceMatrix, dirShadowCuller.planes);
+  const ShadowCuller* dirCuller =
+      settings.mainFrustumCulling ? &dirShadowCuller : nullptr;
 
   {
     CameraUBOData ubo{};
@@ -1615,7 +1647,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
     shadowDirShader->setFloat("alphaCutoff", settings.shadowAlphaCutoff);
     renderEntities(*shadowDirShader, *this, game, models,
-                   /*forShadowPass=*/true);
+                   /*forShadowPass=*/true, dirCuller);
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
@@ -1644,16 +1676,20 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       int slot = lights[i].shadowIdx;
       if (slot < 0 || slot >= kMaxPointLights) continue;
       shadowPointShader->setVec3("lightPos", lights[i].position);
+      // Plane extraction hoisted out of the per-face loop (one normalize set
+      // per face, computed once instead of mixed into the draw submission).
+      ShadowCuller faceCullers[6];
+      for (int f = 0; f < 6; ++f) {
+        extractFrustumPlanes(pointMats[slot * 6 + f], faceCullers[f].planes);
+      }
       for (int f = 0; f < 6; ++f) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                   pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
         const glm::mat4& vp = pointMats[slot * 6 + f];
         shadowPointShader->setMat4("lightSpaceMatrix", vp);
-        ShadowCuller culler;
-        extractFrustumPlanes(vp, culler.planes);
         renderEntities(*shadowPointShader, *this, game, models,
-                       /*forShadowPass=*/true, &culler);
+                       /*forShadowPass=*/true, &faceCullers[f]);
       }
     }
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1674,7 +1710,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     gbufferShader->setInt("textureQuantizeLevels",
                           settings.textureQuantizeLevels);
     // paletteSize + palette uniforms are bound per Model inside Draw().
-    renderEntities(*gbufferShader, *this, game, models);
+    renderEntities(*gbufferShader, *this, game, models, /*forShadowPass=*/false,
+                   mainCuller);
   }
 
   if (settings.ssaoEnabled && ssaoShader && ssaoShader->valid()) {
@@ -1699,6 +1736,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     ssaoShader->setInt("kernelSize", settings.ssaoKernelSize);
     ssaoShader->setFloat("radius", settings.ssaoRadius);
     ssaoShader->setFloat("bias", settings.ssaoBias);
+    ssaoShader->setFloat("ssaoPower", settings.ssaoPower);
     // Noise tile size is in the SSAO render's own pixel space.
     ssaoShader->setVec2("noiseScale", static_cast<float>(ssaoWidth) / 4.0f,
                         static_cast<float>(ssaoHeight) / 4.0f);
@@ -1727,6 +1765,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, ssaoColor);
     ssaoBlurShader->setInt("src", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    ssaoBlurShader->setInt("gPosition", 1);
+    ssaoBlurShader->setInt("bilateral", settings.ssaoBilateralBlur ? 1 : 0);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
@@ -1794,6 +1836,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
         const bool rampOk = settings.celUseRampTexture &&
                             !settings.celRampPath.empty() && celRampTexture;
         lighting->setInt("useRampTexture", rampOk ? 1 : 0);
+        lighting->setFloat("celRimStrength", settings.celRimStrength);
+        lighting->setVec3("celRimColor", settings.celRimColor);
+        lighting->setFloat("celRimPower", settings.celRimPower);
+        lighting->setFloat("celRimThreshold", settings.celRimThreshold);
       }
       uploadDirectionalLight(*lighting, game, settings);
       uploadPointLights(*lighting, lights, numLights);
@@ -1930,6 +1976,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glBindTexture(GL_TEXTURE_2D, gAlbedo);
       tonemapShader->setInt("gAlbedo", 3);
       tonemapShader->setFloat("exposure", settings.exposure);
+      tonemapShader->setInt("tonemapMode", settings.tonemapMode);
       tonemapShader->setFloat("bloomStrength", settings.bloomEnabled
                                                    ? settings.bloomStrength
                                                    : 0.0f);
@@ -2011,6 +2058,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       presentShader->setInt("src", 0);
       presentShader->setInt("fxaaEnabled", settings.fxaaEnabled ? 1 : 0);
       presentShader->setInt("postQuantizeLevels", settings.postQuantizeLevels);
+      presentShader->setFloat("ditherStrength", settings.ditherStrength);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -2627,6 +2675,48 @@ static void drawFPSOverlay() {
   ImGui::End();
 }
 
+static void drawPerfHUDWindow() {
+  const auto& stats = shared::gpu_profiler::hud_stats();
+  ImGui::SetNextWindowPos(ImVec2(8.0f, 56.0f), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowBgAlpha(0.5f);
+  if (ImGui::Begin("GPU (ms/pass)", nullptr,
+                   ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoNav |
+                       ImGuiWindowFlags_NoSavedSettings)) {
+    if (stats.empty()) {
+      ImGui::TextUnformatted("collecting samples…");
+    } else {
+      std::vector<std::pair<std::string, double>> rows(stats.begin(),
+                                                       stats.end());
+      std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+        return a.second > b.second;
+      });
+      double passSum = 0.0;
+      if (ImGui::BeginTable(
+              "gpu", 2,
+              ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg)) {
+        for (const auto& [name, ms] : rows) {
+          if (name != "Render") passSum += ms;
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::TextUnformatted(name.c_str());
+          ImGui::TableNextColumn();
+          ImGui::Text("%.3f", ms);
+        }
+        ImGui::EndTable();
+      }
+      ImGui::Separator();
+      ImGui::Text("sum(passes): %.3f ms", passSum);
+    }
+    ImGui::Separator();
+    ImGui::Text("main pass: %d drawn / %d culled",
+                shared::draw_stats::entitiesDrawn,
+                shared::draw_stats::entitiesCulled);
+  }
+  ImGui::End();
+}
+
 void Graphics::drawSettingsUIFrame(ClientGame& game) {
   if (!ImGui::GetCurrentContext()) return;
   ImGui_ImplOpenGL3_NewFrame();
@@ -2634,6 +2724,7 @@ void Graphics::drawSettingsUIFrame(ClientGame& game) {
   ImGui::NewFrame();
   drawPuzzleHUDs(game);
   if (settings.showFPS) drawFPSOverlay();
+  if (settings.showPerfHUD) drawPerfHUDWindow();
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

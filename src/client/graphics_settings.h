@@ -29,6 +29,9 @@ struct GraphicsSettings {
 
   // Tonemap / bloom
   float exposure = 1.0f;
+  // Tonemap operator: 0 = exponential `1-exp(-x)` (current/default), 1 = ACES
+  // (Narkowicz), 2 = AgX. Applied in the tonemap pass before gamma.
+  int tonemapMode = 0;
   bool bloomEnabled = true;
   float bloomThreshold = 1.0f;
   float bloomStrength = 1.0f;
@@ -43,12 +46,33 @@ struct GraphicsSettings {
   // 4 = quarter). Lighting samples ssaoBlurColor through bilinear filtering
   // when scale > 1.
   int ssaoScale = 2;
+  // Depth-aware (bilateral) SSAO blur instead of the plain 4x4 box. false =
+  // current box blur. Removes occlusion haloing across depth discontinuities.
+  bool ssaoBilateralBlur = false;
+  // Exponent applied to the SSAO term (was a hardcoded 2.0). Higher = darker,
+  // more contrasty AO. 2.0 reproduces current behavior.
+  float ssaoPower = 2.0f;
 
   // FXAA
   bool fxaaEnabled = true;
+  // Ordered (Bayer 4x4) dither applied in the present pass to break up
+  // HDR->8-bit banding on smooth gradients. 0 = off (current), 1 = ~1 LSB.
+  float ditherStrength = 0.0f;
 
   // Top-left overlay showing ImGui's smoothed framerate.
   bool showFPS = true;
+  // On-screen per-pass GPU timing HUD (reuses the gpu_profiler scopes). When
+  // off, no GL timer queries are issued. false = current (off).
+  bool showPerfHUD = false;
+
+  // Camera-frustum cull the main G-buffer pass and the directional shadow pass
+  // (point shadows already cull per face). false = current no-cull behavior.
+  bool mainFrustumCulling = false;
+  // Trilinear + anisotropic filtering on model textures. 1 = current
+  // (nearest-mip / linear-mag, no anisotropy); >1 enables LINEAR_MIPMAP_LINEAR
+  // with that anisotropy level (clamped to the GL max). Applied at load and on
+  // change via a re-apply pass over loaded textures.
+  int textureAnisotropy = 1;
 
   // Pixelation: render the entire 3D scene at fb/scale, then upscale with
   // GL_NEAREST in the present pass for a chunky-pixel look. 1 = off.
@@ -118,6 +142,12 @@ struct GraphicsSettings {
   float celSpecularEpsilon = 0.05f;
   bool celUseRampTexture = false;
   std::string celRampPath = "";  // empty → procedural
+  // Stylized Fresnel rim light for the cel path only (Phong is untouched).
+  // 0 = off (current). The rim is hard-edged (stepped) to match cel shading.
+  float celRimStrength = 0.0f;
+  glm::vec3 celRimColor{1.0f};
+  float celRimPower = 4.0f;
+  float celRimThreshold = 0.6f;
 
   // Outlines (post-process Sobel only)
   OutlineMode outlineMode = OutlineMode::Cross;
@@ -141,6 +171,14 @@ enum class GraphicsPreset {
   HighQuality,
   Performance,
   CelShaded,
+  // Parallel "(New)" presets: each mirrors the base preset above and then
+  // opts into the new toggleable graphics features tuned for that tier. The
+  // base presets and per-field defaults are never changed, so selecting a
+  // base preset reproduces today's look exactly.
+  DefaultNew,
+  HighQualityNew,
+  PerformanceNew,
+  CelShadedNew,
   Count,
 };
 

@@ -7,6 +7,24 @@ uniform sampler2D src;
 uniform int fxaaEnabled;
 // 0/1 = off; >=2 quantizes the HSV value of the final color into N levels.
 uniform int postQuantizeLevels;
+// Ordered (Bayer 4x4) dither amount in LSBs; 0 = off.
+uniform float ditherStrength;
+
+// Returns the 4x4 ordered-dither threshold in [0,1) for this pixel.
+float bayer4(vec2 p) {
+  int x = int(mod(p.x, 4.0));
+  int y = int(mod(p.y, 4.0));
+  int i = y * 4 + x;
+  float m[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0,
+                        1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+  return m[i] / 16.0;
+}
+
+vec3 applyDither(vec3 c) {
+  if (ditherStrength <= 0.0) return c;
+  float d = (bayer4(gl_FragCoord.xy) - 0.5) / 255.0;
+  return c + d * ditherStrength;
+}
 
 const float kEdgeThreshold = 0.0625;
 const float kMinEdgeContrast = 0.0312;
@@ -28,7 +46,7 @@ vec3 postQuantize(vec3 c) {
 void main() {
   vec3 cM = texture(src, vUV).rgb;
   if (fxaaEnabled == 0) {
-    FragColor = vec4(postQuantize(cM), 1.0);
+    FragColor = vec4(applyDither(postQuantize(cM)), 1.0);
     return;
   }
 
@@ -49,7 +67,7 @@ void main() {
   float range = lMax - lMin;
 
   if (range < max(kMinEdgeContrast, lMax * kEdgeThreshold)) {
-    FragColor = vec4(postQuantize(cM), 1.0);
+    FragColor = vec4(applyDither(postQuantize(cM)), 1.0);
     return;
   }
 
@@ -59,5 +77,5 @@ void main() {
 
   vec3 avg = isHorz ? (cE + cW) * 0.5 : (cN + cS) * 0.5;
   vec3 result = mix(cM, avg, kSubpixelBlend);
-  FragColor = vec4(postQuantize(result), 1.0);
+  FragColor = vec4(applyDither(postQuantize(result)), 1.0);
 }
