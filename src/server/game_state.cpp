@@ -446,6 +446,7 @@ void initWorldEntities(ServerGame& game) {
                 .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
                                    game.fallLayout.playHalfY * 2.0f, 1.2f),
                 .collision = CollisionShape::Box,
+                .colorExempt = true,
             }});
 
   // Summer escape trigger pad: stand here (all players) to start the
@@ -464,6 +465,7 @@ void initWorldEntities(ServerGame& game) {
               // pad (it floats at padCenterZ; None would let them fall
               // through).
               .collision = CollisionShape::Box,
+              .colorExempt = true,
           },
       });
 

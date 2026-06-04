@@ -54,8 +54,11 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::Position>(spiritEnt, 0.0f, 0.0f, 0.0f, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(spiritEnt, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(spiritEnt, "start_cube", 0.8f, 0.8f,
-                                            0.8f);
+  {
+    auto& ri = game.registry.emplace<shared::RenderInfo>(spiritEnt, "start_cube",
+                                                         0.8f, 0.8f, 0.8f);
+    ri.colorExempt = true;
+  }
   game.registry.emplace<shared::MazeTag>(spiritEnt);
   JPH::BodyID spiritBody = game.physics.createPlayerBody(
       "start_cube", glm::vec3(0.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
@@ -75,8 +78,11 @@ void loadLevel(ServerGame& game) {
       game.registry.emplace<shared::Position>(
           tile, static_cast<float>(gx) * kCell, static_cast<float>(gy) * kCell,
           -0.8f, 1.0f, 0.0f, 0.0f, 0.0f);
-      game.registry.emplace<shared::RenderInfo>(tile, "cube", kTileScale,
-                                                kTileScale, kTileScale);
+      {
+        auto& ri = game.registry.emplace<shared::RenderInfo>(
+            tile, "cube", kTileScale, kTileScale, kTileScale);
+        ri.colorExempt = true;
+      }
       game.registry.emplace<shared::MazeTag>(tile);
     }
   }

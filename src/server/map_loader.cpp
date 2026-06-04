@@ -65,9 +65,13 @@ bool loadMap(ServerGame& game, const std::string& path,
     tag(entity);
     game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, rot.w,
                                             rot.x, rot.y, rot.z);
-    game.registry.emplace<shared::RenderInfo>(
+    auto& renderInfo = game.registry.emplace<shared::RenderInfo>(
         entity, std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
         scale.x, scale.y, scale.z);
+    // Autumn play platform stays in full color regardless of restoration.
+    if (std::string(node.mName.C_Str()) == "autumn_platform") {
+      renderInfo.colorExempt = true;
+    }
     JPH::BodyID bodyId =
         game.physics.createMeshBody(parsed, node, pos, rot, scale);
     if (!bodyId.IsInvalid()) {

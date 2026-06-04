@@ -4,17 +4,6 @@
 
 namespace shared::tangram {
 
-// World-space AABB used by the client tonemap pass to keep an area in full
-// color regardless of the player's ColorBoundingBox restoration progress.
-struct ColorRestoreAabb {
-  float minX = 0.0f;
-  float minY = 0.0f;
-  float minZ = 0.0f;
-  float maxX = 0.0f;
-  float maxY = 0.0f;
-  float maxZ = 0.0f;
-};
-
 struct ArenaLayout {
   float spawnBaseX = tangram_defaults::kSpawnBaseX;
   float spawnBaseY = tangram_defaults::kSpawnBaseY;
@@ -66,9 +55,6 @@ struct ArenaLayout {
     boardCenterZ += dz;
     spawnHeightZ += dz;
   }
-
-  // Trigger pad + play platform + goal board — always rendered in color.
-  [[nodiscard]] ColorRestoreAabb alwaysColorAabb() const;
 };
 
 }  // namespace shared::tangram

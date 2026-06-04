@@ -27,8 +27,9 @@ std::vector<entt::entity> spawnDescBatch(
     game.registry.emplace<shared::OverworldTag>(entity);
     game.registry.emplace<shared::TangramLayoutVisual>(entity);
     if (!d.modelName.empty()) {
-      game.registry.emplace<shared::RenderInfo>(entity, d.modelName, d.scale.x,
-                                                d.scale.y, d.scale.z);
+      auto& ri = game.registry.emplace<shared::RenderInfo>(
+          entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
+      ri.colorExempt = true;
     }
     if (d.collision != CollisionShape::None) {
       JPH::ShapeRefC shape =

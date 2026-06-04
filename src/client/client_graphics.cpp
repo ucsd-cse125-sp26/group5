@@ -627,7 +627,8 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     // uniforms are no-ops in the shadow pass (no such uniforms).
     const bool isFragment = renderInfo.modelName == "fragment";
     const bool isSun = renderInfo.modelName.starts_with("sun_");
-    shader.setInt("alwaysColor", (isFragment || isSun) ? 1 : 0);
+    shader.setInt("alwaysColor",
+                  (isFragment || isSun || renderInfo.colorExempt) ? 1 : 0);
     shader.setFloat("rainbowStrength", isFragment ? 1.0f : 0.0f);
     if (isFragment) {
       const auto t = static_cast<float>(glfwGetTime());
@@ -1957,16 +1958,6 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
                               settings.colorRestorationLightStrength);
       tonemapShader->setVec3("colorRestorationMin", restoreMin);
       tonemapShader->setVec3("colorRestorationMax", restoreMax);
-
-      const shared::tangram::ColorRestoreAabb tangramColor =
-          game.tangramArena.alwaysColorAabb();
-      tonemapShader->setFloat("tangramAlwaysColorEnabled", 1.0f);
-      tonemapShader->setVec3(
-          "tangramAlwaysColorMin",
-          glm::vec3(tangramColor.minX, tangramColor.minY, tangramColor.minZ));
-      tonemapShader->setVec3(
-          "tangramAlwaysColorMax",
-          glm::vec3(tangramColor.maxX, tangramColor.maxY, tangramColor.maxZ));
 
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);

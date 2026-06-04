@@ -25,6 +25,8 @@ struct StaticEntityDesc {
   /// If >= 0, applied to static Jolt body (higher = grippier tangram platform).
   float staticFriction = -1.0f;
   std::vector<shared::SoundLayer> soundLayers;
+  /// Keep this object in full color regardless of color-restoration progress.
+  bool colorExempt = false;
 };
 
 template <typename WorldTag>
@@ -95,8 +97,9 @@ void spawnStaticEntities(ServerGame& game,
     game.registry.template emplace<WorldTag>(entity);
 
     if (!d.modelName.empty()) {
-      game.registry.template emplace<shared::RenderInfo>(
+      auto& ri = game.registry.template emplace<shared::RenderInfo>(
           entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
+      ri.colorExempt = d.colorExempt;
     }
 
     if (d.collision == CollisionShape::None) continue;

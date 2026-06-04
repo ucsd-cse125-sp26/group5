@@ -37,6 +37,9 @@ struct RenderInfo {
   float sz = 1.0f;
   // 1-4 = join order for player avatars (shown on cube top); 0 = no slot label.
   uint8_t playerSlot = 0;
+  // Puzzle objects stay in full color regardless of color-restoration progress
+  // (tonemap pass reads this via gAlbedo.a, same path as fragments/suns).
+  bool colorExempt = false;
 };
 
 struct ColorBoundingBox {
