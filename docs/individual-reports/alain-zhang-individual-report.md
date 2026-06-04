@@ -8,6 +8,24 @@ permalink: /project-spec/alain-zhang-individual-report/
 
 ## Weekly Notes
 
+### Week 9
+
+Hi
+
+Currently it is 2 am and I have an upcoming (moved to remote luckily) final at 9 am. HAHAHAHHAHAHAHA
+
+Some updates: 
+- Finished the puzzle/challenge with a dynamic progress bar/HUD where players have to dodge objects from the sky to progress to the next section. Since the latest project changes, the puzzle doesn't seem to work anymore, so I'll need to track down what's happening.
+- Mostly have the notifications/QoL system in place for learning the game, but currently on the back burner. Will see how much progress I can make after my final tomorrow, but I definitely have enough time to perform the necessary patches.
+
+Todo:
+- Fix up whatever happened to the puzzle and spawn fences/barriers when the puzzle is triggered
+- Change the puzzle trigger to be in the platform rebecca provided isntead of my placeholder (i dont even know what this is...)
+- Help with sound and movement system if necessary, then finish whatever I was working on
+- Edit my week 8 and week 9 report to reflect more on what i've done technically before the quarter ends
+
+Apologies for the sparse reporting, but currently, I am drained of mind, body, and soul. Also a leg. 
+
 ### Week 8
 
 Working on a puzzle where the players have to dodge falling objects for a certain duration of time. Will update 
