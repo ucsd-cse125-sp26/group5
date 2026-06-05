@@ -235,15 +235,23 @@ void registerClientHandlers(ClientNetwork& network) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.currentGameState = pkt.state;
-        game.audio.stopAllGlobalLoops();
         if (pkt.state == shared::GameStateType::MAZE) {
+          game.audio.stopAllGlobalLoops();
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
+          game.audio.stopAllGlobalLoops();
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::OVERWORLD) {
+          // Stop minigame/credits loops only. Season loops come from
+          // SEASON_MUSIC; do not stopAll here or a reordered packet can mute
+          // overworld music until the next sync.
+          game.audio.stopGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC));
+          game.audio.stopGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC));
         }
-        // Overworld seasonal music arrives via SEASON_MUSIC.
       });
 
   network.dispatcher().on(
