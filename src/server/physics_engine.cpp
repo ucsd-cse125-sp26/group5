@@ -107,18 +107,20 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
   return body->GetID();
 }
 
-//CUBE
-// JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
-//                                                    const glm::vec3& pos) {
-//   auto& bodyInterface = getBodyInterface();
-//   JPH::BoxShapeSettings boxSettings(
-//       JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
-//   boxSettings.SetEmbedded();
-//   JPH::ShapeRefC shape = boxSettings.Create().Get();
+// CUBE
+//  JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3&
+//  halfExtents,
+//                                                     const glm::vec3& pos) {
+//    auto& bodyInterface = getBodyInterface();
+//    JPH::BoxShapeSettings boxSettings(
+//        JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+//    boxSettings.SetEmbedded();
+//    JPH::ShapeRefC shape = boxSettings.Create().Get();
 
 //   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
 //                                      JPH::Quat::sIdentity(),
-//                                      JPH::EMotionType::Dynamic, Layers::MOVING);
+//                                      JPH::EMotionType::Dynamic,
+//                                      Layers::MOVING);
 //   settings.mGravityFactor = 1.0f;
 //   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
@@ -127,11 +129,12 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
 //   return body->GetID();
 // }
 
-//SPHERE
+// SPHERE
 JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
                                                    const glm::vec3& pos) {
   auto& bodyInterface = getBodyInterface();
-  JPH::SphereShapeSettings sphereSettings(halfExtents.x);  // radius = 0.25 from caller
+  JPH::SphereShapeSettings sphereSettings(
+      halfExtents.x);  // radius = 0.25 from caller
   sphereSettings.SetEmbedded();
   JPH::ShapeRefC shape = sphereSettings.Create().Get();
 
@@ -140,8 +143,8 @@ JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
                                      JPH::EMotionType::Dynamic, Layers::MOVING);
   settings.mGravityFactor = 1.0f;
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
-  settings.mFriction = 0.3f;      // ← lower = slides more, higher = grips/rolls
-  settings.mRestitution = 0.2f;   // ← optional: a little bounce on landing
+  settings.mFriction = 0.3f;     // ← lower = slides more, higher = grips/rolls
+  settings.mRestitution = 0.2f;  // ← optional: a little bounce on landing
 
   JPH::Body* body = bodyInterface.CreateBody(settings);
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);

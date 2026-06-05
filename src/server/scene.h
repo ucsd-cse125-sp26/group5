@@ -78,21 +78,20 @@ void spawnInvisibleWall(ServerGame& game, const glm::vec3& pos,
 // Disk coverage: cubes rain uniformly over a circle of `radius`.
 template <typename WorldTag>
 void spawnFallingHazardZone(
-    ServerGame& game, const glm::vec3& center,
-    float radius, float spawnHeight, float interval,
+    ServerGame& game, const glm::vec3& center, float radius, float spawnHeight,
+    float interval,
     shared::FallingHazardZone::AttackPattern pattern =
-        shared::FallingHazardZone::AttackPattern::Random)
-{
+        shared::FallingHazardZone::AttackPattern::Random) {
   auto [id, entity] = new_entity(game);
   game.registry.template emplace<shared::Position>(
       entity, center.x, center.y, center.z, 1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.template emplace<WorldTag>(entity);
   auto& z = game.registry.template emplace<shared::FallingHazardZone>(entity);
-  z.shape       = shared::FallingHazardZone::Shape::Disk;
-  z.radius      = radius;
+  z.shape = shared::FallingHazardZone::Shape::Disk;
+  z.radius = radius;
   z.spawnHeight = spawnHeight;
-  z.interval    = interval;
-  z.pattern     = pattern;
+  z.interval = interval;
+  z.pattern = pattern;
 }
 
 // Rectangle coverage: cubes rain uniformly over an axis-aligned box of

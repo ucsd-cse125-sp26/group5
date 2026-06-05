@@ -438,7 +438,7 @@ void initWorldEntities(ServerGame& game) {
   // spawnFallingHazardZoneRect<shared::OverworldTag>(
   //       game,
   //       /*center=*/
-  //       glm::vec3(game.fallLayout.playCenterX - kShiftX, 
+  //       glm::vec3(game.fallLayout.playCenterX - kShiftX,
   //                 game.fallLayout.playCenterY - kShiftY,
   //                 game.fallLayout.playCenterZ),
   //       /*halfX=*/game.fallLayout.playHalfX,
@@ -446,13 +446,11 @@ void initWorldEntities(ServerGame& game) {
   //       /*spawnHeight=*/game.fallLayout.spawnHeight,
   //       /*interval=*/0.15f);
   spawnFallingHazardZone<shared::OverworldTag>(
-    game,
-    glm::vec3(game.fallLayout.playCenterX,
-              game.fallLayout.playCenterY,
-              game.fallLayout.playCenterZ),
-    std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.4f, 
-    game.fallLayout.spawnHeight,
-    0.12f);
+      game,
+      glm::vec3(game.fallLayout.playCenterX, game.fallLayout.playCenterY,
+                game.fallLayout.playCenterZ),
+      std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.4f,
+      game.fallLayout.spawnHeight, 0.12f);
 
   // Autumn fall arena: one green play surface (collision). Orange rim/trigger
   // markers removed — challenge bounds still use game.fallLayout floats.

@@ -282,18 +282,18 @@ struct FallingObject {
 struct FallingHazardZone {
   enum class Shape : uint8_t { Disk, Rect };
   Shape shape = Shape::Disk;
-  float radius = 8.0f;  // Disk: sampling radius
-  float halfX = 8.0f;   // Rect: half-width  (X)
-  float halfY = 8.0f;   // Rect: half-height (Y)
+  float radius = 8.0f;        // Disk: sampling radius
+  float halfX = 8.0f;         // Rect: half-width  (X)
+  float halfY = 8.0f;         // Rect: half-height (Y)
   float spawnHeight = 20.0f;  // spawn this far above the zone's Position.z
   float interval = 0.4f;      // seconds between drops
   float timer = 0.0f;
   enum class AttackPattern { Random, Spiral, Spokes, Aimed };
   AttackPattern pattern = AttackPattern::Random;
-  float patternAngle = 0.0f;   // current rotation offset, advances each burst
-  int   patternStep  = 0;      // which phase in a multi-burst sequence
-  int burstsUntilSwitch = 8;   // how many bursts before picking a new pattern
-  int burstsSinceSwitch = 0;   // counter, incremented each burst
+  float patternAngle = 0.0f;  // current rotation offset, advances each burst
+  int patternStep = 0;        // which phase in a multi-burst sequence
+  int burstsUntilSwitch = 8;  // how many bursts before picking a new pattern
+  int burstsSinceSwitch = 0;  // counter, incremented each burst
 };
 struct Knockback {
   float remaining =

@@ -17,9 +17,7 @@
 namespace fall_challenge {
 namespace {
 
-
-
-  // ── Pattern burst helper ─────────────────────────────────────────────────────
+// ── Pattern burst helper ─────────────────────────────────────────────────────
 // Returns a list of world-space XY spawn positions (Z is filled in by the
 // caller using zone.spawnHeight). Mutates zone.patternAngle / patternStep so
 // successive bursts rotate / advance automatically.
@@ -28,160 +26,160 @@ namespace {
 // Pass an empty vector when no player data is available; Aimed falls back to
 // Spiral for the non-aimed slots.
 static std::vector<glm::vec3> burstPositions(
-    shared::FallingHazardZone& zone,   // non-const: mutates angle/step
-    const shared::Position&    center,
-    std::mt19937&              rng,
-    const std::vector<glm::vec2>& playerPositions)
-{
-    using Pattern = shared::FallingHazardZone::AttackPattern;
-    std::vector<glm::vec3> out;
+    shared::FallingHazardZone& zone,  // non-const: mutates angle/step
+    const shared::Position& center, std::mt19937& rng,
+    const std::vector<glm::vec2>& playerPositions) {
+  using Pattern = shared::FallingHazardZone::AttackPattern;
+  std::vector<glm::vec3> out;
 
-    const float cx = center.x;
-    const float cy = center.y;
-    const float R  = zone.radius;
+  const float cx = center.x;
+  const float cy = center.y;
+  const float R = zone.radius;
 
-    // ── Random (original behaviour) ──────────────────────────────────────────
-    if (zone.pattern == Pattern::Random) {
-        std::uniform_real_distribution<float> angD(0.0f, glm::two_pi<float>());
-        std::uniform_real_distribution<float> rD(0.0f, 1.0f);
-        float ang = angD(rng);
-        float r   = R * std::sqrt(rD(rng));
-        out.emplace_back(cx + std::cos(ang) * r, cy + std::sin(ang) * r, 0.0f);
-        return out;
+  // ── Random (original behaviour) ──────────────────────────────────────────
+  if (zone.pattern == Pattern::Random) {
+    std::uniform_real_distribution<float> angD(0.0f, glm::two_pi<float>());
+    std::uniform_real_distribution<float> rD(0.0f, 1.0f);
+    float ang = angD(rng);
+    float r = R * std::sqrt(rD(rng));
+    out.emplace_back(cx + std::cos(ang) * r, cy + std::sin(ang) * r, 0.0f);
+    return out;
+  }
+
+  // ── Spiral (Fibonacci / sunflower) ───────────────────────────────────────
+  // Fires `count` objects whose positions are the next `count` points on the
+  // sunflower lattice, advancing patternStep each burst. After a full
+  // revolution the lattice wraps naturally, so coverage stays even forever.
+  if (zone.pattern == Pattern::Spiral) {
+    constexpr int count = 7;
+    constexpr float goldenAngle = 2.39996323f;  // radians, ~137.5°
+    for (int i = 0; i < count; ++i) {
+      int idx = zone.patternStep * count + i;
+      float r = R * std::sqrt(static_cast<float>(idx + 1) /
+                              static_cast<float>(count * 12 + 1));
+      // clamp r so we never exceed the disk radius on the first few steps
+      r = std::min(r, R * 0.97f);
+      float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
+      out.emplace_back(cx + std::cos(ang) * r, cy + std::sin(ang) * r, 0.0f);
+    }
+    // Advance: after 12 bursts the pattern has visited the whole disk once.
+    // Reset step so it loops rather than drifting to huge idx values.
+    zone.patternStep = (zone.patternStep + 1) % 12;
+    zone.burstsSinceSwitch++;
+    if (zone.burstsSinceSwitch >= zone.burstsUntilSwitch) {
+      zone.burstsSinceSwitch = 0;
+      std::uniform_int_distribution<int> switchD(5, 12);
+      zone.burstsUntilSwitch = switchD(rng);
+
+      using P = shared::FallingHazardZone::AttackPattern;
+      std::uniform_int_distribution<int> patD(1, 3);
+      switch (patD(rng)) {
+        case 1:
+          zone.pattern = P::Spiral;
+          break;
+        case 2:
+          zone.pattern = P::Spokes;
+          break;
+        case 3:
+          zone.pattern = P::Aimed;
+          break;
+      }
+      zone.patternAngle = 0.0f;
+      zone.patternStep = 0;
     }
 
-    // ── Spiral (Fibonacci / sunflower) ───────────────────────────────────────
-    // Fires `count` objects whose positions are the next `count` points on the
-    // sunflower lattice, advancing patternStep each burst. After a full
-    // revolution the lattice wraps naturally, so coverage stays even forever.
-    if (zone.pattern == Pattern::Spiral) {
-        constexpr int   count       = 7;
-        constexpr float goldenAngle = 2.39996323f; // radians, ~137.5°
-        for (int i = 0; i < count; ++i) {
-            int   idx = zone.patternStep * count + i;
-            float r   = R * std::sqrt(static_cast<float>(idx + 1) /
-                                      static_cast<float>(count * 12 + 1));
-            // clamp r so we never exceed the disk radius on the first few steps
-            r = std::min(r, R * 0.97f);
-            float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
-            out.emplace_back(cx + std::cos(ang) * r,
-                             cy + std::sin(ang) * r,
-                             0.0f);
-        }
-        // Advance: after 12 bursts the pattern has visited the whole disk once.
-        // Reset step so it loops rather than drifting to huge idx values.
-        zone.patternStep = (zone.patternStep + 1) % 12;
-            zone.burstsSinceSwitch++;
-        if (zone.burstsSinceSwitch >= zone.burstsUntilSwitch) {
-            zone.burstsSinceSwitch = 0;
-            std::uniform_int_distribution<int> switchD(5, 12);
-            zone.burstsUntilSwitch = switchD(rng);
+    return out;  // unreachable but satisfies compiler
+  }
 
-            using P = shared::FallingHazardZone::AttackPattern;
-            std::uniform_int_distribution<int> patD(1, 3);
-            switch (patD(rng)) {
-                case 1: zone.pattern = P::Spiral; break;
-                case 2: zone.pattern = P::Spokes; break;
-                case 3: zone.pattern = P::Aimed;  break;
-            }
-            zone.patternAngle = 0.0f;
-            zone.patternStep  = 0;
-        }
+  // ── Spokes ───────────────────────────────────────────────────────────────
+  // Each burst fires one object per spoke at evenly-spaced radii, then
+  // rotates the whole pattern by (2π / spokeCount / subSteps) so over
+  // `subSteps` bursts every gap between spokes has been hit.
+  if (zone.pattern == Pattern::Spokes) {
+    constexpr int spokeCount = 5;
+    constexpr int perSpoke = 3;  // objects per spoke (inner→outer)
+    constexpr int subSteps = 4;  // how many rotations before full repeat
 
-        return out; // unreachable but satisfies compiler
+    float baseAngle = zone.patternAngle;
+
+    for (int s = 0; s < spokeCount; ++s) {
+      float spokeAng = baseAngle + (glm::two_pi<float>() / spokeCount) * s;
+      for (int d = 0; d < perSpoke; ++d) {
+        // Evenly space radii from 20% to 95% of disk radius.
+        float t = 0.2f + 0.75f * (static_cast<float>(d) /
+                                  static_cast<float>(perSpoke - 1));
+        float r = R * t;
+        out.emplace_back(cx + std::cos(spokeAng) * r,
+                         cy + std::sin(spokeAng) * r, 0.0f);
+      }
+    }
+    if (zone.patternStep % 3 == 0) {
+      constexpr float kCornerT = 0.82f;
+      constexpr float kCornerAngles[4] = {
+          glm::quarter_pi<float>(),
+          glm::quarter_pi<float>() * 3.0f,
+          glm::quarter_pi<float>() * 5.0f,
+          glm::quarter_pi<float>() * 7.0f,
+      };
+      std::uniform_real_distribution<float> jD(-0.6f, 0.6f);
+      for (float ca : kCornerAngles) {
+        float ang = ca + zone.patternAngle + jD(rng);
+        out.emplace_back(cx + std::cos(ang) * R * kCornerT,
+                         cy + std::sin(ang) * R * kCornerT, 0.0f);
+      }
+    }
+    // Rotate by one sub-step increment each burst.
+    zone.patternAngle +=
+        (glm::two_pi<float>() / spokeCount) / static_cast<float>(subSteps);
+    zone.patternStep = (zone.patternStep + 1) % (spokeCount * subSteps);
+    return out;
+  }
+
+  // ── Aimed ────────────────────────────────────────────────────────────────
+  // Fires one object directly at each player (clamped inside the disk so it
+  // still lands on the platform). Then fills remaining slots with spiral
+  // points so total coverage stays even even when player count is low.
+  if (zone.pattern == Pattern::Aimed) {
+    constexpr int totalCount = 7;
+    constexpr float aimJitter = 0.8f;  // metres of random offset on aimed shot
+
+    std::uniform_real_distribution<float> jitterD(-aimJitter, aimJitter);
+
+    // Aimed shots at each player.
+    int aimed = 0;
+    for (const auto& pp : playerPositions) {
+      if (aimed >= totalCount) break;
+      float tx = pp.x + jitterD(rng);
+      float ty = pp.y + jitterD(rng);
+      // Clamp inside disk.
+      float dx = tx - cx, dy = ty - cy;
+      float d = std::sqrt(dx * dx + dy * dy);
+      if (d > R * 0.95f) {
+        tx = cx + dx / d * R * 0.95f;
+        ty = cy + dy / d * R * 0.95f;
+      }
+      out.emplace_back(tx, ty, 0.0f);
+      ++aimed;
     }
 
-    // ── Spokes ───────────────────────────────────────────────────────────────
-    // Each burst fires one object per spoke at evenly-spaced radii, then
-    // rotates the whole pattern by (2π / spokeCount / subSteps) so over
-    // `subSteps` bursts every gap between spokes has been hit.
-    if (zone.pattern == Pattern::Spokes) {
-        constexpr int   spokeCount = 5;
-        constexpr int   perSpoke   = 3;   // objects per spoke (inner→outer)
-        constexpr int   subSteps   = 4;   // how many rotations before full repeat
-
-        float baseAngle = zone.patternAngle;
-
-        for (int s = 0; s < spokeCount; ++s) {
-            float spokeAng = baseAngle + (glm::two_pi<float>() / spokeCount) * s;
-            for (int d = 0; d < perSpoke; ++d) {
-                // Evenly space radii from 20% to 95% of disk radius.
-                float t = 0.2f + 0.75f * (static_cast<float>(d) /
-                                           static_cast<float>(perSpoke - 1));
-                float r = R * t;
-                out.emplace_back(cx + std::cos(spokeAng) * r,
-                                 cy + std::sin(spokeAng) * r,
-                                 0.0f);
-            }
-        }
-        if (zone.patternStep % 3 == 0) {
-            constexpr float kCornerT = 0.82f;
-            constexpr float kCornerAngles[4] = {
-                glm::quarter_pi<float>(),
-                glm::quarter_pi<float>() * 3.0f,
-                glm::quarter_pi<float>() * 5.0f,
-                glm::quarter_pi<float>() * 7.0f,
-            };
-            std::uniform_real_distribution<float> jD(-0.6f, 0.6f);
-            for (float ca : kCornerAngles) {
-                float ang = ca + zone.patternAngle + jD(rng);
-                out.emplace_back(cx + std::cos(ang) * R * kCornerT,
-                                 cy + std::sin(ang) * R * kCornerT,
-                                 0.0f);
-            }
-        }
-        // Rotate by one sub-step increment each burst.
-        zone.patternAngle += (glm::two_pi<float>() / spokeCount) /
-                             static_cast<float>(subSteps);
-        zone.patternStep   = (zone.patternStep + 1) % (spokeCount * subSteps);
-        return out;
+    // Fill remaining with spiral so the whole disk gets coverage.
+    constexpr float goldenAngle = 2.39996323f;
+    int remaining = totalCount - aimed;
+    for (int i = 0; i < remaining; ++i) {
+      int idx = zone.patternStep * remaining + i;
+      float r = R * std::sqrt(static_cast<float>(idx + 1) /
+                              static_cast<float>(remaining * 12 + 1));
+      r = std::min(r, R * 0.97f);
+      float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
+      out.emplace_back(cx + std::cos(ang) * r, cy + std::sin(ang) * r, 0.0f);
     }
 
-    // ── Aimed ────────────────────────────────────────────────────────────────
-    // Fires one object directly at each player (clamped inside the disk so it
-    // still lands on the platform). Then fills remaining slots with spiral
-    // points so total coverage stays even even when player count is low.
-    if (zone.pattern == Pattern::Aimed) {
-        constexpr int totalCount = 7;
-        constexpr float aimJitter = 0.8f;  // metres of random offset on aimed shot
+    zone.patternAngle += 0.31f;  // slow drift so aimed + fill rotate over time
+    zone.patternStep = (zone.patternStep + 1) % 12;
+    return out;
+  }
 
-        std::uniform_real_distribution<float> jitterD(-aimJitter, aimJitter);
-
-        // Aimed shots at each player.
-        int aimed = 0;
-        for (const auto& pp : playerPositions) {
-            if (aimed >= totalCount) break;
-            float tx = pp.x + jitterD(rng);
-            float ty = pp.y + jitterD(rng);
-            // Clamp inside disk.
-            float dx = tx - cx, dy = ty - cy;
-            float d  = std::sqrt(dx * dx + dy * dy);
-            if (d > R * 0.95f) { tx = cx + dx / d * R * 0.95f;
-                                  ty = cy + dy / d * R * 0.95f; }
-            out.emplace_back(tx, ty, 0.0f);
-            ++aimed;
-        }
-
-        // Fill remaining with spiral so the whole disk gets coverage.
-        constexpr float goldenAngle = 2.39996323f;
-        int remaining = totalCount - aimed;
-        for (int i = 0; i < remaining; ++i) {
-            int   idx = zone.patternStep * remaining + i;
-            float r   = R * std::sqrt(static_cast<float>(idx + 1) /
-                                      static_cast<float>(remaining * 12 + 1));
-            r = std::min(r, R * 0.97f);
-            float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
-            out.emplace_back(cx + std::cos(ang) * r,
-                             cy + std::sin(ang) * r,
-                             0.0f);
-        }
-
-        zone.patternAngle += 0.31f;  // slow drift so aimed + fill rotate over time
-        zone.patternStep   = (zone.patternStep + 1) % 12;
-        return out;
-    }
-
-    return out; // unreachable but satisfies compiler
+  return out;  // unreachable but satisfies compiler
 }
 
 // Falling-object size knobs. kHalf is the physics half-extent (sphere radius)
@@ -197,7 +195,8 @@ void falling_objects_system(ServerGame& game, float dt) {
   // zone view (over those same pools) is being iterated can invalidate it.
   std::vector<glm::vec3> spawnPositions;
 
-  // auto zones = game.registry.view<shared::FallingHazardZone, shared::Position,
+  // auto zones = game.registry.view<shared::FallingHazardZone,
+  // shared::Position,
   //                                 shared::OverworldTag>();
   // for (auto zoneEnt : zones) {
   //   auto& zone = zones.get<shared::FallingHazardZone>(zoneEnt);
@@ -206,13 +205,13 @@ void falling_objects_system(ServerGame& game, float dt) {
   //   if (zone.timer >= zone.interval) {
   //     zone.timer = 0.0f;
   //     if (zone.shape == shared::FallingHazardZone::Shape::Rect) {
-  //       // Uniform over an axis-aligned rectangle — full square-platform cover.
-  //       std::uniform_real_distribution<float> xDist(-zone.halfX, zone.halfX);
-  //       std::uniform_real_distribution<float> yDist(-zone.halfY, zone.halfY);
-  //       spawnPositions.emplace_back(center.x + xDist(rng),
+  //       // Uniform over an axis-aligned rectangle — full square-platform
+  //       cover. std::uniform_real_distribution<float> xDist(-zone.halfX,
+  //       zone.halfX); std::uniform_real_distribution<float> yDist(-zone.halfY,
+  //       zone.halfY); spawnPositions.emplace_back(center.x + xDist(rng),
   //                                   center.y + yDist(rng),
   //                                   center.z + zone.spawnHeight);
-  //     } 
+  //     }
   //     else {
   //       // Uniform over a disk: sqrt(u) keeps it from clumping at the center.
   //       std::uniform_real_distribution<float> angDist(0.0f,
@@ -230,36 +229,34 @@ void falling_objects_system(ServerGame& game, float dt) {
   // Collect player XY positions once — used by the Aimed pattern.
   std::vector<glm::vec2> playerPositions;
   {
-      auto players = game.registry.view<shared::Position,
-                                        shared::PlayerInput,
-                                        shared::OverworldTag>();
-      for (auto p : players)
-          playerPositions.emplace_back(players.get<shared::Position>(p).x,
-                                      players.get<shared::Position>(p).y);
+    auto players = game.registry.view<shared::Position, shared::PlayerInput,
+                                      shared::OverworldTag>();
+    for (auto p : players)
+      playerPositions.emplace_back(players.get<shared::Position>(p).x,
+                                   players.get<shared::Position>(p).y);
   }
 
   auto zones = game.registry.view<shared::FallingHazardZone, shared::Position,
                                   shared::OverworldTag>();
   for (auto zoneEnt : zones) {
-      auto& zone   = zones.get<shared::FallingHazardZone>(zoneEnt);
-      auto& center = zones.get<shared::Position>(zoneEnt);
-      zone.timer += dt;
-      if (zone.timer < zone.interval) continue;
-      zone.timer = 0.0f;
+    auto& zone = zones.get<shared::FallingHazardZone>(zoneEnt);
+    auto& center = zones.get<shared::Position>(zoneEnt);
+    zone.timer += dt;
+    if (zone.timer < zone.interval) continue;
+    zone.timer = 0.0f;
 
-      if (zone.shape == shared::FallingHazardZone::Shape::Rect) {
-          // Rect stays random — patterns are disk-only.
-          std::uniform_real_distribution<float> xDist(-zone.halfX, zone.halfX);
-          std::uniform_real_distribution<float> yDist(-zone.halfY, zone.halfY);
-          spawnPositions.emplace_back(center.x + xDist(rng),
-                                      center.y + yDist(rng),
-                                      center.z + zone.spawnHeight);
-      } else {
-          // Disk — delegate to pattern helper; helper returns XY, we add Z here.
-          auto burst = burstPositions(zone, center, rng, playerPositions);
-          for (auto& b : burst)
-              spawnPositions.emplace_back(b.x, b.y, center.z + zone.spawnHeight);
-      }
+    if (zone.shape == shared::FallingHazardZone::Shape::Rect) {
+      // Rect stays random — patterns are disk-only.
+      std::uniform_real_distribution<float> xDist(-zone.halfX, zone.halfX);
+      std::uniform_real_distribution<float> yDist(-zone.halfY, zone.halfY);
+      spawnPositions.emplace_back(center.x + xDist(rng), center.y + yDist(rng),
+                                  center.z + zone.spawnHeight);
+    } else {
+      // Disk — delegate to pattern helper; helper returns XY, we add Z here.
+      auto burst = burstPositions(zone, center, rng, playerPositions);
+      for (auto& b : burst)
+        spawnPositions.emplace_back(b.x, b.y, center.z + zone.spawnHeight);
+    }
   }
 
   for (const auto& pos : spawnPositions) {
@@ -275,8 +272,8 @@ void falling_objects_system(ServerGame& game, float dt) {
     game.registry.emplace<shared::OverworldTag>(
         ent);  // REQUIRED to sync/render
     game.registry.emplace<shared::FallingObject>(ent);
-    JPH::BodyID body =
-        game.physics.createFallingObjectBody(glm::vec3(kFallingObjectHalf), pos);
+    JPH::BodyID body = game.physics.createFallingObjectBody(
+        glm::vec3(kFallingObjectHalf), pos);
 
     std::uniform_real_distribution<float> spin(-6.0f, 6.0f);  // rad/s, tune
 
@@ -340,7 +337,8 @@ void knockback_system(ServerGame& game, float dt) {
     // in the vertical column — including directly overhead — registers.
     float bodyMinZ = 0.0f, bodyMaxZ = 0.0f;
     bool haveSpan = game.physics.getBodyWorldZSpan(pid, bodyMinZ, bodyMaxZ);
-    const float kCubeHalf = kFallingObjectHalf;;  // matches createFallingObjectBody extent
+    const float kCubeHalf = kFallingObjectHalf;
+    ;  // matches createFallingObjectBody extent
     const float kZSlack = 0.25f;
     float zLo = haveSpan ? bodyMinZ - kCubeHalf - kZSlack : ppos.z - 1.0f;
     float zHi = haveSpan ? bodyMaxZ + kCubeHalf + kZSlack : ppos.z + 4.0f;
@@ -481,8 +479,9 @@ void fall_challenge_system(ServerGame& game, float dt) {
   constexpr float hz = 60.0f;
 
   bool inZone[4] = {false, false, false, false};
-  uint8_t connectedMask = 0;  // players in the game right now (valid avatar+slot)
-  uint8_t inZoneMask = 0;     // players physically on the platform this frame
+  uint8_t connectedMask =
+      0;                   // players in the game right now (valid avatar+slot)
+  uint8_t inZoneMask = 0;  // players physically on the platform this frame
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
     entt::entity p = slots.overworld_avatar;
@@ -516,8 +515,10 @@ void fall_challenge_system(ServerGame& game, float dt) {
       // cs.hitPenalty is the per-hit flat drop; divide by a hold time (seconds
       // a player would need to stand still taking hits to empty the bar) to get
       // a per-second drain rate that feels equivalent.
-      constexpr float kOffPlatformDrainSeconds = 10.0f; // empty bar in 10s if AFK off-platform
-      cs.fill[i] = std::max(0.0f, cs.fill[i] - (cs.hitPenalty / kOffPlatformDrainSeconds) * dt);
+      constexpr float kOffPlatformDrainSeconds =
+          10.0f;  // empty bar in 10s if AFK off-platform
+      cs.fill[i] = std::max(
+          0.0f, cs.fill[i] - (cs.hitPenalty / kOffPlatformDrainSeconds) * dt);
       continue;
     }
 
@@ -544,7 +545,7 @@ void fall_challenge_system(ServerGame& game, float dt) {
   // the game, not just whoever happens to be standing in the arena this frame.
   // Disconnecting is the only thing that removes a player (and frees their bar
   // / slot so a future occupant starts fresh).
-  uint8_t dropped =
+  auto dropped =
       static_cast<uint8_t>(cs.participantMask & ~connectedMask);  // gone
   for (int i = 0; i < 4; ++i)
     if (dropped & (1u << i)) cs.fill[i] = 0.0f;
