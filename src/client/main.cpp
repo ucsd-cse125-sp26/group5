@@ -182,9 +182,8 @@ int main() {
         game.currentGameState == shared::GameStateType::CREDITS) {
       game.currentGameState = shared::GameStateType::OVERWORLD;
       graphics.creditsStartTime = -1.0;
-      game.audio.stopAllGlobalLoops();
-      game.audio.playGlobalLoop(
-          static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
+      game.audio.stopGlobalLoop(
+          static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC));
     }
     creditsDismissPrev = dismissNow;
 

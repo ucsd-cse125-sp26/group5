@@ -79,18 +79,13 @@ bool AudioEngine::init() {
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
 
-  loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
-            "assets/sounds/scattered.wav");
-  loadSound(static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC),
-            "assets/sounds/angel.mp3");
-  loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
-            "assets/sounds/yaku.mp3");
-  // Placeholder credits track — swap for a dedicated file when available.
-  loadSound(static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC),
-            "assets/sounds/angel.mp3");
-
-  loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
-            "assets/sounds/angel.mp3");
+  // Temporarily disable non-seasonal audio while validating seasonal music.
+  // loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
+  //           "assets/sounds/scattered.wav");
+  // loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
+  //           "assets/sounds/yaku.mp3");
+  // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
+  //           "assets/sounds/minigame_complete.wav");
   loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
                   "assets/sounds/Winter.mp3");
   loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
