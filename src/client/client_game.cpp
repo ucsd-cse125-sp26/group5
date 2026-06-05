@@ -237,9 +237,9 @@ void registerClientHandlers(ClientNetwork& network) {
         game.currentGameState = pkt.state;
         if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.stopAllGlobalLoops();
-          game.audio.playGlobalLoop(
-              static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
+          // Keep the current seasonal track, especially AfterSpring, through
+          // the credits roll. No separate credits music is loaded right now.
           // Bump the epoch so the render thread restarts the exit clip —
           // supports re-rolling credits from the debug panel mid-roll. Audio is
           // deliberately left untouched: the end ("exit") scene is silent and

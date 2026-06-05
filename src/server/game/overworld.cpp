@@ -313,6 +313,23 @@ shared::SoundId soundIdForActiveSeason(shared::SectionSeasonMap season) {
   return shared::SoundId::SECTION_WINTER_AMBIENT;
 }
 
+const char* seasonMusicName(shared::SoundId soundId) {
+  switch (soundId) {
+    case shared::SoundId::SECTION_WINTER_AMBIENT:
+      return "Winter";
+    case shared::SoundId::SECTION_FALL_AMBIENT:
+      return "Fall";
+    case shared::SoundId::SECTION_SUMMER_AMBIENT:
+      return "Summer";
+    case shared::SoundId::SECTION_SPRING_AMBIENT:
+      return "Spring";
+    case shared::SoundId::SECTION_AFTER_SPRING_AMBIENT:
+      return "AfterSpring";
+    default:
+      return "Unknown";
+  }
+}
+
 }  // namespace
 
 void syncOverworldSeasonMusic(ServerGame& game,
@@ -334,6 +351,9 @@ void syncOverworldSeasonMusic(ServerGame& game,
   shared::SeasonMusicPacket pkt;
   pkt.soundId = static_cast<uint32_t>(soundId);
   pkt.volume = shared::music_config::kSeasonMusicVolume;
+  std::printf(
+      "[Music] Server broadcasting %s music (soundId=%u, volume=%.2f)\n",
+      seasonMusicName(soundId), pkt.soundId, pkt.volume);
   net::broadcastPacket(game.network->getHost(), pkt);
 }
 

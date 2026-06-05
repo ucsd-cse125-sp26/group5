@@ -193,14 +193,14 @@ int main() {
     graphics.keyDebugPanelPrev = dbgChord;
 
     // Enter dismisses the end ("exit") scene back to the overworld view. The
-    // server never froze gameplay, so this is a purely local view swap. Audio
-    // is intentionally left untouched — it is owned by the audio subsystem.
+    // server never froze gameplay, so this is a purely local view swap.
     bool dismissNow = glfwGetKey(graphics.window, GLFW_KEY_ENTER) == GLFW_PRESS;
     if (dismissNow && !creditsDismissPrev &&
         game.currentGameState == shared::GameStateType::CREDITS) {
       game.currentGameState = shared::GameStateType::OVERWORLD;
       graphics.creditsStartTime = -1.0;
       graphics.stopActiveVideo();
+      game.audio.stopAllGlobalLoops();
     }
     creditsDismissPrev = dismissNow;
 
