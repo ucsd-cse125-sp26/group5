@@ -6,47 +6,75 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include "shared/components.h"
 #include "shared/log.h"
 #include "shared/sound_constants.h"
 #include "shared/util.h"
 
+namespace {
+
+#if defined(_WIN32)
+constexpr const char* kAudioPlatform = "Windows";
+constexpr const char* kPrimaryAudioBackend = "MINIAUDIO/WASAPI";
+#elif defined(__APPLE__)
+constexpr const char* kAudioPlatform = "macOS";
+constexpr const char* kPrimaryAudioBackend = "COREAUDIO";
+#elif defined(__linux__)
+constexpr const char* kAudioPlatform = "Linux";
+constexpr const char* kPrimaryAudioBackend = "MINIAUDIO/ALSA-Pulse-PipeWire";
+#else
+constexpr const char* kAudioPlatform = "Unknown";
+constexpr const char* kPrimaryAudioBackend = "SoLoud AUTO";
+#endif
+
+}  // namespace
+
 bool AudioEngine::init() {
   std::scoped_lock lock(mutex_);
   soloud_ = new SoLoud::Soloud();
-  LOG_DEBUG("AudioEngine: attempting init...\n");
+  std::fprintf(stderr, "AudioEngine: init platform=%s backend=%s\n",
+               kAudioPlatform, kPrimaryAudioBackend);
 
   SoLoud::result result = SoLoud::UNKNOWN_ERROR;
+  bool usingSilentDriver = false;
 #if defined(__APPLE__)
   // Prefer native Core Audio on macOS (miniaudio often fails with error 7).
   result =
       soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::COREAUDIO);
   if (result != SoLoud::SO_NO_ERROR) {
-    LOG_DEBUG("AudioEngine: CoreAudio init failed (%d: %s), trying miniaudio\n",
-              result, soloud_->getErrorString(result));
+    std::fprintf(stderr,
+                 "AudioEngine: CoreAudio failed (%d: %s), trying miniaudio\n",
+                 result, soloud_->getErrorString(result));
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::MINIAUDIO, 48000, 1024, 2);
   }
+#elif defined(_WIN32) || defined(__linux__)
+  result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
+                         SoLoud::Soloud::MINIAUDIO, 48000, 1024, 2);
 #else
   result = soloud_->init();
 #endif
 
   if (result != SoLoud::SO_NO_ERROR) {
-    LOG_DEBUG(
-        "AudioEngine: SoLoud init failed (error %d), retrying with null "
-        "driver\n",
-        result);
+    std::fprintf(
+        stderr,
+        "AudioEngine ERROR: real audio backend failed on %s (%d: %s). "
+        "Trying NULLDRIVER; music will be silent if this succeeds.\n",
+        kAudioPlatform, result, soloud_->getErrorString(result));
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::NULLDRIVER);
     if (result != SoLoud::SO_NO_ERROR) {
-      LOG_DEBUG("AudioEngine: null driver also failed: %d\n", result);
+      std::fprintf(stderr, "AudioEngine ERROR: NULLDRIVER also failed: %d\n",
+                   result);
       return false;
     }
-    LOG_DEBUG("AudioEngine: running in silent mode (no audio output)\n");
+    usingSilentDriver = true;
   }
-  LOG_DEBUG("AudioEngine: backend %s, %u Hz\n", soloud_->getBackendString(),
-            soloud_->getBackendSamplerate());
+  std::fprintf(stderr, "AudioEngine: backend active=%s samplerate=%u%s\n",
+               soloud_->getBackendString(), soloud_->getBackendSamplerate(),
+               usingSilentDriver ? " (SILENT NULLDRIVER)" : "");
 
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
@@ -175,13 +203,20 @@ void AudioEngine::loadMusicStream(uint32_t soundId, const std::string& path) {
   std::string fullPath = (exeDir() / path).string();
   SoLoud::result result = stream->load(fullPath.c_str());
   if (result != SoLoud::SO_NO_ERROR) {
-    std::fprintf(stderr, "AudioEngine: failed to stream music %s (%d: %s)\n",
-                 fullPath.c_str(), result, soloud_->getErrorString(result));
+    std::fprintf(
+        stderr,
+        "AudioEngine ERROR: failed to parse music stream id=%u path=%s "
+        "(%d: %s). This usually means missing asset or unsupported/corrupt "
+        "audio format.\n",
+        soundId, fullPath.c_str(), result, soloud_->getErrorString(result));
     delete stream;
     return;
   }
   stream->setLooping(true);
   musicStreams_[soundId] = stream;
+  std::fprintf(stderr,
+               "AudioEngine: music stream loaded id=%u path=%s length=%.2fs\n",
+               soundId, fullPath.c_str(), stream->getLength());
 }
 
 void AudioEngine::updateEmitter(uint32_t entityId,
@@ -298,13 +333,19 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
     globalMusicVolume_ = 0.0f;
   }
 
+  const char* sourceType = "buffered sound";
   if (streamIt != musicStreams_.end()) {
     streamIt->second->setLooping(true);
     globalMusicHandle_ = soloud_->play(*streamIt->second);
+    sourceType = "stream";
   } else {
     soundIt->second->setLooping(true);
     globalMusicHandle_ = soloud_->play(*soundIt->second);
   }
+  std::fprintf(stderr,
+               "AudioEngine: starting global music id=%u source=%s "
+               "handle=%u targetVolume=%.2f\n",
+               soundId, sourceType, globalMusicHandle_, volume);
   globalMusicSoundId_ = soundId;
   globalMusicTargetVolume_ = volume;
   globalMusicVolume_ = 0.0f;
