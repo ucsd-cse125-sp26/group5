@@ -2,7 +2,6 @@
 
 #include <soloud.h>
 #include <soloud_wav.h>
-#include <soloud_wavstream.h>
 
 #include <algorithm>
 #include <cmath>
@@ -86,17 +85,16 @@ bool AudioEngine::init() {
   //           "assets/sounds/yaku.mp3");
   // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
   //           "assets/sounds/minigame_complete.wav");
-  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
-                  "assets/sounds/Winter.mp3");
-  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
-                  "assets/sounds/Fall.mp3");
-  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
-                  "assets/sounds/Summer.mp3");
-  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
-                  "assets/sounds/Spring.mp3");
-  loadMusicStream(
-      static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
-      "assets/sounds/AfterSpring.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
+            "assets/sounds/Winter.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
+            "assets/sounds/Fall.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
+            "assets/sounds/Summer.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
+            "assets/sounds/Spring.mp3");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
+            "assets/sounds/AfterSpring.mp3");
   return true;
 }
 
@@ -109,8 +107,6 @@ void AudioEngine::shutdown() {
   }
   for (auto& [id, wav] : sounds_) delete wav;
   sounds_.clear();
-  for (auto& [id, stream] : musicStreams_) delete stream;
-  musicStreams_.clear();
 }
 
 void AudioEngine::update(float dt) {
@@ -173,27 +169,6 @@ void AudioEngine::loadSound(uint32_t soundId, const std::string& path) {
   wav->set3dMinMaxDistance(5.0f, 1000.0f);
   wav->set3dAttenuation(SoLoud::AudioSource::INVERSE_DISTANCE, 1.0f);
   sounds_[soundId] = wav;
-}
-
-void AudioEngine::loadMusicStream(uint32_t soundId, const std::string& path) {
-  auto* stream = new SoLoud::WavStream();
-  std::string fullPath = (exeDir() / path).string();
-  SoLoud::result result = stream->load(fullPath.c_str());
-  if (result != SoLoud::SO_NO_ERROR) {
-    std::fprintf(
-        stderr,
-        "AudioEngine ERROR: failed to parse music stream id=%u path=%s "
-        "(%d: %s). This usually means missing asset or unsupported/corrupt "
-        "audio format.\n",
-        soundId, fullPath.c_str(), result, soloud_->getErrorString(result));
-    delete stream;
-    return;
-  }
-  stream->setLooping(true);
-  musicStreams_[soundId] = stream;
-  std::fprintf(stderr,
-               "AudioEngine: music stream loaded id=%u path=%s length=%.2fs\n",
-               soundId, fullPath.c_str(), stream->getLength());
 }
 
 void AudioEngine::updateEmitter(uint32_t entityId,
@@ -292,9 +267,8 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
     return;
   }
 
-  auto streamIt = musicStreams_.find(soundId);
   auto soundIt = sounds_.find(soundId);
-  if (streamIt == musicStreams_.end() && soundIt == sounds_.end()) {
+  if (soundIt == sounds_.end()) {
     std::fprintf(stderr,
                  "AudioEngine: global loop sound id %u not loaded "
                  "(missing assets/sounds?)\n",
@@ -315,14 +289,8 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   }
 
   const char* sourceType = "buffered sound";
-  if (streamIt != musicStreams_.end()) {
-    streamIt->second->setLooping(true);
-    globalMusicHandle_ = soloud_->play(*streamIt->second);
-    sourceType = "stream";
-  } else {
-    soundIt->second->setLooping(true);
-    globalMusicHandle_ = soloud_->play(*soundIt->second);
-  }
+  soundIt->second->setLooping(true);
+  globalMusicHandle_ = soloud_->play(*soundIt->second);
   std::fprintf(stderr,
                "AudioEngine: starting global music id=%u source=%s "
                "handle=%u targetVolume=%.2f\n",
