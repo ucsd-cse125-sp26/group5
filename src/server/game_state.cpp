@@ -657,6 +657,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   if (maze_puzzle::isPuzzleActive(game)) {
+    movement_system(game, dt, StateType::OVERWORLD);
     maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
@@ -693,7 +694,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     game.overworldMazeFocusTimer = 0.0f;
   } else if (!summer_escape::isActive(game) && game.overworldMazeTriggerArmed &&
              maze_trigger::canTriggerMaze(game)) {
-    maze_camera::snapOverworldAvatarsFaceMazePreview(game);
     game.overworldMazeFocusTimer += dt;
     if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds) {
       game.overworldMazeTriggerArmed = false;

@@ -10,6 +10,7 @@
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
