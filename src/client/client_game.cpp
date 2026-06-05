@@ -11,6 +11,7 @@
 #include "client_network.h"
 #include "glm/glm.hpp"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/tangram/roles.h"
 #include "shared/simple_profiler.h"
@@ -120,7 +121,7 @@ void registerClientHandlers(ClientNetwork& network) {
         uint16_t entityCount;
         std::memcpy(&entityCount, data + offset, sizeof(uint16_t));
         offset += sizeof(uint16_t);
-        printf("CLIENT: spawn %u entities\n", entityCount);
+        LOG_DEBUG("CLIENT: spawn %u entities\n", entityCount);
         for (uint16_t i = 0; i < entityCount; i++) {
           uint32_t entityId;
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
@@ -147,13 +148,13 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        printf("CLIENT: despawn entity %u\n", pkt.entityId);
+        LOG_DEBUG("CLIENT: despawn entity %u\n", pkt.entityId);
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
           game.audio.stopAllForEntity(pkt.entityId);
           game.networkRegistry.destroy(it->second);
           game.networkEntityMap.erase(it);
-          printf("Destroyed entity %d\n", pkt.entityId);
+          LOG_DEBUG("Destroyed entity %d\n", pkt.entityId);
         }
       });
 
@@ -477,7 +478,7 @@ void printEntityPositions(const ClientGame& game) {
   for (auto ent : view) {
     auto& e = view.get<shared::Entity>(ent);
     auto& p = view.get<shared::Position>(ent);
-    printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
+    LOG_DEBUG("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
            e.id == game.renderEntityId ? " (me)" : "");
   }
 }

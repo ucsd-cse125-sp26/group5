@@ -3,6 +3,7 @@
 #include "client/client_game.h"
 #include "client/client_graphics.h"
 #include "imgui.h"
+#include "shared/log.h"
 #include "shared/protocol.h"
 
 namespace {
@@ -138,6 +139,13 @@ void drawDebugPanel(Graphics& g, ClientGame& game, bool& open) {
   ImGui::SameLine();
   ImGui::AlignTextToFramePadding();
   ImGui::Text("Debug channel: %d", static_cast<int>(g.debugChannel));
+
+  // ── Logging ──────────────────────────────────────────────
+  ImGui::SeparatorText("LOGGING");
+  ImGui::Checkbox("Client debug log output", &shared::log::debugEnabled);
+  if (ImGui::Button("Toggle Server Debug Log", kBtn)) {
+    pushCmd(game, shared::DebugCommand::TOGGLE_DEBUG_LOG);
+  }
 
   ImGui::End();
 }

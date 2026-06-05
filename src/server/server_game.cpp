@@ -12,6 +12,7 @@
 #include "server/game/puzzles/maze/layout_editor.h"
 #include "server_network.h"
 #include "shared/assets.h"
+#include "shared/log.h"
 #include "shared/components.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/maze/layout.h"
@@ -331,7 +332,7 @@ void registerServerHandlers(ServerNetwork& network) {
         std::memcpy(&pkt, data, sizeof(pkt));
         auto it = game.active_players.find(sender);
         if (it == game.active_players.end()) {
-          std::printf("[Server] INPUT dropped: sender not in active_players\n");
+          LOG_DEBUG("[Server] INPUT dropped: sender not in active_players\n");
           return;
         }
 
@@ -343,7 +344,7 @@ void registerServerHandlers(ServerNetwork& network) {
           ent = it->second.maze_avatar;
         }
         if (ent == entt::null) {
-          std::printf(
+          LOG_DEBUG(
               "[Server] INPUT dropped: no active avatar for current state\n");
           return;
         }

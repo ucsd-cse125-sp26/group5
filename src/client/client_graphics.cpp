@@ -37,6 +37,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "shared/assets.h"
+#include "shared/log.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/draw_stats.h"
@@ -839,7 +840,7 @@ bool Graphics::load(int width, int height) {
   glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
 
   int version = gladLoadGL(glfwGetProcAddress);
-  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
+  LOG_DEBUG("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
          GLAD_VERSION_MINOR(version));
 
   if (glDebugMessageCallback) {
@@ -1029,7 +1030,7 @@ bool Graphics::load(int width, int height) {
     }
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
-    printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+    LOG_DEBUG("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
   renderLoadingFrame("Building player-slot cubes");
@@ -1039,7 +1040,7 @@ bool Graphics::load(int width, int height) {
     if (m) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[name] = m;
-      printf("Loaded asset: %s (player join order)\n", name.c_str());
+      LOG_DEBUG("Loaded asset: %s (player join order)\n", name.c_str());
     }
   }
 
@@ -1048,7 +1049,7 @@ bool Graphics::load(int width, int height) {
     if (m) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[std::string(def.modelName)] = m;
-      printf("Loaded tangram mesh: %s\n", def.modelName);
+      LOG_DEBUG("Loaded tangram mesh: %s\n", def.modelName);
     }
     Model* mute = makeTangramPieceMuteModel(def);
     if (mute) {
@@ -1066,7 +1067,7 @@ bool Graphics::load(int width, int height) {
     if (ghostColored) {
       ghostColored->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[ghostName + "_colored"] = ghostColored;
-      printf("Loaded tangram ghost: %s (colored slot guide)\n",
+      LOG_DEBUG("Loaded tangram ghost: %s (colored slot guide)\n",
              ghostName.c_str());
     }
   }
@@ -1084,7 +1085,7 @@ bool Graphics::load(int width, int height) {
   auto mapModels = loadMapModels(*parsedLandscape, pump);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
-    printf("Loaded map sub-model: %s\n", key.c_str());
+    LOG_DEBUG("Loaded map sub-model: %s\n", key.c_str());
     pumpLoadingFrame();
   }
 
@@ -1093,7 +1094,7 @@ bool Graphics::load(int width, int height) {
     if (skyboxes.find(dir) == skyboxes.end()) {
       renderLoadingFrame(std::string("Loading skybox: ") + dir);
       skyboxes[dir] = loadSkybox(dir, pump);
-      printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
+      LOG_DEBUG("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
              dir.c_str());
     }
   }
@@ -1445,7 +1446,7 @@ void Graphics::reloadShaders() {
                                            : Shader(r.vert, r.frag);
     if (candidate.valid()) {
       r.slot.emplace(std::move(candidate));
-      printf("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
+      LOG_DEBUG("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
              (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
     } else {
       fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
@@ -1519,7 +1520,7 @@ void Graphics::cycleDebugChannel() {
     case DebugChannel::Count:
       break;
   }
-  printf("Debug overlay: %s\n", name);
+  LOG_DEBUG("Debug overlay: %s\n", name);
 }
 
 void Graphics::processDebugKeys() {

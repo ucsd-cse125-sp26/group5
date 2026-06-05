@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
@@ -89,10 +90,10 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
     layout.triggerCenterY = y;
     layout.triggerCenterZ = z;
     foundTrigger = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeTriggerNode, x, y,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeTriggerNode, x, y,
            z);
   } else {
-    printf("[MapGamelogic] node \"%s\" not found; using layout default\n",
+    LOG_DEBUG("[MapGamelogic] node \"%s\" not found; using layout default\n",
            kMazeTriggerNode);
   }
 
@@ -102,10 +103,10 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
     layout.boardCenterZ = z;
     layout.autoBoardFromTrigger = false;
     foundBoard = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeBoardNode, x, y,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kMazeBoardNode, x, y,
            z);
   } else {
-    printf("[MapGamelogic] node \"%s\" not found; board derived from trigger\n",
+    LOG_DEBUG("[MapGamelogic] node \"%s\" not found; board derived from trigger\n",
            kMazeBoardNode);
   }
 
@@ -114,10 +115,10 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
     layout.spawnBaseY = y;
     layout.spawnHeightZ = z;
     foundSpawn = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kPlayerStartNode, x, y,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kPlayerStartNode, x, y,
            z);
   } else {
-    printf("[MapGamelogic] node \"%s\" not found; using layout default\n",
+    LOG_DEBUG("[MapGamelogic] node \"%s\" not found; using layout default\n",
            kPlayerStartNode);
   }
 
@@ -126,7 +127,7 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
   if (foundSpawn && foundTrigger &&
       layout.spawnHeightZ < layout.triggerCenterZ + 0.25f) {
     const float adjusted = layout.triggerCenterZ + 0.5f;
-    printf("[MapGamelogic] %s Z raised %.3f -> %.3f (maze_trigger floor)\n",
+    LOG_DEBUG("[MapGamelogic] %s Z raised %.3f -> %.3f (maze_trigger floor)\n",
            kPlayerStartNode, layout.spawnHeightZ, adjusted);
     layout.spawnHeightZ = adjusted;
   }
@@ -138,7 +139,7 @@ bool tryApplyMazeLayoutFromMap(const ParsedModel& parsed,
   layout.resolveBoardPlacement();
 
   if (foundTrigger || foundBoard || foundSpawn) {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] maze layout: trigger (%.3f, %.3f) board (%.3f, %.3f, "
         "%.3f) spawn (%.3f, %.3f, %.3f)\n",
         layout.triggerCenterX, layout.triggerCenterY, layout.boardCenterX,
@@ -168,10 +169,10 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     layout.platformCenterZ = topZ - layout.platformScaleZ * 0.5f;
     layout.spawnHeightZ = topZ + 0.5f;
     foundTrigger = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTriggerNode, x,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTriggerNode, x,
            y, z);
   } else {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] node \"%s\" not found; tangram trigger uses "
         "tangram_defaults fallback\n",
         kSpringTriggerNode);
@@ -182,10 +183,10 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     layout.boardCenterY = y;
     layout.boardCenterZ = z;
     foundZone = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTangramZoneNode,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringTangramZoneNode,
            x, y, z);
   } else {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] node \"%s\" not found; tangram board derived from "
         "trigger\n",
         kSpringTangramZoneNode);
@@ -197,7 +198,7 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     if (foundTrigger) {
       const float topZ = layout.platformTopZ();
       if (z < topZ - 0.25f) {
-        printf(
+        LOG_DEBUG(
             "[MapGamelogic] %s Z raised %.3f -> %.3f (spring_trigger "
             "floor)\n",
             kSpringPlayerStartNode, z, topZ + 0.5f);
@@ -209,7 +210,7 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
       layout.spawnHeightZ = z + 0.5f;
     }
     foundSpawn = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringPlayerStartNode,
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f)\n", kSpringPlayerStartNode,
            x, y, z);
   }
 
@@ -223,7 +224,7 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
   }
 
   if (foundTrigger || foundZone || foundSpawn) {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] tangram layout: trigger (%.3f, %.3f) board (%.3f, "
         "%.3f, %.3f) pad spawn (%.3f, %.3f, %.3f)\n",
         layout.triggerCenterX, layout.triggerCenterY, layout.boardCenterX,
@@ -238,7 +239,7 @@ bool tryApplyTangramArenaFromMapFile(const std::string& path,
                                      tangram::ArenaLayout& layout) {
   ParsedModel parsed;
   if (!parsed.load(path, MAP_LOAD_FLAGS)) {
-    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+    LOG_DEBUG("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
            parsed.lastError().c_str());
     return false;
   }
@@ -265,10 +266,10 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
     if (std::abs(sx) > 1.25f) layout.triggerHalfX = std::abs(sx);
     if (std::abs(sy) > 1.25f) layout.triggerHalfY = std::abs(sy);
     foundTrigger = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
            matchedName, x, y, z, sx, sy, sz);
   } else {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall trigger uses "
         "default\n",
         kFallTriggerNode, kAutumnTriggerNode);
@@ -282,10 +283,10 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
     if (std::abs(sx) > 1.25f) layout.playHalfX = std::abs(sx);
     if (std::abs(sy) > 1.25f) layout.playHalfY = std::abs(sy);
     foundPlay = true;
-    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
+    LOG_DEBUG("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) scale (%.3f, %.3f, %.3f)\n",
            matchedName, x, y, z, sx, sy, sz);
   } else {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] nodes \"%s\"/\"%s\" not found; fall play zone uses "
         "default\n",
         kFallPlayZoneNode, kAutumnZoneNode);
@@ -297,12 +298,12 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
   if (foundTrigger || foundPlay) {
     const float floorZ = std::max(layout.triggerCenterZ, layout.playCenterZ);
     if (layout.triggerCenterZ < floorZ - 0.25f) {
-      printf("[MapGamelogic] fall trigger Z raised %.3f -> %.3f\n",
+      LOG_DEBUG("[MapGamelogic] fall trigger Z raised %.3f -> %.3f\n",
              layout.triggerCenterZ, floorZ);
       layout.triggerCenterZ = floorZ;
     }
     if (layout.playCenterZ < floorZ - 0.25f) {
-      printf("[MapGamelogic] fall play Z raised %.3f -> %.3f\n",
+      LOG_DEBUG("[MapGamelogic] fall play Z raised %.3f -> %.3f\n",
              layout.playCenterZ, floorZ);
       layout.playCenterZ = floorZ;
     }
@@ -311,7 +312,7 @@ bool tryApplyFallLayoutFromMap(const ParsedModel& parsed, FallLayout& layout) {
   layout.spawnHeight = layout.playCenterZ + 20.0f;
 
   if (foundTrigger || foundPlay) {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] fall layout: trigger (%.3f, %.3f, %.3f) half (%.3f, "
         "%.3f) play (%.3f, %.3f, %.3f) half (%.3f, %.3f) spawnHeight %.3f\n",
         layout.triggerCenterX, layout.triggerCenterY, layout.triggerCenterZ,
@@ -327,7 +328,7 @@ bool tryApplyFallLayoutFromMapFile(const std::string& path,
                                    FallLayout& layout) {
   ParsedModel parsed;
   if (!parsed.load(path, MAP_LOAD_FLAGS)) {
-    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+    LOG_DEBUG("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
            parsed.lastError().c_str());
     return false;
   }
@@ -378,11 +379,11 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
         shared::tangram_puzzle::quantizeYawToRotateStep(yaw);
     layout.slots[i].valid = true;
     ++found;
-    printf("[MapGamelogic] %s -> rel (%.3f, %.3f) yaw %.3f\n", name,
+    LOG_DEBUG("[MapGamelogic] %s -> rel (%.3f, %.3f) yaw %.3f\n", name,
            layout.slots[i].relX, layout.slots[i].relY, layout.slots[i].rotRad);
   }
   if (found > 0 && found < 7) {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] tangram slots: only %d/7 empties — ignoring map "
         "(need all spring_tangram_slot_1..7 or none)\n",
         found);
@@ -400,7 +401,7 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
   }
   if (layout.anyFromMap &&
       shared::tangram_slot_validate::slotPosesOverlap(loaded)) {
-    printf(
+    LOG_DEBUG(
         "[MapGamelogic] tangram slots overlap in map — ignoring map layout "
         "(fix empty positions or remove spring_tangram_slot_*)\n");
     for (auto& slot : layout.slots) {
@@ -411,7 +412,7 @@ bool tryApplyTangramSlotsFromMap(const ParsedModel& parsed, float boardCenterX,
   }
 
   if (layout.anyFromMap) {
-    printf("[MapGamelogic] tangram slots from map: 7/7 (no overlap)\n");
+    LOG_DEBUG("[MapGamelogic] tangram slots from map: 7/7 (no overlap)\n");
   }
   return layout.anyFromMap;
 }
@@ -420,7 +421,7 @@ bool tryApplyMazeLayoutFromMapFile(const std::string& path,
                                    maze_layout::Config& layout) {
   ParsedModel parsed;
   if (!parsed.load(path, MAP_LOAD_FLAGS)) {
-    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+    LOG_DEBUG("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
            parsed.lastError().c_str());
     return false;
   }
@@ -436,7 +437,7 @@ bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
   const aiNode* node = scene->mRootNode->FindNode(aiString(kFallenHouseNode));
   const aiMatrix4x4* world = parsed.worldTransform(kFallenHouseNode);
   if (!node || !world) {
-    printf("[MapGamelogic] node \"%s\" not found; credits trigger disabled\n",
+    LOG_DEBUG("[MapGamelogic] node \"%s\" not found; credits trigger disabled\n",
            kFallenHouseNode);
     return false;
   }
@@ -447,7 +448,7 @@ bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
   std::vector<uint32_t> indices;
   flattenNodeGeometry(*node, *scene, verts, indices);
   if (verts.empty()) {
-    printf("[MapGamelogic] node \"%s\" has no geometry; credits trigger off\n",
+    LOG_DEBUG("[MapGamelogic] node \"%s\" has no geometry; credits trigger off\n",
            kFallenHouseNode);
     return false;
   }
@@ -473,7 +474,7 @@ bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
   region.minZ = minZ - kPad;
   region.maxZ = maxZ + kPad;
   region.valid = true;
-  printf(
+  LOG_DEBUG(
       "[MapGamelogic] Fallen house region -> X[%.2f,%.2f] Y[%.2f,%.2f] "
       "Z[%.2f,%.2f]\n",
       region.minX, region.maxX, region.minY, region.maxY, region.minZ,

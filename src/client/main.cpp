@@ -16,6 +16,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
@@ -27,6 +28,7 @@ void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
+  shared::log::initFromEnvironment();
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
@@ -93,14 +95,14 @@ int main() {
   // }
 
   if (!game.audio.init()) {
-    printf("Audio init failed; continuing without audio\n");
+    LOG_DEBUG("Audio init failed; continuing without audio\n");
   }
 
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {
-    printf("[DevSpawn] Client fallback camera: tangram pad\n");
+    LOG_DEBUG("[DevSpawn] Client fallback camera: tangram pad\n");
   } else {
-    printf("[DevSpawn] Client fallback camera: winter maze\n");
+    LOG_DEBUG("[DevSpawn] Client fallback camera: winter maze\n");
   }
   auto lastTime = (float)glfwGetTime();
   while (!glfwWindowShouldClose(graphics.window)) {

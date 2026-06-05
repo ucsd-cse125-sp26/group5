@@ -7,28 +7,29 @@
 #include <cmath>
 
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/sound_constants.h"
 #include "shared/util.h"
 
 bool AudioEngine::init() {
   std::scoped_lock lock(mutex_);
   soloud_ = new SoLoud::Soloud();
-  printf("AudioEngine: attempting init...\n");
+  LOG_DEBUG("AudioEngine: attempting init...\n");
 
   SoLoud::result result = soloud_->init();
 
   if (result != SoLoud::SO_NO_ERROR) {
-    printf(
+    LOG_DEBUG(
         "AudioEngine: SoLoud init failed (error %d), retrying with null "
         "driver\n",
         result);
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::NULLDRIVER);
     if (result != SoLoud::SO_NO_ERROR) {
-      printf("AudioEngine: null driver also failed: %d\n", result);
+      LOG_DEBUG("AudioEngine: null driver also failed: %d\n", result);
       return false;
     }
-    printf("AudioEngine: running in silent mode (no audio output)\n");
+    LOG_DEBUG("AudioEngine: running in silent mode (no audio output)\n");
   }
 
   // raise voice limit to 32 for more simultaneous sounds
@@ -136,7 +137,7 @@ void AudioEngine::loadSound(uint32_t soundId, const std::string& path) {
   std::string fullPath = (exeDir() / path).string();
   SoLoud::result result = wav->load(fullPath.c_str());
   if (result != SoLoud::SO_NO_ERROR) {
-    printf("AudioEngine: failed to load sound %s\n", fullPath.c_str());
+    LOG_DEBUG("AudioEngine: failed to load sound %s\n", fullPath.c_str());
     delete wav;
     return;
   }

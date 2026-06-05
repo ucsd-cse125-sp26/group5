@@ -16,6 +16,7 @@ endif()
 
 add_library(shared
     src/shared/hello.cpp
+    src/shared/log.cpp
     src/shared/util.cpp
     src/shared/mesh_loader.cpp
     src/shared/puzzles/maze/layout.cpp

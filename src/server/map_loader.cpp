@@ -10,6 +10,7 @@
 #include "physics_engine.h"
 #include "server_game.h"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/lighting.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
@@ -42,7 +43,7 @@ bool loadMap(ServerGame& game, const std::string& path,
              const std::function<void(ServerGame&, entt::entity)>& tagEntity) {
   shared::ParsedModel parsed;
   if (!parsed.load(path, shared::MAP_LOAD_FLAGS)) {
-    printf("loadMap: failed to load \"%s\": %s\n", path.c_str(),
+    LOG_DEBUG("loadMap: failed to load \"%s\": %s\n", path.c_str(),
            parsed.lastError().c_str());
     return false;
   }
@@ -85,7 +86,7 @@ bool loadMap(ServerGame& game, const std::string& path,
     const aiLight* light = scene->mLights[i];
     const aiMatrix4x4* world = parsed.worldTransform(light->mName.C_Str());
     if (!world) {
-      printf("loadMap: light \"%s\" has no matching node, skipping\n",
+      LOG_DEBUG("loadMap: light \"%s\" has no matching node, skipping\n",
              light->mName.C_Str());
       ++skippedLights;
       continue;
@@ -121,7 +122,7 @@ bool loadMap(ServerGame& game, const std::string& path,
       // Directional lighting comes from the scene's SceneInfo, not the map.
       ++skippedLights;
     } else {
-      printf("loadMap: unsupported light type %d on node \"%s\", skipping\n",
+      LOG_DEBUG("loadMap: unsupported light type %d on node \"%s\", skipping\n",
              static_cast<int>(light->mType), light->mName.C_Str());
       ++skippedLights;
     }
@@ -141,7 +142,7 @@ bool loadMap(ServerGame& game, const std::string& path,
   shared::map_gamelogic_layout::tryApplyFallenHouseRegionFromMap(
       parsed, game.fallenHouseRegion);
 
-  printf(
+  LOG_DEBUG(
       "loadMap: \"%s\" — spawned %u mesh entities, %u point lights "
       "(%u skipped)\n",
       path.c_str(), meshEntities, pointLights, skippedLights);

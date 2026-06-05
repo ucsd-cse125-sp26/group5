@@ -14,6 +14,7 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/sound_constants.h"
@@ -203,7 +204,7 @@ void solve(ServerGame& game, shared::SummerEscapeState& s) {
   playSound(game, shared::SoundId::PUZZLE_SOLVED);
   s.active = false;
   s.completed = true;
-  printf("[Summer] All waves survived — summer fragment revealed\n");
+  LOG_DEBUG("[Summer] All waves survived — summer fragment revealed\n");
 }
 
 }  // namespace
@@ -245,7 +246,7 @@ void debugSnapAllPlayersToSummerPad(ServerGame& game) {
       }
     }
   }
-  printf("[Summer] Debug: snapped %zu players to summer pad (z=%.1f)\n",
+  LOG_DEBUG("[Summer] Debug: snapped %zu players to summer pad (z=%.1f)\n",
          game.active_players.size(), L.playFloorZ);
 }
 
@@ -333,7 +334,7 @@ void CollectSummerFragment(ServerGame& game) {
   }
   setSummerPuzzleFinished(game);
   section_puzzle::completeSection(game, shared::SectionSeasonMap::SUMMER);
-  printf("[Summer] CollectSummerFragment: summer done, sections completed++\n");
+  LOG_DEBUG("[Summer] CollectSummerFragment: summer done, sections completed++\n");
 }
 
 }  // namespace summer_escape

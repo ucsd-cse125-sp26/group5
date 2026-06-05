@@ -11,6 +11,7 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/input.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/maze/defaults.h"
@@ -343,10 +344,10 @@ void beginPuzzle(ServerGame& game) {
   broadcastSpawnEntities(game, {piece});
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
-  printf(
+  LOG_DEBUG(
       "[OverworldMaze] Puzzle started — slot 1=Up 2=Down 3=Left 4=Right "
       "(all 4 players on pad required)\n");
-  printf("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
+  LOG_DEBUG("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
          layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
@@ -381,7 +382,7 @@ void endPuzzle(ServerGame& game) {
 
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
-  printf("[OverworldMaze] Puzzle ended\n");
+  LOG_DEBUG("[OverworldMaze] Puzzle ended\n");
 }
 
 void updatePuzzle(ServerGame& game, float dt) {
@@ -503,7 +504,7 @@ void completeOverworldMazePreview(ServerGame& game) {
   }
 
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
-  printf(
+  LOG_DEBUG(
       "[OverworldMaze] Winter maze complete — arrow control exited "
       "automatically\n");
 }
