@@ -256,6 +256,10 @@ struct Graphics {
   // Wall clock when the credits roll started; -1 = not started. Reset to -1 on
   // dismiss so the scroll restarts from the bottom next time credits play.
   double creditsStartTime = -1.0;
+  // Last credits epoch the render thread has seen (see
+  // ClientGame::creditsEpoch); a mismatch means the server (re)rolled credits,
+  // so restart the scroll.
+  uint32_t lastCreditsEpoch = 0;
 
   bool load(int width, int height);
   void render(ClientGame& game, ClientNetwork& network);

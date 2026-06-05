@@ -61,6 +61,10 @@ struct ClientGame {
   uint32_t tangramCrosshairTargetId = 0;
   // Latest game state from the server (drives the credits screen / music).
   shared::GameStateType currentGameState = shared::GameStateType::OVERWORLD;
+  // Bumped by the network thread each time the server (re)enters CREDITS so the
+  // render thread can restart the scroll from the top — lets the debug panel
+  // re-roll the credits even while they're already on screen.
+  std::atomic<uint32_t> creditsEpoch = 0;
   AudioEngine audio;
 };
 
@@ -72,6 +76,10 @@ void registerClientHandlers(ClientNetwork& network);
 [[nodiscard]] bool isLocalOverworldMazePuzzleControl(const ClientGame& game);
 [[nodiscard]] bool isOverworldTangramPuzzleActive(const ClientGame& game);
 [[nodiscard]] uint8_t tangramRoleIsolationStage(const ClientGame& game);
+// The active tangram controller's full role state (stage + per-player grant
+// masks), or a default-constructed value when no puzzle is active.
+[[nodiscard]] shared::OverworldTangramPuzzleState tangramRoleState(
+    const ClientGame& game);
 [[nodiscard]] uint8_t localOverworldPlayerSlot(const ClientGame& game);
 [[nodiscard]] bool isLocalOverworldTangramPuzzleControl(const ClientGame& game);
 

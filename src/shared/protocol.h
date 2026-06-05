@@ -38,9 +38,62 @@ enum class DebugCommand : uint8_t {
   TOGGLE_BARRIER_COLLISION,   // arg ignored
   TOGGLE_BARRIER_VISIBILITY,  // arg ignored
   RESET_TO_OVERWORLD_SPAWN,   // arg ignored
-  TRIGGER_CREDITS,            // arg ignored
+  TRIGGER_CREDITS,            // arg ignored (force re-roll: resets the latch)
   PRINT_POSITIONS,            // arg ignored
   TOGGLE_DEBUG_LOG,           // arg ignored
+  // ── Demo "unstick" controls (append-only). ──────────────────────────────
+  // Winter maze: rebind one player's directional power. arg = join slot (1..4),
+  // arg2 = MazeDirection (0 = NONE -> grant ALL arrows, 1=UP 2=DOWN 3=LEFT
+  // 4=RIGHT).
+  SET_MAZE_POWER,
+  // Spring tangram: set the role-isolation stage live. arg = stage (0..5; 0 =
+  // everyone can do everything).
+  SET_TANGRAM_STAGE,
+  // Teleport a single player. arg = join slot (1..4), arg2 = destination
+  // (0=Winter 1=Fall 2=Summer 3=Spring puzzle, 4 = overworld spawn).
+  TELEPORT_PLAYER,
+  // Fall challenge difficulty. arg = param id (see DebugFallParam), farg =
+  // value.
+  SET_FALL_PARAM,
+  // Summer escape difficulty. arg = param id (see DebugSummerParam), farg =
+  // value.
+  SET_SUMMER_PARAM,
+  // Spring tangram: grant/revoke one ability for one player, layered on top of
+  // the stage rules. arg = join slot (1..4), arg2 = ability (see
+  // DebugTangramAbility), farg = enable (>0.5 grant, else revoke).
+  SET_TANGRAM_GRANT,
+};
+
+// SET_TANGRAM_GRANT::arg2 selector — which per-player ability to grant/revoke.
+enum class DebugTangramAbility : uint32_t {
+  PUSH = 0,
+  ROTATE = 1,
+  COLOR = 2,
+  SLOTS = 3,
+};
+
+// Per-player teleport destinations for TELEPORT_PLAYER::arg2.
+enum class DebugTeleportDest : uint32_t {
+  WINTER_PUZZLE = 0,
+  FALL_PUZZLE = 1,
+  SUMMER_PUZZLE = 2,
+  SPRING_PUZZLE = 3,
+  OVERWORLD_SPAWN = 4,
+};
+
+// SET_FALL_PARAM::arg selector. Value carried in DebugCommandPacket::farg.
+enum class DebugFallParam : uint32_t {
+  FILL_RATE = 0,         // FallChallengeState::fillRate (progress/sec)
+  HIT_PENALTY = 1,       // FallChallengeState::hitPenalty (progress lost/hit)
+  SPAWN_INTERVAL = 2,    // FallingHazardZone::interval (seconds between drops)
+  BURSTS_TO_SWITCH = 3,  // FallingHazardZone::burstsUntilSwitch (int)
+};
+
+// SET_SUMMER_PARAM::arg selector. Value carried in DebugCommandPacket::farg.
+enum class DebugSummerParam : uint32_t {
+  SHRINK_FACTOR = 0,  // summer::Layout::shrinkFactor (lower = harder)
+  WAVE_DURATION = 1,  // summer::Layout::waveDurationSec[all] (sec/wave)
+  START_GRACE = 2,    // summer::Layout::startGraceSec (settle window)
 };
 
 enum class GameStateType : uint8_t {
@@ -111,5 +164,9 @@ struct DebugCommandPacket {
   DebugCommand cmd = DebugCommand::PRINT_POSITIONS;
   uint8_t _pad[2] = {0, 0};
   uint32_t arg = 0;
+  // Appended after the original 8-byte layout (which stays byte-identical) so
+  // newer commands can carry a second integer selector and a float payload.
+  uint32_t arg2 = 0;
+  float farg = 0.0f;
 };
 }  // namespace shared

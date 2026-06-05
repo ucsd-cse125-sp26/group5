@@ -28,6 +28,8 @@
 #include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
+#include "shared/puzzles/summer/layout.h"
+#include "shared/puzzles/tangram/roles.h"
 #include "shared/sound_constants.h"
 
 namespace server_debug {
@@ -39,8 +41,10 @@ using Season = shared::SectionSeasonMap;
 // avatar; `targetForSlot` returns the destination for a 1..4 join slot. Modeled
 // on summer_escape::debugSnapAllPlayersToSummerPad. Position updates ride the
 // next per-tick UPDATE_ENTITY broadcast.
-void teleportAllPlayers(
-    ServerGame& game, const std::function<glm::vec3(uint8_t)>& targetForSlot) {
+// `onlySlot` in 1..4 restricts the teleport to that join slot; 0 = all players.
+void teleportAllPlayers(ServerGame& game,
+                        const std::function<glm::vec3(uint8_t)>& targetForSlot,
+                        uint8_t onlySlot = 0) {
   auto& bi = game.physics.getBodyInterface();
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
@@ -55,6 +59,7 @@ void teleportAllPlayers(
           game.registry.get<shared::RenderInfo>(avatar).playerSlot;
       if (s >= 1 && s <= 4) slot = s;
     }
+    if (onlySlot != 0 && slot != onlySlot) continue;
     const glm::vec3 t = targetForSlot(slot);
     auto& pos = game.registry.get<shared::Position>(avatar);
     pos.x = t.x;
@@ -251,13 +256,13 @@ void pickupFragment(ServerGame& game, Season season) {
   }
 }
 
-// Teleport players just OUTSIDE a puzzle's trigger region (backed off along -Y
-// and spread laterally) so they're next to the puzzle and can walk in to start
-// it — never onto the trigger/pad, which would auto-activate.
-void teleportToPuzzle(ServerGame& game, Season season) {
+// Destination just OUTSIDE a puzzle's trigger region (backed off along -Y and
+// spread laterally by join slot) so a player lands next to the puzzle and can
+// walk in to start it — never onto the trigger/pad, which would auto-activate.
+glm::vec3 puzzleSlotTarget(ServerGame& game, Season season, uint8_t slot) {
   static constexpr float kLat[4] = {-3.0f, -1.0f, 1.0f, 3.0f};
   static constexpr float kMargin = 4.0f;
-  float cx, cy, cz, backoff;
+  float cx = 0.0f, cy = 0.0f, cz = 0.0f, backoff = 0.0f;
   switch (season) {
     case Season::WINTER: {
       const auto& L = game.mazeLayout;
@@ -291,13 +296,149 @@ void teleportToPuzzle(ServerGame& game, Season season) {
       backoff = F.triggerHalfY + kMargin;
       break;
     }
+  }
+  const int i = (slot >= 1 && slot <= 4) ? slot - 1 : 0;
+  return {cx + kLat[i], cy - backoff, cz};
+}
+
+void teleportToPuzzle(ServerGame& game, Season season) {
+  teleportAllPlayers(
+      game, [&](uint8_t slot) { return puzzleSlotTarget(game, season, slot); });
+}
+
+// Teleport ONE player (by join slot) to a puzzle area or the overworld spawn.
+void teleportPlayer(ServerGame& game, uint8_t slot,
+                    shared::DebugTeleportDest dest) {
+  if (slot < 1 || slot > 4) return;
+  using D = shared::DebugTeleportDest;
+  std::function<glm::vec3(uint8_t)> target;
+  switch (dest) {
+    case D::WINTER_PUZZLE:
+      target = [&](uint8_t s) {
+        return puzzleSlotTarget(game, Season::WINTER, s);
+      };
+      break;
+    case D::FALL_PUZZLE:
+      target = [&](uint8_t s) {
+        return puzzleSlotTarget(game, Season::FALL, s);
+      };
+      break;
+    case D::SUMMER_PUZZLE:
+      target = [&](uint8_t s) {
+        return puzzleSlotTarget(game, Season::SUMMER, s);
+      };
+      break;
+    case D::SPRING_PUZZLE:
+      target = [&](uint8_t s) {
+        return puzzleSlotTarget(game, Season::SPRING, s);
+      };
+      break;
+    case D::OVERWORLD_SPAWN:
+      target = [&](uint8_t s) { return overworldSpawnFor(game, s); };
+      break;
     default:
       return;
   }
-  teleportAllPlayers(game, [=](uint8_t slot) {
-    const int i = (slot >= 1 && slot <= 4) ? slot - 1 : 0;
-    return glm::vec3(cx + kLat[i], cy - backoff, cz);
-  });
+  teleportAllPlayers(game, target, slot);
+  LOG_DEBUG("[DebugPanel] teleported slot %u to dest %u\n",
+            static_cast<unsigned>(slot), static_cast<unsigned>(dest));
+}
+
+// ── Winter maze: rebind a player's single directional power. ──────────────
+// dir == NONE removes the binding entirely, which lets that player drive with
+// ALL four arrow keys (maze_spirit_control reads every arrow when unbound).
+void setMazePower(ServerGame& game, uint8_t slot, shared::MazeDirection dir) {
+  if (slot < 1 || slot > 4) return;
+  for (auto& [peer, slots] : game.active_players) {
+    (void)peer;
+    const entt::entity avatar = slots.overworld_avatar;
+    if (!game.registry.valid(avatar) ||
+        !game.registry.all_of<shared::RenderInfo>(avatar)) {
+      continue;
+    }
+    if (game.registry.get<shared::RenderInfo>(avatar).playerSlot != slot) {
+      continue;
+    }
+    if (dir == shared::MazeDirection::NONE) {
+      game.registry.remove<shared::MazePadBinding>(avatar);
+      LOG_DEBUG("[DebugPanel] maze: slot %u granted ALL directions\n",
+                static_cast<unsigned>(slot));
+    } else {
+      game.registry.emplace_or_replace<shared::MazePadBinding>(avatar, dir);
+      LOG_DEBUG("[DebugPanel] maze: slot %u bound to direction %u\n",
+                static_cast<unsigned>(slot), static_cast<unsigned>(dir));
+    }
+    return;
+  }
+}
+
+// ── Spring tangram: set role-isolation stage live (0 = everyone everything).
+// ──
+void setTangramStage(ServerGame& game, uint8_t stage) {
+  if (stage > shared::tangram_roles::kStagePushP1) {
+    stage = shared::tangram_roles::kStagePushP1;
+  }
+  tangram_puzzle::setIsolationStage(game, stage);
+  LOG_DEBUG("[DebugPanel] tangram isolation stage -> %u\n",
+            static_cast<unsigned>(stage));
+}
+
+// ── Spring tangram: per-player ability grant (layered over the stage). ─────
+void setTangramGrant(ServerGame& game, uint8_t slot,
+                     shared::DebugTangramAbility ability, bool enable) {
+  tangram_puzzle::setPlayerGrant(game, slot, static_cast<uint8_t>(ability),
+                                 enable);
+  LOG_DEBUG("[DebugPanel] tangram grant: slot %u ability %u -> %s\n",
+            static_cast<unsigned>(slot), static_cast<unsigned>(ability),
+            enable ? "on" : "off");
+}
+
+// ── Fall challenge difficulty (applies live to the running controller/zone).
+// ──
+void setFallParam(ServerGame& game, shared::DebugFallParam param, float value) {
+  using P = shared::DebugFallParam;
+  if (param == P::FILL_RATE || param == P::HIT_PENALTY) {
+    for (auto e : game.registry.view<shared::FallChallengeState>()) {
+      auto& cs = game.registry.get<shared::FallChallengeState>(e);
+      if (param == P::FILL_RATE)
+        cs.fillRate = value;
+      else
+        cs.hitPenalty = value;
+    }
+  } else {
+    for (auto e : game.registry.view<shared::FallingHazardZone>()) {
+      auto& z = game.registry.get<shared::FallingHazardZone>(e);
+      if (param == P::SPAWN_INTERVAL)
+        z.interval = value;
+      else if (param == P::BURSTS_TO_SWITCH)
+        z.burstsUntilSwitch = static_cast<int>(value);
+    }
+  }
+  LOG_DEBUG("[DebugPanel] fall param %u -> %.3f\n",
+            static_cast<unsigned>(param), value);
+}
+
+// ── Summer escape difficulty (read live from summerLayout each tick). ──────
+void setSummerParam(ServerGame& game, shared::DebugSummerParam param,
+                    float value) {
+  using P = shared::DebugSummerParam;
+  switch (param) {
+    case P::SHRINK_FACTOR:
+      game.summerLayout.shrinkFactor = value;
+      break;
+    case P::WAVE_DURATION:
+      for (float& i : game.summerLayout.waveDurationSec) {
+        i = value;
+      }
+      break;
+    case P::START_GRACE:
+      game.summerLayout.startGraceSec = value;
+      break;
+    default:
+      return;
+  }
+  LOG_DEBUG("[DebugPanel] summer param %u -> %.3f\n",
+            static_cast<unsigned>(param), value);
 }
 
 // Toggle Jolt collision on the overworld section barriers (old B-key action).
@@ -353,18 +494,19 @@ void resetPlayersToOverworldSpawn(ServerGame& game) {
   LOG_DEBUG("[DebugPanel] reset players to overworld spawn\n");
 }
 
+// Force the credits roll, even if it already played this run. Resetting the
+// latch also re-arms the natural Fallen-house auto-trigger. Clients restart the
+// scroll from the top because the StateChangePacket bumps the credits epoch
+// (the client resets creditsStartTime whenever it (re)enters the CREDITS
+// state).
 void triggerCredits(ServerGame& game) {
-  if (game.creditsRolled) {
-    LOG_DEBUG("[DebugPanel] credits already rolled this run — ignoring\n");
-    return;
-  }
-  game.creditsRolled = true;
+  game.creditsRolled = true;  // suppress the natural auto-trigger double-fire
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::CREDITS;
   if (game.network != nullptr) {
     net::broadcastPacket(game.network->getHost(), pkt);
   }
-  LOG_DEBUG("[DebugPanel] credits triggered\n");
+  LOG_DEBUG("[DebugPanel] credits (re)rolled\n");
 }
 
 void toggleDebugLog() {
@@ -445,6 +587,29 @@ void processPendingCommands(ServerGame& game) {
         break;
       case TOGGLE_DEBUG_LOG:
         toggleDebugLog();
+        break;
+      case SET_MAZE_POWER:
+        setMazePower(game, static_cast<uint8_t>(c.arg),
+                     static_cast<shared::MazeDirection>(c.arg2));
+        break;
+      case SET_TANGRAM_STAGE:
+        setTangramStage(game, static_cast<uint8_t>(c.arg));
+        break;
+      case TELEPORT_PLAYER:
+        teleportPlayer(game, static_cast<uint8_t>(c.arg),
+                       static_cast<shared::DebugTeleportDest>(c.arg2));
+        break;
+      case SET_FALL_PARAM:
+        setFallParam(game, static_cast<shared::DebugFallParam>(c.arg), c.farg);
+        break;
+      case SET_SUMMER_PARAM:
+        setSummerParam(game, static_cast<shared::DebugSummerParam>(c.arg),
+                       c.farg);
+        break;
+      case SET_TANGRAM_GRANT:
+        setTangramGrant(game, static_cast<uint8_t>(c.arg),
+                        static_cast<shared::DebugTangramAbility>(c.arg2),
+                        c.farg > 0.5f);
         break;
     }
   }

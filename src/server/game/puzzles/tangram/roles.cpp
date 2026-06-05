@@ -61,13 +61,23 @@ void syncPieceCollisionLayer(ServerGame& game, entt::entity pieceEnt,
 void applyCollisionRoles(ServerGame& game, uint8_t isolationStage) {
   if (!shared::tangram_roles::pushCollisionIsolation(isolationStage)) return;
 
+  uint8_t grantPush = 0;
+  if (game.registry.valid(game.overworldTangramController) &&
+      game.registry.all_of<shared::OverworldTangramPuzzleState>(
+          game.overworldTangramController)) {
+    grantPush = game.registry
+                    .get<shared::OverworldTangramPuzzleState>(
+                        game.overworldTangramController)
+                    .grantPush;
+  }
+
   auto playerView =
       game.registry.view<shared::OverworldTag, shared::PhysicsBody,
                          shared::PlayerInput, shared::RenderInfo>();
   for (auto ent : playerView) {
     const uint8_t slot = playerSlotForAvatar(game, ent);
     const JPH::ObjectLayer layer =
-        shared::tangram_roles::canPush(isolationStage, slot)
+        shared::tangram_roles::canPush(isolationStage, slot, grantPush)
             ? Layers::MOVING
             : Layers::MOVING_NO_TANGRAM;
     setBodyLayer(game, ent, layer);
