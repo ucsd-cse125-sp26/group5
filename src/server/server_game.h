@@ -14,6 +14,7 @@
 #include "shared/map_gamelogic_layout.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/maze/layout.h"
+#include "shared/puzzles/decrypt/layout.h"
 #include "shared/puzzles/summer/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/puzzles/tangram/slot_layout.h"
@@ -105,6 +106,8 @@ struct ServerGame {
   // players are inside, clients roll the credits. One-way latch: the credits
   // broadcast once per server lifetime and never re-trigger.
   shared::map_gamelogic_layout::FallenHouseRegion fallenHouseRegion{};
+  shared::decrypt::Layout decryptLayout{};
+  entt::entity decryptController = entt::null;
   bool creditsRolled = false;
 
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).

@@ -2,6 +2,7 @@
 
 #include <cstdio>
 
+#include "server/game/decrypt_puzzle.h"
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
@@ -28,15 +29,16 @@ bool allActivePlayersInFallenHouse(const ServerGame& game) {
 }
 
 void checkCreditsTrigger(ServerGame& game) {
-  // Credits roll exactly once per server lifetime.
+  // Credits roll exactly once per server lifetime, after decryption succeeds.
   if (game.creditsRolled) return;
+  if (!decrypt_puzzle::isSolved(game)) return;
   if (!allActivePlayersInFallenHouse(game)) return;
   game.creditsRolled = true;
 
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::CREDITS;
   net::broadcastPacket(game.network->getHost(), pkt);
-  printf("[Credits] All players in the Fallen house — rolling credits.\n");
+  printf("[Credits] Decryption solved — rolling credits.\n");
 }
 
 }  // namespace credits_trigger

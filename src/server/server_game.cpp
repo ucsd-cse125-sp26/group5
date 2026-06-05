@@ -9,6 +9,7 @@
 #include "entt/entity/fwd.hpp"
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include "server/game/decrypt_puzzle.h"
 #include "server/game/puzzles/maze/layout_editor.h"
 #include "server_network.h"
 #include "shared/assets.h"
@@ -366,6 +367,16 @@ void registerServerHandlers(ServerNetwork& network) {
         shared::DebugCommandPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.pendingDebugCommands.push_back(pkt);
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::DECRYPT_SUBMIT,
+      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+        if (len < sizeof(shared::DecryptSubmitPacket)) return;
+        shared::DecryptSubmitPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        pkt.text[sizeof(pkt.text) - 1] = '\0';
+        decrypt_puzzle::handleSubmitFromPeer(game, sender, pkt.text);
       });
 }
 

@@ -8,8 +8,8 @@ namespace credits_trigger {
 // connected, and every active player's overworld avatar is inside that region.
 bool allActivePlayersInFallenHouse(const ServerGame& game);
 
-// Per-tick end-game check. On the rising edge of "all players inside" it
-// broadcasts a STATE_CHANGE(CREDITS) once; re-arms when players leave.
+// Per-tick end-game check. After decryption is solved and all players are
+// inside the Fallen house, broadcasts STATE_CHANGE(CREDITS) once.
 void checkCreditsTrigger(ServerGame& game);
 
 }  // namespace credits_trigger

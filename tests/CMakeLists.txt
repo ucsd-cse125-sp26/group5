@@ -78,6 +78,15 @@ target_link_libraries(tangram_layout_tests PRIVATE
     shared
 )
 
+add_executable(decrypt_answer_tests
+    decrypt_answer_tests.cpp
+)
+
+target_link_libraries(decrypt_answer_tests PRIVATE
+    GTest::gtest_main
+    shared
+)
+
 target_link_libraries(overworld_logic_tests PRIVATE
     GTest::gtest_main
     server_lib
@@ -99,3 +108,4 @@ gtest_discover_tests(maze_logic_tests)
 gtest_discover_tests(overworld_logic_tests)
 gtest_discover_tests(overworld_maze_puzzle_tests)
 gtest_discover_tests(tangram_layout_tests)
+gtest_discover_tests(decrypt_answer_tests)

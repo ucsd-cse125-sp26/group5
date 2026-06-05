@@ -20,6 +20,10 @@ enum class PacketType : uint8_t {
   VIDEO_STOP,
   // Client→server demo debug-panel command. Append-only: keep last.
   DEBUG_COMMAND,
+  // End-game decryption puzzle answer submission.
+  DECRYPT_SUBMIT,
+  // Server→client decrypt validation result (wrong answer feedback).
+  DECRYPT_RESULT,
 };
 
 // Demo debug-control-panel commands. The active season / target puzzle is
@@ -37,13 +41,15 @@ enum class DebugCommand : uint8_t {
   TOGGLE_BARRIER_COLLISION,   // arg ignored
   TOGGLE_BARRIER_VISIBILITY,  // arg ignored
   RESET_TO_OVERWORLD_SPAWN,   // arg ignored
-  TRIGGER_CREDITS,            // arg ignored
+  TRIGGER_CREDITS,            // arg ignored (skips decrypt requirement)
+  TRIGGER_DECRYPT,              // arg ignored
   PRINT_POSITIONS,            // arg ignored
 };
 
 enum class GameStateType : uint8_t {
   OVERWORLD,
   MAZE,
+  DECRYPT,
   CREDITS,
 };
 
@@ -102,5 +108,16 @@ struct DebugCommandPacket {
   DebugCommand cmd = DebugCommand::PRINT_POSITIONS;
   uint8_t _pad[2] = {0, 0};
   uint32_t arg = 0;
+};
+
+struct DecryptSubmitPacket {
+  PacketType type = PacketType::DECRYPT_SUBMIT;
+  char text[128] = {};
+};
+
+struct DecryptResultPacket {
+  PacketType type = PacketType::DECRYPT_RESULT;
+  uint8_t accepted = 0;
+  uint8_t _pad[3] = {0, 0, 0};
 };
 }  // namespace shared

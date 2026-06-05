@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "game/credits_trigger.h"
+#include "game/decrypt_puzzle.h"
 #include "game/fall_challenge.h"
 #include "game/maze.h"
 #include "game/maze_generation.h"
@@ -698,7 +699,9 @@ void OverworldState::update(ServerGame& game, float dt) {
     // }
   }
 
-  // End-game: roll credits once all players gather in the Fallen house.
+  // End-game: activate decryption when all players gather in the Fallen house,
+  // then roll credits once the puzzle is solved.
+  decrypt_puzzle::update(game);
   credits_trigger::checkCreditsTrigger(game);
 
   render_model_change(game, dt);

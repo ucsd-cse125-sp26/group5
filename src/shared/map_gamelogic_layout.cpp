@@ -481,4 +481,71 @@ bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
   return true;
 }
 
+bool tryApplyFallenHouseRegionFromMapFile(const std::string& path,
+                                          FallenHouseRegion& region) {
+  ParsedModel parsed;
+  if (!parsed.load(path, MAP_LOAD_FLAGS)) {
+    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+           parsed.lastError().c_str());
+    return false;
+  }
+  return tryApplyFallenHouseRegionFromMap(parsed, region);
+}
+
+void applyDecryptLayoutFallback(const FallenHouseRegion& fallenHouse,
+                                decrypt::Layout& layout) {
+  if (fallenHouse.valid) {
+    layout.boardCenterX = (fallenHouse.minX + fallenHouse.maxX) * 0.5f;
+    layout.boardCenterY = fallenHouse.maxY;
+    layout.boardCenterZ = (fallenHouse.minZ + fallenHouse.maxZ) * 0.5f + 1.0f;
+  } else {
+    layout.boardCenterX = 0.0f;
+    layout.boardCenterY = 0.0f;
+    layout.boardCenterZ = 1.5f;
+  }
+  layout.faceYaw = 0.0f;
+  layout.valid = true;
+  printf(
+      "[MapGamelogic] decrypt board fallback -> (%.3f, %.3f, %.3f) yaw=%.2f\n",
+      layout.boardCenterX, layout.boardCenterY, layout.boardCenterZ,
+      layout.faceYaw);
+}
+
+bool tryApplyDecryptLayoutFromMap(const ParsedModel& parsed,
+                                  const FallenHouseRegion& fallenHouse,
+                                  decrypt::Layout& layout) {
+  float x = 0.0f;
+  float y = 0.0f;
+  float z = 0.0f;
+  float yaw = 0.0f;
+  if (nodePosition(parsed, kDecryptBoardNode, x, y, z)) {
+    layout.boardCenterX = x;
+    layout.boardCenterY = y;
+    layout.boardCenterZ = z;
+    if (!nodeYaw(parsed, kDecryptBoardNode, yaw)) yaw = 0.0f;
+    layout.faceYaw = yaw;
+    layout.valid = true;
+    printf("[MapGamelogic] %s -> (%.3f, %.3f, %.3f) yaw=%.2f\n",
+           kDecryptBoardNode, x, y, z, yaw);
+    return true;
+  }
+  printf("[MapGamelogic] node \"%s\" not found; using Fallen house fallback\n",
+         kDecryptBoardNode);
+  applyDecryptLayoutFallback(fallenHouse, layout);
+  return false;
+}
+
+bool tryApplyDecryptLayoutFromMapFile(const std::string& path,
+                                      const FallenHouseRegion& fallenHouse,
+                                      decrypt::Layout& layout) {
+  ParsedModel parsed;
+  if (!parsed.load(path, MAP_LOAD_FLAGS)) {
+    printf("[MapGamelogic] failed to load \"%s\": %s\n", path.c_str(),
+           parsed.lastError().c_str());
+    applyDecryptLayoutFallback(fallenHouse, layout);
+    return false;
+  }
+  return tryApplyDecryptLayoutFromMap(parsed, fallenHouse, layout);
+}
+
 }  // namespace shared::map_gamelogic_layout

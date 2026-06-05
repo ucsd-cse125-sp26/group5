@@ -9,6 +9,7 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include "shared/component_registry.h"
 #include "shared/protocol.h"
+#include "shared/puzzles/decrypt/layout.h"
 #include "shared/puzzles/maze/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/puzzles/tangram/defaults.h"
@@ -53,10 +54,14 @@ struct ClientGame {
   // Server-driven video play/stop requests, produced on the network thread and
   // consumed on the render thread (see main.cpp).
   SpscQueue<VideoRequest, 8> videoQueue;
+  SpscQueue<shared::DecryptSubmitPacket, 16> decryptSubmitQueue;
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();
   shared::tangram::ArenaLayout tangramArena =
       shared::tangram::ArenaLayout::defaults();
+  shared::decrypt::Layout decryptLayout{};
+  // Set by network thread when server rejects an answer.
+  std::atomic<bool> decryptWrongAnswer = false;
   // Entity id under screen-center reticle (updated each frame during tangram).
   uint32_t tangramCrosshairTargetId = 0;
   // Latest game state from the server (drives the credits screen / music).

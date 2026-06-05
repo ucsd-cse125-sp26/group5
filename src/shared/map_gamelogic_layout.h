@@ -3,6 +3,7 @@
 #include <string>
 
 #include "shared/puzzles/maze/layout.h"
+#include "shared/puzzles/decrypt/layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
 #include "shared/puzzles/tangram/slot_layout.h"
 
@@ -43,6 +44,7 @@ struct FallLayout {
 
 // End-game landmark mesh node in the landscape (Blender object name).
 inline constexpr const char* kFallenHouseNode = "Fallen house";
+inline constexpr const char* kDecryptBoardNode = "decrypt_board";
 
 inline constexpr const char* kMazeTriggerNode = "maze_trigger";
 inline constexpr const char* kMazeBoardNode = "maze_board";
@@ -87,6 +89,19 @@ bool tryApplyFallLayoutFromMapFile(const std::string& path, FallLayout& layout);
 // Returns false (region.valid stays false) when the node is missing.
 bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
                                       FallenHouseRegion& region);
+
+bool tryApplyFallenHouseRegionFromMapFile(const std::string& path,
+                                          FallenHouseRegion& region);
+
+// End-game cipher board: position + yaw from a `decrypt_board` empty. When
+// missing, derives placement from the Fallen house region center.
+bool tryApplyDecryptLayoutFromMap(const ParsedModel& parsed,
+                                  const FallenHouseRegion& fallenHouse,
+                                  decrypt::Layout& layout);
+
+bool tryApplyDecryptLayoutFromMapFile(const std::string& path,
+                                      const FallenHouseRegion& fallenHouse,
+                                      decrypt::Layout& layout);
 
 // Reads spring_tangram_slot_1 .. spring_tangram_slot_7 empties (position +
 // yaw). relX/relY are offsets from boardCenter; falls back to code defaults if

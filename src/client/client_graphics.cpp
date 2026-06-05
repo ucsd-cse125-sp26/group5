@@ -25,6 +25,7 @@
 #include "client/asset.h"
 #include "client/client_game.h"
 #include "client/debug_panel.h"
+#include "client/decrypt_ui.h"
 #include "client/puzzle_hud.h"
 #include "client/ui_settings.h"
 #include "client_network.h"
@@ -399,6 +400,21 @@ static std::optional<CameraState> overworldHubFallbackCamera(
 }
 
 std::optional<CameraState> computeCamera(const ClientGame& game) {
+  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
+  if (game.currentGameState == shared::GameStateType::DECRYPT &&
+      game.decryptLayout.valid) {
+    const auto& L = game.decryptLayout;
+    const glm::vec3 target(L.lookAtX(), L.lookAtY(), L.lookAtZ());
+    const float cy = std::cos(L.faceYaw);
+    const float sy = std::sin(L.faceYaw);
+    const glm::vec3 faceNormal(sy, cy, 0.0f);
+    const glm::vec3 eye =
+        target - faceNormal * L.cameraDistance +
+        glm::vec3(0.0f, 0.0f, L.cameraHeightOffset);
+    return CameraState{.position = eye,
+                       .view = glm::lookAt(eye, target, worldUp)};
+  }
+
   auto selfIt = game.renderEntityMap.find(game.renderEntityId);
   if (selfIt == game.renderEntityMap.end() ||
       !game.renderRegistry.valid(selfIt->second) ||
@@ -412,7 +428,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
   const auto& p = game.renderRegistry.get<shared::Position>(selfIt->second);
   const auto& cam = game.renderRegistry.get<shared::Camera>(selfIt->second);
 
-  const glm::vec3 worldUp(0.0f, 0.0f, 1.0f);
   glm::vec3 pos = glm::vec3(p.x, p.y, p.z + cam.ht);
 
   // Maze mode: detected by the replicated MazeSpiritGrid component, which
@@ -3029,6 +3044,9 @@ void Graphics::drawSettingsUIFrame(ClientGame& game) {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   drawPuzzleHUDs(game);
+  if (game.currentGameState == shared::GameStateType::DECRYPT) {
+    decrypt_ui::drawDecryptOverlay(*this, game);
+  }
   if (settings.showFPS) drawFPSOverlay();
   if (settings.showPerfHUD) drawPerfHUDWindow();
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);

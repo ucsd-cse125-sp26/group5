@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "client/decrypt_ui.h"
 #include "client/spsc_queue.h"
 #include "client_network.h"
 #include "glm/glm.hpp"
@@ -71,6 +72,9 @@ void removeSyncedComponent(entt::registry& registry, entt::entity entity,
       break;
     case shared::CID_SUMMER_ESCAPE:
       registry.remove<shared::SummerEscapeState>(entity);
+      break;
+    case shared::CID_DECRYPT_PUZZLE:
+      registry.remove<shared::DecryptPuzzleState>(entity);
       break;
   }
 }
@@ -241,9 +245,23 @@ void registerClientHandlers(ClientNetwork& network) {
         } else if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::DECRYPT) {
+          game.decryptWrongAnswer.store(false, std::memory_order_release);
+          decrypt_ui::onDecryptActivated();
         } else if (pkt.state == shared::GameStateType::CREDITS) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
+        }
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::DECRYPT_RESULT,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        if (len < sizeof(shared::DecryptResultPacket)) return;
+        shared::DecryptResultPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        if (!pkt.accepted) {
+          game.decryptWrongAnswer.store(true, std::memory_order_release);
         }
       });
 
@@ -378,9 +396,9 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys) {
-  // Freeze the avatar while the credits roll: send one zero-input packet to
-  // stop movement, then ignore keyboard/mouse until credits are dismissed.
-  if (game.currentGameState == shared::GameStateType::CREDITS) {
+  // Freeze the avatar while the credits roll or during the decrypt puzzle.
+  if (game.currentGameState == shared::GameStateType::CREDITS ||
+      game.currentGameState == shared::GameStateType::DECRYPT) {
     if (prevKeys != 0) {
       shared::InputPacket pkt;
       pkt.type = shared::PacketType::INPUT;

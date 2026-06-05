@@ -19,6 +19,7 @@ add_library(shared
     src/shared/util.cpp
     src/shared/mesh_loader.cpp
     src/shared/puzzles/maze/layout.cpp
+    src/shared/puzzles/decrypt/layout.cpp
     src/shared/map_gamelogic_layout.cpp
     src/shared/puzzles/tangram/arena_layout.cpp
     )
@@ -180,6 +181,7 @@ target_sources(client PRIVATE
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
     src/client/puzzle_hud.cpp
+    src/client/decrypt_ui.cpp
     src/client/debug_panel.cpp
     src/client/video_player.cpp
 )
@@ -229,6 +231,7 @@ add_library(server_lib STATIC
     src/server/game/maze_spirit_control.cpp
     src/server/game/fall_challenge.cpp
     src/server/game/summer_escape.cpp
+    src/server/game/decrypt_puzzle.cpp
     src/server/game/credits_trigger.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp

@@ -101,6 +101,7 @@ enum ComponentIds : ComponentTypeId {
   CID_TANGRAM_PIECE = 15,
   CID_FALL_CHALLENGE = 16,
   CID_SUMMER_ESCAPE = 17,
+  CID_DECRYPT_PUZZLE = 18,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -159,6 +160,9 @@ inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
         break;
       case CID_SUMMER_ESCAPE:
         dst.remove<SummerEscapeState>(entity);
+        break;
+      case CID_DECRYPT_PUZZLE:
+        dst.remove<DecryptPuzzleState>(entity);
         break;
     }
   };
@@ -267,6 +271,7 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
   reg.registerComponent<FallChallengeState>(CID_FALL_CHALLENGE);
   reg.registerComponent<SummerEscapeState>(CID_SUMMER_ESCAPE);
+  reg.registerComponent<DecryptPuzzleState>(CID_DECRYPT_PUZZLE);
   return reg;
 }
 

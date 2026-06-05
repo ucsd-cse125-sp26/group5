@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "server/game/credits_trigger.h"
+#include "server/game/decrypt_puzzle.h"
 #include "server/game/fall_challenge.h"
 #include "server/game/maze.h"
 #include "server/game/overworld.h"
@@ -356,13 +357,26 @@ void triggerCredits(ServerGame& game) {
     printf("[DebugPanel] credits already rolled this run — ignoring\n");
     return;
   }
+  // Debug bypass: skip decrypt requirement.
+  shared::DecryptPuzzleState* st = nullptr;
+  if (game.registry.valid(game.decryptController) &&
+      game.registry.all_of<shared::DecryptPuzzleState>(game.decryptController)) {
+    st = &game.registry.get<shared::DecryptPuzzleState>(game.decryptController);
+    st->solved = true;
+    st->active = false;
+  }
   game.creditsRolled = true;
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::CREDITS;
   if (game.network != nullptr) {
     net::broadcastPacket(game.network->getHost(), pkt);
   }
-  printf("[DebugPanel] credits triggered\n");
+  printf("[DebugPanel] credits triggered (decrypt bypassed)\n");
+}
+
+void triggerDecrypt(ServerGame& game) {
+  decrypt_puzzle::debugActivate(game);
+  printf("[DebugPanel] decrypt puzzle activated\n");
 }
 
 void printPositions(ServerGame& game) {
@@ -431,6 +445,9 @@ void processPendingCommands(ServerGame& game) {
         break;
       case TRIGGER_CREDITS:
         triggerCredits(game);
+        break;
+      case TRIGGER_DECRYPT:
+        triggerDecrypt(game);
         break;
       case PRINT_POSITIONS:
         printPositions(game);

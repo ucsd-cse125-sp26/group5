@@ -23,6 +23,8 @@ class ClientNetwork {
 
   void drainInputQueue(SpscQueue<shared::InputPacket, 256>& inputQueue);
   void drainDebugQueue(SpscQueue<shared::DebugCommandPacket, 64>& debugQueue);
+  void drainDecryptSubmitQueue(
+      SpscQueue<shared::DecryptSubmitPacket, 16>& decryptQueue);
 
  private:
   ENetHost* client_ = nullptr;

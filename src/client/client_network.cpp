@@ -118,3 +118,14 @@ void ClientNetwork::drainDebugQueue(
     enet_host_flush(client_);
   }
 }
+
+void ClientNetwork::drainDecryptSubmitQueue(
+    SpscQueue<shared::DecryptSubmitPacket, 16>& decryptQueue) {
+  shared::DecryptSubmitPacket pkt;
+  while (decryptQueue.tryPop(pkt)) {
+    send(pkt);
+  }
+  if (client_) {
+    enet_host_flush(client_);
+  }
+}

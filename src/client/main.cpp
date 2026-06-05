@@ -83,6 +83,12 @@ int main() {
       (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.mazeLayout);
   shared::map_gamelogic_layout::tryApplyTangramArenaFromMapFile(
       (exeDir() / shared::DEFAULT_MAP_PATH).string(), game.tangramArena);
+  shared::map_gamelogic_layout::FallenHouseRegion fallenHouse{};
+  shared::map_gamelogic_layout::tryApplyFallenHouseRegionFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), fallenHouse);
+  shared::map_gamelogic_layout::tryApplyDecryptLayoutFromMapFile(
+      (exeDir() / shared::DEFAULT_MAP_PATH).string(), fallenHouse,
+      game.decryptLayout);
   game.mazeLayout.applyHeightBoost();
   game.tangramArena.applyHeightBoost();
 
@@ -190,9 +196,16 @@ int main() {
     }
     creditsDismissPrev = dismissNow;
 
+    const bool decryptActive =
+        game.currentGameState == shared::GameStateType::DECRYPT;
+    if (decryptActive) {
+      glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+
     // Sync cursor mode whenever a cursor-freeing menu opens/closes — settings
     // (H) or the debug panel — whether toggled by key or by an in-UI Close box.
-    bool anyMenuOpen = graphics.settingsMenuOpen || graphics.debugPanelOpen;
+    bool anyMenuOpen =
+        graphics.settingsMenuOpen || graphics.debugPanelOpen || decryptActive;
     if (anyMenuOpen != graphics.prevSyncedMenuOpen) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR,
                        anyMenuOpen ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
@@ -225,6 +238,7 @@ void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
     }
     network.drainInputQueue(game.inputQueue);
     network.drainDebugQueue(game.debugQueue);
+    network.drainDecryptSubmitQueue(game.decryptSubmitQueue);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   network.disconnect();

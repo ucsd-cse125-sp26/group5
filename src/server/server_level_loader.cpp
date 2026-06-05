@@ -44,6 +44,13 @@ void loadLevel(ServerGame& game) {
   game.registry.emplace<shared::OverworldTag>(summerEscape);
   game.summerEscapeController = summerEscape;
 
+  // End-game decryption puzzle controller.
+  auto [decryptControllerID, decryptController] = new_entity(game);
+  (void)decryptControllerID;
+  game.registry.emplace<shared::DecryptPuzzleState>(decryptController);
+  game.registry.emplace<shared::OverworldTag>(decryptController);
+  game.decryptController = decryptController;
+
   // entity holding game progress for each season
   // Shared memory spirit: visible green piece players move through the maze
   // toward the orange goal marker.

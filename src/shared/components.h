@@ -340,4 +340,15 @@ struct SummerEscapeState {
                    self.tgtMinY, self.tgtMaxX, self.tgtMaxY);
   }
 };
+
+// End-game decryption puzzle at the Fallen house. Replicated so clients know
+// when the puzzle is active or already solved.
+struct DecryptPuzzleState {
+  bool active = false;
+  bool solved = false;
+
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.active, self.solved);
+  }
+};
 }  // namespace shared

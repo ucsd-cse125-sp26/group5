@@ -124,6 +124,10 @@ void drawDebugPanel(Graphics& g, ClientGame& game, bool& open) {
   if (ImGui::Button("Print Positions", kBtn)) {
     pushCmd(game, shared::DebugCommand::PRINT_POSITIONS);
   }
+  if (bigButton("TRIGGER DECRYPT  (end-game puzzle)", ImVec2(-1.0f, 52.0f),
+                &kSeasonColor[3])) {
+    pushCmd(game, shared::DebugCommand::TRIGGER_DECRYPT);
+  }
   if (bigButton("TRIGGER CREDITS  (once per run)", ImVec2(-1.0f, 52.0f),
                 &kSeasonColor[1])) {
     pushCmd(game, shared::DebugCommand::TRIGGER_CREDITS);
