@@ -31,6 +31,7 @@
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
@@ -159,7 +160,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
 
     const auto& pos = game.registry.get<shared::Position>(ent);
     const auto& ri = game.registry.get<shared::RenderInfo>(ent);
-    printf(
+    LOG_DEBUG(
         "[DebugPos] slot=%u player=(%.3f, %.3f, %.3f) "
         "maze_board_suggest=(%.3f, %.3f, %.3f)\n",
         static_cast<unsigned>(ri.playerSlot), pos.x, pos.y, pos.z, pos.x, pos.y,
@@ -178,7 +179,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
     }
 
     const auto& arena = game.tangramArena;
-    printf(
+    LOG_DEBUG(
         "[TangramDebug] unlocked=%d completed=%d active=%d armed=%d "
         "focus=%.2f triggerCenter=(%.3f, %.3f) half=%.3f board=(%.3f, %.3f, "
         "%.3f) spawn=(%.3f, %.3f, %.3f)\n",
@@ -204,7 +205,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
       const auto& playerRender = game.registry.get<shared::RenderInfo>(avatar);
       const bool inTrigger = arena.isInsideTrigger(playerPos.x, playerPos.y);
       if (inTrigger) ++inside;
-      printf(
+      LOG_DEBUG(
           "[TangramDebug] slot=%u pos=(%.3f, %.3f, %.3f) inTrigger=%d "
           "dx=%.3f dy=%.3f\n",
           static_cast<unsigned>(playerRender.playerSlot), playerPos.x,
@@ -212,8 +213,8 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
           playerPos.x - arena.triggerCenterX,
           playerPos.y - arena.triggerCenterY);
     }
-    printf("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
-           connected, inside);
+    LOG_DEBUG("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
+              connected, inside);
   }
 }
 
@@ -263,7 +264,8 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
         entity, modelName, scale.x, scale.y, scale.z);
     ri.colorExempt = true;
   }
-  game.registry.emplace<shared::Camera>(entity, 0.0f, 2.0f);
+  game.registry.emplace<shared::Camera>(entity, 0.0f,
+                                        shared::kDefaultPlayerCameraHeight);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
@@ -430,14 +432,28 @@ void initWorldEntities(ServerGame& game) {
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
+
+  // Rect is the same size as the block but sits slightly toward +X/+Y. Nudge
+  // its center back toward the origin to line them up; leave half-extents full.
+  // constexpr float kShiftX = 0.2f;  // how far it pokes past the block on +X
+  // constexpr float kShiftY = 0.2f;  // ... on +Y
+  // spawnFallingHazardZoneRect<shared::OverworldTag>(
+  //       game,
+  //       /*center=*/
+  //       glm::vec3(game.fallLayout.playCenterX - kShiftX,
+  //                 game.fallLayout.playCenterY - kShiftY,
+  //                 game.fallLayout.playCenterZ),
+  //       /*halfX=*/game.fallLayout.playHalfX,
+  //       /*halfY=*/game.fallLayout.playHalfY,
+  //       /*spawnHeight=*/game.fallLayout.spawnHeight,
+  //       /*interval=*/0.15f);
   spawnFallingHazardZone<shared::OverworldTag>(
       game,
-      /*center=*/
       glm::vec3(game.fallLayout.playCenterX, game.fallLayout.playCenterY,
                 game.fallLayout.playCenterZ),
-      /*radius=*/std::min(game.fallLayout.playHalfX, game.fallLayout.playHalfY),
-      /*spawnHeight=*/game.fallLayout.spawnHeight,
-      /*interval=*/0.4f);
+      std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.3f,
+      game.fallLayout.spawnHeight, 0.12f);
+
   // Autumn fall arena: one green play surface (collision). Orange rim/trigger
   // markers removed — challenge bounds still use game.fallLayout floats.
   spawnStaticEntities<shared::OverworldTag>(
@@ -538,7 +554,7 @@ void initWorldEntities(ServerGame& game) {
 
 template <typename Tag, entt::entity PlayerAvatars::* AvatarField>
 static void enterStateHelper(ServerGame& game, const char* stateName) {
-  printf("[State] Entering %s\n", stateName);
+  LOG_DEBUG("[State] Entering %s\n", stateName);
   std::vector<entt::entity> spawned;
   auto view = game.registry.view<Tag>();
   for (auto ent : view) spawned.push_back(ent);
@@ -559,6 +575,18 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
   auto view = game.registry.view<Tag>();
   for (auto ent : view) existing.push_back(ent);
   return existing;
+}
+
+static bool shouldSkipTangramDevInitialEntity(ServerGame& game,
+                                              entt::entity ent) {
+  if (shared::dev_spawn::kOverworldSpawn !=
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    return false;
+  }
+
+  if (!game.registry.all_of<shared::RenderInfo>(ent)) return false;
+  const auto& render = game.registry.get<shared::RenderInfo>(ent);
+  return render.modelName.starts_with("map:");
 }
 
 // ── OverworldState ───────────────────────────────────────
@@ -605,10 +633,11 @@ void OverworldState::onEnter(ServerGame& game) {
   }
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
+  syncOverworldSeasonMusic(game);
 }
 
 void OverworldState::onExit(ServerGame& game) {
-  printf("[State] Exiting Overworld\n");
+  LOG_DEBUG("[State] Exiting Overworld\n");
   if (maze_puzzle::isPuzzleActive(game)) {
     maze_puzzle::endPuzzle(game);
   }
@@ -626,7 +655,11 @@ entt::entity OverworldState::getClientAvatar(const PlayerAvatars& slots) const {
 
 std::vector<entt::entity> OverworldState::getStateEntities(
     ServerGame& game) const {
-  return getEntitiesHelper<shared::OverworldTag>(game);
+  auto entities = getEntitiesHelper<shared::OverworldTag>(game);
+  std::erase_if(entities, [&](entt::entity ent) {
+    return shouldSkipTangramDevInitialEntity(game, ent);
+  });
+  return entities;
 }
 
 void OverworldState::update(ServerGame& game, float dt) {
@@ -643,6 +676,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   if (maze_puzzle::isPuzzleActive(game)) {
+    movement_system(game, dt, StateType::OVERWORLD);
     maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
@@ -679,7 +713,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     game.overworldMazeFocusTimer = 0.0f;
   } else if (!summer_escape::isActive(game) && game.overworldMazeTriggerArmed &&
              maze_trigger::canTriggerMaze(game)) {
-    maze_camera::snapOverworldAvatarsFaceMazePreview(game);
     game.overworldMazeFocusTimer += dt;
     if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds) {
       game.overworldMazeTriggerArmed = false;
@@ -707,6 +740,26 @@ void OverworldState::update(ServerGame& game, float dt) {
   // snap to summer pad, toggle barriers) moved to the demo debug control panel;
   // they now arrive as DEBUG_COMMAND packets and run in
   // server_debug::processPendingCommands.
+
+  // F2 then F — first F starts music pickup test; later F re-spawns fragment.
+  auto inputView = game.registry.view<shared::PlayerInput>();
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
+    if (!game.registry.all_of<shared::Position>(ent)) break;
+
+    if (!game.musicFragmentPickupTestActive) {
+      game.musicFragmentPickupTestActive = true;
+      LOG_DEBUG(
+          "DEBUG: music pickup test ON — Winter music playing; first fragment "
+          "spawned (pick winter→fall→summer→spring with E)\n");
+      debugRevealActiveSeasonFragmentNearPlayer(game, ent);
+      break;
+    }
+
+    debugRevealActiveSeasonFragmentNearPlayer(game, ent);
+    break;
+  }
 
   scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
@@ -742,7 +795,7 @@ void MazeState::onEnter(ServerGame& game) {
 }
 
 void MazeState::onExit(ServerGame& game) {
-  printf("[State] Exiting Maze\n");
+  LOG_DEBUG("[State] Exiting Maze\n");
   game.overworldMazeTriggerArmed = false;
   game.overworldMazeFocusTimer = 0.0f;
   ExitMazePuzzle(game);

@@ -55,6 +55,8 @@ struct ServerGame {
   std::map<ENetPeer*, PlayerAvatars> active_players;
   std::vector<PlayerAvatars> unused_player_slots;
   uint32_t nextEntityId = 0;
+  // Next display index for clients (1–4) in connection order.
+  uint8_t nextPlayerJoinSlot = 1;
   GameStateManager gameStateManager;
   ServerNetwork* network = nullptr;
   // Overworld maze trigger: when false, all players must leave the trigger
@@ -93,6 +95,10 @@ struct ServerGame {
   // the rest of the run.
   bool debugSeasonOverride = false;
 
+  // F2 then F (debug): skip puzzle gates and spawn fragments one-by-one for
+  // seasonal music testing. Off until a player presses F while debug is on.
+  bool musicFragmentPickupTestActive = false;
+
   // Debug-control-panel commands received from a client this poll, drained and
   // executed once per fixed-step tick by server_debug::processPendingCommands.
   std::vector<shared::DebugCommandPacket> pendingDebugCommands;
@@ -106,7 +112,6 @@ struct ServerGame {
   // broadcast once per server lifetime and never re-trigger.
   shared::map_gamelogic_layout::FallenHouseRegion fallenHouseRegion{};
   bool creditsRolled = false;
-
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
   bool overworldTangramActive = false;
   bool overworldTangramTriggerArmed = true;

@@ -16,6 +16,7 @@ endif()
 
 add_library(shared
     src/shared/hello.cpp
+    src/shared/log.cpp
     src/shared/util.cpp
     src/shared/mesh_loader.cpp
     src/shared/puzzles/maze/layout.cpp
@@ -46,7 +47,6 @@ target_include_directories(stb_image INTERFACE lib/stb)
 
 add_library(pl_mpeg INTERFACE)
 target_include_directories(pl_mpeg INTERFACE lib/pl_mpeg)
-
 target_link_libraries(shared PUBLIC zpp_bits assimp)
 
 # Path to glad directory
@@ -115,12 +115,17 @@ if(NOT MSVC)
 endif()
 
 target_compile_definitions(soloud PUBLIC
-    WITH_MINIAUDIO 
+    WITH_MINIAUDIO
     #MA_DEBUG_OUTPUT
     #MA_NO_RUNTIME_LINKING
     MA_NO_JACK
 )
 
+if(APPLE)
+    target_sources(soloud PRIVATE
+        lib/soloud/src/backend/coreaudio/soloud_coreaudio.cpp)
+    target_compile_definitions(soloud PUBLIC WITH_COREAUDIO)
+endif()
 # if(UNIX AND NOT APPLE)
 #     target_compile_definitions(soloud PUBLIC
 #         MA_NO_JACK

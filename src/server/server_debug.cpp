@@ -25,6 +25,7 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/sound_constants.h"
@@ -106,8 +107,9 @@ void setSeason(ServerGame& game, Season season) {
   game.debugSeasonOverride = true;
   section_puzzle::setActiveSeason(game, season);
   colorizeSection(game, season);
-  printf("[DebugPanel] set season to %s\n",
-         section_puzzle::sceneNameForSeason(season));
+  syncOverworldSeasonMusic(game);
+  LOG_DEBUG("[DebugPanel] set season to %s\n",
+            section_puzzle::sceneNameForSeason(season));
 }
 
 void cycleSeason(ServerGame& game) {
@@ -229,8 +231,8 @@ void finishPuzzle(ServerGame& game, Season season) {
     s.positional = false;
     net::broadcastPacket(game.network->getHost(), s);
   }
-  printf("[DebugPanel] finished (revealed fragment for) season %d\n",
-         static_cast<int>(season));
+  LOG_DEBUG("[DebugPanel] finished (revealed fragment for) season %d\n",
+            static_cast<int>(season));
 }
 
 // "Pickup Fragment" — run the EXACT organic pickup chain for this season's
@@ -311,7 +313,7 @@ void toggleBarrierCollision(ServerGame& game) {
       bi.AddBody(id, JPH::EActivation::DontActivate);
     }
   }
-  printf("[DebugPanel] toggled barrier collision\n");
+  LOG_DEBUG("[DebugPanel] toggled barrier collision\n");
 }
 
 // Toggle barrier RenderInfo + despawn/respawn so clients pick up the change
@@ -342,18 +344,18 @@ void toggleBarrierVisibility(ServerGame& game) {
                           shared::PacketType::SPAWN_ENTITY, toRespawn, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
-  printf("[DebugPanel] toggled barrier visibility\n");
+  LOG_DEBUG("[DebugPanel] toggled barrier visibility\n");
 }
 
 void resetPlayersToOverworldSpawn(ServerGame& game) {
   teleportAllPlayers(
       game, [&](uint8_t slot) { return overworldSpawnFor(game, slot); });
-  printf("[DebugPanel] reset players to overworld spawn\n");
+  LOG_DEBUG("[DebugPanel] reset players to overworld spawn\n");
 }
 
 void triggerCredits(ServerGame& game) {
   if (game.creditsRolled) {
-    printf("[DebugPanel] credits already rolled this run — ignoring\n");
+    LOG_DEBUG("[DebugPanel] credits already rolled this run — ignoring\n");
     return;
   }
   game.creditsRolled = true;
@@ -362,7 +364,13 @@ void triggerCredits(ServerGame& game) {
   if (game.network != nullptr) {
     net::broadcastPacket(game.network->getHost(), pkt);
   }
-  printf("[DebugPanel] credits triggered\n");
+  LOG_DEBUG("[DebugPanel] credits triggered\n");
+}
+
+void toggleDebugLog() {
+  shared::log::setDebugEnabled(!shared::log::debugEnabled);
+  LOG_DEBUG("[DebugPanel] server debug log %s\n",
+            shared::log::debugEnabled ? "enabled" : "disabled");
 }
 
 void printPositions(ServerGame& game) {
@@ -377,8 +385,8 @@ void printPositions(ServerGame& game) {
         game.registry.all_of<shared::RenderInfo>(a)
             ? game.registry.get<shared::RenderInfo>(a).playerSlot
             : 0;
-    printf("[DebugPanel] slot=%u pos=(%.2f, %.2f, %.2f)\n",
-           static_cast<unsigned>(slot), pos.x, pos.y, pos.z);
+    LOG_DEBUG("[DebugPanel] slot=%u pos=(%.2f, %.2f, %.2f)\n",
+              static_cast<unsigned>(slot), pos.x, pos.y, pos.z);
   }
 }
 
@@ -434,6 +442,9 @@ void processPendingCommands(ServerGame& game) {
         break;
       case PRINT_POSITIONS:
         printPositions(game);
+        break;
+      case TOGGLE_DEBUG_LOG:
+        toggleDebugLog();
         break;
     }
   }

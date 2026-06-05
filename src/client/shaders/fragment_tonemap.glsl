@@ -57,6 +57,10 @@ uniform vec3 colorRestorationMax;
 // How strongly colored point lights resist the desaturation (0 = off, 1 = full).
 uniform float colorRestorationLightStrength;
 
+// Tangram play area stays in full color regardless of restoration progress.
+uniform float tangramAlwaysColorEnabled;
+uniform vec3 tangramAlwaysColorMin;
+uniform vec3 tangramAlwaysColorMax;
 // Signed distance from p to the AABB [mn, mx]. Negative inside, positive
 // outside; smooth across the edge so we don't get a hard ring.
 float aabbSignedDistance(vec3 p, vec3 mn, vec3 mx) {
@@ -96,6 +100,11 @@ void main() {
                                    colorRestorationMax);
       float edge = max(colorRestorationEdgeWidth, 1e-4);
       float outsideAmt = smoothstep(0.0, edge, d);
+      if (tangramAlwaysColorEnabled > 0.5) {
+        float dTangram = aabbSignedDistance(pos.rgb, tangramAlwaysColorMin,
+                                            tangramAlwaysColorMax);
+        outsideAmt *= smoothstep(0.0, edge, dTangram);
+      }
       // Keep the colored point light's illuminated area in color even out here
       // (scaled by the configurable strength; 0 = off).
       outsideAmt *= 1.0 - clamp(coloredLightKeep * colorRestorationLightStrength,

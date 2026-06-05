@@ -16,6 +16,7 @@
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/hello.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
 #include "shared/puzzles/tangram/arena_layout.h"
@@ -27,6 +28,7 @@ void runNetworkLoop(ClientGame& game, ClientNetwork& network);
 int main() {
   std::cout << "Hello World Client";
   shared::hello();
+  shared::log::initFromEnvironment();
 
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
@@ -72,6 +74,10 @@ int main() {
     return EXIT_SUCCESS;
   }
 
+  // Init audio before the network thread so SEASON_MUSIC on connect is heard.
+  if (!game.audio.init()) {
+    LOG_DEBUG("Audio init failed; continuing without audio\n");
+  }
   // Back to mouselook for gameplay.
   glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -86,21 +92,14 @@ int main() {
   game.mazeLayout.applyHeightBoost();
   game.tangramArena.applyHeightBoost();
 
-  // if (!game.audio.init()) {
-  //   game.running.store(false, std::memory_order_release);
-  //   networkThread.join();
-  //   return EXIT_FAILURE;
-  // }
-
-  if (!game.audio.init()) {
-    printf("Audio init failed; continuing without audio\n");
-  }
-
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {
-    printf("[DevSpawn] Client fallback camera: tangram pad\n");
+    applyPreset(graphics.settings, GraphicsPreset::Performance);
+    graphics.settings.shadowsEnabled = false;
+    graphics.settings.outlineMode = OutlineMode::None;
+    LOG_DEBUG("[DevSpawn] Client fallback camera: tangram pad\n");
   } else {
-    printf("[DevSpawn] Client fallback camera: winter maze\n");
+    LOG_DEBUG("[DevSpawn] Client fallback camera: winter maze\n");
   }
   auto lastTime = (float)glfwGetTime();
   while (!glfwWindowShouldClose(graphics.window)) {
@@ -139,7 +138,6 @@ int main() {
     VideoRequest videoReq;
     while (game.videoQueue.tryPop(videoReq))
       graphics.handleVideoRequest(videoReq);
-
     graphics.render(game, network);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");
@@ -207,7 +205,9 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, game, game.inputQueue, prevKeys);
+    processInput(
+        graphics.window, game, game.inputQueue, prevKeys,
+        graphics.debugChannel != DebugChannel::Off || graphics.debugPanelOpen);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 

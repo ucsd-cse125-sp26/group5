@@ -9,6 +9,7 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -171,7 +172,7 @@ void spawnLayoutVisuals(ServerGame& game) {
 
 void applyLayout(ServerGame& game, shared::maze_layout::Config layout) {
   if (maze_puzzle::isPuzzleActive(game)) {
-    printf("[MazeLayout] Cannot apply while puzzle is active.\n");
+    LOG_DEBUG("[MazeLayout] Cannot apply while puzzle is active.\n");
     return;
   }
   if (layout.autoBoardFromTrigger) {
@@ -188,14 +189,15 @@ void applyLayout(ServerGame& game, shared::maze_layout::Config layout) {
   }
   broadcastSpawnEntities(game, spawned);
   printLayoutSnippet(game.mazeLayout);
-  printf("[MazeLayout] Applied trigger (%.2f, %.2f) board (%.2f, %.2f, %.2f)\n",
-         game.mazeLayout.triggerCenterX, game.mazeLayout.triggerCenterY,
-         game.mazeLayout.boardCenterX, game.mazeLayout.boardCenterY,
-         game.mazeLayout.boardCenterZ);
+  LOG_DEBUG(
+      "[MazeLayout] Applied trigger (%.2f, %.2f) board (%.2f, %.2f, %.2f)\n",
+      game.mazeLayout.triggerCenterX, game.mazeLayout.triggerCenterY,
+      game.mazeLayout.boardCenterX, game.mazeLayout.boardCenterY,
+      game.mazeLayout.boardCenterZ);
 }
 
 void printLayoutSnippet(const shared::maze_layout::Config& layout) {
-  printf(
+  LOG_DEBUG(
       "--- paste into maze_preview.h (trigger/board) ---\n"
       "constexpr float kTriggerCenterX = %.3ff;\n"
       "constexpr float kTriggerCenterY = %.3ff;\n"

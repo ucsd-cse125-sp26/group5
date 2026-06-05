@@ -6,8 +6,7 @@ struct ServerGame;
 
 namespace maze_camera {
 
-// Seconds all four players must stand in the trigger (facing the preview)
-// before auto-entering the maze.
+// Seconds all four players must stand in the trigger before auto-entering.
 constexpr float kFocusHoldSeconds = 1.0f;
 
 // Snap overworld avatar yaw so +Y faces the maze preview center.

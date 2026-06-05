@@ -11,6 +11,7 @@
 #include "client_network.h"
 #include "glm/glm.hpp"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/protocol.h"
 #include "shared/puzzles/tangram/roles.h"
 #include "shared/simple_profiler.h"
@@ -120,7 +121,7 @@ void registerClientHandlers(ClientNetwork& network) {
         uint16_t entityCount;
         std::memcpy(&entityCount, data + offset, sizeof(uint16_t));
         offset += sizeof(uint16_t);
-        printf("CLIENT: spawn %u entities\n", entityCount);
+        LOG_DEBUG("CLIENT: spawn %u entities\n", entityCount);
         for (uint16_t i = 0; i < entityCount; i++) {
           uint32_t entityId;
           std::memcpy(&entityId, data + offset, sizeof(uint32_t));
@@ -147,13 +148,13 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::DespawnPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
-        printf("CLIENT: despawn entity %u\n", pkt.entityId);
+        LOG_DEBUG("CLIENT: despawn entity %u\n", pkt.entityId);
         auto it = game.networkEntityMap.find(pkt.entityId);
         if (it != game.networkEntityMap.end()) {
           game.audio.stopAllForEntity(pkt.entityId);
           game.networkRegistry.destroy(it->second);
           game.networkEntityMap.erase(it);
-          printf("Destroyed entity %d\n", pkt.entityId);
+          LOG_DEBUG("Destroyed entity %d\n", pkt.entityId);
         }
       });
 
@@ -234,17 +235,31 @@ void registerClientHandlers(ClientNetwork& network) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.currentGameState = pkt.state;
-        game.audio.stopAllGlobalLoops();
-        if (pkt.state == shared::GameStateType::OVERWORLD) {
-          game.audio.playGlobalLoop(
-              static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
-        } else if (pkt.state == shared::GameStateType::MAZE) {
+        if (pkt.state == shared::GameStateType::MAZE) {
+          game.audio.stopAllGlobalLoops();
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
+          game.audio.stopAllGlobalLoops();
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::OVERWORLD) {
+          // Stop minigame/credits loops only. Season loops come from
+          // SEASON_MUSIC; do not stopAll here or a reordered packet can mute
+          // overworld music until the next sync.
+          game.audio.stopGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC));
+          game.audio.stopGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC));
         }
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::SEASON_MUSIC,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::SeasonMusicPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.audio.playGlobalLoop(pkt.soundId, pkt.volume);
       });
 
   // Runs on the network thread — GL is invalid here, so only enqueue a request
@@ -352,32 +367,43 @@ bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
 uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
                                         const glm::mat4& view,
                                         const glm::mat4& projection) {
-  uint32_t bestId = 0;
-  float bestDist = 1e9f;
-  constexpr float kMaxNdcRadius = 0.14f;
+  // Cast a ray through the screen center (crosshair) and pick the piece the ray
+  // passes closest to, within that piece's footprint. The old approach matched
+  // only pieces whose *center* projected within a small NDC radius of the
+  // crosshair, so aiming at the body of a large piece (center off to the side)
+  // missed entirely and the server fell back to the nearest piece.
+  const glm::mat4 invVP = glm::inverse(projection * view);
+  glm::vec4 nearH = invVP * glm::vec4(0.0f, 0.0f, -1.0f, 1.0f);
+  glm::vec4 farH = invVP * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+  if (std::abs(nearH.w) < 1e-6f || std::abs(farH.w) < 1e-6f) return 0;
+  const glm::vec3 rayOrigin = glm::vec3(nearH) / nearH.w;
+  const glm::vec3 rayDir = glm::normalize(glm::vec3(farH) / farH.w - rayOrigin);
 
+  uint32_t bestId = 0;
+  float bestPerp = 1e9f;
   auto pieceView =
-      game.renderRegistry
-          .view<shared::Entity, shared::Position, shared::TangramPiece>();
+      game.renderRegistry.view<shared::Entity, shared::Position,
+                               shared::RenderInfo, shared::TangramPiece>();
   for (auto ent : pieceView) {
     const auto& pos = pieceView.get<shared::Position>(ent);
-    const auto& entity = pieceView.get<shared::Entity>(ent);
-    const glm::vec4 clip =
-        projection * view * glm::vec4(pos.x, pos.y, pos.z, 1.0f);
-    if (clip.w <= 0.0f) continue;
-    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
-    if (ndc.z < -1.0f || ndc.z > 1.0f) continue;
-    const float d = std::hypot(ndc.x, ndc.y);
-    if (d > kMaxNdcRadius || d >= bestDist) continue;
-    bestDist = d;
-    bestId = entity.id;
+    const auto& ri = pieceView.get<shared::RenderInfo>(ent);
+    const glm::vec3 center(pos.x, pos.y, pos.z);
+    const float tHit = glm::dot(center - rayOrigin, rayDir);
+    if (tHit <= 0.0f) continue;  // piece is behind the camera
+    // Perpendicular distance from the piece center to the crosshair ray.
+    const float perp = glm::length(center - (rayOrigin + tHit * rayDir));
+    // Generous footprint radius so aiming anywhere on the piece counts.
+    const float radius = 0.6f * std::max(ri.sx, ri.sy);
+    if (perp > radius || perp >= bestPerp) continue;
+    bestPerp = perp;
+    bestId = pieceView.get<shared::Entity>(ent).id;
   }
   return bestId;
 }
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys) {
+                  InputKeys& prevKeys, bool debugMode) {
   // Freeze the avatar while the credits roll: send one zero-input packet to
   // stop movement, then ignore keyboard/mouse until credits are dismissed.
   if (game.currentGameState == shared::GameStateType::CREDITS) {
@@ -393,23 +419,23 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     prevKeys = 0;
     return;
   }
-
   InputKeys keys = 0;
+  const bool mazePuzzleActive = isOverworldMazePuzzleActive(game);
   const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
 
-  if (!mazeBoardControl) {
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+  if (!mazePuzzleActive) {
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
-    // Gameplay debug shortcuts (B/N/G/V/Y/F) were removed in favor of the demo
-    // debug control panel (Ctrl+Shift+\); those actions now travel over the
-    // DEBUG_COMMAND packet instead of the input bitfield.
   }
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
+  if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+  // Gameplay debug shortcuts (B/N/G/V/Y/F) were removed in favor of the demo
+  // debug control panel (Ctrl+Shift+\); those actions now travel over the
+  // DEBUG_COMMAND packet instead of the input bitfield.
 
   if (mazeBoardControl) {
     // Send every arrow key pressed; server MazePadBinding picks the one
@@ -438,7 +464,7 @@ void processInput(GLFWwindow* window, const ClientGame& game,
   const bool tangramActive = isOverworldTangramPuzzleActive(game);
   const uint32_t rotateTargetId =
       tangramActive ? game.tangramCrosshairTargetId : 0;
-  const bool lockCamera = mazeBoardControl;
+  const bool lockCamera = false;
   bool captured = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
   if (captured && !lockCamera) {
     double mouseX, mouseY;
@@ -477,8 +503,8 @@ void printEntityPositions(const ClientGame& game) {
   for (auto ent : view) {
     auto& e = view.get<shared::Entity>(ent);
     auto& p = view.get<shared::Position>(ent);
-    printf("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
-           e.id == game.renderEntityId ? " (me)" : "");
+    LOG_DEBUG("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
+              e.id == game.renderEntityId ? " (me)" : "");
   }
 }
 

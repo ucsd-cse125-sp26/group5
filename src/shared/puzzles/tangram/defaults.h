@@ -31,7 +31,8 @@ constexpr float kSpawnOffsetY[4] = {-1.5f, -1.5f, 0.0f, 0.0f};
 
 constexpr float kTriggerCenterX = 0.0f;
 constexpr float kTriggerCenterY = 0.0f;
-constexpr float kHalfExtent = 12.0f;
+// Square trigger pad matches full platform (syncTriggerFromPlatform).
+constexpr float kHalfExtent = kPlatformScaleX * 0.5f;
 
 constexpr float kPuzzleCenterX = 0.0f;
 constexpr float kPuzzleCenterY = 7.0f;

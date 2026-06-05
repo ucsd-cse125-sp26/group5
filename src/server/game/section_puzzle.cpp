@@ -2,6 +2,7 @@
 
 #include "server/server_game.h"
 #include "shared/components.h"
+#include "shared/log.h"
 
 namespace section_puzzle {
 
@@ -86,8 +87,8 @@ void completeSection(ServerGame& game, shared::SectionSeasonMap season) {
   if (season == shared::SectionSeasonMap::FALL) {
     setActiveSeason(game, shared::SectionSeasonMap::FALL);
   }
-  printf("[Section] %s section completed\n",
-         season == shared::SectionSeasonMap::FALL ? "Fall" : "Season");
+  LOG_DEBUG("[Section] %s section completed\n",
+            season == shared::SectionSeasonMap::FALL ? "Fall" : "Season");
 }
 
 }  // namespace section_puzzle

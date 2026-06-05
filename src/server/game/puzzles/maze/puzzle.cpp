@@ -12,6 +12,7 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/maze/defaults.h"
 
@@ -244,20 +245,6 @@ void claimOverworldPadsForActivePlayers(ServerGame& game) {
   }
 }
 
-void freezeOverworldPlayerAvatars(ServerGame& game) {
-  auto& bodyInterface = game.physics.getBodyInterface();
-  auto view = game.registry.view<shared::OverworldTag, shared::PhysicsBody,
-                                 shared::PlayerInput>();
-  for (auto ent : view) {
-    if (game.registry.all_of<shared::OverworldMazePiece>(ent)) continue;
-    auto& pb = view.get<shared::PhysicsBody>(ent);
-    JPH::BodyID body(pb.bodyId);
-    if (!bodyInterface.IsAdded(body)) continue;
-    bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
-    bodyInterface.SetAngularVelocity(body, JPH::Vec3::sZero());
-  }
-}
-
 }  // namespace
 
 namespace {
@@ -291,6 +278,10 @@ void initOverworldMazePuzzleController(ServerGame& game) {
 
 bool isPuzzleActive(const ServerGame& game) {
   return game.overworldMazePuzzleActive;
+}
+
+bool shouldConfinePlayersToMazeTrigger(const ServerGame& game) {
+  return game.overworldMazePuzzleActive || game.overworldMazeFocusTimer > 0.0f;
 }
 
 void beginPuzzle(ServerGame& game) {
@@ -343,11 +334,11 @@ void beginPuzzle(ServerGame& game) {
   broadcastSpawnEntities(game, {piece});
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
-  printf(
+  LOG_DEBUG(
       "[OverworldMaze] Puzzle started — slot 1=Up 2=Down 3=Left 4=Right "
       "(all 4 players on pad required)\n");
-  printf("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
-         layout.startPos.x, layout.startPos.y, layout.startPos.z);
+  LOG_DEBUG("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
+            layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
 void endPuzzle(ServerGame& game) {
@@ -381,7 +372,7 @@ void endPuzzle(ServerGame& game) {
 
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
 
-  printf("[OverworldMaze] Puzzle ended\n");
+  LOG_DEBUG("[OverworldMaze] Puzzle ended\n");
 }
 
 void updatePuzzle(ServerGame& game, float dt) {
@@ -406,11 +397,79 @@ void updatePuzzle(ServerGame& game, float dt) {
     }
   }
 
-  freezeOverworldPlayerAvatars(game);
-
   const maze_spirit_control::SpiritDrive drive =
       maze_spirit_control::collectSpiritDriveFromOverworldPlayers(game);
   applyOverworldDrive(game, piece, drive);
+}
+
+void clampPlayersToMazeTrigger(ServerGame& game) {
+  if (!shouldConfinePlayersToMazeTrigger(game)) return;
+
+  const auto& layout = game.mazeLayout;
+  const float minX = layout.triggerCenterX - layout.halfExtent;
+  const float maxX = layout.triggerCenterX + layout.halfExtent;
+  const float minY = layout.triggerCenterY - layout.halfExtent;
+  const float maxY = layout.triggerCenterY + layout.halfExtent;
+  // Map maze_trigger Z is the pad floor; avatar origin sits above it.
+  const float floorZ = layout.triggerCenterZ;
+  constexpr float kFloorSlack = 0.5f;
+  constexpr float kCeilingAboveFloor = 6.0f;
+  const float minZ = floorZ - kFloorSlack;
+  const float maxZ = floorZ + kCeilingAboveFloor;
+  constexpr float kBoundaryEps = 1e-3f;
+
+  auto& bodyInterface = game.physics.getBodyInterface();
+  for (const auto& [peer, slots] : game.active_players) {
+    (void)peer;
+    const entt::entity avatar = slots.overworld_avatar;
+    if (!game.registry.valid(avatar) ||
+        !game.registry.all_of<shared::Position>(avatar)) {
+      continue;
+    }
+    auto& pos = game.registry.get<shared::Position>(avatar);
+    bool clamped = false;
+    if (pos.x < minX) {
+      pos.x = minX;
+      clamped = true;
+    } else if (pos.x > maxX) {
+      pos.x = maxX;
+      clamped = true;
+    }
+    if (pos.y < minY) {
+      pos.y = minY;
+      clamped = true;
+    } else if (pos.y > maxY) {
+      pos.y = maxY;
+      clamped = true;
+    }
+    if (pos.z < minZ) {
+      pos.z = minZ;
+      clamped = true;
+    } else if (pos.z > maxZ) {
+      pos.z = maxZ;
+      clamped = true;
+    }
+
+    if (!game.registry.all_of<shared::PhysicsBody>(avatar)) continue;
+    auto& pb = game.registry.get<shared::PhysicsBody>(avatar);
+    JPH::BodyID body(pb.bodyId);
+    if (!bodyInterface.IsAdded(body)) continue;
+
+    if (clamped) {
+      bodyInterface.SetPosition(body, JPH::RVec3(pos.x, pos.y, pos.z),
+                                JPH::EActivation::Activate);
+      // Stop only velocity pushing through the hit face so walking inside
+      // the pad (and along walls) still works.
+      JPH::Vec3 v = bodyInterface.GetLinearVelocity(body);
+      if (pos.x <= minX + kBoundaryEps && v.GetX() < 0.0f) v.SetX(0.0f);
+      if (pos.x >= maxX - kBoundaryEps && v.GetX() > 0.0f) v.SetX(0.0f);
+      if (pos.y <= minY + kBoundaryEps && v.GetY() < 0.0f) v.SetY(0.0f);
+      if (pos.y >= maxY - kBoundaryEps && v.GetY() > 0.0f) v.SetY(0.0f);
+      if (pos.z <= minZ + kBoundaryEps && v.GetZ() < 0.0f) v.SetZ(0.0f);
+      if (pos.z >= maxZ - kBoundaryEps && v.GetZ() > 0.0f) v.SetZ(0.0f);
+      bodyInterface.SetLinearVelocity(body, v);
+    }
+  }
 }
 
 void clampPieceToBoard(ServerGame& game) {
@@ -503,7 +562,7 @@ void completeOverworldMazePreview(ServerGame& game) {
   }
 
   broadcastUpdateEntities(game, {game.overworldMazePuzzleController});
-  printf(
+  LOG_DEBUG(
       "[OverworldMaze] Winter maze complete — arrow control exited "
       "automatically\n");
 }

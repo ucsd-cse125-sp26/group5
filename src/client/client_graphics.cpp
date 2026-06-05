@@ -42,6 +42,7 @@
 #include "shared/draw_stats.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
 #include "shared/puzzles/maze/layout.h"
@@ -456,15 +457,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
     }
   }
 
-  // During the preview-board puzzle only; after exit, normal FPS view
-  // immediately.
-  if (isOverworldMazePuzzleActive(game)) {
-    const glm::vec3 target(game.mazeLayout.lookAtX(), game.mazeLayout.lookAtY(),
-                           game.mazeLayout.lookAtZ());
-    glm::mat4 view = glm::lookAt(pos, target, worldUp);
-    return CameraState{.position = pos, .view = view};
-  }
-
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);
@@ -839,8 +831,8 @@ bool Graphics::load(int width, int height) {
   glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
 
   int version = gladLoadGL(glfwGetProcAddress);
-  printf("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
-         GLAD_VERSION_MINOR(version));
+  LOG_DEBUG("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
+            GLAD_VERSION_MINOR(version));
 
   if (glDebugMessageCallback) {
     glEnable(GL_DEBUG_OUTPUT);
@@ -1034,7 +1026,7 @@ bool Graphics::load(int width, int height) {
     }
     m->orientation = glm::quat(asset.qw, asset.qx, asset.qy, asset.qz);
     models[std::string(asset.name)] = m;
-    printf("Loaded asset: %s\n", std::string(asset.name).c_str());
+    LOG_DEBUG("Loaded asset: %s\n", std::string(asset.name).c_str());
   }
 
   renderLoadingFrame("Building player-slot cubes");
@@ -1044,7 +1036,7 @@ bool Graphics::load(int width, int height) {
     if (m) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[name] = m;
-      printf("Loaded asset: %s (player join order)\n", name.c_str());
+      LOG_DEBUG("Loaded asset: %s (player join order)\n", name.c_str());
     }
   }
 
@@ -1053,7 +1045,7 @@ bool Graphics::load(int width, int height) {
     if (m) {
       m->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[std::string(def.modelName)] = m;
-      printf("Loaded tangram mesh: %s\n", def.modelName);
+      LOG_DEBUG("Loaded tangram mesh: %s\n", def.modelName);
     }
     Model* mute = makeTangramPieceMuteModel(def);
     if (mute) {
@@ -1071,8 +1063,8 @@ bool Graphics::load(int width, int height) {
     if (ghostColored) {
       ghostColored->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[ghostName + "_colored"] = ghostColored;
-      printf("Loaded tangram ghost: %s (colored slot guide)\n",
-             ghostName.c_str());
+      LOG_DEBUG("Loaded tangram ghost: %s (colored slot guide)\n",
+                ghostName.c_str());
     }
   }
 
@@ -1089,7 +1081,7 @@ bool Graphics::load(int width, int height) {
   auto mapModels = loadMapModels(*parsedLandscape, pump);
   for (auto& [key, m] : mapModels) {
     models[key] = m;
-    printf("Loaded map sub-model: %s\n", key.c_str());
+    LOG_DEBUG("Loaded map sub-model: %s\n", key.c_str());
     pumpLoadingFrame();
   }
 
@@ -1098,8 +1090,8 @@ bool Graphics::load(int width, int height) {
     if (skyboxes.find(dir) == skyboxes.end()) {
       renderLoadingFrame(std::string("Loading skybox: ") + dir);
       skyboxes[dir] = loadSkybox(dir, pump);
-      printf("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
-             dir.c_str());
+      LOG_DEBUG("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
+                dir.c_str());
     }
   }
 
@@ -1502,8 +1494,8 @@ void Graphics::reloadShaders() {
                                            : Shader(r.vert, r.frag);
     if (candidate.valid()) {
       r.slot.emplace(std::move(candidate));
-      printf("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
-             (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
+      LOG_DEBUG("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
+                (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
     } else {
       fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
               r.frag);
@@ -1576,7 +1568,7 @@ void Graphics::cycleDebugChannel() {
     case DebugChannel::Count:
       break;
   }
-  printf("Debug overlay: %s\n", name);
+  LOG_DEBUG("Debug overlay: %s\n", name);
 }
 
 void Graphics::processDebugKeys() {

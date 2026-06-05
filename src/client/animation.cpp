@@ -134,7 +134,6 @@ Animation::Animation(const aiScene* scene, Model* model) {
   // bone override is applied.
   boneInfoMap_ = model->boneInfoMap;
 }
-
 void Animation::readHierarchy(AssimpNodeData& dest, const aiNode* src) {
   dest.name = src->mName.C_Str();
   dest.transformation = toGlm(src->mTransformation);
