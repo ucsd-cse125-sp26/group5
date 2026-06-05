@@ -13,10 +13,10 @@ inline constexpr int kPointShadowLayers = kMaxPointLights * 6;
 // a GL_TEXTURE_2D_ARRAY with this many layers; both lighting shaders and the
 // CameraBlock UBO size depend on it. Keep <= 4 (cascadeSplits is a single
 // vec4). Each cascade is a full re-submission of all shadow casters, so
-// ShadowDir cost is ~linear in this. 3 covers near..shadowDistance with little
-// visible loss vs 4; bump back to 4 if mid-distance cascade banding is
-// noticeable.
-inline constexpr int kShadowCascadeCount = 3;
+// ShadowDir cost is ~linear in this. 4 is the max (cascadeSplits is one vec4);
+// drop to 3 if the extra ShadowDir submission cost matters more than the
+// crisper mid-distance shadows.
+inline constexpr int kShadowCascadeCount = 4;
 
 // Linear-depth range; writer and reader must agree.
 inline constexpr float kPointShadowNear = 0.1f;
@@ -29,5 +29,10 @@ inline constexpr int kMaxPaletteColors = 64;
 // Mirrors MAX_BONES from client/asset.h — kept here so the gbuffer + shadow
 // vertex shaders can declare `finalBonesMatrices[K_MAX_BONES]` consistently.
 inline constexpr int kMaxBones = 100;
+
+// Max number of section-barrier AABBs the "barrier fog" pass renders in one
+// draw. Sizes the uniform arrays in fragment_fog.glsl (K_MAX_FOG_BOXES) and the
+// CPU-side upload buffers; there are only a handful of barriers at a time.
+inline constexpr int kMaxFogBoxes = 16;
 
 }  // namespace shared
