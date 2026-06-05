@@ -273,6 +273,13 @@ struct OverworldTangramPuzzleState {
   bool active = false;
   // shared::tangram_roles::kIsolationStage while active; 0 = full access.
   uint8_t roleIsolationStage = 0;
+  // Per-player ability grants layered ON TOP of the stage rules: bit (slot-1)
+  // set => that player gets the ability regardless of the isolation stage.
+  // Demo "unstick" lever; replicated so clients gate input/rendering correctly.
+  uint8_t grantPush = 0;
+  uint8_t grantRotate = 0;
+  uint8_t grantColor = 0;
+  uint8_t grantSlots = 0;
 };
 
 struct TangramLayoutVisual {};

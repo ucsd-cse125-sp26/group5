@@ -240,9 +240,12 @@ void registerClientHandlers(ClientNetwork& network) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
-          // Deliberately a no-op: the end ("exit") scene is silent and any
-          // accompanying audio is owned by the audio subsystem, so we must not
-          // stop whatever is currently playing on entering CREDITS.
+          // Bump the epoch so the render thread restarts the exit clip —
+          // supports re-rolling credits from the debug panel mid-roll. Audio is
+          // deliberately left untouched: the end ("exit") scene is silent and
+          // any accompanying audio is owned by the audio subsystem, so we must
+          // not stop whatever is currently playing on entering CREDITS.
+          game.creditsEpoch.fetch_add(1, std::memory_order_release);
         } else if (pkt.state == shared::GameStateType::OVERWORLD) {
           // Stop minigame/credits loops only. Season loops come from
           // SEASON_MUSIC; do not stopAll here or a reordered packet can mute
@@ -331,12 +334,16 @@ bool isOverworldTangramPuzzleActive(const ClientGame& game) {
 }
 
 uint8_t tangramRoleIsolationStage(const ClientGame& game) {
+  return tangramRoleState(game).roleIsolationStage;
+}
+
+shared::OverworldTangramPuzzleState tangramRoleState(const ClientGame& game) {
   auto view = game.renderRegistry.view<shared::OverworldTangramPuzzleState>();
   for (auto ent : view) {
     const auto& st = view.get<shared::OverworldTangramPuzzleState>(ent);
-    if (st.active) return st.roleIsolationStage;
+    if (st.active) return st;
   }
-  return 0;
+  return {};
 }
 
 uint8_t localOverworldPlayerSlot(const ClientGame& game) {
@@ -451,9 +458,10 @@ void processInput(GLFWwindow* window, const ClientGame& game,
 
   if (isOverworldTangramPuzzleActive(game) &&
       glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
-    const uint8_t stage = tangramRoleIsolationStage(game);
+    const auto st = tangramRoleState(game);
     const uint8_t slot = localOverworldPlayerSlot(game);
-    if (shared::tangram_roles::canRotate(stage, slot)) {
+    if (shared::tangram_roles::canRotate(st.roleIsolationStage, slot,
+                                         st.grantRotate)) {
       keys |= KEY_ROTATE_PIECE;
     }
   }

@@ -81,4 +81,33 @@ inline constexpr uint8_t kRotateSlot = 4;
   return true;
 }
 
+// Per-player grant overlay (see OverworldTangramPuzzleState::grant*). A set bit
+// (slot-1) hands that ability to the player on top of whatever the stage
+// allows.
+[[nodiscard]] inline constexpr bool slotGranted(uint8_t grantMask,
+                                                uint8_t playerSlot) {
+  return playerSlot >= 1 && playerSlot <= 4 &&
+         (grantMask & (1u << (playerSlot - 1))) != 0;
+}
+
+[[nodiscard]] inline bool canRotate(uint8_t stage, uint8_t playerSlot,
+                                    uint8_t grant) {
+  return slotGranted(grant, playerSlot) || canRotate(stage, playerSlot);
+}
+
+[[nodiscard]] inline bool canSeeSlots(uint8_t stage, uint8_t playerSlot,
+                                      uint8_t grant) {
+  return slotGranted(grant, playerSlot) || canSeeSlots(stage, playerSlot);
+}
+
+[[nodiscard]] inline bool canSeeColor(uint8_t stage, uint8_t playerSlot,
+                                      uint8_t grant) {
+  return slotGranted(grant, playerSlot) || canSeeColor(stage, playerSlot);
+}
+
+[[nodiscard]] inline bool canPush(uint8_t stage, uint8_t playerSlot,
+                                  uint8_t grant) {
+  return slotGranted(grant, playerSlot) || canPush(stage, playerSlot);
+}
+
 }  // namespace shared::tangram_roles

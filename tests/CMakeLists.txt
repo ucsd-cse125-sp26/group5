@@ -88,6 +88,15 @@ target_link_libraries(overworld_maze_puzzle_tests PRIVATE
     server_lib
 )
 
+add_executable(debug_panel_command_tests
+    debug_panel_command_tests.cpp
+)
+
+target_link_libraries(debug_panel_command_tests PRIVATE
+    GTest::gtest_main
+    server_lib
+)
+
 include(GoogleTest)
 gtest_discover_tests(smoke_tests)
 gtest_discover_tests(network_tests)
@@ -99,3 +108,4 @@ gtest_discover_tests(maze_logic_tests)
 gtest_discover_tests(overworld_logic_tests)
 gtest_discover_tests(overworld_maze_puzzle_tests)
 gtest_discover_tests(tangram_layout_tests)
+gtest_discover_tests(debug_panel_command_tests)
