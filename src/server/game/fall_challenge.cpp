@@ -17,6 +17,179 @@
 namespace fall_challenge {
 namespace {
 
+
+
+  // ── Pattern burst helper ─────────────────────────────────────────────────────
+// Returns a list of world-space XY spawn positions (Z is filled in by the
+// caller using zone.spawnHeight). Mutates zone.patternAngle / patternStep so
+// successive bursts rotate / advance automatically.
+//
+// player_positions: overworld avatar XY coords — used only by Aimed pattern.
+// Pass an empty vector when no player data is available; Aimed falls back to
+// Spiral for the non-aimed slots.
+static std::vector<glm::vec3> burstPositions(
+    shared::FallingHazardZone& zone,   // non-const: mutates angle/step
+    const shared::Position&    center,
+    std::mt19937&              rng,
+    const std::vector<glm::vec2>& playerPositions)
+{
+    using Pattern = shared::FallingHazardZone::AttackPattern;
+    std::vector<glm::vec3> out;
+
+    const float cx = center.x;
+    const float cy = center.y;
+    const float R  = zone.radius;
+
+    // ── Random (original behaviour) ──────────────────────────────────────────
+    if (zone.pattern == Pattern::Random) {
+        std::uniform_real_distribution<float> angD(0.0f, glm::two_pi<float>());
+        std::uniform_real_distribution<float> rD(0.0f, 1.0f);
+        float ang = angD(rng);
+        float r   = R * std::sqrt(rD(rng));
+        out.emplace_back(cx + std::cos(ang) * r, cy + std::sin(ang) * r, 0.0f);
+        return out;
+    }
+
+    // ── Spiral (Fibonacci / sunflower) ───────────────────────────────────────
+    // Fires `count` objects whose positions are the next `count` points on the
+    // sunflower lattice, advancing patternStep each burst. After a full
+    // revolution the lattice wraps naturally, so coverage stays even forever.
+    if (zone.pattern == Pattern::Spiral) {
+        constexpr int   count       = 7;
+        constexpr float goldenAngle = 2.39996323f; // radians, ~137.5°
+        for (int i = 0; i < count; ++i) {
+            int   idx = zone.patternStep * count + i;
+            float r   = R * std::sqrt(static_cast<float>(idx + 1) /
+                                      static_cast<float>(count * 12 + 1));
+            // clamp r so we never exceed the disk radius on the first few steps
+            r = std::min(r, R * 0.97f);
+            float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
+            out.emplace_back(cx + std::cos(ang) * r,
+                             cy + std::sin(ang) * r,
+                             0.0f);
+        }
+        // Advance: after 12 bursts the pattern has visited the whole disk once.
+        // Reset step so it loops rather than drifting to huge idx values.
+        zone.patternStep = (zone.patternStep + 1) % 12;
+            zone.burstsSinceSwitch++;
+        if (zone.burstsSinceSwitch >= zone.burstsUntilSwitch) {
+            zone.burstsSinceSwitch = 0;
+            std::uniform_int_distribution<int> switchD(5, 12);
+            zone.burstsUntilSwitch = switchD(rng);
+
+            using P = shared::FallingHazardZone::AttackPattern;
+            std::uniform_int_distribution<int> patD(1, 3);
+            switch (patD(rng)) {
+                case 1: zone.pattern = P::Spiral; break;
+                case 2: zone.pattern = P::Spokes; break;
+                case 3: zone.pattern = P::Aimed;  break;
+            }
+            zone.patternAngle = 0.0f;
+            zone.patternStep  = 0;
+        }
+
+        return out; // unreachable but satisfies compiler
+    }
+
+    // ── Spokes ───────────────────────────────────────────────────────────────
+    // Each burst fires one object per spoke at evenly-spaced radii, then
+    // rotates the whole pattern by (2π / spokeCount / subSteps) so over
+    // `subSteps` bursts every gap between spokes has been hit.
+    if (zone.pattern == Pattern::Spokes) {
+        constexpr int   spokeCount = 5;
+        constexpr int   perSpoke   = 3;   // objects per spoke (inner→outer)
+        constexpr int   subSteps   = 4;   // how many rotations before full repeat
+
+        float baseAngle = zone.patternAngle;
+
+        for (int s = 0; s < spokeCount; ++s) {
+            float spokeAng = baseAngle + (glm::two_pi<float>() / spokeCount) * s;
+            for (int d = 0; d < perSpoke; ++d) {
+                // Evenly space radii from 20% to 95% of disk radius.
+                float t = 0.2f + 0.75f * (static_cast<float>(d) /
+                                           static_cast<float>(perSpoke - 1));
+                float r = R * t;
+                out.emplace_back(cx + std::cos(spokeAng) * r,
+                                 cy + std::sin(spokeAng) * r,
+                                 0.0f);
+            }
+        }
+        if (zone.patternStep % 3 == 0) {
+            constexpr float kCornerT = 0.82f;
+            constexpr float kCornerAngles[4] = {
+                glm::quarter_pi<float>(),
+                glm::quarter_pi<float>() * 3.0f,
+                glm::quarter_pi<float>() * 5.0f,
+                glm::quarter_pi<float>() * 7.0f,
+            };
+            std::uniform_real_distribution<float> jD(-0.6f, 0.6f);
+            for (float ca : kCornerAngles) {
+                float ang = ca + zone.patternAngle + jD(rng);
+                out.emplace_back(cx + std::cos(ang) * R * kCornerT,
+                                 cy + std::sin(ang) * R * kCornerT,
+                                 0.0f);
+            }
+        }
+        // Rotate by one sub-step increment each burst.
+        zone.patternAngle += (glm::two_pi<float>() / spokeCount) /
+                             static_cast<float>(subSteps);
+        zone.patternStep   = (zone.patternStep + 1) % (spokeCount * subSteps);
+        return out;
+    }
+
+    // ── Aimed ────────────────────────────────────────────────────────────────
+    // Fires one object directly at each player (clamped inside the disk so it
+    // still lands on the platform). Then fills remaining slots with spiral
+    // points so total coverage stays even even when player count is low.
+    if (zone.pattern == Pattern::Aimed) {
+        constexpr int totalCount = 7;
+        constexpr float aimJitter = 0.8f;  // metres of random offset on aimed shot
+
+        std::uniform_real_distribution<float> jitterD(-aimJitter, aimJitter);
+
+        // Aimed shots at each player.
+        int aimed = 0;
+        for (const auto& pp : playerPositions) {
+            if (aimed >= totalCount) break;
+            float tx = pp.x + jitterD(rng);
+            float ty = pp.y + jitterD(rng);
+            // Clamp inside disk.
+            float dx = tx - cx, dy = ty - cy;
+            float d  = std::sqrt(dx * dx + dy * dy);
+            if (d > R * 0.95f) { tx = cx + dx / d * R * 0.95f;
+                                  ty = cy + dy / d * R * 0.95f; }
+            out.emplace_back(tx, ty, 0.0f);
+            ++aimed;
+        }
+
+        // Fill remaining with spiral so the whole disk gets coverage.
+        constexpr float goldenAngle = 2.39996323f;
+        int remaining = totalCount - aimed;
+        for (int i = 0; i < remaining; ++i) {
+            int   idx = zone.patternStep * remaining + i;
+            float r   = R * std::sqrt(static_cast<float>(idx + 1) /
+                                      static_cast<float>(remaining * 12 + 1));
+            r = std::min(r, R * 0.97f);
+            float ang = static_cast<float>(idx) * goldenAngle + zone.patternAngle;
+            out.emplace_back(cx + std::cos(ang) * r,
+                             cy + std::sin(ang) * r,
+                             0.0f);
+        }
+
+        zone.patternAngle += 0.31f;  // slow drift so aimed + fill rotate over time
+        zone.patternStep   = (zone.patternStep + 1) % 12;
+        return out;
+    }
+
+    return out; // unreachable but satisfies compiler
+}
+
+// Falling-object size knobs. kHalf is the physics half-extent (sphere radius)
+// AND the knockback hit-half — they must stay equal, so they share this. Render
+// scale is separate (it scales the mesh, not a world radius).
+constexpr float kFallingObjectHalf = 1.1f;         // physics + knockback
+constexpr float kFallingObjectRenderScale = 1.2f;  // visual mesh scale
+
 void falling_objects_system(ServerGame& game, float dt) {
   static std::mt19937 rng(1337);
 
@@ -24,23 +197,69 @@ void falling_objects_system(ServerGame& game, float dt) {
   // zone view (over those same pools) is being iterated can invalidate it.
   std::vector<glm::vec3> spawnPositions;
 
+  // auto zones = game.registry.view<shared::FallingHazardZone, shared::Position,
+  //                                 shared::OverworldTag>();
+  // for (auto zoneEnt : zones) {
+  //   auto& zone = zones.get<shared::FallingHazardZone>(zoneEnt);
+  //   auto& center = zones.get<shared::Position>(zoneEnt);
+  //   zone.timer += dt;
+  //   if (zone.timer >= zone.interval) {
+  //     zone.timer = 0.0f;
+  //     if (zone.shape == shared::FallingHazardZone::Shape::Rect) {
+  //       // Uniform over an axis-aligned rectangle — full square-platform cover.
+  //       std::uniform_real_distribution<float> xDist(-zone.halfX, zone.halfX);
+  //       std::uniform_real_distribution<float> yDist(-zone.halfY, zone.halfY);
+  //       spawnPositions.emplace_back(center.x + xDist(rng),
+  //                                   center.y + yDist(rng),
+  //                                   center.z + zone.spawnHeight);
+  //     } 
+  //     else {
+  //       // Uniform over a disk: sqrt(u) keeps it from clumping at the center.
+  //       std::uniform_real_distribution<float> angDist(0.0f,
+  //                                                     glm::two_pi<float>());
+  //       std::uniform_real_distribution<float> rDist(0.0f, 1.0f);
+  //       float ang = angDist(rng);
+  //       float r = zone.radius * std::sqrt(rDist(rng));
+  //       spawnPositions.emplace_back(center.x + std::cos(ang) * r,
+  //                                   center.y + std::sin(ang) * r,
+  //                                   center.z + zone.spawnHeight);
+  //     }
+  //   }
+  // }
+
+  // Collect player XY positions once — used by the Aimed pattern.
+  std::vector<glm::vec2> playerPositions;
+  {
+      auto players = game.registry.view<shared::Position,
+                                        shared::PlayerInput,
+                                        shared::OverworldTag>();
+      for (auto p : players)
+          playerPositions.emplace_back(players.get<shared::Position>(p).x,
+                                      players.get<shared::Position>(p).y);
+  }
+
   auto zones = game.registry.view<shared::FallingHazardZone, shared::Position,
                                   shared::OverworldTag>();
   for (auto zoneEnt : zones) {
-    auto& zone = zones.get<shared::FallingHazardZone>(zoneEnt);
-    auto& center = zones.get<shared::Position>(zoneEnt);
-    zone.timer += dt;
-    if (zone.timer >= zone.interval) {
+      auto& zone   = zones.get<shared::FallingHazardZone>(zoneEnt);
+      auto& center = zones.get<shared::Position>(zoneEnt);
+      zone.timer += dt;
+      if (zone.timer < zone.interval) continue;
       zone.timer = 0.0f;
-      // Uniform sampling over a disk: sqrt(u) keeps it from clumping at center.
-      std::uniform_real_distribution<float> angDist(0.0f, glm::two_pi<float>());
-      std::uniform_real_distribution<float> rDist(0.0f, 1.0f);
-      float ang = angDist(rng);
-      float r = zone.radius * std::sqrt(rDist(rng));
-      spawnPositions.emplace_back(center.x + std::cos(ang) * r,
-                                  center.y + std::sin(ang) * r,
-                                  center.z + zone.spawnHeight);
-    }
+
+      if (zone.shape == shared::FallingHazardZone::Shape::Rect) {
+          // Rect stays random — patterns are disk-only.
+          std::uniform_real_distribution<float> xDist(-zone.halfX, zone.halfX);
+          std::uniform_real_distribution<float> yDist(-zone.halfY, zone.halfY);
+          spawnPositions.emplace_back(center.x + xDist(rng),
+                                      center.y + yDist(rng),
+                                      center.z + zone.spawnHeight);
+      } else {
+          // Disk — delegate to pattern helper; helper returns XY, we add Z here.
+          auto burst = burstPositions(zone, center, rng, playerPositions);
+          for (auto& b : burst)
+              spawnPositions.emplace_back(b.x, b.y, center.z + zone.spawnHeight);
+      }
   }
 
   for (const auto& pos : spawnPositions) {
@@ -48,17 +267,22 @@ void falling_objects_system(ServerGame& game, float dt) {
     game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f,
                                             0.0f, 0.0f, 0.0f);
     {
-      auto& ri = game.registry.emplace<shared::RenderInfo>(ent, "cube", 0.5f,
-                                                           0.5f, 0.5f);
+      auto& ri = game.registry.emplace<shared::RenderInfo>(
+          ent, "pumpkin", kFallingObjectRenderScale, kFallingObjectRenderScale,
+          kFallingObjectRenderScale);
       ri.colorExempt = true;
     }
     game.registry.emplace<shared::OverworldTag>(
         ent);  // REQUIRED to sync/render
     game.registry.emplace<shared::FallingObject>(ent);
     JPH::BodyID body =
-        game.physics.createFallingObjectBody(glm::vec3(0.25f), pos);
+        game.physics.createFallingObjectBody(glm::vec3(kFallingObjectHalf), pos);
 
     std::uniform_real_distribution<float> spin(-6.0f, 6.0f);  // rad/s, tune
+
+    std::uniform_real_distribution<float> drift(-2.0f, 2.0f);  // m/s sideways
+    game.physics.getBodyInterface().SetLinearVelocity(
+        body, JPH::Vec3(drift(rng), drift(rng), 0.0f));
     game.physics.getBodyInterface().SetAngularVelocity(
         body, JPH::Vec3(spin(rng), spin(rng), spin(rng)));
     game.registry.emplace<shared::PhysicsBody>(
@@ -116,7 +340,7 @@ void knockback_system(ServerGame& game, float dt) {
     // in the vertical column — including directly overhead — registers.
     float bodyMinZ = 0.0f, bodyMaxZ = 0.0f;
     bool haveSpan = game.physics.getBodyWorldZSpan(pid, bodyMinZ, bodyMaxZ);
-    const float kCubeHalf = 0.25f;  // matches createFallingObjectBody extent
+    const float kCubeHalf = kFallingObjectHalf;;  // matches createFallingObjectBody extent
     const float kZSlack = 0.25f;
     float zLo = haveSpan ? bodyMinZ - kCubeHalf - kZSlack : ppos.z - 1.0f;
     float zHi = haveSpan ? bodyMaxZ + kCubeHalf + kZSlack : ppos.z + 4.0f;
@@ -204,12 +428,18 @@ void maybeActivateFallChallenge(ServerGame& game) {
   auto& cs = game.registry.get<shared::FallChallengeState>(ctrl);
   if (cs.active || cs.completed) return;  // don't restart a finished challenge
 
-  // Activation fires when every connected player is inside the trigger box.
-  const float cx = game.fallLayout.triggerCenterX;
-  const float cy = game.fallLayout.triggerCenterY;
-  const float cz = game.fallLayout.triggerCenterZ;
-  const float hx = game.fallLayout.triggerHalfX;
-  const float hy = game.fallLayout.triggerHalfY;
+  // Activation fires when every connected player is standing on the play
+  // platform. The old trigger box was a small region offset from the visible
+  // green platform (playCenter), so a single player could wander into it but
+  // getting several bodies to crowd into it simultaneously was nearly
+  // impossible. The platform IS the natural gather spot, so trigger on it
+  // directly. A small margin lets a player on the very edge still count.
+  constexpr float kEntryMargin = 1.5f;
+  const float cx = game.fallLayout.playCenterX;
+  const float cy = game.fallLayout.playCenterY;
+  const float cz = game.fallLayout.playCenterZ;
+  const float hx = game.fallLayout.playHalfX + kEntryMargin;
+  const float hy = game.fallLayout.playHalfY + kEntryMargin;
   constexpr float hz = 60.0f;
 
   int connected = 0, insideCount = 0;
@@ -250,9 +480,9 @@ void fall_challenge_system(ServerGame& game, float dt) {
   const float hy = game.fallLayout.playHalfY;
   constexpr float hz = 60.0f;
 
-  bool present[4] = {false, false, false, false};
   bool inZone[4] = {false, false, false, false};
-  uint8_t mask = 0;  // replicated: who is inside the zone right now
+  uint8_t connectedMask = 0;  // players in the game right now (valid avatar+slot)
+  uint8_t inZoneMask = 0;     // players physically on the platform this frame
   for (auto& [peer, slots] : game.active_players) {
     (void)peer;
     entt::entity p = slots.overworld_avatar;
@@ -261,14 +491,14 @@ void fall_challenge_system(ServerGame& game, float dt) {
     int slot = game.registry.get<shared::RenderInfo>(p).playerSlot;
     if (slot < 1 || slot > 4) continue;
     int i = slot - 1;
-    present[i] = true;
+    connectedMask |= (1u << i);
 
     if (game.registry.all_of<shared::Position>(p)) {
       auto& pos = game.registry.get<shared::Position>(p);
       if (std::abs(pos.x - cx) <= hx && std::abs(pos.y - cy) <= hy &&
           std::abs(pos.z - cz) <= hz) {
         inZone[i] = true;
-        mask |= (1u << i);
+        inZoneMask |= (1u << i);
       }
     }
 
@@ -277,9 +507,17 @@ void fall_challenge_system(ServerGame& game, float dt) {
     auto& win = game.registry.get<shared::FallHitWindow>(p);
 
     if (!inZone[i]) {
-      // Player stepped out — freeze their fill, don't penalise or reward.
-      // The HUD hides their bar segment because participantMask won't have
-      // their bit set; their fill value is preserved for when they return.
+      // Stepped off the platform: freeze this player's fill — no reward, no
+      // penalty. They stay enrolled (their bar remains and still blocks the
+      // solve), and the value is preserved for when they step back on.
+
+      // Drain fill at the same rate as a hit penalty, scaled by dt so it's
+      // smooth rather than a single frame deduction.
+      // cs.hitPenalty is the per-hit flat drop; divide by a hold time (seconds
+      // a player would need to stand still taking hits to empty the bar) to get
+      // a per-second drain rate that feels equivalent.
+      constexpr float kOffPlatformDrainSeconds = 10.0f; // empty bar in 10s if AFK off-platform
+      cs.fill[i] = std::max(0.0f, cs.fill[i] - (cs.hitPenalty / kOffPlatformDrainSeconds) * dt);
       continue;
     }
 
@@ -299,12 +537,30 @@ void fall_challenge_system(ServerGame& game, float dt) {
     }
   }
 
-  cs.participantMask = mask;
-  // Solve only counts players currently inside the zone.
-  bool anyoneInZone = (mask != 0);
-  bool solved = anyoneInZone;
+  // Enrollment. A player joins the challenge the first time they set foot on
+  // the platform, and stays enrolled — keeps their bar, still counts toward the
+  // solve — for as long as they remain connected, even after stepping off the
+  // platform. So the bar count reflects everyone who has joined and is still in
+  // the game, not just whoever happens to be standing in the arena this frame.
+  // Disconnecting is the only thing that removes a player (and frees their bar
+  // / slot so a future occupant starts fresh).
+  uint8_t dropped =
+      static_cast<uint8_t>(cs.participantMask & ~connectedMask);  // gone
   for (int i = 0; i < 4; ++i)
-    if (inZone[i] && cs.fill[i] < 1.0f) solved = false;
+    if (dropped & (1u << i)) cs.fill[i] = 0.0f;
+  cs.participantMask |= inZoneMask;     // new arrivals get a permanent bar
+  cs.participantMask &= connectedMask;  // drop anyone who disconnected
+
+  // Solve requires EVERY enrolled (joined + still connected) player to have
+  // filled their bar. One player can't finish for the group while a teammate
+  // who has joined is still working — or has stepped off mid-fill. If that
+  // teammate disconnects they drop out of participantMask above, which unblocks
+  // the remaining players.
+  bool solved = (cs.participantMask != 0);
+  for (int i = 0; i < 4; ++i) {
+    bool enrolled = (cs.participantMask & (1u << i)) != 0;
+    if (enrolled && cs.fill[i] < 1.0f) solved = false;
+  }
   if (solved) {
     cs.active = false;
     cs.completed = true;
