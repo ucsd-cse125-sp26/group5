@@ -576,7 +576,8 @@ void setPlayerModel(ServerGame& game, uint8_t slot, uint8_t modelIdx) {
             modelName.c_str());
 }
 
-// ── Grant/revoke fly (unlimited jumping) for a player, both avatars. ──────────
+// ── Grant/revoke fly (unlimited jumping) for a player, both avatars.
+// ──────────
 void setPlayerFly(ServerGame& game, uint8_t slot, bool enable) {
   forEachAvatarOfSlot(game, slot, [&](entt::entity avatar) {
     if (enable) {

@@ -117,7 +117,8 @@ static void movement_system_for_world(ServerGame& game, float dt) {
       auto& g = game.registry.get<shared::Grounded>(entity);
       if (g.isGrounded) g.jumpsRemaining = 2;
 
-      // Fly (debug): unlimited jumps — never require ground or spend the budget.
+      // Fly (debug): unlimited jumps — never require ground or spend the
+      // budget.
       const bool fly = game.registry.all_of<shared::FlyMode>(entity);
       if ((input.keys_newly_pressed & KEY_JUMP) &&
           (fly || g.jumpsRemaining > 0)) {
