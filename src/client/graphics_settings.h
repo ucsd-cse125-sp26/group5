@@ -43,7 +43,10 @@ struct GraphicsSettings {
 
   // SSAO
   bool ssaoEnabled = true;
-  int ssaoKernelSize = 64;
+  // 32 taps is visually ~indistinguishable from 64 at half-res but halves the
+  // SSAO inner loop. Raise back toward 64 (the uniform array cap) for max
+  // quality, or lower / disable in the debug panel for more FPS headroom.
+  int ssaoKernelSize = 32;
   float ssaoRadius = 0.25f;
   float ssaoBias = 0.025f;
   // SSAO render resolution = renderWidth / ssaoScale (1 = full, 2 = half,

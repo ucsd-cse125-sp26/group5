@@ -97,8 +97,6 @@ void spawnStaticEntities(ServerGame& game,
     game.registry.template emplace<WorldTag>(entity);
 
     if (!d.modelName.empty()) {
-      game.registry.template emplace<shared::RenderInfo>(
-          entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
       auto& ri = game.registry.template emplace<shared::RenderInfo>(
           entity, d.modelName, d.scale.x, d.scale.y, d.scale.z);
       ri.colorExempt = d.colorExempt;

@@ -65,9 +65,6 @@ bool loadMap(ServerGame& game, const std::string& path,
     tag(entity);
     game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, rot.w,
                                             rot.x, rot.y, rot.z);
-    game.registry.emplace<shared::RenderInfo>(
-        entity, std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
-        scale.x, scale.y, scale.z);
     auto& renderInfo = game.registry.emplace<shared::RenderInfo>(
         entity, std::string(shared::MAP_MODEL_PREFIX) + node.mName.C_Str(),
         scale.x, scale.y, scale.z);

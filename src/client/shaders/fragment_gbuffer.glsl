@@ -89,7 +89,16 @@ void main() {
   // Gram-Schmidt re-orthogonalize T against N to absorb interpolation drift,
   // then derive B by cross to fix handedness regardless of attribute sign.
   vec3 N = normalize(worldNormal);
-  vec3 T = normalize(worldTangent - dot(worldTangent, N) * N);
+  vec3 T = worldTangent - dot(worldTangent, N) * N;
+  // Procedurally-built meshes (e.g. tangram pieces) ship zero tangents, so the
+  // line above is the zero vector and normalize() would yield NaN. Because
+  // NaN*0 == NaN, that poisons TBN * tn even for a flat (0,0,1) normal map and
+  // the surface renders black. Fall back to an arbitrary perpendicular of N.
+  if (dot(T, T) < 1e-8) {
+    T = abs(N.z) < 0.999 ? cross(vec3(0.0, 0.0, 1.0), N)
+                         : cross(vec3(1.0, 0.0, 0.0), N);
+  }
+  T = normalize(T);
   vec3 B = cross(N, T);
   mat3 TBN = mat3(T, B, N);
 

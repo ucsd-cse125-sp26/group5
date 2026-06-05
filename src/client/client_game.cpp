@@ -358,25 +358,37 @@ bool isLocalOverworldMazePuzzleControl(const ClientGame& game) {
 uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
                                         const glm::mat4& view,
                                         const glm::mat4& projection) {
-  uint32_t bestId = 0;
-  float bestDist = 1e9f;
-  constexpr float kMaxNdcRadius = 0.14f;
+  // Cast a ray through the screen center (crosshair) and pick the piece the ray
+  // passes closest to, within that piece's footprint. The old approach matched
+  // only pieces whose *center* projected within a small NDC radius of the
+  // crosshair, so aiming at the body of a large piece (center off to the side)
+  // missed entirely and the server fell back to the nearest piece.
+  const glm::mat4 invVP = glm::inverse(projection * view);
+  glm::vec4 nearH = invVP * glm::vec4(0.0f, 0.0f, -1.0f, 1.0f);
+  glm::vec4 farH = invVP * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+  if (std::abs(nearH.w) < 1e-6f || std::abs(farH.w) < 1e-6f) return 0;
+  const glm::vec3 rayOrigin = glm::vec3(nearH) / nearH.w;
+  const glm::vec3 rayDir =
+      glm::normalize(glm::vec3(farH) / farH.w - rayOrigin);
 
+  uint32_t bestId = 0;
+  float bestPerp = 1e9f;
   auto pieceView =
-      game.renderRegistry
-          .view<shared::Entity, shared::Position, shared::TangramPiece>();
+      game.renderRegistry.view<shared::Entity, shared::Position,
+                               shared::RenderInfo, shared::TangramPiece>();
   for (auto ent : pieceView) {
     const auto& pos = pieceView.get<shared::Position>(ent);
-    const auto& entity = pieceView.get<shared::Entity>(ent);
-    const glm::vec4 clip =
-        projection * view * glm::vec4(pos.x, pos.y, pos.z, 1.0f);
-    if (clip.w <= 0.0f) continue;
-    const glm::vec3 ndc = glm::vec3(clip) / clip.w;
-    if (ndc.z < -1.0f || ndc.z > 1.0f) continue;
-    const float d = std::hypot(ndc.x, ndc.y);
-    if (d > kMaxNdcRadius || d >= bestDist) continue;
-    bestDist = d;
-    bestId = entity.id;
+    const auto& ri = pieceView.get<shared::RenderInfo>(ent);
+    const glm::vec3 center(pos.x, pos.y, pos.z);
+    const float tHit = glm::dot(center - rayOrigin, rayDir);
+    if (tHit <= 0.0f) continue;  // piece is behind the camera
+    // Perpendicular distance from the piece center to the crosshair ray.
+    const float perp = glm::length(center - (rayOrigin + tHit * rayDir));
+    // Generous footprint radius so aiming anywhere on the piece counts.
+    const float radius = 0.6f * std::max(ri.sx, ri.sy);
+    if (perp > radius || perp >= bestPerp) continue;
+    bestPerp = perp;
+    bestId = pieceView.get<shared::Entity>(ent).id;
   }
   return bestId;
 }

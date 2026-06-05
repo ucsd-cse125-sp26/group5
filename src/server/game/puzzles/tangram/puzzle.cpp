@@ -769,9 +769,14 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::Position>(ghostEnt, ghostPos.x, ghostPos.y,
                                             ghostPos.z, ghostRot.w, ghostRot.x,
                                             ghostRot.y, ghostRot.z);
-    game.registry.emplace<shared::RenderInfo>(
-        ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
-        def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
+    {
+      auto& ghostRi = game.registry.emplace<shared::RenderInfo>(
+          ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
+          def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
+      // Same as the pieces: puzzle objects opt out of the color-restoration
+      // desaturation so the slot guides keep their tint instead of greying out.
+      ghostRi.colorExempt = true;
+    }
     game.overworldTangramGhostSlotEntities[static_cast<size_t>(i)] = ghostEnt;
     spawned.push_back(ghostEnt);
   }

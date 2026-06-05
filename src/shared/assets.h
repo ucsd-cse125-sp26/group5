@@ -377,8 +377,8 @@ inline constexpr AssetInfo ASSETS[] = {
 
 // Models a player avatar can take. Index 0 is the spawn default; pressing
 // KEY_SWAP_MODEL advances to the next entry (wrapping).
-inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {
-    "gurf", "rat", "playerbase", "goose", "dog"};
+inline constexpr std::string_view PLAYER_MODEL_CYCLE[] = {"gurf", "rat", "goose",
+                                                          "dog"};
 inline constexpr std::size_t PLAYER_MODEL_CYCLE_COUNT =
     sizeof(PLAYER_MODEL_CYCLE) / sizeof(PLAYER_MODEL_CYCLE[0]);
 
