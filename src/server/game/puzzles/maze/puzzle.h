@@ -10,12 +10,15 @@ void initOverworldMazePuzzleController(ServerGame& game);
 
 [[nodiscard]] bool isPuzzleActive(const ServerGame& game);
 
+// True while the winter maze countdown or puzzle is running — players stay on pad.
+[[nodiscard]] bool shouldConfinePlayersToMazeTrigger(const ServerGame& game);
+
 void beginPuzzle(ServerGame& game);
 void endPuzzle(ServerGame& game);
 
 void updatePuzzle(ServerGame& game, float dt);
 
-// Keep overworld avatars inside the maze trigger pad (XY) while puzzle runs.
+// Keep overworld avatars inside the maze trigger pad (XY + jump height).
 void clampPlayersToMazeTrigger(ServerGame& game);
 
 // Clamp piece to preview board (XZ plane); call after physics sync.

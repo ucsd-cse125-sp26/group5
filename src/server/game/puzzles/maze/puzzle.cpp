@@ -279,6 +279,10 @@ bool isPuzzleActive(const ServerGame& game) {
   return game.overworldMazePuzzleActive;
 }
 
+bool shouldConfinePlayersToMazeTrigger(const ServerGame& game) {
+  return game.overworldMazePuzzleActive || game.overworldMazeFocusTimer > 0.0f;
+}
+
 void beginPuzzle(ServerGame& game) {
   if (game.overworldMazePuzzleActive) return;
 
@@ -398,12 +402,20 @@ void updatePuzzle(ServerGame& game, float dt) {
 }
 
 void clampPlayersToMazeTrigger(ServerGame& game) {
+  if (!shouldConfinePlayersToMazeTrigger(game)) return;
+
   const auto& layout = game.mazeLayout;
   const float minX = layout.triggerCenterX - layout.halfExtent;
   const float maxX = layout.triggerCenterX + layout.halfExtent;
   const float minY = layout.triggerCenterY - layout.halfExtent;
   const float maxY = layout.triggerCenterY + layout.halfExtent;
-  const float minZ = layout.spawnHeightZ;
+  // Map maze_trigger Z is the pad floor; avatar origin sits above it.
+  const float floorZ = layout.triggerCenterZ;
+  constexpr float kFloorSlack = 0.5f;
+  constexpr float kCeilingAboveFloor = 6.0f;
+  const float minZ = floorZ - kFloorSlack;
+  const float maxZ = floorZ + kCeilingAboveFloor;
+  constexpr float kBoundaryEps = 1e-3f;
 
   auto& bodyInterface = game.physics.getBodyInterface();
   for (const auto& [peer, slots] : game.active_players) {
@@ -432,6 +444,9 @@ void clampPlayersToMazeTrigger(ServerGame& game) {
     if (pos.z < minZ) {
       pos.z = minZ;
       clamped = true;
+    } else if (pos.z > maxZ) {
+      pos.z = maxZ;
+      clamped = true;
     }
 
     if (!game.registry.all_of<shared::PhysicsBody>(avatar)) continue;
@@ -442,12 +457,15 @@ void clampPlayersToMazeTrigger(ServerGame& game) {
     if (clamped) {
       bodyInterface.SetPosition(body, JPH::RVec3(pos.x, pos.y, pos.z),
                                 JPH::EActivation::Activate);
+      // Stop only velocity pushing through the hit face so walking inside
+      // the pad (and along walls) still works.
       JPH::Vec3 v = bodyInterface.GetLinearVelocity(body);
-      if (pos.x <= minX && v.GetX() < 0.0f) v.SetX(0.0f);
-      if (pos.x >= maxX && v.GetX() > 0.0f) v.SetX(0.0f);
-      if (pos.y <= minY && v.GetY() < 0.0f) v.SetY(0.0f);
-      if (pos.y >= maxY && v.GetY() > 0.0f) v.SetY(0.0f);
-      if (pos.z <= minZ && v.GetZ() < 0.0f) v.SetZ(0.0f);
+      if (pos.x <= minX + kBoundaryEps && v.GetX() < 0.0f) v.SetX(0.0f);
+      if (pos.x >= maxX - kBoundaryEps && v.GetX() > 0.0f) v.SetX(0.0f);
+      if (pos.y <= minY + kBoundaryEps && v.GetY() < 0.0f) v.SetY(0.0f);
+      if (pos.y >= maxY - kBoundaryEps && v.GetY() > 0.0f) v.SetY(0.0f);
+      if (pos.z <= minZ + kBoundaryEps && v.GetZ() < 0.0f) v.SetZ(0.0f);
+      if (pos.z >= maxZ - kBoundaryEps && v.GetZ() > 0.0f) v.SetZ(0.0f);
       bodyInterface.SetLinearVelocity(body, v);
     }
   }

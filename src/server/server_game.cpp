@@ -10,6 +10,7 @@
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/components.h"
@@ -111,7 +112,8 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    if (input.keys_newly_pressed & KEY_JUMP) {
+    if (input.keys_newly_pressed & KEY_JUMP &&
+        !maze_puzzle::shouldConfinePlayersToMazeTrigger(game)) {
       verticalVel = 10.0f;
       shared::SoundEventPacket pkt;
       pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
