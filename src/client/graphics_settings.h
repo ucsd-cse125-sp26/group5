@@ -200,15 +200,16 @@ struct GraphicsSettings {
   // 1/units: how fast the mist thins above the fade-start height (0 = no fade,
   // uniform density up the whole wall).
   float fogHeightFalloff = 0.016f;
-  // Scales the fog volume's vertical reach vs the barrier's (gameplay) collision
-  // box, so the mist can rise higher than the wall.
+  // Scales the fog volume's vertical reach vs the barrier's (gameplay)
+  // collision box, so the mist can rise higher than the wall.
   float fogHeightScale = 1.5f;
-  // Fraction of the fog height that stays at full density before the upward fade
-  // begins — 0.5 = solid lower half, fade the upper half, like a ground mist
-  // bank covering the floor.
+  // Fraction of the fog height that stays at full density before the upward
+  // fade begins — 0.5 = solid lower half, fade the upper half, like a ground
+  // mist bank covering the floor.
   float fogFadeStartFraction = 0.0f;
   // Anchor the height fade to the landscape under the fog (from scene depth)
-  // instead of a flat z = 0, so the mist hugs the terrain. Off = barrier center.
+  // instead of a flat z = 0, so the mist hugs the terrain. Off = barrier
+  // center.
   bool fogFloorDetect = true;
   // World-space distance over which the mist fades in around the barrier
   // footprint, so it ramps up over a wide area instead of a hard wall edge.

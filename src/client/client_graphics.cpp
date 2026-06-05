@@ -2402,9 +2402,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   // Barrier fog: volumetric walls of drifting, lit mist at each active section
   // barrier, all sharing one tint = the current active season. Barriers are
   // despawned in season order as the run progresses, so the lowest season still
-  // present is the current one (and fog only exists where barriers exist), which
-  // lets the client pick the season color with no extra networking. Skipped at
-  // zero cost when disabled or no barriers exist.
+  // present is the current one (and fog only exists where barriers exist),
+  // which lets the client pick the season color with no extra networking.
+  // Skipped at zero cost when disabled or no barriers exist.
   if (settings.fogEnabled && fogShader && fogShader->valid() &&
       fogCompositeShader && fogCompositeShader->valid()) {
     float boxCenter[3 * shared::kMaxFogBoxes];
