@@ -529,23 +529,24 @@ void clampPieceToBoard(ServerGame& game) {
 }
 
 void completeOverworldMazePreview(ServerGame& game) {
-  const entt::entity piece = game.overworldMazePieceEntity;
-  if (piece != entt::null && game.registry.valid(piece) &&
-      game.registry.all_of<shared::PhysicsBody>(piece)) {
-    auto& bodyInterface = game.physics.getBodyInterface();
-    const auto& pb = game.registry.get<shared::PhysicsBody>(piece);
-    JPH::BodyID body(pb.bodyId);
-    if (bodyInterface.IsAdded(body)) {
-      bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
-    }
-    if (game.registry.all_of<shared::Velocity>(piece)) {
-      auto& velocity = game.registry.get<shared::Velocity>(piece);
-      velocity.dx = velocity.dy = velocity.dz = 0.0f;
-    }
-  }
-
   CollectMazeFragment(game);
   ExitMazePuzzle(game);
+
+  // Tear down the preview board piece + grid like endPuzzle does. Completing
+  // the maze by reaching the goal otherwise orphans the piece entity and its
+  // Jolt body, which leaks and duplicates on the next preview trigger.
+  // registry.destroy fires on_destroy<PhysicsBody> -> destroyBody, so the Jolt
+  // body is reclaimed too.
+  game.overworldMazeGridTiles.clear();
+  game.overworldMazeGridWidth = 0;
+  game.overworldMazeGridHeight = 0;
+  if (game.registry.valid(game.overworldMazePieceEntity)) {
+    const uint32_t eid =
+        game.registry.get<shared::Entity>(game.overworldMazePieceEntity).id;
+    broadcastDespawn(game, eid);
+    game.registry.destroy(game.overworldMazePieceEntity);
+    game.overworldMazePieceEntity = entt::null;
+  }
 
   game.overworldMazePuzzleActive = false;
   setPuzzleActiveFlag(game, false);

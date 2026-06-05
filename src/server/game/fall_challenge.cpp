@@ -281,6 +281,13 @@ void falling_objects_system(ServerGame& game, float dt) {
     game.registry.emplace<shared::FallingObject>(ent);
     JPH::BodyID body = game.physics.createFallingObjectBody(
         glm::vec3(kFallingObjectHalf), pos);
+    if (body.IsInvalid()) {
+      // Physics pool exhausted (already logged). Drop this hazard rather than
+      // spawning a collisionless ghost or dereferencing a null body. No
+      // PhysicsBody was emplaced, so destroy() has nothing extra to clean up.
+      game.registry.destroy(ent);
+      continue;
+    }
 
     std::uniform_real_distribution<float> spin(-6.0f, 6.0f);  // rad/s, tune
 

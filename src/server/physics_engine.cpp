@@ -13,8 +13,26 @@
 #include <cstdio>
 
 #include "shared/assets.h"
+#include "shared/debug_log.h"
 #include "shared/log.h"
 #include "shared/mesh_loader.h"
+
+JPH::Body* PhysicsEngine::createBodyChecked(
+    const JPH::BodyCreationSettings& settings, const char* what) {
+  JPH::Body* body = getBodyInterface().CreateBody(settings);
+  if (!body) {
+    const JPH::RVec3 p = settings.mPosition;
+    LOG_FILE(
+        "[physics] CreateBody FAILED in %s: Jolt body pool exhausted "
+        "(%u/%u bodies, %u active) at pos=(%.2f, %.2f, %.2f). Skipping body; "
+        "the entity will have no collision.",
+        what, physicsSystem.GetNumBodies(), kMaxBodies,
+        physicsSystem.GetNumActiveBodies(JPH::EBodyType::RigidBody),
+        static_cast<double>(p.GetX()), static_cast<double>(p.GetY()),
+        static_cast<double>(p.GetZ()));
+  }
+  return body;
+}
 
 JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
                                             const glm::vec3& pos,
@@ -52,7 +70,8 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
                           JPH::EAllowedDOFs::TranslationZ;
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
-  JPH::Body* body = bodyInterface.CreateBody(settings);
+  JPH::Body* body = createBodyChecked(settings, "createPlayerBody");
+  if (!body) return {};
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
   bodyFootOffset_[body->GetID().GetIndexAndSequenceNumber()] = footOffset;
   return body->GetID();
@@ -74,7 +93,8 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
       JPH::EAllowedDOFs::TranslationX | JPH::EAllowedDOFs::TranslationZ;
   settings.mMotionQuality = JPH::EMotionQuality::Discrete;
 
-  JPH::Body* body = bodyInterface.CreateBody(settings);
+  JPH::Body* body = createBodyChecked(settings, "createMazeBoardPieceBody");
+  if (!body) return {};
   return body->GetID();
 }
 
@@ -128,7 +148,8 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
                           JPH::EAllowedDOFs::RotationZ;
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
-  JPH::Body* body = bodyInterface.CreateBody(settings);
+  JPH::Body* body = createBodyChecked(settings, "createTangramPieceBody");
+  if (!body) return {};
   return body->GetID();
 }
 
@@ -171,7 +192,8 @@ JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
   settings.mFriction = 0.3f;     // ← lower = slides more, higher = grips/rolls
   settings.mRestitution = 0.2f;  // ← optional: a little bounce on landing
 
-  JPH::Body* body = bodyInterface.CreateBody(settings);
+  JPH::Body* body = createBodyChecked(settings, "createFallingObjectBody");
+  if (!body) return {};
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
   return body->GetID();
 }
@@ -254,7 +276,8 @@ JPH::BodyID PhysicsEngine::createStaticBody(const JPH::ShapeRefC& shape,
   if (frictionOrNegative >= 0.0f) {
     settings.mFriction = frictionOrNegative;
   }
-  JPH::Body* body = getBodyInterface().CreateBody(settings);
+  JPH::Body* body = createBodyChecked(settings, "createStaticBody");
+  if (!body) return {};
   getBodyInterface().AddBody(body->GetID(), JPH::EActivation::DontActivate);
   return body->GetID();
 }
