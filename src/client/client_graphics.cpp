@@ -1593,9 +1593,11 @@ void Graphics::processDebugKeys() {
   if (f8 && !keyF8Prev) handleVideoRequest(VideoRequest{0, 0, 0, 0, false});
   keyF8Prev = f8;
 
-  // Enter dismisses an active fullscreen cutscene.
+  // Enter dismisses an active fullscreen cutscene — unless it was started as
+  // nondismissable (e.g. the connect cutscene, which must play through).
   bool skip = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
-  if (skip && !keySkipPrev && videoMode == VideoMode::Fullscreen) {
+  if (skip && !keySkipPrev && videoMode == VideoMode::Fullscreen &&
+      videoDismissable) {
     if (videoPlayer) videoPlayer->stop();
     videoMode = VideoMode::None;
   }
@@ -1622,6 +1624,58 @@ void Graphics::handleVideoRequest(const VideoRequest& req) {
   }
   videoMode = (req.mode == 1) ? VideoMode::InWorld : VideoMode::Fullscreen;
   videoTargetEntityId = req.targetEntityId;
+  videoDismissable = true;  // server-driven cutscenes can be skipped with Enter
+}
+
+void Graphics::playFullscreenCutscene(uint16_t videoId, bool loop,
+                                      bool dismissable) {
+  const std::string path = videoPathFor(videoId);
+  if (path.empty()) {
+    fprintf(stderr, "playFullscreenCutscene: unknown videoId %u\n", videoId);
+    return;
+  }
+  videoPlayer.emplace();  // destroys any previous player (frees its GL textures)
+  if (!videoPlayer->open(path, loop)) {
+    videoPlayer.reset();
+    videoMode = VideoMode::None;
+    return;
+  }
+  videoMode = VideoMode::Fullscreen;
+  videoTargetEntityId = 0;
+  videoDismissable = dismissable;
+}
+
+void Graphics::stopActiveVideo() {
+  if (videoPlayer) videoPlayer->stop();
+  videoMode = VideoMode::None;
+}
+
+void Graphics::drawFullscreenVideo() {
+  if (!videoPlayer || !videoPlayer->isPlaying() || !videoYuvShader ||
+      !videoYuvShader->valid() || !fullscreenVAO)
+    return;
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_BLEND);
+  videoYuvShader->use();
+  videoPlayer->bindPlanes(0, 1, 2);
+  videoYuvShader->setInt("texY", 0);
+  videoYuvShader->setInt("texCb", 1);
+  videoYuvShader->setInt("texCr", 2);
+  videoYuvShader->setVec2("texScale", videoPlayer->texScaleX(),
+                          videoPlayer->texScaleY());
+  const float winAspect =
+      fbHeight > 0 ? static_cast<float>(fbWidth) / fbHeight : 1.0f;
+  const float vidAspect = videoPlayer->aspect();
+  const glm::vec2 fit = (winAspect > vidAspect)
+                            ? glm::vec2(winAspect / vidAspect, 1.0f)
+                            : glm::vec2(1.0f, vidAspect / winAspect);
+  videoYuvShader->setVec2("fit", fit.x, fit.y);
+  videoYuvShader->setInt("linearize", 0);
+  videoYuvShader->setFloat("emissiveBoost", 1.0f);
+  glBindVertexArray(fullscreenVAO);
+  glDrawArrays(GL_TRIANGLES, 0, 3);
+  glBindVertexArray(0);
+  glActiveTexture(GL_TEXTURE0);
 }
 
 void Graphics::drawDebugOverlay() {
@@ -1785,8 +1839,35 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     return;
   }
 
+  // Advance the active clip on real wallclock dt before anything else, so a
+  // fullscreen cutscene plays even on frames where there is no world to draw
+  // yet (e.g. right after connect, while the first snapshot streams in).
+  const double now = glfwGetTime();
+  const float dt =
+      lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
+  lastFrameTime = now;
+  if (videoPlayer && videoPlayer->isPlaying()) {
+    videoPlayer->update(dt);
+    // A finished non-looping cutscene clears itself.
+    if (!videoPlayer->isPlaying() && videoMode == VideoMode::Fullscreen)
+      videoMode = VideoMode::None;
+  }
+
   auto camera = computeCamera(game);
-  if (!camera) return;
+  if (!camera) {
+    // No world yet. Keep a fullscreen cutscene on screen over black so it
+    // covers the post-connect network/loading gap instead of flashing empty.
+    if (videoMode == VideoMode::Fullscreen && videoPlayer &&
+        videoPlayer->isPlaying()) {
+      glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glViewport(0, 0, fbWidth, fbHeight);
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      drawFullscreenVideo();
+    }
+    return;
+  }
 
   game.tangramCrosshairTargetId =
       isOverworldTangramPuzzleActive(game)
@@ -1842,19 +1923,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   // level changes; cheap no-op otherwise.
   setModelTextureAnisotropy(settings.textureAnisotropy);
 
-  // Advance per-entity animators using real wallclock dt (independent of the
-  // server tick). Only animated, skinned entities pay any work here.
-  const double now = glfwGetTime();
-  const float dt =
-      lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
-  lastFrameTime = now;
-  if (videoPlayer && videoPlayer->isPlaying()) {
-    videoPlayer->update(dt);
-    // A finished non-looping cutscene clears itself.
-    if (!videoPlayer->isPlaying() && videoMode == VideoMode::Fullscreen) {
-      videoMode = VideoMode::None;
-    }
-  }
+  // Advance per-entity animators using the same real wallclock dt computed
+  // above (independent of the server tick). Only animated, skinned entities pay
+  // any work here.
   updateAnimators(*this, game, dt);
 
   projection = glm::perspective(
@@ -2532,32 +2603,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   // it outputs display-referred RGB directly. Game keeps running underneath;
   // Enter dismisses (see processDebugKeys).
   if (videoMode == VideoMode::Fullscreen && videoPlayer &&
-      videoPlayer->isPlaying() && videoYuvShader && videoYuvShader->valid() &&
-      fullscreenVAO) {
+      videoPlayer->isPlaying()) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, fbWidth, fbHeight);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    videoYuvShader->use();
-    videoPlayer->bindPlanes(0, 1, 2);
-    videoYuvShader->setInt("texY", 0);
-    videoYuvShader->setInt("texCb", 1);
-    videoYuvShader->setInt("texCr", 2);
-    videoYuvShader->setVec2("texScale", videoPlayer->texScaleX(),
-                            videoPlayer->texScaleY());
-    const float winAspect =
-        fbHeight > 0 ? static_cast<float>(fbWidth) / fbHeight : 1.0f;
-    const float vidAspect = videoPlayer->aspect();
-    const glm::vec2 fit = (winAspect > vidAspect)
-                              ? glm::vec2(winAspect / vidAspect, 1.0f)
-                              : glm::vec2(1.0f, vidAspect / winAspect);
-    videoYuvShader->setVec2("fit", fit.x, fit.y);
-    videoYuvShader->setInt("linearize", 0);
-    videoYuvShader->setFloat("emissiveBoost", 1.0f);
-    glBindVertexArray(fullscreenVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
-    glActiveTexture(GL_TEXTURE0);
+    drawFullscreenVideo();
   }
 
   drawDebugOverlay();
@@ -2935,31 +2984,29 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  if (!ImGui::GetCurrentContext()) return;
-
+  // The end "exit" clip replaces the old scrolling-text roll. Opened lazily on
+  // the first credits frame (creditsStartTime is the sentinel, reset to -1 on
+  // dismiss in main.cpp so it reopens next time) and looped so the screen stays
+  // alive until the player presses Enter to return. Deliberately NOT routed
+  // through videoMode/Fullscreen so the generic Enter-skip can't fight the
+  // credits' own dismiss handler.
   const double now = glfwGetTime();
-  if (creditsStartTime < 0.0) creditsStartTime = now;
-  const auto elapsed = static_cast<float>(now - creditsStartTime);
+  if (creditsStartTime < 0.0) {
+    creditsStartTime = now;
+    const std::string path = videoPathFor(static_cast<uint16_t>(VideoId::Exit));
+    if (!path.empty()) {
+      videoPlayer.emplace();
+      if (!videoPlayer->open(path, /*loop=*/true)) videoPlayer.reset();
+      videoMode = VideoMode::None;
+    }
+  }
+  const float dt =
+      lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
+  lastFrameTime = now;
+  if (videoPlayer && videoPlayer->isPlaying()) videoPlayer->update(dt);
+  drawFullscreenVideo();
 
-  // Edit these lines to credit the team.
-  static const char* kCreditsLines[] = {
-      "Thanks for playing",
-      "",
-      "",
-      "A CSE 125 Production",
-      "",
-      "Programming",
-      "The Team",
-      "",
-      "Art & World",
-      "The Team",
-      "",
-      "Audio",
-      "The Team",
-      "",
-      "",
-      "See you next season",
-  };
+  if (!ImGui::GetCurrentContext()) return;
 
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
@@ -2974,22 +3021,9 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBringToFrontOnFocus |
       ImGuiWindowFlags_NoSavedSettings;
   if (ImGui::Begin("##Credits", nullptr, flags)) {
-    ImGui::SetWindowFontScale(2.4f);
-    const float lineH = ImGui::GetTextLineHeightWithSpacing();
-    const float scrollSpeed = 70.0f;  // pixels per second, bottom -> top
-    float y = io.DisplaySize.y - elapsed * scrollSpeed;
-    for (const char* line : kCreditsLines) {
-      if (line[0] != '\0') {
-        const float textW = ImGui::CalcTextSize(line).x;
-        ImGui::SetCursorPos(ImVec2((io.DisplaySize.x - textW) * 0.5f, y));
-        ImGui::TextUnformatted(line);
-      }
-      y += lineH;
-    }
-
-    // Dismiss hint pinned at the bottom (does not scroll).
+    // Dismiss hint pinned at the bottom over the video.
     ImGui::SetWindowFontScale(1.2f);
-    const char* hint = "Press Enter to return";
+    const char* hint = "Press Enter to exit";
     const float hintW = ImGui::CalcTextSize(hint).x;
     ImGui::SetCursorPos(
         ImVec2((io.DisplaySize.x - hintW) * 0.5f, io.DisplaySize.y - 40.0f));
@@ -3064,6 +3098,30 @@ Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
   glDisable(GL_CULL_FACE);
   glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  // Menu background: the intro clip plays once, then loops its final few
+  // seconds forever (setLoopTail). Opened lazily on the first menu frame; the
+  // connect cutscene later replaces this player. Drawn behind the ImGui dialog.
+  if (!menuVideoOpened) {
+    menuVideoOpened = true;
+    const std::string path = videoPathFor(static_cast<uint16_t>(VideoId::Intro));
+    if (!path.empty()) {
+      videoPlayer.emplace();
+      if (videoPlayer->open(path, /*loop=*/false)) {
+        videoPlayer->setLoopTail(3.0);
+      } else {
+        videoPlayer.reset();
+      }
+    }
+  }
+  if (videoPlayer && videoPlayer->isPlaying()) {
+    const double now = glfwGetTime();
+    const float dt =
+        lastFrameTime == 0.0 ? 0.0f : static_cast<float>(now - lastFrameTime);
+    lastFrameTime = now;
+    videoPlayer->update(dt);
+    drawFullscreenVideo();
+  }
 
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();

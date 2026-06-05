@@ -10,7 +10,9 @@
 namespace {
 // videoId -> path under assets/videos/. Add entries here as clips are authored.
 constexpr const char* kVideoPaths[] = {
-    "assets/videos/intro.mpg",
+    "assets/videos/intro.mpg",   // VideoId::Intro  — menu background
+    "assets/videos/intro2.mpg",  // VideoId::Intro2 — connect cutscene
+    "assets/videos/exit.mpg",    // VideoId::Exit   — end scene
 };
 
 void uploadPlane(GLuint tex, const plm_plane_t& p, bool allocate) {
@@ -85,6 +87,14 @@ void VideoPlayer::update(double dt) {
       if (looping_) {
         plm_rewind(plm_);
         f = plm_decode_video(plm_);
+      } else if (loopTailSeconds_ > 0.0) {
+        // Reached the end of a play-once clip with tail-looping enabled: jump
+        // back to the final `loopTailSeconds_` and keep going. plm_seek_frame
+        // returns the intra frame at that point and leaves the decoder
+        // positioned to continue forward (it re-loops here when it ends again).
+        double tailStart = plm_get_duration(plm_) - loopTailSeconds_;
+        if (tailStart < 0.0) tailStart = 0.0;
+        f = plm_seek_frame(plm_, tailStart, /*seek_exact=*/0);
       }
       if (!f) {
         playing_ = false;

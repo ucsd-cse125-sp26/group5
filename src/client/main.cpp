@@ -101,6 +101,12 @@ int main() {
   } else {
     LOG_DEBUG("[DevSpawn] Client fallback camera: winter maze\n");
   }
+  // Play the connect cutscene fullscreen and nondismissable: it covers the
+  // network/world-loading gap above and runs through to its end. Silent — any
+  // audio is owned by the audio subsystem.
+  graphics.playFullscreenCutscene(static_cast<uint16_t>(VideoId::Intro2),
+                                  /*loop=*/false, /*dismissable=*/false);
+
   auto lastTime = (float)glfwGetTime();
   while (!glfwWindowShouldClose(graphics.window)) {
     auto currentTime = (float)glfwGetTime();
@@ -175,16 +181,15 @@ int main() {
     }
     graphics.keyDebugPanelPrev = dbgChord;
 
-    // Enter dismisses the credits roll back to the overworld view. The server
-    // never froze gameplay, so this is a purely local view/music swap.
+    // Enter dismisses the end ("exit") scene back to the overworld view. The
+    // server never froze gameplay, so this is a purely local view swap. Audio
+    // is intentionally left untouched — it is owned by the audio subsystem.
     bool dismissNow = glfwGetKey(graphics.window, GLFW_KEY_ENTER) == GLFW_PRESS;
     if (dismissNow && !creditsDismissPrev &&
         game.currentGameState == shared::GameStateType::CREDITS) {
       game.currentGameState = shared::GameStateType::OVERWORLD;
       graphics.creditsStartTime = -1.0;
-      game.audio.stopAllGlobalLoops();
-      game.audio.playGlobalLoop(
-          static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
+      graphics.stopActiveVideo();
     }
     creditsDismissPrev = dismissNow;
 
