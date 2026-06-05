@@ -102,6 +102,18 @@ struct Graphics {
   GLuint sobelFBO = 0;
   GLuint sobelColor = 0;
 
+  // Volumetric "barrier fog". The march runs at a reduced resolution
+  // (fogHalf*, sized by settings.fogScale) and is composited back over the
+  // scene at full res into fogColor, chained after the outline pass when
+  // settings.fogEnabled and at least one section barrier is active.
+  GLuint fogFBO = 0;
+  GLuint fogColor = 0;
+  GLuint fogHalfFBO = 0;
+  GLuint fogHalfColor = 0;
+  int fogHalfWidth = 0;
+  int fogHalfHeight = 0;
+  int lastFogScale = 0;
+
   // Optional 1D cel ramp texture loaded from settings.celRampPath.
   GLuint celRampTexture = 0;
   std::string lastCelRampPath = "";
@@ -112,6 +124,8 @@ struct Graphics {
   std::optional<Shader> tonemapShader;
   std::optional<Shader> ssaoShader;
   std::optional<Shader> ssaoBlurShader;
+  std::optional<Shader> fogShader;
+  std::optional<Shader> fogCompositeShader;
 
   GLuint ssaoFBO = 0;
   GLuint ssaoColor = 0;

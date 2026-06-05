@@ -899,6 +899,11 @@ bool Graphics::load(int width, int height) {
                      "shaders/fragment_ssao.glsl");
   ssaoBlurShader.emplace("shaders/vertex_present.glsl",
                          "shaders/fragment_ssao_blur.glsl");
+  // Optional (like the bloom shaders): not in required[] below, so a compile
+  // failure just disables fog instead of refusing to start.
+  fogShader.emplace("shaders/vertex_present.glsl", "shaders/fragment_fog.glsl");
+  fogCompositeShader.emplace("shaders/vertex_present.glsl",
+                             "shaders/fragment_fog_composite.glsl");
   shadowDirShader.emplace("shaders/vertex_shadow_dir.glsl",
                           "shaders/fragment_shadow_dir.glsl");
   shadowPointShader.emplace("shaders/vertex_shadow_point.glsl",
@@ -1312,6 +1317,50 @@ void Graphics::resizeBuffers(int width, int height) {
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     fprintf(stderr, "sobelFBO incomplete\n");
   }
+
+  // Barrier fog. The volumetric march runs into a reduced-resolution target
+  // (the main perf lever — fog is low-frequency), then a full-res composite
+  // blends it over the scene. Both chained after the outline pass when active.
+  GPU_MEM_CLEAR("Fog");
+  const int fogScale = std::max(1, settings.fogScale);
+  fogHalfWidth = std::max(1, rw / fogScale);
+  fogHalfHeight = std::max(1, rh / fogScale);
+  lastFogScale = fogScale;
+  // Half-res march output: rgb = premultiplied fog color, a = transmittance.
+  // Bilinear so the composite upsamples it smoothly.
+  if (!fogHalfFBO) glGenFramebuffers(1, &fogHalfFBO);
+  if (!fogHalfColor) glGenTextures(1, &fogHalfColor);
+  glBindTexture(GL_TEXTURE_2D, fogHalfColor);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fogHalfWidth, fogHalfHeight, 0,
+               GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  GPU_MEM_TEX2D("FogHalf", GL_RGBA8, fogHalfWidth, fogHalfHeight);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindFramebuffer(GL_FRAMEBUFFER, fogHalfFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         fogHalfColor, 0);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "fogHalfFBO incomplete\n");
+  }
+  // Full-res composite output (read by the present pass like ldr/sobel color).
+  if (!fogFBO) glGenFramebuffers(1, &fogFBO);
+  if (!fogColor) glGenTextures(1, &fogColor);
+  glBindTexture(GL_TEXTURE_2D, fogColor);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               nullptr);
+  GPU_MEM_TEX2D("Fog", GL_RGBA8, rw, rh);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, upscaleFilter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, upscaleFilter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindFramebuffer(GL_FRAMEBUFFER, fogFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         fogColor, 0);
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    fprintf(stderr, "fogFBO incomplete\n");
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -1418,6 +1467,14 @@ void Graphics::reloadShaders() {
       {.slot = ssaoBlurShader,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_ssao_blur.glsl",
+       .geom = ""},
+      {.slot = fogShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_fog.glsl",
+       .geom = ""},
+      {.slot = fogCompositeShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_fog_composite.glsl",
        .geom = ""},
       {.slot = shadowDirShader,
        .vert = "shaders/vertex_shadow_dir.glsl",
@@ -1698,6 +1755,22 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
   glDisable(GL_BLEND);
 }
 
+// Per-season tint for the barrier fog wall (LDR display-space color). Cool blue
+// for winter, warm orange for fall, golden for summer, fresh green for spring.
+static glm::vec3 seasonFogTint(shared::SectionSeasonMap season) {
+  switch (season) {
+    case shared::SectionSeasonMap::WINTER:
+      return glm::vec3(0.80f, 0.87f, 0.96f);
+    case shared::SectionSeasonMap::FALL:
+      return glm::vec3(0.85f, 0.55f, 0.30f);
+    case shared::SectionSeasonMap::SUMMER:
+      return glm::vec3(0.95f, 0.86f, 0.45f);
+    case shared::SectionSeasonMap::SPRING:
+      return glm::vec3(0.58f, 0.85f, 0.55f);
+  }
+  return glm::vec3(0.8f);
+}
+
 void Graphics::render(ClientGame& game, ClientNetwork& network) {
   // Gate GPU timer queries: always on in a profiling build, otherwise only
   // while the on-screen perf HUD is enabled (zero cost when off).
@@ -1749,7 +1822,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     lastPointShadowSize = settings.pointShadowMapSize;
   }
   if (std::max(1, settings.pixelationScale) != lastPixelationScale ||
-      std::max(1, settings.ssaoScale) != lastSsaoScale) {
+      std::max(1, settings.ssaoScale) != lastSsaoScale ||
+      std::max(1, settings.fogScale) != lastFogScale) {
     resizeBuffers(fbWidth, fbHeight);
   }
   if (settings.paletteQuantizeColors != lastPaletteColors) {
@@ -2331,6 +2405,105 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
     finalLDR = sobelColor;
+  }
+
+  // Barrier fog: volumetric walls of drifting, lit mist at each active section
+  // barrier, all sharing one tint = the current active season. Barriers are
+  // despawned in season order as the run progresses, so the lowest season still
+  // present is the current one (and fog only exists where barriers exist), which
+  // lets the client pick the season color with no extra networking. Skipped at
+  // zero cost when disabled or no barriers exist.
+  if (settings.fogEnabled && fogShader && fogShader->valid() &&
+      fogCompositeShader && fogCompositeShader->valid()) {
+    float boxCenter[3 * shared::kMaxFogBoxes];
+    float boxHalf[3 * shared::kMaxFogBoxes];
+    int boxCount = 0;
+    auto barrierView =
+        game.renderRegistry.view<shared::Position, shared::SectionBarrierTag>();
+    for (auto ent : barrierView) {
+      if (boxCount >= shared::kMaxFogBoxes) break;
+      const auto& p = barrierView.get<shared::Position>(ent);
+      const auto& tag = barrierView.get<shared::SectionBarrierTag>(ent);
+      boxCenter[3 * boxCount + 0] = p.x;
+      boxCenter[3 * boxCount + 1] = p.y;
+      boxCenter[3 * boxCount + 2] = p.z;
+      boxHalf[3 * boxCount + 0] = tag.halfExtents.x;
+      boxHalf[3 * boxCount + 1] = tag.halfExtents.y;
+      boxHalf[3 * boxCount + 2] = tag.halfExtents.z;
+      ++boxCount;
+    }
+    if (boxCount > 0) {
+      SIMPLE_PROFILE_SCOPE("Fog");
+      GPU_PROFILE_SCOPE("Fog");
+      // All barriers share the winter section's fog tint, regardless of season.
+      const glm::vec3 fogTint = seasonFogTint(shared::SectionSeasonMap::WINTER);
+      // Direction toward the sun (light travel direction negated) for the
+      // in-scattering halo, matching the scene's directional light.
+      const glm::vec3 sunDir = glm::normalize(-directionalLightDir(game));
+
+      // Pass 1 — volumetric march at fog resolution. Writes the fog
+      // contribution only (premultiplied color + transmittance); it does not
+      // read the scene, so it can run at reduced resolution.
+      glBindFramebuffer(GL_FRAMEBUFFER, fogHalfFBO);
+      glViewport(0, 0, fogHalfWidth, fogHalfHeight);
+      glDisable(GL_DEPTH_TEST);
+      fogShader->use();
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, gPosition);
+      fogShader->setInt("gPosition", 0);
+      fogShader->setMat4("uInvViewProj",
+                         glm::inverse(projection * camera->view));
+      fogShader->setVec3("uCamPos", camera->position);
+      fogShader->setFloat("uFarPlane", settings.farPlane);
+      fogShader->setFloat("uTime", static_cast<float>(glfwGetTime()));
+      fogShader->setFloat("uDensity", settings.fogDensity);
+      fogShader->setFloat("uHeightFalloff", settings.fogHeightFalloff);
+      fogShader->setFloat("uHeightScale", settings.fogHeightScale);
+      fogShader->setFloat("uFadeFraction", settings.fogFadeStartFraction);
+      fogShader->setFloat("uWidth", settings.fogWidth);
+      fogShader->setInt("uFloorDetect", settings.fogFloorDetect ? 1 : 0);
+      fogShader->setFloat("uNoiseScale", settings.fogNoiseScale);
+      fogShader->setFloat("uNoiseSpeed", settings.fogNoiseSpeed);
+      fogShader->setFloat("uNoiseStrength", settings.fogNoiseStrength);
+      fogShader->setFloat("uSwirl", settings.fogSwirl);
+      fogShader->setFloat("uMistiness", settings.fogMistiness);
+      fogShader->setInt("uSteps", std::min(std::max(settings.fogSteps, 1), 32));
+      fogShader->setVec3("uFogColor", fogTint);
+      fogShader->setVec3("uSunDir", sunDir);
+      fogShader->setVec3("uScatterColor", settings.fogScatterColor);
+      fogShader->setFloat("uScatterStrength", settings.fogScatterStrength);
+      fogShader->setFloat("uScatterAnisotropy", settings.fogScatterAnisotropy);
+      fogShader->setInt("uLighting", settings.fogLighting ? 1 : 0);
+      fogShader->setFloat("uFogAmbient", settings.fogAmbient);
+      fogShader->setInt("uBoxCount", boxCount);
+      fogShader->setVec3Array("uBoxCenter", boxCount, boxCenter);
+      fogShader->setVec3Array("uBoxHalf", boxCount, boxHalf);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+
+      // Pass 2 — depth-aware (joint-bilateral) upsample + composite over the
+      // scene at full res, so reduced-res fog doesn't halo geometry edges.
+      glBindFramebuffer(GL_FRAMEBUFFER, fogFBO);
+      glViewport(0, 0, renderWidth, renderHeight);
+      fogCompositeShader->use();
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, finalLDR);
+      fogCompositeShader->setInt("src", 0);
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_2D, fogHalfColor);
+      fogCompositeShader->setInt("fogTex", 1);
+      glActiveTexture(GL_TEXTURE2);
+      glBindTexture(GL_TEXTURE_2D, gPosition);
+      fogCompositeShader->setInt("gPosition", 2);
+      fogCompositeShader->setVec3("uCamPos", camera->position);
+      fogCompositeShader->setFloat("uFarPlane", settings.farPlane);
+      fogCompositeShader->setVec2("uFogTexel", 1.0f / fogHalfWidth,
+                                  1.0f / fogHalfHeight);
+      glBindVertexArray(fullscreenVAO);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glBindVertexArray(0);
+      finalLDR = fogColor;
+    }
   }
 
   {

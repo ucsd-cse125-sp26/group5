@@ -188,6 +188,43 @@ void ssaoSection(GraphicsSettings& s) {
   ImGui::EndDisabled();
 }
 
+void fogSection(GraphicsSettings& s) {
+  if (!ImGui::CollapsingHeader("Barrier Fog")) return;
+  ImGui::Checkbox("Fog enabled", &s.fogEnabled);
+  ImGui::BeginDisabled(!s.fogEnabled);
+  ImGui::SliderInt("Steps", &s.fogSteps, 4, 32);
+  const int fogScales[] = {1, 2, 4};
+  const char* fogScaleLabels[] = {"Full", "Half", "Quarter"};
+  int fogScaleIdx = 1;
+  for (int i = 0; i < IM_ARRAYSIZE(fogScales); ++i) {
+    if (fogScales[i] == s.fogScale) fogScaleIdx = i;
+  }
+  if (ImGui::Combo("Resolution", &fogScaleIdx, fogScaleLabels,
+                   IM_ARRAYSIZE(fogScaleLabels))) {
+    s.fogScale = fogScales[fogScaleIdx];
+  }
+  ImGui::SliderFloat("Density", &s.fogDensity, 0.0f, 4.0f, "%.2f");
+  ImGui::SliderFloat("Height falloff", &s.fogHeightFalloff, 0.0f, 0.5f, "%.3f");
+  ImGui::SliderFloat("Height scale", &s.fogHeightScale, 0.25f, 3.0f, "%.2f");
+  ImGui::SliderFloat("Fade start", &s.fogFadeStartFraction, 0.0f, 1.0f, "%.2f");
+  ImGui::SliderFloat("Width", &s.fogWidth, 0.0f, 30.0f, "%.1f");
+  ImGui::Checkbox("Detect floor", &s.fogFloorDetect);
+  ImGui::SliderFloat("Noise scale", &s.fogNoiseScale, 0.0f, 0.5f, "%.3f");
+  ImGui::SliderFloat("Noise speed", &s.fogNoiseSpeed, 0.0f, 2.0f, "%.2f");
+  ImGui::SliderFloat("Noise strength", &s.fogNoiseStrength, 0.0f, 1.0f, "%.2f");
+  ImGui::SliderFloat("Swirl", &s.fogSwirl, 0.0f, 2.0f, "%.2f");
+  ImGui::SliderFloat("Mistiness", &s.fogMistiness, 0.0f, 1.0f, "%.2f");
+  ImGui::SeparatorText("Lighting (3D)");
+  ImGui::Checkbox("Self-shadow", &s.fogLighting);
+  ImGui::SliderFloat("Ambient", &s.fogAmbient, 0.0f, 1.0f, "%.2f");
+  ImGui::SliderFloat("Scatter strength", &s.fogScatterStrength, 0.0f, 3.0f,
+                     "%.2f");
+  ImGui::SliderFloat("Anisotropy", &s.fogScatterAnisotropy, 0.0f, 0.95f,
+                     "%.2f");
+  ImGui::ColorEdit3("Scatter color", &s.fogScatterColor.x);
+  ImGui::EndDisabled();
+}
+
 void shadowsSection(GraphicsSettings& s) {
   if (!ImGui::CollapsingHeader("Shadows")) return;
   ImGui::Checkbox("Shadows enabled", &s.shadowsEnabled);
@@ -326,6 +363,7 @@ void drawSettingsUI(GraphicsSettings& s, bool& open) {
   dirLightSection(s);
   tonemapBloomSection(s);
   ssaoSection(s);
+  fogSection(s);
   shadowsSection(s);
   antialiasingSection(s);
   pixelationSection(s);

@@ -101,6 +101,7 @@ enum ComponentIds : ComponentTypeId {
   CID_TANGRAM_PIECE = 15,
   CID_FALL_CHALLENGE = 16,
   CID_SUMMER_ESCAPE = 17,
+  CID_SECTION_BARRIER = 18,
 };
 
 inline void cloneRegistry(const ComponentRegistry& compReg, entt::registry& src,
@@ -267,6 +268,11 @@ inline ComponentRegistry createDefaultRegistry() {
   reg.registerComponent<MazeSpiritGrid>(CID_MAZESPIRITGRID);
   reg.registerComponent<FallChallengeState>(CID_FALL_CHALLENGE);
   reg.registerComponent<SummerEscapeState>(CID_SUMMER_ESCAPE);
+  // Replicated so the client knows each active barrier's center (Position),
+  // halfExtents and season — used to render the volumetric "barrier fog" wall.
+  // Removal is by full entity destroy (despawn on unlock), which the dstMap
+  // cleanup already handles, so no removeSyncedComponent case is needed.
+  reg.registerComponent<SectionBarrierTag>(CID_SECTION_BARRIER);
   return reg;
 }
 

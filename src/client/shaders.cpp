@@ -21,6 +21,7 @@ static std::string buildShaderConstantsBlock() {
   s << "#define K_POINT_SHADOW_FAR " << shared::kPointShadowFar << "\n";
   s << "#define K_MAX_PALETTE_COLORS " << shared::kMaxPaletteColors << "\n";
   s << "#define K_MAX_BONES " << shared::kMaxBones << "\n";
+  s << "#define K_MAX_FOG_BOXES " << shared::kMaxFogBoxes << "\n";
   return s.str();
 }
 
