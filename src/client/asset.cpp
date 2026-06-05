@@ -658,6 +658,11 @@ static GLuint defaultFlatNormalTexture() {
   return id;
 }
 
+static void bindFlatNormalMap(Material& material) {
+  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
+                     .texture = defaultFlatNormalTexture()};
+}
+
 static GLuint makeSolidTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   uint8_t pixel[4] = {r, g, b, a};
   GLuint id;
@@ -707,10 +712,27 @@ void appendPrismFaces(std::vector<Vertex>& vertices,
   const int n = static_cast<int>(footprint.size());
 
   auto pushTri = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 normal) {
+    const glm::vec3 t = anyPerpendicular(normal);
+    const glm::vec3 bitan = glm::cross(normal, t);
     const auto base = static_cast<GLuint>(vertices.size());
-    vertices.push_back({a, normal, uv});
-    vertices.push_back({b, normal, uv});
-    vertices.push_back({c, normal, uv});
+    vertices.push_back(
+        {.position = a,
+         .normal = normal,
+         .texture_coordinates = uv,
+         .tangent = t,
+         .bitangent = bitan});
+    vertices.push_back(
+        {.position = b,
+         .normal = normal,
+         .texture_coordinates = uv,
+         .tangent = t,
+         .bitangent = bitan});
+    vertices.push_back(
+        {.position = c,
+         .normal = normal,
+         .texture_coordinates = uv,
+         .tangent = t,
+         .bitangent = bitan});
     indices.push_back(base);
     indices.push_back(base + 1);
     indices.push_back(base + 2);
@@ -737,11 +759,29 @@ void appendPrismFaces(std::vector<Vertex>& vertices,
     const glm::vec2 b = footprint[static_cast<size_t>(j)];
     glm::vec3 edge(b.x - a.x, b.y - a.y, 0.0f);
     glm::vec3 normal = glm::normalize(glm::cross(edge, glm::vec3(0, 0, 1)));
+    const glm::vec3 t = glm::normalize(edge);
+    const glm::vec3 bitan = glm::cross(normal, t);
     const auto base = static_cast<GLuint>(vertices.size());
-    vertices.push_back({{a.x, a.y, z0}, normal, uv});
-    vertices.push_back({{b.x, b.y, z0}, normal, uv});
-    vertices.push_back({{b.x, b.y, z1}, normal, uv});
-    vertices.push_back({{a.x, a.y, z1}, normal, uv});
+    vertices.push_back({.position = {a.x, a.y, z0},
+                        .normal = normal,
+                        .texture_coordinates = uv,
+                        .tangent = t,
+                        .bitangent = bitan});
+    vertices.push_back({.position = {b.x, b.y, z0},
+                        .normal = normal,
+                        .texture_coordinates = uv,
+                        .tangent = t,
+                        .bitangent = bitan});
+    vertices.push_back({.position = {b.x, b.y, z1},
+                        .normal = normal,
+                        .texture_coordinates = uv,
+                        .tangent = t,
+                        .bitangent = bitan});
+    vertices.push_back({.position = {a.x, a.y, z1},
+                        .normal = normal,
+                        .texture_coordinates = uv,
+                        .tangent = t,
+                        .bitangent = bitan});
     indices.push_back(base);
     indices.push_back(base + 1);
     indices.push_back(base + 2);
@@ -774,6 +814,7 @@ Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
+  bindFlatNormalMap(material);
   material.shininess = 12.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -800,6 +841,7 @@ Model* makeTangramPieceMuteModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
+  bindFlatNormalMap(material);
   material.shininess = 8.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -828,6 +870,7 @@ Model* makeTangramColoredGhostSlotModel(
   fillMat.specular = {.constant = glm::vec3(0.0f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = tint * 0.28f, .texture = diffuseTex};
+  bindFlatNormalMap(fillMat);
   fillMat.shininess = 4.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -856,6 +899,7 @@ Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def) {
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = glm::vec3(0.45f, 0.38f, 0.55f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
+  bindFlatNormalMap(fillMat);
   fillMat.shininess = 2.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));

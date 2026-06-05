@@ -552,8 +552,10 @@ static bool isTangramGhostModelName(const std::string& name) {
 }
 
 static bool isTangramPlayPieceModelName(const std::string& name) {
-  return name.size() > 8 && name.starts_with("tangram_") &&
-         !isTangramGhostModelName(name);
+  // Only the seven playable pieces (tangram_1..7), not table/pad props.
+  if (name.size() != 9 || !name.starts_with("tangram_")) return false;
+  const char id = name[8];
+  return id >= '1' && id <= '7';
 }
 
 static bool shouldDrawTangramEntity(const ClientGame& game,
@@ -714,6 +716,7 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     std::string variantKey;
     bool variant = false;
     if (isTangramGhostModelName(renderInfo.modelName)) {
+      // Colored swan guides (per-piece tint). Only drawn when canSeeSlots.
       variantKey = renderInfo.modelName + "_colored";
       variant = true;
     } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
@@ -756,8 +759,12 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
     // uniforms are no-ops in the shadow pass (no such uniforms).
     const bool isFragment = renderInfo.modelName == "fragment";
     const bool isSun = renderInfo.modelName.starts_with("sun_");
+    const bool isTangramGhost = isTangramGhostModelName(renderInfo.modelName);
     shader.setInt("alwaysColor",
-                  (isFragment || isSun || renderInfo.colorExempt) ? 1 : 0);
+                  (isFragment || isSun || renderInfo.colorExempt ||
+                   isTangramGhost)
+                      ? 1
+                      : 0);
     shader.setFloat("rainbowStrength", isFragment ? 1.0f : 0.0f);
     if (isFragment) {
       const auto t = static_cast<float>(glfwGetTime());

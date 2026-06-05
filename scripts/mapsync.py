@@ -82,14 +82,41 @@ def ssh_target(state: dict) -> str:
     return f"{state['server_user']}@{state['server_host']}"
 
 
+def resolve_ssh_identity(state: dict) -> str | None:
+    """SSH private key: config, CSE125_SSH_KEY env, or repo-root id_cse125."""
+    configured = state.get("ssh_identity_file")
+    if configured:
+        return str(configured)
+    env_key = os.environ.get("CSE125_SSH_KEY")
+    if env_key:
+        return env_key
+    default = REPO_ROOT / "id_cse125"
+    if default.is_file():
+        return str(default)
+    return None
+
+
 def ssh_base_args(state: dict) -> list[str]:
-    return ["ssh", "-p", str(state["server_port"]), ssh_target(state)]
+    args = ["ssh", "-p", str(state["server_port"])]
+    identity = resolve_ssh_identity(state)
+    if identity:
+        args.extend(["-i", identity, "-o", "IdentitiesOnly=yes"])
+    args.append(ssh_target(state))
+    return args
+
+
+def rsync_ssh_shell(state: dict) -> str:
+    identity = resolve_ssh_identity(state)
+    parts = ["ssh", "-p", str(state["server_port"])]
+    if identity:
+        parts.extend(["-i", identity, "-o", "IdentitiesOnly=yes"])
+    return " ".join(shlex.quote(p) for p in parts)
 
 
 def rsync_base_args(state: dict) -> list[str]:
     # rsync writes to a hidden temp file and atomic-renames; partial
     # transfers never replace the existing file.
-    return ["rsync", "-q", "-e", f"ssh -p {state['server_port']}"]
+    return ["rsync", "-q", "-e", rsync_ssh_shell(state)]
 
 
 def remote_path(state: dict, *parts: str) -> str:

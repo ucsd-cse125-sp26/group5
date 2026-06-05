@@ -62,19 +62,51 @@ jekyll build && scp -P222 -r _site/*  jaroot@cse125.ucsd.edu:/var/www/html/cse12
 
 Assets are not tracked in git. They are stored on the CSE 125 server and synced manually.
 
-### Download assets from server
+Use your CSE 125 account (`CSE125_USER`, e.g. `shc067`) and your course SSH private key. Set the key once per shell session:
 
 ```bash
-rsync -avz --progress -e 'ssh -p 222' jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/ assets/
+export CSE125_USER=shc067
+export CSE125_SSH_KEY="$HOME/.ssh/id_ed25519_cse125"   # your key path
+export RSYNC_RSH="ssh -p 222 -i $CSE125_SSH_KEY -o IdentitiesOnly=yes"
+```
+
+Or put the key path in `.mapsync.local.json` (gitignored) so `scripts/mapsync.py` picks it up automatically:
+
+```json
+{
+  "server_user": "shc067",
+  "ssh_identity_file": "/Users/you/.ssh/id_ed25519_cse125"
+}
+```
+
+`mapsync` also checks `CSE125_SSH_KEY` and `./id_cse125` in the repo root (same as `build-dist.sh`).
+
+### Download assets from server
+
+Models (goose, dog, gurf, rat), sounds, skyboxes, props, etc.:
+
+```bash
+rsync -avz --progress -e "$RSYNC_RSH" \
+  "${CSE125_USER}@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/" \
+  assets/
 ```
 
 ### Upload assets to server
 
 ```bash
-rsync -avz --progress -e 'ssh -p 222' assets/ jaroot@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/
+rsync -avz --progress -e "$RSYNC_RSH" \
+  assets/ \
+  "${CSE125_USER}@cse125.ucsd.edu:/var/www/html/cse125/2026/cse125g5/assets_for_game/"
 ```
 
 The `-a` flag preserves file attributes and handles directories recursively. The `-z` flag compresses data during transfer. rsync only transfers files that have changed, so repeated syncs are fast.
+
+After syncing assets, pull the latest map and export `landscape.glb` for the client (see **Maps** below):
+
+```bash
+scripts/mapsync.py sync landscape
+scripts/mapsync.py blend2glb landscape
+```
 
 ## Maps
 

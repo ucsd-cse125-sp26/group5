@@ -103,7 +103,7 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     if (input.keys & KEY_RIGHT) strafeInput += 1.0f;
     if (input.keys & KEY_LEFT) strafeInput -= 1.0f;
 
-    const float speed = game.overworldTangramActive ? 4.0f : 10.0f;
+    const float speed = 10.0f;
     velocity.dx = (fwdInput * fwdX + strafeInput * rightX) * speed;
     velocity.dy = (fwdInput * fwdY + strafeInput * rightY) * speed;
 

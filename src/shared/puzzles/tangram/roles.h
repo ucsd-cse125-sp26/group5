@@ -68,6 +68,7 @@ inline constexpr uint8_t kRotateSlot = 4;
 
 [[nodiscard]] inline bool canSeeColor(uint8_t stage, uint8_t playerSlot) {
   if (!colorRestricted(stage)) return true;
+  // P2 only: tinted play pieces. P3 sees colored ghost slots (client), not piece tint.
   return playerSlot == kColorSlot;
 }
 
