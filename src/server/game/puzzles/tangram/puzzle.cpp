@@ -13,7 +13,6 @@
 #include <random>
 #include <vector>
 
-#include "server/game/puzzles/maze/trigger.h"
 #include "server/game/puzzles/tangram/roles.h"
 #include "server/game/puzzles/tangram/trigger.h"
 #include "server/game/section_puzzle.h"
@@ -340,7 +339,7 @@ void releasePlayersAfterExit(ServerGame& game) {
       slot = game.registry.get<shared::RenderInfo>(avatar).playerSlot;
       if (slot < 1 || slot > 4) slot = 1;
     }
-    const glm::vec3 spawn = maze_trigger::overworldSpawnPosition(game, slot);
+    const glm::vec3 spawn = tangram_trigger::overworldSpawnPosition(game, slot);
     auto& pos = game.registry.get<shared::Position>(avatar);
     pos.x = spawn.x;
     pos.y = spawn.y;
