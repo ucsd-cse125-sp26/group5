@@ -244,20 +244,6 @@ void claimOverworldPadsForActivePlayers(ServerGame& game) {
   }
 }
 
-void freezeOverworldPlayerAvatars(ServerGame& game) {
-  auto& bodyInterface = game.physics.getBodyInterface();
-  auto view = game.registry.view<shared::OverworldTag, shared::PhysicsBody,
-                                 shared::PlayerInput>();
-  for (auto ent : view) {
-    if (game.registry.all_of<shared::OverworldMazePiece>(ent)) continue;
-    auto& pb = view.get<shared::PhysicsBody>(ent);
-    JPH::BodyID body(pb.bodyId);
-    if (!bodyInterface.IsAdded(body)) continue;
-    bodyInterface.SetLinearVelocity(body, JPH::Vec3::sZero());
-    bodyInterface.SetAngularVelocity(body, JPH::Vec3::sZero());
-  }
-}
-
 }  // namespace
 
 namespace {
@@ -406,11 +392,65 @@ void updatePuzzle(ServerGame& game, float dt) {
     }
   }
 
-  freezeOverworldPlayerAvatars(game);
-
   const maze_spirit_control::SpiritDrive drive =
       maze_spirit_control::collectSpiritDriveFromOverworldPlayers(game);
   applyOverworldDrive(game, piece, drive);
+}
+
+void clampPlayersToMazeTrigger(ServerGame& game) {
+  const auto& layout = game.mazeLayout;
+  const float minX = layout.triggerCenterX - layout.halfExtent;
+  const float maxX = layout.triggerCenterX + layout.halfExtent;
+  const float minY = layout.triggerCenterY - layout.halfExtent;
+  const float maxY = layout.triggerCenterY + layout.halfExtent;
+  const float minZ = layout.spawnHeightZ;
+
+  auto& bodyInterface = game.physics.getBodyInterface();
+  for (const auto& [peer, slots] : game.active_players) {
+    (void)peer;
+    const entt::entity avatar = slots.overworld_avatar;
+    if (!game.registry.valid(avatar) ||
+        !game.registry.all_of<shared::Position>(avatar)) {
+      continue;
+    }
+    auto& pos = game.registry.get<shared::Position>(avatar);
+    bool clamped = false;
+    if (pos.x < minX) {
+      pos.x = minX;
+      clamped = true;
+    } else if (pos.x > maxX) {
+      pos.x = maxX;
+      clamped = true;
+    }
+    if (pos.y < minY) {
+      pos.y = minY;
+      clamped = true;
+    } else if (pos.y > maxY) {
+      pos.y = maxY;
+      clamped = true;
+    }
+    if (pos.z < minZ) {
+      pos.z = minZ;
+      clamped = true;
+    }
+
+    if (!game.registry.all_of<shared::PhysicsBody>(avatar)) continue;
+    auto& pb = game.registry.get<shared::PhysicsBody>(avatar);
+    JPH::BodyID body(pb.bodyId);
+    if (!bodyInterface.IsAdded(body)) continue;
+
+    if (clamped) {
+      bodyInterface.SetPosition(body, JPH::RVec3(pos.x, pos.y, pos.z),
+                                JPH::EActivation::Activate);
+      JPH::Vec3 v = bodyInterface.GetLinearVelocity(body);
+      if (pos.x <= minX && v.GetX() < 0.0f) v.SetX(0.0f);
+      if (pos.x >= maxX && v.GetX() > 0.0f) v.SetX(0.0f);
+      if (pos.y <= minY && v.GetY() < 0.0f) v.SetY(0.0f);
+      if (pos.y >= maxY && v.GetY() > 0.0f) v.SetY(0.0f);
+      if (pos.z <= minZ && v.GetZ() < 0.0f) v.SetZ(0.0f);
+      bodyInterface.SetLinearVelocity(body, v);
+    }
+  }
 }
 
 void clampPieceToBoard(ServerGame& game) {

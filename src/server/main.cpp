@@ -322,6 +322,9 @@ int main() {
       if (game.overworldTangramActive) {
         tangram_puzzle::clampPlayersToPlayArena(game);
       }
+      if (maze_puzzle::isPuzzleActive(game)) {
+        maze_puzzle::clampPlayersToMazeTrigger(game);
+      }
       maze_puzzle::tryCompleteOnGoal(game);
       accumulator -= fixedDt;
 

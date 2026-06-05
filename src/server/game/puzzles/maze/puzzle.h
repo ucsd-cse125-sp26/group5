@@ -15,6 +15,9 @@ void endPuzzle(ServerGame& game);
 
 void updatePuzzle(ServerGame& game, float dt);
 
+// Keep overworld avatars inside the maze trigger pad (XY) while puzzle runs.
+void clampPlayersToMazeTrigger(ServerGame& game);
+
 // Clamp piece to preview board (XZ plane); call after physics sync.
 void clampPieceToBoard(ServerGame& game);
 
