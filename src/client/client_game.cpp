@@ -238,7 +238,8 @@ void registerClientHandlers(ClientNetwork& network) {
         if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.stopAllGlobalLoops();
         } else if (pkt.state == shared::GameStateType::CREDITS) {
-          game.audio.stopAllGlobalLoops();
+          // Keep the current seasonal track, especially AfterSpring, through
+          // the credits roll. No separate credits music is loaded right now.
         } else if (pkt.state == shared::GameStateType::OVERWORLD) {
           // Stop minigame/credits loops only. Season loops come from
           // SEASON_MUSIC; do not stopAll here or a reordered packet can mute

@@ -68,14 +68,14 @@ class AudioEngine {
   // soundId → SoLoud handle for global loops (legacy one-shots)
   std::unordered_map<uint32_t, unsigned int> globalHandles_;
 
-  // Crossfaded overworld / maze background music
+  // Background music fades in for one second when a new seasonal track starts.
   unsigned int globalMusicHandle_ = 0;
   unsigned int globalMusicFadeOutHandle_ = 0;
   uint32_t globalMusicSoundId_ = 0;
   float globalMusicVolume_ = 0.0f;
   float globalMusicTargetVolume_ = 0.0f;
   float globalMusicFadeOutVolume_ = 0.0f;
-  static constexpr float kGlobalMusicFadeSpeed = 0.35f;
+  static constexpr float kGlobalMusicFadeSeconds = 1.0f;
 
   void loadSound(uint32_t soundId, const std::string& path);
   void loadMusicStream(uint32_t soundId, const std::string& path);

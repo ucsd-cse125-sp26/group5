@@ -125,22 +125,12 @@ void AudioEngine::update(float dt) {
   std::scoped_lock lock(mutex_);
   soloud_->update3dAudio();
 
-  if (globalMusicFadeOutHandle_ != 0) {
-    globalMusicFadeOutVolume_ -= kGlobalMusicFadeSpeed * dt;
-    if (globalMusicFadeOutVolume_ <= 0.0f) {
-      soloud_->stop(globalMusicFadeOutHandle_);
-      globalMusicFadeOutHandle_ = 0;
-      globalMusicFadeOutVolume_ = 0.0f;
-    } else {
-      soloud_->setVolume(globalMusicFadeOutHandle_, globalMusicFadeOutVolume_);
-    }
-  }
-
   if (globalMusicHandle_ != 0 &&
       globalMusicVolume_ < globalMusicTargetVolume_) {
+    const float fadeStep =
+        (globalMusicTargetVolume_ / kGlobalMusicFadeSeconds) * dt;
     globalMusicVolume_ =
-        std::min(globalMusicVolume_ + kGlobalMusicFadeSpeed * dt,
-                 globalMusicTargetVolume_);
+        std::min(globalMusicVolume_ + fadeStep, globalMusicTargetVolume_);
     soloud_->setVolume(globalMusicHandle_, globalMusicVolume_);
   }
 }
@@ -321,11 +311,15 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   }
 
   if (globalMusicHandle_ != 0) {
-    globalMusicFadeOutHandle_ = globalMusicHandle_;
-    globalMusicFadeOutVolume_ = globalMusicVolume_;
+    soloud_->stop(globalMusicHandle_);
     globalMusicHandle_ = 0;
     globalMusicSoundId_ = 0;
     globalMusicVolume_ = 0.0f;
+  }
+  if (globalMusicFadeOutHandle_ != 0) {
+    soloud_->stop(globalMusicFadeOutHandle_);
+    globalMusicFadeOutHandle_ = 0;
+    globalMusicFadeOutVolume_ = 0.0f;
   }
 
   const char* sourceType = "buffered sound";

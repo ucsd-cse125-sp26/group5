@@ -37,7 +37,7 @@ namespace music_config {
 // AfterSpring.wav: start / loop from this timestamp (seconds).
 // 1:12 => 72. Edit here if you re-export the WAV.
 inline constexpr float kAfterSpringLoopStartSeconds = 72.0f;
-inline constexpr float kSeasonMusicVolume = 0.35f;
+inline constexpr float kSeasonMusicVolume = 0.80f;
 }  // namespace music_config
 
 }  // namespace shared
