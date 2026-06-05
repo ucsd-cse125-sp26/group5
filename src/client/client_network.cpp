@@ -88,6 +88,7 @@ void ClientNetwork::poll(ClientGame& game) {
         printf("Disconnected from server.\n");
         event.peer->data = nullptr;
         peer_ = nullptr;
+        game.serverLost.store(true, std::memory_order_release);
         break;
 
       default:
@@ -103,6 +104,7 @@ void ClientNetwork::drainInputQueue(
     // Input is high-frequency state. Send it like movement snapshots: recent
     // packets matter more than guaranteed delivery of stale key states.
     send(pkt, /*reliable=*/false, /*channel=*/1);
+    send(pkt);
   }
   if (client_) {
     enet_host_flush(client_);

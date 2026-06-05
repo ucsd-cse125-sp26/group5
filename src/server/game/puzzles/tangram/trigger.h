@@ -14,6 +14,8 @@ namespace tangram_trigger {
 // Puzzle start is NOT a hidden collision cube in this repo. When four players
 // stand anywhere on the grey tangram platform (spring_trigger footprint),
 // game_state begins the puzzle.
+// stand inside the square around spring_trigger (from landscape.glb →
+// tangramArena.triggerCenter* + halfExtent), game_state begins the puzzle.
 // Rebecca places the Empty spring_trigger in Blender; map load copies its XY.
 
 [[nodiscard]] bool isInsideTypingTriggerRegion(

@@ -424,8 +424,8 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
     glBindTexture(GL_TEXTURE_2D, id);
     if (pixels) {
       glTexImage2D(GL_TEXTURE_2D, 0, internal, w, h, 0, pixelOrder,
-                 GL_UNSIGNED_BYTE, pixels);
-    glGenerateMipmap(GL_TEXTURE_2D);
+                   GL_UNSIGNED_BYTE, pixels);
+      glGenerateMipmap(GL_TEXTURE_2D);
       GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
     } else {
       std::fprintf(stderr,
@@ -531,7 +531,10 @@ Model* loadModel(const std::string& filename) {
     }
   });
 
-  model->skinned = model->boneCount > 0 && scene->mNumAnimations > 0;
+  // Skinned if the mesh has bones, even without animation clips: such models
+  // (e.g. the rat/goose) still render through the skinning path so a rest-pose
+  // bone hierarchy + neck look-pitch override can drive head movement.
+  model->skinned = model->boneCount > 0;
   model->parsed = std::move(parsed);
   if (model->boneCount > MAX_BONES) {
     std::fprintf(stderr,
@@ -707,8 +710,6 @@ Model* makeTangramPieceModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
-  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
-                     .texture = defaultFlatNormalTexture()};
   material.shininess = 12.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -735,8 +736,6 @@ Model* makeTangramPieceMuteModel(const shared::tangram_puzzle::PieceDef& def) {
                        .texture = makeSolidTexture(0, 0, 0, 255)};
   material.emissive = {.constant = glm::vec3(0.0f),
                        .texture = makeSolidTexture(0, 0, 0, 255)};
-  material.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
-                     .texture = defaultFlatNormalTexture()};
   material.shininess = 8.0f;
   model->materials.push_back(material);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -765,8 +764,6 @@ Model* makeTangramColoredGhostSlotModel(
   fillMat.specular = {.constant = glm::vec3(0.0f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = tint * 0.28f, .texture = diffuseTex};
-  fillMat.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
-                    .texture = defaultFlatNormalTexture()};
   fillMat.shininess = 4.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));
@@ -795,8 +792,6 @@ Model* makeTangramGhostSlotModel(const shared::tangram_puzzle::PieceDef& def) {
                       .texture = makeSolidTexture(0, 0, 0, 255)};
   fillMat.emissive = {.constant = glm::vec3(0.45f, 0.38f, 0.55f),
                       .texture = makeSolidTexture(0, 0, 0, 255)};
-  fillMat.normal = {.constant = glm::vec3(0.5f, 0.5f, 1.0f),
-                    .texture = defaultFlatNormalTexture()};
   fillMat.shininess = 2.0f;
   model->materials.push_back(fillMat);
   model->meshes.push_back(buildMesh(std::move(vertices), indices, 0));

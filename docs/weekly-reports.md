@@ -48,6 +48,69 @@ Even if normal markdown format might work on your machine, it will NOT work on t
 Reference [README.MD]({{https://github.com/ucsd-cse125-sp26/group5}}).
 
 ---
+## Week 9 Group Report
+
+## Rendering
+**Jacob**
+- Adding and rigging the player model; rig is working correctly.
+- Skybox fixes and continued skybox work.
+- Tested on the demo machine and identified performance issues; actively working on resolving them.
+- Working on tooling to make testing on Windows easier.
+
+## Network / Game Logic
+**Tim**
+- Back in San Diego!
+- Caught up with Leon on game logic and implemented the summer minigame:
+  - Players enter a platform and get scattered to different positions across the summer map.
+  - An overlay shows players where they need to escape to.
+  - If players fail to escape the danger zone in time, the game restarts and keeps iterating until everyone succeeds.
+- Used the overlay region system to display the minimap and target destination.
+- Next priorities: set up a 4-player test server, and focus on making everything currently existing polished and playable rather than adding new features.
+
+## Game Logic: Minigames / Puzzles
+**Leon**
+- Finished minigame implementation; typing game may take ~2 days.
+- Goal: get all games tested and working today so the build is demo-ready.
+- Known issue: when players enter the maze, they all spawn in the center clipping into each other.
+
+**Philip**
+- Hooked up the fragment system to the falling puzzle.
+- Made sound non-fatal (game no longer breaks without sound); needs testing.
+- Resolving merge conflicts with Leon.
+
+## Physics / Audio / UI
+**Alain**
+- Finished the falling puzzle.
+- Working on UI elements: notifications, timers, and progress bars.
+- Falling puzzle only activates when all players are in the trigger area.
+- Audio issue on Linux identified but low priority; music may fail if assets aren't loaded — being investigated.
+
+## Modeling / World Building
+**Rebecca**
+- Worked with Leon to finalize landscape assets for the minigame areas.
+- Collaborated with Jacob on skybox integration.
+- Created falling object models for the autumn minigame: pumpkin asset complete.
+- Fragment model complete. 
+- Finished the final map layout including extended sections; created final assets including a park bench.
+- Helped with asset pipeline: downloaded audio, converted via DaVinci Resolve, and uploaded to the sound asset system. Sent instructions for music and walking sounds.
+- Starting to work on exit and intro video screen. 
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+  <img src="{{ '/assets/week9/rebecca/1.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week9/rebecca/2.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week9/rebecca/3.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week9/rebecca/4.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week9/rebecca/5.png' | relative_url }}" alt="Note">
+  <img src="{{ '/assets/week9/rebecca/6.png' | relative_url }}" alt="Note">
+
+</div>
+
+**Sarah**
+- Modeling the rat player model and rigging the Gurf model; continuing work on the rat.
+- Last remaining model is the goose.
+- Decrypt game design: players are given a bank of symbols and a symbol-to-text mapping; they must translate correctly and cooperate with each other to solve it.
+
+*This is the final week. The game is largely complete. Leon is debugging remaining minigame issues, and Jacob is working through a full integration checklist to pull everything together holistically.*
+
 
 ## Week 8 Group Report
 

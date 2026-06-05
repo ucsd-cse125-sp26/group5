@@ -7,6 +7,26 @@ permalink: /project-spec/jiaying-chen-individual-report/
 [← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }})
 ---
 
+## Week 9
+1. What were your concrete goals for the week?
+Finish...like...everything. I am filling this out at 1:20 am. I am not the most sane. 
+
+2. What goals were you able to accomplish?
+Most of the modeling is indeed done. I realized i have more executive frontend and look and feel parts to take care of. 
+
+3. If the week went differently than you had planned, what were the reasons? 
+Not much difference, just that people in my group are finally more motivated to do work now, which is a good thing. 
+
+4. What are your specific goals for the next week?
+Rest. 
+
+5. What did you learn this week, if anything (and did you expect to learn it)?
+Even more modeling. More understanding of the project as a whole. I need to finish the intro and exit scene for the project. 
+
+6. What is your individual morale (which might be different from the overall group morale)?
+Tired. But I am getting things done. 
+
+
 ## Week 8
 1. What were your concrete goals for the week?
 Goals: 1. Finish the sungod mesh that I might potentially use. 2. Finish as much as the main landscape mesh as possible; work with the game logic people for barrier and minigame placement. 

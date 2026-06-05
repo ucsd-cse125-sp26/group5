@@ -15,11 +15,16 @@ enum class PacketType : uint8_t {
   SOUND_EVENT,
   STATE_CHANGE,
   SEASON_MUSIC,
+  // Server-driven video playback. Append-only: keep these last so existing
+  // packet byte values stay stable across separately built server/clients.
+  VIDEO_PLAY,
+  VIDEO_STOP,
 };
 
 enum class GameStateType : uint8_t {
   OVERWORLD,
   MAZE,
+  CREDITS,
 };
 
 struct StateChangePacket {
@@ -60,5 +65,19 @@ struct SeasonMusicPacket {
   PacketType type = PacketType::SEASON_MUSIC;
   uint32_t soundId = 0;
   float volume = 0.35f;
+};
+
+// Fixed-size POD, framed by sizeof+memcpy like SoundEventPacket. uint32 first
+// after the type keeps the layout alignment identical across MinGW/Linux.
+struct VideoPlayPacket {
+  PacketType type = PacketType::VIDEO_PLAY;
+  uint32_t targetEntityId = 0;  // in-world placement; 0 = fullscreen
+  uint16_t videoId = 0;         // index into the client's video path table
+  uint8_t mode = 0;             // 0 = fullscreen cutscene, 1 = in-world screen
+  uint8_t loop = 0;
+};
+
+struct VideoStopPacket {
+  PacketType type = PacketType::VIDEO_STOP;
 };
 }  // namespace shared

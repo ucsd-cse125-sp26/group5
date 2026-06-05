@@ -124,6 +124,16 @@ Animation::Animation(const aiScene* scene, unsigned animIndex, Model* model) {
   readMissingBones(anim, model);
 }
 
+Animation::Animation(const aiScene* scene, Model* model) {
+  assert(scene && model);
+  duration_ = 0.0f;
+  ticksPerSecond_ = 25.0f;
+  readHierarchy(rootNode_, scene->mRootNode);
+  // No channels: every node falls back to its bind-pose transformation during
+  // the hierarchy walk, so finalBoneMatrices resolve to the bind pose unless a
+  // bone override is applied.
+  boneInfoMap_ = model->boneInfoMap;
+}
 void Animation::readHierarchy(AssimpNodeData& dest, const aiNode* src) {
   dest.name = src->mName.C_Str();
   dest.transformation = toGlm(src->mTransformation);
@@ -213,6 +223,13 @@ AnimationLibrary::AnimationLibrary(Model* model) {
     auto anim = std::make_unique<Animation>(scene, i, model);
     byName_[scene->mAnimations[i]->mName.C_Str()] = anim.get();
     clips_.push_back(std::move(anim));
+  }
+  // Skinned model with no animation clips: synthesize a rest pose so the
+  // skinning path runs and bone overrides (head look-pitch) still apply.
+  if (clips_.empty() && model->skinned) {
+    auto rest = std::make_unique<Animation>(scene, model);
+    byName_[std::string()] = rest.get();
+    clips_.push_back(std::move(rest));
   }
 }
 

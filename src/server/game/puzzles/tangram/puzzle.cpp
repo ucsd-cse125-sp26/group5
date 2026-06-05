@@ -527,17 +527,15 @@ void rollRandomPieceSpawns(ServerGame& game) {
   // board).
   static constexpr glm::vec2
       kSpawnOffsets[shared::tangram_puzzle::kPieceCount] = {
-          {-7.2f, -9.0f},  {-2.4f, -10.2f}, {2.4f, -10.2f}, {7.2f, -9.0f},
-          {-4.8f, -12.6f}, {0.0f, -13.2f},  {4.8f, -12.6f},
+          {-6.0f, -7.5f},  {-2.0f, -8.5f}, {2.0f, -8.5f},  {6.0f, -7.5f},
+          {-4.0f, -10.5f}, {0.0f, -11.0f}, {4.0f, -10.5f},
       };
 
   for (int i = 0; i < shared::tangram_puzzle::kPieceCount; ++i) {
     glm::vec2 pos = kSpawnOffsets[i] + glm::vec2(tcx, tcy);
     if (!layout.isInsideTrigger(pos.x, pos.y) ||
         shared::tangram_puzzle::isInsideShapeGoalZone(pos.x, pos.y, bcx, bcy)) {
-      pos = glm::vec2(layout.platformCenterX,
-                      layout.platformCenterY - layout.platformScaleY * 0.5f +
-                          3.0f);
+      pos = glm::vec2(tcx, tcy - layout.halfExtent * 0.55f);
     }
     game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)] = pos;
   }
@@ -734,8 +732,11 @@ void beginPuzzle(ServerGame& game) {
     game.registry.emplace<shared::TangramPiece>(ent, def.id, false);
     game.registry.emplace<shared::Position>(ent, pos.x, pos.y, pos.z, 1.0f,
                                             0.0f, 0.0f, 0.0f);
-    game.registry.emplace<shared::RenderInfo>(ent, def.modelName, def.scaleX,
-                                              def.scaleY, pieceZ);
+    {
+      auto& ri = game.registry.emplace<shared::RenderInfo>(
+          ent, def.modelName, def.scaleX, def.scaleY, pieceZ);
+      ri.colorExempt = true;
+    }
     game.registry.emplace<shared::Velocity>(ent, 0.0f, 0.0f, 0.0f);
 
     const uint8_t stage = shared::tangram_roles::kIsolationStage;

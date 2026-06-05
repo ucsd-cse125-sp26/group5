@@ -95,10 +95,19 @@ struct ServerGame {
   // the rest of the run.
   bool debugSeasonOverride = false;
 
+  // F2 then F (debug): skip puzzle gates and spawn fragments one-by-one for
+  // seasonal music testing. Off until a player presses F while debug is on.
+  bool musicFragmentPickupTestActive = false;
+
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();
   shared::map_gamelogic_layout::FallLayout fallLayout{};
 
+  // End-game: gather region around the "Fallen house" landmark. When all active
+  // players are inside, clients roll the credits. One-way latch: the credits
+  // broadcast once per server lifetime and never re-trigger.
+  shared::map_gamelogic_layout::FallenHouseRegion fallenHouseRegion{};
+  bool creditsRolled = false;
   // Tangram puzzle (floating test platform in sky; legacy "fall board" naming).
   bool overworldTangramActive = false;
   bool overworldTangramTriggerArmed = true;

@@ -64,6 +64,10 @@ struct AssimpNodeData {
 class Animation {
  public:
   Animation(const aiScene* scene, unsigned animIndex, Model* model);
+  // Rest-pose "clip": the node hierarchy with no channels. For skinned models
+  // shipped without animations, so the skinning path still runs and bone
+  // overrides (head look-pitch) apply on top of the bind pose.
+  Animation(const aiScene* scene, Model* model);
 
   Bone* findBone(const std::string& name);
   float ticksPerSecond() const { return ticksPerSecond_; }

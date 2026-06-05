@@ -4,7 +4,7 @@ title: Sarah Balatbat — Individual Report
 permalink: /project-spec/sarah-balatbat-individual-report/
 ---
 
-[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}}) [8]({{ '/project-spec/sarah-balatbat-individual-report/#week-8' | relative_url}})
+[← Back to Weekly Reports]({{ '/weekly-reports/' | relative_url }}) // [1]({{ '/project-spec/sarah-balatbat-individual-report/#week-1' | relative_url}}) [2]({{ '/project-spec/sarah-balatbat-individual-report/#week-2' | relative_url}}) [3]({{ '/project-spec/sarah-balatbat-individual-report/#week-3' | relative_url}}) [4]({{ '/project-spec/sarah-balatbat-individual-report/#week-4' | relative_url}}) [5]({{ '/project-spec/sarah-balatbat-individual-report/#week-5' | relative_url}}) [6]({{ '/project-spec/sarah-balatbat-individual-report/#week-6' | relative_url}}) [7]({{ '/project-spec/sarah-balatbat-individual-report/#week-7' | relative_url}}) [8]({{ '/project-spec/sarah-balatbat-individual-report/#week-8' | relative_url}}) [9]({{ '/project-spec/sarah-balatbat-individual-report/#week-9' | relative_url}})
 
 
 <!-- Sarah's template 
@@ -21,6 +21,98 @@ permalink: /project-spec/sarah-balatbat-individual-report/
 
 ### Individual Morale
 -->
+
+## [Week 9](#week-9)
+### Goals
+
+- [x] Continue modeling
+  - [x] Mouse
+  - [x] Goose
+- [x] Watch UV unwrapping and texturing tutorials
+
+### Achieved
+
+- Gurf
+  - Updated model to be more "squishy" in appearance
+  <img src="{{ '/assets/week9/sarah/gurf-squish-front.jpg' | relative_url }}" alt="squishy Gurf front view">
+  <img src="{{ '/assets/week9/sarah/gurf-squish-side.jpg' | relative_url }}" alt="squishy Gurf side view">
+  - Added rig so head can be movable
+  <img src="{{ '/assets/week9/sarah/gurf-squish-pose.jpg' | relative_url }}" alt="squishy Gurf posed">
+  <img src="{{ '/assets/week9/sarah/gurf-rig-front.jpg' | relative_url }}" alt="Gurf rig front view">
+  <img src="{{ '/assets/week9/sarah/gurf-rig-side.jpg' | relative_url }}" alt="Gurf rig side view">
+  <img src="{{ '/assets/week9/sarah/gurf-rig-pose.jpg' | relative_url }}" alt="Gurf rig posed">
+  - Added texture
+  <img src="{{ '/assets/week9/sarah/gurf-textured-front.jpg' | relative_url }}" alt="textured Gurf front view">
+  <img src="{{ '/assets/week9/sarah/gurf-textured-side.jpg' | relative_url }}" alt="textured Gurf side view">
+  <img src="{{ '/assets/week9/sarah/gurf-textured-back.jpg' | relative_url }}" alt="textured Gurf back view">
+
+- Mouse
+  - Finished modeling and rigging - was a bit hard to shape the snout
+  <img src="{{ '/assets/week9/sarah/mouse-front.jpg' | relative_url }}" alt="mouse front view">
+  <img src="{{ '/assets/week9/sarah/mouse-side.jpg' | relative_url }}" alt="mouse side view">
+  <img src="{{ '/assets/week9/sarah/mouse-angle.jpg' | relative_url }}" alt="mouse angled view">
+  <img src="{{ '/assets/week9/sarah/mouse-rig-front.jpg' | relative_url }}" alt="mouse rig front view">
+  <img src="{{ '/assets/week9/sarah/mouse-rig-side.jpg' | relative_url }}" alt="mouse rig side view">
+  <img src="{{ '/assets/week9/sarah/mouse-pose-front.jpg' | relative_url }}" alt="mouse pose front view">
+  <img src="{{ '/assets/week9/sarah/mouse-pose-side.jpg' | relative_url }}" alt="mouse pose side view">
+  - Finished texturing
+  <img src="{{ '/assets/week9/sarah/mouse-textured-front.jpg' | relative_url }}" alt="textured mouse front view">
+  <img src="{{ '/assets/week9/sarah/mouse-textured-side.jpg' | relative_url }}" alt="textured mouse side view">
+
+- Goose
+  - Finished modeling and rigging - the beak was such a pain to model and intersect into the head; there were also stray verts I found while rigging that I ended up not bothering to fix for my own sanity
+  <img src="{{ '/assets/week9/sarah/goose-front.jpg' | relative_url }}" alt="goose front view">
+  <img src="{{ '/assets/week9/sarah/goose-side.jpg' | relative_url }}" alt="goose side view">
+  <img src="{{ '/assets/week9/sarah/goose-pose-rig-angle.jpg' | relative_url }}" alt="posed goose rig angled view">
+  - Preliminary material
+  <img src="{{ '/assets/week9/sarah/goose-color-pose-front.jpg' | relative_url }}" alt="colored posed goose front view">
+  <img src="{{ '/assets/week9/sarah/goose-color-pose-back.jpg' | relative_url }}" alt="colored posed goose back view">
+  - Finished texturing
+  <img src="{{ '/assets/week9/sarah/goose-textured-front.jpg' | relative_url }}" alt="textured goose front view">
+  <img src="{{ '/assets/week9/sarah/goose-textured-side.jpg' | relative_url }}" alt="textured goose side view">
+  <img src="{{ '/assets/week9/sarah/goose-textured-back.jpg' | relative_url }}" alt="textured goose back view">
+
+- Corgi
+  - Added texture - had to do multiple passes because the 1st result turned out too light
+    - 1st pass -- ended up too light
+  <img src="{{ '/assets/week9/sarah/corgi-textured-front.jpg' | relative_url }}" alt="textured corgi version 1 front view">
+  <img src="{{ '/assets/week9/sarah/corgi-textured-side.jpg' | relative_url }}" alt="textured corgi version 1 side view">
+    - 2nd pass -- much better coloration after some wrestling with the .jpg texture
+  <img src="{{ '/assets/week9/sarah/corgi-textured-front-b.jpg' | relative_url }}" alt="textured corgi version 2 front view">
+  <img src="{{ '/assets/week9/sarah/corgi-textured-side-b.jpg' | relative_url }}" alt="textured corgi version 2 side view">
+
+- In-game previews -- Jacob successfully rendered the models in the game engine
+  <img src="{{ '/assets/week9/sarah/goose-game.png' | relative_url }}" alt="goose in-game preview">
+  <img src="{{ '/assets/week9/sarah/gurf-game.png' | relative_url }}" alt="gurf in-game preview">
+  <img src="{{ '/assets/week9/sarah/mouse-game.png' | relative_url }}" alt="mouse in-game preview">
+  <img src="{{ '/assets/week9/sarah/corgi-game.png' | relative_url }}" alt="corgi in-game preview">
+
+
+### Progress Evaluation
+
+This is the most modeling I did in any week whatsoever. Everyone was working so hard, it only felt right to do the same. I'm glad I actually managed to get some texturing done, I was afraid they're gonna just be blank player models, but the texturing was easier than I thought. I can almost see the light at the end of the tunnel. We even got to do the dry run, it was pretty fun, and it was cool to see the result of everyone's effort from this quarter. There was a lot of funny sound effects, curious to see how the end products turn out. I don't know if I can say that I'm fully satisfied with what I got done, but I think I definitely got a *lot* done. I think it is good enough.
+
+### Upcoming Goals
+
+- [ ] friday demo :>
+- [ ] show off to my loved ones :>
+
+### Lessons Learned
+
+- Texturing was really not as hard as I thought
+- There's a vast ocean of resources out on the internet that I can tap into at almost any time -- I'm not doing this alone (I seem to conveniently forget this weekly)
+- Not recommended to save the texture as .jpg because artifacts end up happening
+- I can preview meshes in MeshLab with their textures, helps with seeing the colors without having to set up a scene in Blender
+
+### Individual Morale
+
+I'm glad to finally see my son Gurf be realized. He looks kinda goofy, which was the point anyway -- he looks weird in 2d since he doesn't have the proper proportions of an actual cat, only the bare essentials of what you would come to recognize as one (pointy ears, whiskers and curled mouth, etc). I think he turned out quite nicely, though I'm curious about trying to *actually* adapt his original design to 3d without the stylization for this game. I am very happy that I actually managed to get the textures done. It was still rough having to retexture at some point, but I think all of them turned out pretty alright.
+
+I wonder if they managed to implement the decryption puzzle. It was one of the first puzzle ideas we had, and one that I'm particularly fond of not just because I like ciphers but also because I made a whole font for it and all. I hope that they can actually implement it -- would be a shame if some of the stuff I made don't get added in.
+
+<img src="{{ '/assets/week9/sarah/decrypt-bg.png' | relative_url }}" alt="a purple sunset sky with pink-orange clouds, which serve as the background for the decryption puzzle">
+
+
 ## [Week 8](#week-8)
 ### Goals
 

@@ -8,6 +8,7 @@
 #include "server/game/summer_escape.h"
 #include "server/server_game.h"  // serializeEntities
 #include <vector>
+#include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
 #include "shared/components.h"
@@ -134,7 +135,7 @@ void ProcessFragmentPickups(ServerGame& game) {
         }
         // Music test only: allow pickup progression without puzzle completion.
         // Production: shouldRestore stays false until the section is finished.
-        if (shared::dev_spawn::kMusicFragmentPickupTest) {
+        if (game.musicFragmentPickupTestActive) {
           shouldRestore = true;
         }
         if (shouldRestore) {
@@ -158,7 +159,7 @@ void ProcessFragmentPickups(ServerGame& game) {
           section_puzzle::setActiveSeason(game, next);
           syncOverworldSeasonMusic(
               game, fragment.season == shared::SectionSeasonMap::SPRING);
-          if (shared::dev_spawn::kMusicFragmentPickupTest &&
+          if (game.musicFragmentPickupTestActive &&
               fragment.season != shared::SectionSeasonMap::SPRING) {
             debugRevealActiveSeasonFragmentNearPlayer(game, playerEntity);
           }

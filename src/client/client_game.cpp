@@ -233,10 +233,14 @@ void registerClientHandlers(ClientNetwork& network) {
       [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
         shared::StateChangePacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
+        game.currentGameState = pkt.state;
         game.audio.stopAllGlobalLoops();
         if (pkt.state == shared::GameStateType::MAZE) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
+        } else if (pkt.state == shared::GameStateType::CREDITS) {
+          game.audio.playGlobalLoop(
+              static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
         }
         // Overworld seasonal music arrives via SEASON_MUSIC.
       });
@@ -247,6 +251,24 @@ void registerClientHandlers(ClientNetwork& network) {
         shared::SeasonMusicPacket pkt;
         std::memcpy(&pkt, data, sizeof(pkt));
         game.audio.playGlobalLoop(pkt.soundId, pkt.volume);
+      });
+
+  // Runs on the network thread — GL is invalid here, so only enqueue a request
+  // for the render thread (main.cpp) to act on.
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_PLAY,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        shared::VideoPlayPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.videoQueue.tryPush(VideoRequest{pkt.videoId, pkt.mode, pkt.loop,
+                                             pkt.targetEntityId,
+                                             /*stop=*/false});
+      });
+
+  network.dispatcher().on(
+      shared::PacketType::VIDEO_STOP,
+      [](ClientGame& game, ENetPeer*, const uint8_t* data, size_t len) {
+        game.videoQueue.tryPush(VideoRequest{0, 0, 0, 0, /*stop=*/true});
       });
 }
 
@@ -362,6 +384,21 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
                   InputKeys& prevKeys, bool debugMode) {
+  // Freeze the avatar while the credits roll: send one zero-input packet to
+  // stop movement, then ignore keyboard/mouse until credits are dismissed.
+  if (game.currentGameState == shared::GameStateType::CREDITS) {
+    if (prevKeys != 0) {
+      shared::InputPacket pkt;
+      pkt.type = shared::PacketType::INPUT;
+      pkt.keys = 0;
+      pkt.mouseDx = 0.0f;
+      pkt.mouseDy = 0.0f;
+      pkt.rotateTargetId = 0;
+      inputQueue.tryPush(pkt);
+    }
+    prevKeys = 0;
+    return;
+  }
   InputKeys keys = 0;
   const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
 
@@ -377,7 +414,7 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) keys |= KEY_CYCLE_SCENE;
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
-    // Music test (server kMusicFragmentPickupTest): press F2 once, then F.
+    // F2 enables debug overlay; F starts music pickup test (server-side).
     if (debugMode) {
       if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
         keys |= KEY_DEBUG_SPAWN_FRAGMENT;
@@ -438,7 +475,7 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     mouseInit = false;  // re-prime on next capture
   }
 
-  if (keys != 0 || keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f ||
+  if (keys != prevKeys || mouseDx != 0.0f || mouseDy != 0.0f ||
       rotateTargetId != prevRotateTargetId ||
       (tangramActive && (keys & KEY_ROTATE_PIECE))) {
     shared::InputPacket pkt;

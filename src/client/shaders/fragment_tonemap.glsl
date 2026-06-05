@@ -24,7 +24,6 @@ uniform float colorRestorationLightStrength;
 uniform float tangramAlwaysColorEnabled;
 uniform vec3 tangramAlwaysColorMin;
 uniform vec3 tangramAlwaysColorMax;
-
 // Signed distance from p to the AABB [mn, mx]. Negative inside, positive
 // outside; smooth across the edge so we don't get a hard ring.
 float aabbSignedDistance(vec3 p, vec3 mn, vec3 mx) {

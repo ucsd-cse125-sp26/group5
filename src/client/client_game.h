@@ -17,6 +17,16 @@
 struct GLFWwindow;
 class ClientNetwork;
 
+// Render-thread hand-off for a video play/stop request. The network handler
+// fills one and pushes it onto ClientGame::videoQueue; the render thread (the
+// only GL thread) drains it. POD — no GL types here.
+struct VideoRequest {
+  uint16_t videoId = 0;
+  uint8_t mode = 0;  // 0 = fullscreen, 1 = in-world
+  uint8_t loop = 0;
+  uint32_t targetEntityId = 0;
+  bool stop = false;
+};
 struct ClientGame {
   shared::ComponentRegistry componentRegistry;
 
@@ -33,12 +43,21 @@ struct ClientGame {
   std::atomic<bool> running = true;
 
   SpscQueue<shared::InputPacket, 256> inputQueue;
+  // Set by the network thread on server disconnect; the render thread shows a
+  // "lost connection" overlay instead of a frozen world.
+  std::atomic<bool> serverLost = false;
+
+  // Server-driven video play/stop requests, produced on the network thread and
+  // consumed on the render thread (see main.cpp).
+  SpscQueue<VideoRequest, 8> videoQueue;
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();
   shared::tangram::ArenaLayout tangramArena =
       shared::tangram::ArenaLayout::defaults();
   // Entity id under screen-center reticle (updated each frame during tangram).
   uint32_t tangramCrosshairTargetId = 0;
+  // Latest game state from the server (drives the credits screen / music).
+  shared::GameStateType currentGameState = shared::GameStateType::OVERWORLD;
   AudioEngine audio;
 };
 

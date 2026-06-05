@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -46,6 +47,10 @@ class AudioEngine {
   float getMasterVolume() const { return masterVolume_; }
 
  private:
+  // Guards all map/SoLoud access: public methods run on both the render thread
+  // (update/updateEmitter/listener) and the network thread (playSound/
+  // stopAllForEntity/global loops). Private helpers assume it is already held.
+  mutable std::mutex mutex_;
   SoLoud::Soloud* soloud_ = nullptr;
   std::unordered_map<uint32_t, SoLoud::Wav*> sounds_;
   float masterVolume_ = 1.0f;

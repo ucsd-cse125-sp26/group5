@@ -11,6 +11,7 @@ enum class SoundId : uint32_t {
   ENTITY_SPEAK,
   OVERWORLD_MUSIC,
   MAZE_MUSIC,
+  CREDITS_MUSIC,
   // Section ambient music — one per season
   SECTION_WINTER_AMBIENT,
   SECTION_FALL_AMBIENT,

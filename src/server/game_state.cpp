@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 
+#include "game/credits_trigger.h"
 #include "game/fall_challenge.h"
 #include "game/maze.h"
 #include "game/maze_generation.h"
@@ -257,8 +258,11 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
   game.registry.emplace<shared::Position>(entity, pos.x, pos.y, pos.z, 1.0f,
                                           0.0f, 0.0f, 0.0f);
   game.registry.emplace<shared::Velocity>(entity, 0.0f, 0.0f, 0.0f);
-  game.registry.emplace<shared::RenderInfo>(entity, modelName, scale.x, scale.y,
-                                            scale.z);
+  {
+    auto& ri = game.registry.emplace<shared::RenderInfo>(
+        entity, modelName, scale.x, scale.y, scale.z);
+    ri.colorExempt = true;
+  }
   game.registry.emplace<shared::Camera>(entity, 0.0f,
                                           shared::kDefaultPlayerCameraHeight);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
@@ -446,6 +450,7 @@ void initWorldEntities(ServerGame& game) {
                 .scale = glm::vec3(game.fallLayout.playHalfX * 2.0f,
                                    game.fallLayout.playHalfY * 2.0f, 1.2f),
                 .collision = CollisionShape::Box,
+                .colorExempt = true,
             }});
 
   // Summer escape trigger pad: stand here (all players) to start the
@@ -464,6 +469,7 @@ void initWorldEntities(ServerGame& game) {
               // pad (it floats at padCenterZ; None would let them fall
               // through).
               .collision = CollisionShape::Box,
+              .colorExempt = true,
           },
       });
 
@@ -709,6 +715,10 @@ void OverworldState::update(ServerGame& game, float dt) {
     //     net::broadcastPacket(game.network->getHost(), pkt);
     // }
   }
+
+  // End-game: roll credits once all players gather in the Fallen house.
+  credits_trigger::checkCreditsTrigger(game);
+
   render_model_change(game, dt);
 
   auto inputView = game.registry.view<shared::PlayerInput>();
@@ -775,41 +785,22 @@ void OverworldState::update(ServerGame& game, float dt) {
     }
   }
 
-  // DEBUG: F2 on client enables debug, then F spawns one fragment (music test).
+  // DEBUG: F2 then F — first F starts music pickup test; later F re-spawns fragment.
   for (auto ent : inputView) {
     auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
     if (!game.registry.all_of<shared::Position>(ent)) break;
 
-    if (shared::dev_spawn::kMusicFragmentPickupTest) {
+    if (!game.musicFragmentPickupTestActive) {
+      game.musicFragmentPickupTestActive = true;
+      printf(
+          "DEBUG: music pickup test ON — Winter music playing; first fragment "
+          "spawned (pick winter→fall→summer→spring with E)\n");
       debugRevealActiveSeasonFragmentNearPlayer(game, ent);
       break;
     }
 
-    shared::SectionSeasonMap season = shared::SectionSeasonMap::WINTER;
-    auto gsView = game.registry.view<shared::GameSection>();
-    for (auto e : gsView) {
-      season = gsView.get<shared::GameSection>(e).currentActiveSeason;
-      break;
-    }
-    auto frags = game.registry.view<shared::FragmentComponent>();
-    for (auto fe : frags) {
-      if (frags.get<shared::FragmentComponent>(fe).season != season) continue;
-      if (game.registry.all_of<shared::RenderInfo>(fe)) {
-        printf("DEBUG: %s fragment already revealed\n",
-               section_puzzle::sceneNameForSeason(season));
-        break;
-      }
-      game.registry.emplace<shared::RenderInfo>(fe, "fragment", 0.25f, 0.25f,
-                                                0.25f);
-      auto buf =
-          serializeEntities(game.registry, game.componentRegistry,
-                            shared::PacketType::SPAWN_ENTITY, {fe}, false);
-      net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
-      printf("DEBUG: spawned %s fragment\n",
-             section_puzzle::sceneNameForSeason(season));
-      break;
-    }
+    debugRevealActiveSeasonFragmentNearPlayer(game, ent);
     break;
   }
 

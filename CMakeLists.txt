@@ -44,6 +44,8 @@ target_include_directories(zpp_bits INTERFACE lib/zpp_bits)
 add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE lib/stb)
 
+add_library(pl_mpeg INTERFACE)
+target_include_directories(pl_mpeg INTERFACE lib/pl_mpeg)
 target_link_libraries(shared PUBLIC zpp_bits assimp)
 
 # Path to glad directory
@@ -123,7 +125,6 @@ if(APPLE)
         lib/soloud/src/backend/coreaudio/soloud_coreaudio.cpp)
     target_compile_definitions(soloud PUBLIC WITH_COREAUDIO)
 endif()
-
 # if(UNIX AND NOT APPLE)
 #     target_compile_definitions(soloud PUBLIC
 #         MA_NO_JACK
@@ -183,9 +184,10 @@ target_sources(client PRIVATE
     src/client/graphics_settings.cpp
     src/client/ui_settings.cpp
     src/client/puzzle_hud.cpp
+    src/client/video_player.cpp
 )
-target_link_libraries(client PRIVATE shared 
-    glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud
+target_link_libraries(client PRIVATE shared
+    glfw enet glad_gl_core_41 imgui EnTT::EnTT glm::glm assimp stb_image Jolt soloud pl_mpeg
 )
 
 add_custom_command(TARGET client POST_BUILD
@@ -229,6 +231,7 @@ add_library(server_lib STATIC
     src/server/game/maze_spirit_control.cpp
     src/server/game/fall_challenge.cpp
     src/server/game/summer_escape.cpp
+    src/server/game/credits_trigger.cpp
     src/server/physics_engine.cpp
     src/server/scene.cpp
     src/server/server_level_loader.cpp

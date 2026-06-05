@@ -2,9 +2,13 @@
 
 #include <assimp/scene.h>
 
+#include <algorithm>
 #include <array>
+#include <cfloat>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <vector>
 
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
@@ -214,9 +218,6 @@ bool tryApplyTangramArenaFromMap(const ParsedModel& parsed,
     layout.spawnBaseY = layout.triggerCenterY - layout.halfExtent - 2.0f;
   }
 
-  if (foundTrigger) {
-    layout.syncTriggerFromPlatform();
-  }
   if (!foundZone && foundTrigger) {
     layout.syncBoardFromTrigger();
   }
@@ -424,6 +425,60 @@ bool tryApplyMazeLayoutFromMapFile(const std::string& path,
     return false;
   }
   return tryApplyMazeLayoutFromMap(parsed, layout);
+}
+
+bool tryApplyFallenHouseRegionFromMap(const ParsedModel& parsed,
+                                      FallenHouseRegion& region) {
+  region.valid = false;
+  const aiScene* scene = parsed.scene();
+  if (!scene || !scene->mRootNode) return false;
+
+  const aiNode* node = scene->mRootNode->FindNode(aiString(kFallenHouseNode));
+  const aiMatrix4x4* world = parsed.worldTransform(kFallenHouseNode);
+  if (!node || !world) {
+    printf("[MapGamelogic] node \"%s\" not found; credits trigger disabled\n",
+           kFallenHouseNode);
+    return false;
+  }
+
+  // flattenNodeGeometry returns mesh-local positions; lift them to world space
+  // (the same space player Positions live in) before bounding.
+  std::vector<aiVector3D> verts;
+  std::vector<uint32_t> indices;
+  flattenNodeGeometry(*node, *scene, verts, indices);
+  if (verts.empty()) {
+    printf("[MapGamelogic] node \"%s\" has no geometry; credits trigger off\n",
+           kFallenHouseNode);
+    return false;
+  }
+
+  float minX = FLT_MAX, minY = FLT_MAX, minZ = FLT_MAX;
+  float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
+  for (const aiVector3D& local : verts) {
+    const aiVector3D p = (*world) * local;
+    minX = std::min(minX, p.x);
+    maxX = std::max(maxX, p.x);
+    minY = std::min(minY, p.y);
+    maxY = std::max(maxY, p.y);
+    minZ = std::min(minZ, p.z);
+    maxZ = std::max(maxZ, p.z);
+  }
+
+  // Pad so players standing in the doorway/threshold still count as inside.
+  constexpr float kPad = 1.5f;
+  region.minX = minX - kPad;
+  region.maxX = maxX + kPad;
+  region.minY = minY - kPad;
+  region.maxY = maxY + kPad;
+  region.minZ = minZ - kPad;
+  region.maxZ = maxZ + kPad;
+  region.valid = true;
+  printf(
+      "[MapGamelogic] Fallen house region -> X[%.2f,%.2f] Y[%.2f,%.2f] "
+      "Z[%.2f,%.2f]\n",
+      region.minX, region.maxX, region.minY, region.maxY, region.minZ,
+      region.maxZ);
+  return true;
 }
 
 }  // namespace shared::map_gamelogic_layout

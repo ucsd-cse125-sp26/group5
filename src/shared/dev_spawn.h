@@ -16,11 +16,8 @@ enum class OverworldSpawn : uint8_t {
 // Normal play: Winter. For tangram testing, switch to Tangram and rebuild.
 inline constexpr OverworldSpawn kOverworldSpawn = OverworldSpawn::Winter;
 
-// When true: F2 then F spawns one fragment; pickup advances music + next
-// fragment (skips puzzle completion). Production uses the same music on real
-// fragment pickup when kMusicFragmentPickupTest is false. Set false to ship.
-inline constexpr bool kMusicFragmentPickupTest = true;
-
+// Music fragment pickup test: press F2 (debug), then F in-game to start at runtime
+// (see ServerGame::musicFragmentPickupTestActive). No compile-time flag needed.
 // Only active when kOverworldSpawn == Tangram (pieces spawn near ghost slots).
 inline constexpr float kTangramDevPieceOffsetFromSlotM = 1.15f;
 
