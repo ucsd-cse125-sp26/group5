@@ -22,6 +22,7 @@
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
@@ -320,8 +321,8 @@ void trySnapPiecesToSlots(ServerGame& game) {
     }
     tangram_role_server::syncPieceCollisionLayer(game, ent, stage);
 
-    printf("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
-           static_cast<unsigned>(piece.pieceId));
+    LOG_DEBUG("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
+              static_cast<unsigned>(piece.pieceId));
   }
 }
 
@@ -463,8 +464,8 @@ void tryRotateNearbyPiece(ServerGame& game) {
       const glm::vec3 slotPos = slotSnapWorldPos(game, *def);
       if (shared::tangram_puzzle::yawMatchesTarget(newYaw, qTarget)) {
         applyPieceTransform(game, best, slotPos, flatQuatFromYaw(qTarget));
-        printf("[Tangram] Piece %u aligned with ghost slot\n",
-               static_cast<unsigned>(piece.pieceId));
+        LOG_DEBUG("[Tangram] Piece %u aligned with ghost slot\n",
+                  static_cast<unsigned>(piece.pieceId));
       } else {
         applyPieceTransform(game, best, slotPos, q);
       }
@@ -511,7 +512,7 @@ void rollRandomPieceSpawns(ServerGame& game) {
       game.overworldFallFragmentSpawnXZ[static_cast<size_t>(i)] = {
           slotPos.x - towardSlot.x * off, slotPos.y - towardSlot.y * off};
     }
-    printf(
+    LOG_DEBUG(
         "[DevSpawn] Pieces near ghost slots (%.1fm outside — short push to "
         "snap)\n",
         shared::dev_spawn::kTangramDevPieceOffsetFromSlotM);
@@ -616,7 +617,7 @@ void tryCompletePuzzle(ServerGame& game) {
     net::broadcastPacket(game.network->getHost(), soundPkt);
   }
 
-  printf(
+  LOG_DEBUG(
       "[Tangram] Puzzle complete — spring fragment spawned at trigger (%.1f, "
       "%.1f, %.1f). Pick it up to restore spring.\n",
       fragmentX, fragmentY, fragmentZ);
@@ -790,32 +791,32 @@ void beginPuzzle(ServerGame& game) {
   spawned.push_back(game.overworldTangramController);
   broadcastSpawn(game, spawned);
 
-  printf(
+  LOG_DEBUG(
       "[Tangram] Started — push pieces onto the ghost swan | R rotate | "
       "snap all 7 + correct facing to win. Q to exit.\n");
   if (game.tangramSlotLayout.anyFromMap) {
-    printf("[Tangram] Slot poses from map (spring_tangram_slot_1..7)\n");
+    LOG_DEBUG("[Tangram] Slot poses from map (spring_tangram_slot_1..7)\n");
   } else {
-    printf(
+    LOG_DEBUG(
         "[Tangram] Slot poses from tangram_puzzle_data.h (add Blender "
         "empties spring_tangram_slot_1..7 to override)\n");
   }
-  printf("[Tangram] %d ghost slots (one per piece, ids 1–7)\n",
-         shared::tangram_puzzle::kPieceCount);
+  LOG_DEBUG("[Tangram] %d ghost slots (one per piece, ids 1–7)\n",
+            shared::tangram_puzzle::kPieceCount);
   if (shared::tangram_roles::rolesActive(isolationStage)) {
-    printf("[Tangram] Role isolation stage %u (0=off, 5=full split)\n",
-           static_cast<unsigned>(isolationStage));
+    LOG_DEBUG("[Tangram] Role isolation stage %u (0=off, 5=full split)\n",
+              static_cast<unsigned>(isolationStage));
     if (shared::tangram_roles::rotateRestricted(isolationStage)) {
-      printf("[Tangram]   rotate: slot %u only\n",
-             static_cast<unsigned>(shared::tangram_roles::kRotateSlot));
+      LOG_DEBUG("[Tangram]   rotate: slot %u only\n",
+                static_cast<unsigned>(shared::tangram_roles::kRotateSlot));
     }
     if (shared::tangram_roles::slotsRestricted(isolationStage)) {
-      printf("[Tangram]   ghost slots visible: slot %u only\n",
-             static_cast<unsigned>(shared::tangram_roles::kSlotsSlot));
+      LOG_DEBUG("[Tangram]   ghost slots visible: slot %u only\n",
+                static_cast<unsigned>(shared::tangram_roles::kSlotsSlot));
     }
     if (shared::tangram_roles::colorRestricted(isolationStage)) {
-      printf("[Tangram]   piece color visible: slot %u only (others grey)\n",
-             static_cast<unsigned>(shared::tangram_roles::kColorSlot));
+      LOG_DEBUG("[Tangram]   piece color visible: slot %u only (others grey)\n",
+                static_cast<unsigned>(shared::tangram_roles::kColorSlot));
     }
   }
 }
@@ -855,9 +856,9 @@ void endPuzzle(ServerGame& game, bool releasePlayers) {
   game.overworldTangramFocusTimer = 0.0f;
   if (releasePlayers) {
     releasePlayersAfterExit(game);
-    printf("[Tangram] Puzzle ended — walk onto green pad to play again\n");
+    LOG_DEBUG("[Tangram] Puzzle ended — walk onto green pad to play again\n");
   } else {
-    printf(
+    LOG_DEBUG(
         "[Tangram] Puzzle complete — players stay on board; pick up the "
         "fragment to restore spring\n");
   }

@@ -5,6 +5,7 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 
@@ -36,7 +37,7 @@ void checkCreditsTrigger(ServerGame& game) {
   shared::StateChangePacket pkt;
   pkt.state = shared::GameStateType::CREDITS;
   net::broadcastPacket(game.network->getHost(), pkt);
-  printf("[Credits] All players in the Fallen house — rolling credits.\n");
+  LOG_DEBUG("[Credits] All players in the Fallen house — rolling credits.\n");
 }
 
 }  // namespace credits_trigger

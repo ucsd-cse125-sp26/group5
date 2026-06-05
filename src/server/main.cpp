@@ -23,6 +23,7 @@
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/hello.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
@@ -45,6 +46,7 @@ bool shouldSendFrameUpdate(entt::registry& registry, entt::entity ent) {
 int main() {
   std::cout << "Hello World Server";
   shared::hello();
+  shared::log::initFromEnvironment();
 
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
@@ -63,17 +65,17 @@ int main() {
 
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {
-    printf("[DevSpawn] Overworld connect spawn: tangram pad\n");
+    LOG_DEBUG("[DevSpawn] Overworld connect spawn: tangram pad\n");
   } else {
-    printf("[DevSpawn] Overworld connect spawn: winter maze\n");
+    LOG_DEBUG("[DevSpawn] Overworld connect spawn: winter maze\n");
   }
 
   // Start in the Overworld
   game.gameStateManager.changeState(game, std::make_unique<OverworldState>());
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
-    printf("A new client connected from %x:%u.\n", peer->address.host,
-           peer->address.port);
+    LOG_DEBUG("A new client connected from %x:%u.\n", peer->address.host,
+              peer->address.port);
 
     if (g.unused_player_slots.empty()) {
       enet_peer_disconnect(peer, 0);
@@ -110,7 +112,7 @@ int main() {
         g.registry.get<shared::RenderInfo>(av).playerSlot = slot;
       }
     }
-    printf("[Server] Client assigned player slot %" PRIu8 "\n", slot);
+    LOG_DEBUG("[Server] Client assigned player slot %" PRIu8 "\n", slot);
 
     if (g.gameStateManager.currentState() &&
         g.gameStateManager.currentState()->getStateType() ==
@@ -181,7 +183,7 @@ int main() {
     auto it = g.active_players.find(peer);
     if (it == g.active_players.end()) return;
 
-    printf("%s disconnected.\n", (const char*)peer->data);
+    LOG_DEBUG("%s disconnected.\n", (const char*)peer->data);
     PlayerAvatars slots = it->second;
 
     // if we wanted to immediately despawn the player's avatar on disconnect, we

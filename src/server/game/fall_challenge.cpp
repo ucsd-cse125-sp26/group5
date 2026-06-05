@@ -11,6 +11,7 @@
 #include "server/server_game.h"     // ServerGame, new_entity, serializeEntities
 #include "server/server_network.h"  // net::broadcastRaw / broadcastPacket
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/sound_constants.h"
 
@@ -683,7 +684,8 @@ void CollectFallFragment(ServerGame& game) {
     auto& gs = game.registry.get<shared::GameSection>(e);
     if (gs.sectionsCompleted < 255) gs.sectionsCompleted++;
   }
-  printf("[GameLogic] CollectFallFragment: fall done, sections completed++\n");
+  LOG_DEBUG(
+      "[GameLogic] CollectFallFragment: fall done, sections completed++\n");
 }
 
 void update(ServerGame& game, float dt) {

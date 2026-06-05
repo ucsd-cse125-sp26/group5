@@ -13,6 +13,7 @@
 #include <cstdio>
 
 #include "shared/assets.h"
+#include "shared/log.h"
 #include "shared/mesh_loader.h"
 
 JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
@@ -225,16 +226,16 @@ JPH::ShapeRefC buildMeshShape(JPH::TriangleList&& tris, const char* tag) {
   if (tris.empty()) return nullptr;
   size_t dropped = pruneDegenerateTriangles(tris);
   if (dropped > 0) {
-    printf("MeshShape: pruned %zu degenerate triangle(s) from %s\n", dropped,
-           tag);
+    LOG_DEBUG("MeshShape: pruned %zu degenerate triangle(s) from %s\n", dropped,
+              tag);
   }
   if (tris.empty()) return nullptr;
   JPH::MeshShapeSettings settings(tris);
   settings.SetEmbedded();
   auto result = settings.Create();
   if (result.HasError()) {
-    printf("MeshShape build failed for %s: %s\n", tag,
-           result.GetError().c_str());
+    LOG_DEBUG("MeshShape build failed for %s: %s\n", tag,
+              result.GetError().c_str());
     return nullptr;
   }
   return result.Get();
@@ -310,8 +311,8 @@ JPH::BodyID PhysicsEngine::createMeshBody(const shared::ParsedModel& parsed,
   scaledSettings.SetEmbedded();
   auto sresult = scaledSettings.Create();
   if (sresult.HasError()) {
-    printf("ScaledShape build failed for %s: %s\n", key.c_str(),
-           sresult.GetError().c_str());
+    LOG_DEBUG("ScaledShape build failed for %s: %s\n", key.c_str(),
+              sresult.GetError().c_str());
     return {};
   }
   return createStaticBody(sresult.Get(), pos, rot);
@@ -355,8 +356,8 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
     const std::string& modelName, const glm::vec3& scale,
     const glm::vec3& centerOffsetMask) {
   if (!isUsableScale(scale)) {
-    printf("boxShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
-           scale.x, scale.y, scale.z, modelName.c_str());
+    LOG_DEBUG("boxShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+              scale.x, scale.y, scale.z, modelName.c_str());
     return nullptr;
   }
   BoxExtents ext;
@@ -370,8 +371,9 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
       if (!parsed.load(
               std::string(asset->filename),
               aiProcess_Triangulate | aiProcess_JoinIdenticalVertices)) {
-        printf("boxShapeForAsset: failed to load %s for %s — using unit box\n",
-               std::string(asset->filename).c_str(), modelName.c_str());
+        LOG_DEBUG(
+            "boxShapeForAsset: failed to load %s for %s — using unit box\n",
+            std::string(asset->filename).c_str(), modelName.c_str());
         ext = {.center = glm::vec3(0.0f), .halfExtents = glm::vec3(0.5f)};
       } else {
         glm::vec3 mn(FLT_MAX), mx(-FLT_MAX);
@@ -414,8 +416,8 @@ JPH::ShapeRefC PhysicsEngine::boxShapeForAsset(
 JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
                                                 const glm::vec3& scale) {
   if (!isUsableScale(scale)) {
-    printf("meshShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
-           scale.x, scale.y, scale.z, modelName.c_str());
+    LOG_DEBUG("meshShapeForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+              scale.x, scale.y, scale.z, modelName.c_str());
     return nullptr;
   }
   JPH::ShapeRefC unscaled;
@@ -428,8 +430,8 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
     shared::ParsedModel parsed;
     if (!parsed.load(std::string(asset->filename),
                      aiProcess_Triangulate | aiProcess_JoinIdenticalVertices)) {
-      printf("meshShapeForAsset: failed to load %s for %s\n",
-             std::string(asset->filename).c_str(), modelName.c_str());
+      LOG_DEBUG("meshShapeForAsset: failed to load %s for %s\n",
+                std::string(asset->filename).c_str(), modelName.c_str());
       return nullptr;
     }
     JPH::TriangleList tris;
@@ -467,8 +469,8 @@ JPH::ShapeRefC PhysicsEngine::meshShapeForAsset(const std::string& modelName,
 JPH::ShapeRefC PhysicsEngine::convexHullForAsset(const std::string& modelName,
                                                  const glm::vec3& scale) {
   if (!isUsableScale(scale)) {
-    printf("convexHullForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
-           scale.x, scale.y, scale.z, modelName.c_str());
+    LOG_DEBUG("convexHullForAsset: rejecting bad scale (%g, %g, %g) for %s\n",
+              scale.x, scale.y, scale.z, modelName.c_str());
     return nullptr;
   }
   JPH::ShapeRefC unscaled;
@@ -481,8 +483,8 @@ JPH::ShapeRefC PhysicsEngine::convexHullForAsset(const std::string& modelName,
     shared::ParsedModel parsed;
     if (!parsed.load(std::string(asset->filename),
                      aiProcess_Triangulate | aiProcess_JoinIdenticalVertices)) {
-      printf("convexHullForAsset: failed to load %s for %s — no hull\n",
-             std::string(asset->filename).c_str(), modelName.c_str());
+      LOG_DEBUG("convexHullForAsset: failed to load %s for %s — no hull\n",
+                std::string(asset->filename).c_str(), modelName.c_str());
       return nullptr;
     }
     // Bake the asset orientation into the points (same as boxShapeForAsset) so
@@ -505,8 +507,8 @@ JPH::ShapeRefC PhysicsEngine::convexHullForAsset(const std::string& modelName,
     settings.SetEmbedded();
     JPH::Shape::ShapeResult res = settings.Create();
     if (res.HasError()) {
-      printf("convexHullForAsset: hull build failed for %s: %s — no hull\n",
-             modelName.c_str(), res.GetError().c_str());
+      LOG_DEBUG("convexHullForAsset: hull build failed for %s: %s — no hull\n",
+                modelName.c_str(), res.GetError().c_str());
       return nullptr;
     }
     unscaled = res.Get();

@@ -4,6 +4,7 @@
 #include <functional>
 #include <unordered_map>
 
+#include "shared/log.h"
 #include "shared/protocol.h"
 
 namespace net {
@@ -25,7 +26,7 @@ class PacketDispatcher {
     if (it != handlers_.end()) {
       it->second(ctx, sender, packet->data, packet->dataLength);
     } else {
-      printf("Unhandled packet type %d\n", static_cast<int>(type));
+      LOG_DEBUG("Unhandled packet type %d\n", static_cast<int>(type));
     }
   }
 

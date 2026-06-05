@@ -194,6 +194,36 @@ To diagnose performance and stuttering issues, you can compile the client and se
 ./build-profiling.sh
 ```
 
+## Debug logging
+
+Informational debug output (state transitions, puzzle events, asset load progress, network spawn/despawn, etc.) is gated behind a shared runtime flag and is **off by default**. Real errors still print unconditionally to `stderr`.
+
+### Enable at startup
+
+Set `CSE125_DEBUG_LOG=1` before launching either process:
+
+```bash
+CSE125_DEBUG_LOG=1 ./build/server
+CSE125_DEBUG_LOG=1 ./build/client
+```
+
+Both `main.cpp` files call `shared::log::initFromEnvironment()` at startup, which turns logging on only when the env var is exactly `1`.
+
+### Toggle at runtime (debug panel)
+
+Open the debug control panel with `Ctrl+Shift+\`:
+
+- **Client debug log output** — toggles logging in the client process directly.
+- **Toggle Server Debug Log** — sends a `TOGGLE_DEBUG_LOG` command to the server.
+
+Client and server each have their own `shared::log::debugEnabled` flag; toggling one does not affect the other.
+
+### For developers
+
+- Gated messages use the `LOG_DEBUG(...)` macro from `src/shared/log.h` (a drop-in replacement for `printf`).
+- The flag lives in `src/shared/log.cpp` as `shared::log::debugEnabled` (default `false`).
+- `fprintf(stderr, ...)` errors, fatal startup failures, and the standalone `gltf_inspect` tool are not gated.
+
 ## Important links 
 - [Group main document](https://docs.google.com/document/d/119IUXJaZzLB1Wnq-WjzROSS_ZlbwY8B1QAaQj5ue13c/edit?tab=t.ugr095ybe2nc) 
 - [Brainstorm whiteboard](https://excalidraw.com/#room=e75b50a0442682a79f02,f1qUrFmzmgYeGmBa12QS0A)

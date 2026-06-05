@@ -31,6 +31,7 @@
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
@@ -159,7 +160,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
 
     const auto& pos = game.registry.get<shared::Position>(ent);
     const auto& ri = game.registry.get<shared::RenderInfo>(ent);
-    printf(
+    LOG_DEBUG(
         "[DebugPos] slot=%u player=(%.3f, %.3f, %.3f) "
         "maze_board_suggest=(%.3f, %.3f, %.3f)\n",
         static_cast<unsigned>(ri.playerSlot), pos.x, pos.y, pos.z, pos.x, pos.y,
@@ -178,7 +179,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
     }
 
     const auto& arena = game.tangramArena;
-    printf(
+    LOG_DEBUG(
         "[TangramDebug] unlocked=%d completed=%d active=%d armed=%d "
         "focus=%.2f triggerCenter=(%.3f, %.3f) half=%.3f board=(%.3f, %.3f, "
         "%.3f) spawn=(%.3f, %.3f, %.3f)\n",
@@ -204,7 +205,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
       const auto& playerRender = game.registry.get<shared::RenderInfo>(avatar);
       const bool inTrigger = arena.isInsideTrigger(playerPos.x, playerPos.y);
       if (inTrigger) ++inside;
-      printf(
+      LOG_DEBUG(
           "[TangramDebug] slot=%u pos=(%.3f, %.3f, %.3f) inTrigger=%d "
           "dx=%.3f dy=%.3f\n",
           static_cast<unsigned>(playerRender.playerSlot), playerPos.x,
@@ -212,8 +213,8 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
           playerPos.x - arena.triggerCenterX,
           playerPos.y - arena.triggerCenterY);
     }
-    printf("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
-           connected, inside);
+    LOG_DEBUG("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
+              connected, inside);
   }
 }
 
@@ -553,7 +554,7 @@ void initWorldEntities(ServerGame& game) {
 
 template <typename Tag, entt::entity PlayerAvatars::* AvatarField>
 static void enterStateHelper(ServerGame& game, const char* stateName) {
-  printf("[State] Entering %s\n", stateName);
+  LOG_DEBUG("[State] Entering %s\n", stateName);
   std::vector<entt::entity> spawned;
   auto view = game.registry.view<Tag>();
   for (auto ent : view) spawned.push_back(ent);
@@ -585,7 +586,7 @@ static bool shouldSkipTangramDevInitialEntity(ServerGame& game,
 
   if (!game.registry.all_of<shared::RenderInfo>(ent)) return false;
   const auto& render = game.registry.get<shared::RenderInfo>(ent);
-  return render.modelName.rfind("map:", 0) == 0;
+  return render.modelName.starts_with("map:");
 }
 
 // ── OverworldState ───────────────────────────────────────
@@ -636,7 +637,7 @@ void OverworldState::onEnter(ServerGame& game) {
 }
 
 void OverworldState::onExit(ServerGame& game) {
-  printf("[State] Exiting Overworld\n");
+  LOG_DEBUG("[State] Exiting Overworld\n");
   if (maze_puzzle::isPuzzleActive(game)) {
     maze_puzzle::endPuzzle(game);
   }
@@ -749,7 +750,7 @@ void OverworldState::update(ServerGame& game, float dt) {
 
     if (!game.musicFragmentPickupTestActive) {
       game.musicFragmentPickupTestActive = true;
-      printf(
+      LOG_DEBUG(
           "DEBUG: music pickup test ON — Winter music playing; first fragment "
           "spawned (pick winter→fall→summer→spring with E)\n");
       debugRevealActiveSeasonFragmentNearPlayer(game, ent);
@@ -794,7 +795,7 @@ void MazeState::onEnter(ServerGame& game) {
 }
 
 void MazeState::onExit(ServerGame& game) {
-  printf("[State] Exiting Maze\n");
+  LOG_DEBUG("[State] Exiting Maze\n");
   game.overworldMazeTriggerArmed = false;
   game.overworldMazeFocusTimer = 0.0f;
   ExitMazePuzzle(game);

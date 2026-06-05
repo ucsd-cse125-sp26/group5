@@ -14,6 +14,7 @@
 #include "server/server_network.h"
 #include "shared/components.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 
 namespace {
@@ -118,9 +119,9 @@ void EnterMazePuzzle(ServerGame& game) {
   }
 
   game.registry.emplace_or_replace<shared::MazeUIState>(puzzleEnt, true);
-  printf("[GameLogic] EnterMazePuzzle: puzzle id %" PRIu32
-         " -> INPROGRESS, maze UI on\n",
-         section.puzzleID);
+  LOG_DEBUG("[GameLogic] EnterMazePuzzle: puzzle id %" PRIu32
+            " -> INPROGRESS, maze UI on\n",
+            section.puzzleID);
 }
 
 void ExitMazePuzzle(ServerGame& game) {
@@ -139,7 +140,8 @@ void ExitMazePuzzle(ServerGame& game) {
   if (game.registry.all_of<shared::MazeUIState>(puzzleEnt)) {
     game.registry.get<shared::MazeUIState>(puzzleEnt).open = false;
   }
-  printf("[GameLogic] ExitMazePuzzle: maze UI cleared (puzzle was FINISHED)\n");
+  LOG_DEBUG(
+      "[GameLogic] ExitMazePuzzle: maze UI cleared (puzzle was FINISHED)\n");
 }
 
 bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId,
@@ -237,7 +239,7 @@ void CollectMazeFragment(ServerGame& game) {
     auto& gs = game.registry.get<shared::GameSection>(e);
     if (gs.sectionsCompleted < 255) gs.sectionsCompleted++;
   }
-  printf(
+  LOG_DEBUG(
       "[GameLogic] CollectMazeFragment: winter done, sections completed++\n");
 
   // Reveal the winter fragment now that the puzzle is solved.
@@ -279,9 +281,9 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
       shared::RunPhase::INPROGRESS)
     return;
 
-  printf("[GameLogic] ClaimPadsForActivePlayers puzzle %" PRIu32
-         " (facing from join slot, matches client camera)\n",
-         puzzleEntityId);
+  LOG_DEBUG("[GameLogic] ClaimPadsForActivePlayers puzzle %" PRIu32
+            " (facing from join slot, matches client camera)\n",
+            puzzleEntityId);
   for (auto& kv : game.active_players) {
     entt::entity m = kv.second.maze_avatar;
     if (m == entt::null || !game.registry.valid(m)) continue;
@@ -291,9 +293,9 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
     const auto pad = mazeDirectionForJoinSlot(slot);
     game.registry.emplace_or_replace<shared::MazePadBinding>(m, pad);
     uint32_t eid = game.registry.get<shared::Entity>(m).id;
-    printf("[GameLogic]   entity %" PRIu32 " slot=%" PRIu8
-           " pad=%d (UP key = this facing)\n",
-           eid, slot, static_cast<int>(pad));
+    LOG_DEBUG("[GameLogic]   entity %" PRIu32 " slot=%" PRIu8
+              " pad=%d (UP key = this facing)\n",
+              eid, slot, static_cast<int>(pad));
   }
 }
 

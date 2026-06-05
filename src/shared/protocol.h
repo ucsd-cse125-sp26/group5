@@ -40,6 +40,7 @@ enum class DebugCommand : uint8_t {
   RESET_TO_OVERWORLD_SPAWN,   // arg ignored
   TRIGGER_CREDITS,            // arg ignored
   PRINT_POSITIONS,            // arg ignored
+  TOGGLE_DEBUG_LOG,           // arg ignored
 };
 
 enum class GameStateType : uint8_t {

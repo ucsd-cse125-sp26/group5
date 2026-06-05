@@ -9,6 +9,7 @@
 #include "physics_engine.h"
 #include "server_game.h"
 #include "shared/components.h"
+#include "shared/log.h"
 
 enum class CollisionShape {
   None,  // visual-only marker
@@ -134,7 +135,7 @@ void spawnStaticEntities(ServerGame& game,
     if (d.collision == CollisionShape::Mesh) {
       shape = game.physics.meshShapeForAsset(d.modelName, d.scale);
       if (!shape) {
-        printf(
+        LOG_DEBUG(
             "spawnStaticEntities: %s has no mesh geometry, falling back "
             "to box\n",
             d.modelName.c_str());

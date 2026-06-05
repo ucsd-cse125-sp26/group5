@@ -2,6 +2,7 @@
 
 #include <cstdio>
 
+#include "shared/log.h"
 #include "shared/simple_profiler.h"
 
 bool ClientNetwork::connect(const char* host, uint16_t port,
@@ -31,13 +32,13 @@ bool ClientNetwork::connect(const char* host, uint16_t port,
   ENetEvent event;
   if (enet_host_service(client_, &event, timeoutMs) > 0 &&
       event.type == ENET_EVENT_TYPE_CONNECT) {
-    printf("Connection to %s:%u succeeded.\n", host, port);
+    LOG_DEBUG("Connection to %s:%u succeeded.\n", host, port);
     return true;
   }
 
   enet_peer_reset(peer_);
   peer_ = nullptr;
-  printf("Connection to %s:%u failed.\n", host, port);
+  LOG_DEBUG("Connection to %s:%u failed.\n", host, port);
   return false;
 }
 
@@ -54,7 +55,7 @@ void ClientNetwork::disconnect() {
         enet_packet_destroy(event.packet);
         break;
       case ENET_EVENT_TYPE_DISCONNECT:
-        puts("Disconnection succeeded.");
+        LOG_DEBUG("Disconnection succeeded.\n");
         done = true;
         break;
       default:
@@ -85,7 +86,7 @@ void ClientNetwork::poll(ClientGame& game) {
         break;
 
       case ENET_EVENT_TYPE_DISCONNECT:
-        printf("Disconnected from server.\n");
+        LOG_DEBUG("Disconnected from server.\n");
         event.peer->data = nullptr;
         peer_ = nullptr;
         game.serverLost.store(true, std::memory_order_release);

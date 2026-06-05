@@ -15,6 +15,7 @@
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/sound_constants.h"  // music_config, SoundId
@@ -359,8 +360,8 @@ void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
     break;
   }
   if (fragEnt == entt::null) {
-    printf("DEBUG: no %s fragment left to reveal\n",
-           section_puzzle::sceneNameForSeason(season));
+    LOG_DEBUG("DEBUG: no %s fragment left to reveal\n",
+              section_puzzle::sceneNameForSeason(season));
     return;
   }
 
@@ -387,6 +388,7 @@ void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
                           shared::PacketType::UPDATE_ENTITY, {fragEnt}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
-  printf("DEBUG: %s fragment beside you (F2 then F to respawn; E to pick up)\n",
-         section_puzzle::sceneNameForSeason(season));
+  LOG_DEBUG(
+      "DEBUG: %s fragment beside you (F2 then F to respawn; E to pick up)\n",
+      section_puzzle::sceneNameForSeason(season));
 }

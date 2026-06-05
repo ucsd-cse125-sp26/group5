@@ -7,13 +7,14 @@
 #include <cmath>
 
 #include "shared/components.h"
+#include "shared/log.h"
 #include "shared/sound_constants.h"
 #include "shared/util.h"
 
 bool AudioEngine::init() {
   std::scoped_lock lock(mutex_);
   soloud_ = new SoLoud::Soloud();
-  printf("AudioEngine: attempting init...\n");
+  LOG_DEBUG("AudioEngine: attempting init...\n");
 
   SoLoud::result result = SoLoud::UNKNOWN_ERROR;
 #if defined(__APPLE__)
@@ -21,8 +22,8 @@ bool AudioEngine::init() {
   result =
       soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::COREAUDIO);
   if (result != SoLoud::SO_NO_ERROR) {
-    printf("AudioEngine: CoreAudio init failed (%d: %s), trying miniaudio\n",
-           result, soloud_->getErrorString(result));
+    LOG_DEBUG("AudioEngine: CoreAudio init failed (%d: %s), trying miniaudio\n",
+              result, soloud_->getErrorString(result));
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::MINIAUDIO, 48000, 1024, 2);
   }
@@ -31,20 +32,20 @@ bool AudioEngine::init() {
 #endif
 
   if (result != SoLoud::SO_NO_ERROR) {
-    printf(
+    LOG_DEBUG(
         "AudioEngine: SoLoud init failed (error %d), retrying with null "
         "driver\n",
         result);
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::NULLDRIVER);
     if (result != SoLoud::SO_NO_ERROR) {
-      printf("AudioEngine: null driver also failed: %d\n", result);
+      LOG_DEBUG("AudioEngine: null driver also failed: %d\n", result);
       return false;
     }
-    printf("AudioEngine: running in silent mode (no audio output)\n");
+    LOG_DEBUG("AudioEngine: running in silent mode (no audio output)\n");
   }
-  printf("AudioEngine: backend %s, %u Hz\n", soloud_->getBackendString(),
-         soloud_->getBackendSamplerate());
+  LOG_DEBUG("AudioEngine: backend %s, %u Hz\n", soloud_->getBackendString(),
+            soloud_->getBackendSamplerate());
 
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
@@ -155,7 +156,7 @@ void AudioEngine::loadSound(uint32_t soundId, const std::string& path) {
   std::string fullPath = (exeDir() / path).string();
   SoLoud::result result = wav->load(fullPath.c_str());
   if (result != SoLoud::SO_NO_ERROR) {
-    printf("AudioEngine: failed to load sound %s\n", fullPath.c_str());
+    LOG_DEBUG("AudioEngine: failed to load sound %s\n", fullPath.c_str());
     delete wav;
     return;
   }
