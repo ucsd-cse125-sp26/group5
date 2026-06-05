@@ -2,6 +2,7 @@
 
 #include <soloud.h>
 #include <soloud_wav.h>
+#include <soloud_wavstream.h>
 
 #include <algorithm>
 #include <cmath>
@@ -62,19 +63,21 @@ bool AudioEngine::init() {
 
   loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
             "assets/sounds/angel.mp3");
-  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
-            "assets/sounds/Winter.wav");
-  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
-            "assets/sounds/Fall.wav");
-  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
-            "assets/sounds/Summer.wav");
-  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
-            "assets/sounds/Spring.wav");
-  loadSound(
+  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
+                  "assets/sounds/Winter.mp3");
+  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
+                  "assets/sounds/Fall.mp3");
+  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
+                  "assets/sounds/Summer.mp3");
+  loadMusicStream(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
+                  "assets/sounds/Spring.mp3");
+  loadMusicStream(
       static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
-      "assets/sounds/AfterSpring.wav");
-  if (auto* afterSpring = sounds_[static_cast<uint32_t>(
-          shared::SoundId::SECTION_AFTER_SPRING_AMBIENT)]) {
+      "assets/sounds/AfterSpring.mp3");
+  auto afterSpringIt = musicStreams_.find(static_cast<uint32_t>(
+      shared::SoundId::SECTION_AFTER_SPRING_AMBIENT));
+  if (afterSpringIt != musicStreams_.end() && afterSpringIt->second != nullptr) {
+    auto* afterSpring = afterSpringIt->second;
     afterSpring->setLooping(true);
     afterSpring->setLoopPoint(
         shared::music_config::kAfterSpringLoopStartSeconds);
@@ -91,6 +94,8 @@ void AudioEngine::shutdown() {
   }
   for (auto& [id, wav] : sounds_) delete wav;
   sounds_.clear();
+  for (auto& [id, stream] : musicStreams_) delete stream;
+  musicStreams_.clear();
 }
 
 void AudioEngine::update(float dt) {
@@ -163,6 +168,20 @@ void AudioEngine::loadSound(uint32_t soundId, const std::string& path) {
   wav->set3dMinMaxDistance(5.0f, 1000.0f);
   wav->set3dAttenuation(SoLoud::AudioSource::INVERSE_DISTANCE, 1.0f);
   sounds_[soundId] = wav;
+}
+
+void AudioEngine::loadMusicStream(uint32_t soundId, const std::string& path) {
+  auto* stream = new SoLoud::WavStream();
+  std::string fullPath = (exeDir() / path).string();
+  SoLoud::result result = stream->load(fullPath.c_str());
+  if (result != SoLoud::SO_NO_ERROR) {
+    std::fprintf(stderr, "AudioEngine: failed to stream music %s (%d: %s)\n",
+                 fullPath.c_str(), result, soloud_->getErrorString(result));
+    delete stream;
+    return;
+  }
+  stream->setLooping(true);
+  musicStreams_[soundId] = stream;
 }
 
 void AudioEngine::updateEmitter(uint32_t entityId,
@@ -261,8 +280,9 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
     return;
   }
 
-  auto it = sounds_.find(soundId);
-  if (it == sounds_.end()) {
+  auto streamIt = musicStreams_.find(soundId);
+  auto soundIt = sounds_.find(soundId);
+  if (streamIt == musicStreams_.end() && soundIt == sounds_.end()) {
     std::fprintf(stderr,
                  "AudioEngine: global loop sound id %u not loaded "
                  "(missing assets/sounds?)\n",
@@ -278,8 +298,13 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
     globalMusicVolume_ = 0.0f;
   }
 
-  it->second->setLooping(true);
-  globalMusicHandle_ = soloud_->play(*it->second);
+  if (streamIt != musicStreams_.end()) {
+    streamIt->second->setLooping(true);
+    globalMusicHandle_ = soloud_->play(*streamIt->second);
+  } else {
+    soundIt->second->setLooping(true);
+    globalMusicHandle_ = soloud_->play(*soundIt->second);
+  }
   globalMusicSoundId_ = soundId;
   globalMusicTargetVolume_ = volume;
   globalMusicVolume_ = 0.0f;

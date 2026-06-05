@@ -10,6 +10,7 @@
 namespace SoLoud {
 class Soloud;
 class Wav;
+class WavStream;
 }  // namespace SoLoud
 namespace shared {
 struct SoundEmitter;
@@ -53,6 +54,7 @@ class AudioEngine {
   mutable std::mutex mutex_;
   SoLoud::Soloud* soloud_ = nullptr;
   std::unordered_map<uint32_t, SoLoud::Wav*> sounds_;
+  std::unordered_map<uint32_t, SoLoud::WavStream*> musicStreams_;
   float masterVolume_ = 1.0f;
 
   // entityId → (soundId → SoLoud handle)
@@ -76,6 +78,7 @@ class AudioEngine {
   static constexpr float kGlobalMusicFadeSpeed = 0.35f;
 
   void loadSound(uint32_t soundId, const std::string& path);
+  void loadMusicStream(uint32_t soundId, const std::string& path);
   void startLayer(uint32_t entityId, uint32_t soundId, float x, float y,
                   float z, shared::SoundPlayMode mode);
   void stopLayer(uint32_t entityId, uint32_t soundId);
