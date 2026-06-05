@@ -221,11 +221,19 @@ struct SwitchComponent {
   bool switchOn = false;
 };
 
-// Tag component — marks this entity as a section barrier
+// Tag component — marks this entity as a section barrier. Replicated so the
+// client can draw the "barrier fog" wall at the right place/size and tint it by
+// season; the entity despawns on section completion, which clears the fog.
 struct SectionBarrierTag {
   uint8_t sectionID;  // matches SectionController's puzzleID
   glm::vec3 halfExtents;
   SectionSeasonMap season;
+
+  // glm::vec3 isn't a flat aggregate zpp_bits can reflect, so decompose it.
+  constexpr static auto serialize(auto& archive, auto& self) {
+    return archive(self.sectionID, self.halfExtents.x, self.halfExtents.y,
+                   self.halfExtents.z, self.season);
+  }
 };
 
 // Flag component — added to a barrier when it should be torn down

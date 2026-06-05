@@ -240,6 +240,9 @@ void registerClientHandlers(ClientNetwork& network) {
         } else if (pkt.state == shared::GameStateType::CREDITS) {
           // Keep the current seasonal track, especially AfterSpring, through
           // the credits roll. No separate credits music is loaded right now.
+          // Deliberately a no-op: the end ("exit") scene is silent and any
+          // accompanying audio is owned by the audio subsystem, so we must not
+          // stop whatever is currently playing on entering CREDITS.
         } else if (pkt.state == shared::GameStateType::OVERWORLD) {
           // Stop minigame/credits loops only. Season loops come from
           // SEASON_MUSIC; do not stopAll here or a reordered packet can mute

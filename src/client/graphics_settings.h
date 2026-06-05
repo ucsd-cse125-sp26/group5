@@ -126,12 +126,12 @@ struct GraphicsSettings {
   // geometry AND the same texels cover less area (crisper near shadows). Raise
   // toward farPlane if long-range shadows are needed.
   float shadowDistance =
-      250.0f;  // clamped to farPlane; cascades cover near..this
+      300.0f;  // clamped to farPlane; cascades cover near..this
   float shadowNearOffset =
       2.0f;  // split-scheme near, decoupled from camera near
   float cascadeSplitLambda = 0.7f;  // 0 = uniform splits, 1 = logarithmic
   float cascadeCasterPullback =
-      50.0f;                      // light-space depth for off-slice casters
+      100.0f;                     // light-space depth for off-slice casters
   float cascadeBlendBand = 0.0f;  // 0 = hard switch; fraction of range to blend
   bool visualizeCascades =
       false;  // tint each cascade band in the lighting pass
@@ -189,6 +189,64 @@ struct GraphicsSettings {
   glm::vec3 celRimColor{1.0f};
   float celRimPower = 4.0f;
   float celRimThreshold = 0.6f;
+
+  // Barrier fog: season-tinted volumetric mist drawn at each active section
+  // barrier (an invisible AABB wall) so blocked passages read as walls of fog
+  // that lift when the season unlocks. Pure client-side post pass driven by the
+  // replicated SectionBarrierTag — no effect when no barriers are active.
+  bool fogEnabled = true;
+  // Opacity accrued per world-unit of camera ray inside a barrier box.
+  float fogDensity = 1.29f;
+  // 1/units: how fast the mist thins above the fade-start height (0 = no fade,
+  // uniform density up the whole wall).
+  float fogHeightFalloff = 0.016f;
+  // Scales the fog volume's vertical reach vs the barrier's (gameplay)
+  // collision box, so the mist can rise higher than the wall.
+  float fogHeightScale = 1.5f;
+  // Fraction of the fog height that stays at full density before the upward
+  // fade begins — 0.5 = solid lower half, fade the upper half, like a ground
+  // mist bank covering the floor.
+  float fogFadeStartFraction = 0.0f;
+  // Anchor the height fade to the landscape under the fog (from scene depth)
+  // instead of a flat z = 0, so the mist hugs the terrain. Off = barrier
+  // center.
+  bool fogFloorDetect = true;
+  // World-space distance over which the mist fades in around the barrier
+  // footprint, so it ramps up over a wide area instead of a hard wall edge.
+  float fogWidth = 8.0f;
+  // Ray-march samples across the fog span. Lower = faster, more banding (jitter
+  // + noise hide most of it).
+  int fogSteps = 12;
+  // Fog render resolution = render size / fogScale (1 = full, 2 = half,
+  // 4 = quarter), then composited back at full res. The main perf lever; fog is
+  // low-frequency so quarter looks nearly identical.
+  int fogScale = 4;
+  // World-space frequency of the drifting mist noise (smaller = larger wisps).
+  float fogNoiseScale = 0.072f;
+  // Scroll speed of the mist animation.
+  float fogNoiseSpeed = 2.0f;
+  // 0 = uniform slab, 1 = fully noise-modulated wisps.
+  float fogNoiseStrength = 1.0f;
+  // Domain-warp amount: displaces the noise by a low-frequency flow so the mist
+  // billows/curls like real fog instead of static lumps. 0 = off (cheapest).
+  float fogSwirl = 0.0f;
+  // Breaks the barrier box's flat faces / straight silhouette edges into wisps
+  // by carving the surface inward with noise. 0 = hard box edges, higher =
+  // softer and more mist-like (scaled by the box's thinnest half-extent).
+  float fogMistiness = 0.0f;
+  // Self-shadowed volumetric shading: a few density taps toward the sun darken
+  // the mist's depths so it reads as a 3D volume instead of a flat tint.
+  bool fogLighting = true;
+  // Shadow-floor brightness for the lit path (lower = darker depths / more 3D
+  // contrast; 1 = no self-shadowing).
+  float fogAmbient = 0.4f;
+  // Directional in-scattering: adds a bright sun halo on top of the shading.
+  // 0 = no halo.
+  float fogScatterStrength = 0.0f;
+  // Henyey-Greenstein anisotropy (forward-scatter bias) for the sun halo.
+  float fogScatterAnisotropy = 0.6f;
+  // Color of the in-scattered sunlight added on top of the season tint.
+  glm::vec3 fogScatterColor{1.0f, 0.96f, 0.88f};
 
   // Outlines (post-process Sobel only)
   OutlineMode outlineMode = OutlineMode::Cross;
