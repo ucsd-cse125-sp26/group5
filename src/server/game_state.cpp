@@ -264,7 +264,7 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
     ri.colorExempt = true;
   }
   game.registry.emplace<shared::Camera>(entity, 0.0f,
-                                          shared::kDefaultPlayerCameraHeight);
+                                        shared::kDefaultPlayerCameraHeight);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);

@@ -1,22 +1,22 @@
 #include "server/game/overworld.h"
 
 #include <cstdio>
+#include <vector>
 
 #include "server/game/fall_challenge.h"
 #include "server/game/maze.h"
 #include "server/game/section_puzzle.h"
 #include "server/game/summer_escape.h"
 #include "server/server_game.h"  // serializeEntities
-#include <vector>
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
 #include "shared/components.h"
+#include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
-#include "shared/dev_spawn.h"
 #include "shared/sound_constants.h"  // music_config, SoundId
 
 namespace {
@@ -377,17 +377,16 @@ void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
   if (game.network == nullptr) return;
 
   if (needsSpawn) {
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::SPAWN_ENTITY, {fragEnt},
-                                 false);
+    auto buf =
+        serializeEntities(game.registry, game.componentRegistry,
+                          shared::PacketType::SPAWN_ENTITY, {fragEnt}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   } else {
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::UPDATE_ENTITY, {fragEnt},
-                                 false);
+    auto buf =
+        serializeEntities(game.registry, game.componentRegistry,
+                          shared::PacketType::UPDATE_ENTITY, {fragEnt}, false);
     net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
   }
-  printf(
-      "DEBUG: %s fragment beside you (F2 then F to respawn; E to pick up)\n",
-      section_puzzle::sceneNameForSeason(season));
+  printf("DEBUG: %s fragment beside you (F2 then F to respawn; E to pick up)\n",
+         section_puzzle::sceneNameForSeason(season));
 }

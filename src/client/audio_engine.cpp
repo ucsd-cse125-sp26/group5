@@ -18,12 +18,13 @@ bool AudioEngine::init() {
   SoLoud::result result = SoLoud::UNKNOWN_ERROR;
 #if defined(__APPLE__)
   // Prefer native Core Audio on macOS (miniaudio often fails with error 7).
-  result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::COREAUDIO);
+  result =
+      soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::COREAUDIO);
   if (result != SoLoud::SO_NO_ERROR) {
     printf("AudioEngine: CoreAudio init failed (%d: %s), trying miniaudio\n",
            result, soloud_->getErrorString(result));
-    result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::MINIAUDIO,
-                           48000, 1024, 2);
+    result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
+                           SoLoud::Soloud::MINIAUDIO, 48000, 1024, 2);
   }
 #else
   result = soloud_->init();
@@ -108,8 +109,9 @@ void AudioEngine::update(float dt) {
 
   if (globalMusicHandle_ != 0 &&
       globalMusicVolume_ < globalMusicTargetVolume_) {
-    globalMusicVolume_ = std::min(globalMusicVolume_ + kGlobalMusicFadeSpeed * dt,
-                                  globalMusicTargetVolume_);
+    globalMusicVolume_ =
+        std::min(globalMusicVolume_ + kGlobalMusicFadeSpeed * dt,
+                 globalMusicTargetVolume_);
     soloud_->setVolume(globalMusicHandle_, globalMusicVolume_);
   }
 }

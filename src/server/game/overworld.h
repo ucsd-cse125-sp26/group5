@@ -53,4 +53,4 @@ void syncOverworldSeasonMusic(ServerGame& game,
 
 // Reveal the fragment for the current active season beside the player (~3 m).
 void debugRevealActiveSeasonFragmentNearPlayer(ServerGame& game,
-                                                entt::entity player);
+                                               entt::entity player);

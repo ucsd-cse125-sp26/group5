@@ -368,8 +368,7 @@ uint32_t pickTangramPieceAtScreenCenter(const ClientGame& game,
   glm::vec4 farH = invVP * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
   if (std::abs(nearH.w) < 1e-6f || std::abs(farH.w) < 1e-6f) return 0;
   const glm::vec3 rayOrigin = glm::vec3(nearH) / nearH.w;
-  const glm::vec3 rayDir =
-      glm::normalize(glm::vec3(farH) / farH.w - rayOrigin);
+  const glm::vec3 rayDir = glm::normalize(glm::vec3(farH) / farH.w - rayOrigin);
 
   uint32_t bestId = 0;
   float bestPerp = 1e9f;

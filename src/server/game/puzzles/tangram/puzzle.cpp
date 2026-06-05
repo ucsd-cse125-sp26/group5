@@ -857,8 +857,9 @@ void endPuzzle(ServerGame& game, bool releasePlayers) {
     releasePlayersAfterExit(game);
     printf("[Tangram] Puzzle ended — walk onto green pad to play again\n");
   } else {
-    printf("[Tangram] Puzzle complete — players stay on board; pick up the "
-           "fragment to restore spring\n");
+    printf(
+        "[Tangram] Puzzle complete — players stay on board; pick up the "
+        "fragment to restore spring\n");
   }
 }
 

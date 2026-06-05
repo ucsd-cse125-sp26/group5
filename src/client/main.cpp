@@ -203,9 +203,9 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, game, game.inputQueue, prevKeys,
-                 graphics.debugChannel != DebugChannel::Off ||
-                     graphics.debugPanelOpen);
+    processInput(
+        graphics.window, game, game.inputQueue, prevKeys,
+        graphics.debugChannel != DebugChannel::Off || graphics.debugPanelOpen);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 
