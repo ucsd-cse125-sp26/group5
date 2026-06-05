@@ -139,6 +139,7 @@ struct SoundEmitter {
 struct Grounded {
   bool isGrounded = false;
   bool wasGrounded = false;  // last frame's value, for edge detection
+  int jumpsRemaining = 2;
 };
 
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
@@ -275,13 +276,26 @@ struct FallingObject {
 
 // Server-only: a marker entity that rains FallingObjects within `radius` of its
 // own Position. `timer` is a per-zone spawn accumulator.
+// Server-only: a marker entity that rains FallingObjects over an area centered
+// on its own Position. `shape` picks how spawn points are sampled: Disk uses
+// `radius`; Rect uses `halfX`/`halfY` (covers a square platform fully, corners
+// included). `timer` is a per-zone spawn accumulator.
 struct FallingHazardZone {
-  float radius = 8.0f;
+  enum class Shape : uint8_t { Disk, Rect };
+  Shape shape = Shape::Disk;
+  float radius = 8.0f;        // Disk: sampling radius
+  float halfX = 8.0f;         // Rect: half-width  (X)
+  float halfY = 8.0f;         // Rect: half-height (Y)
   float spawnHeight = 20.0f;  // spawn this far above the zone's Position.z
   float interval = 0.4f;      // seconds between drops
   float timer = 0.0f;
+  enum class AttackPattern { Random, Spiral, Spokes, Aimed };
+  AttackPattern pattern = AttackPattern::Random;
+  float patternAngle = 0.0f;  // current rotation offset, advances each burst
+  int patternStep = 0;        // which phase in a multi-burst sequence
+  int burstsUntilSwitch = 8;  // how many bursts before picking a new pattern
+  int burstsSinceSwitch = 0;  // counter, incremented each burst
 };
-
 struct Knockback {
   float remaining =
       0.0f;              // seconds left where physics owns horizontal velocity

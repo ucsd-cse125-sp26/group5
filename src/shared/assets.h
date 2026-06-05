@@ -249,6 +249,13 @@ inline constexpr AssetInfo ASSETS[] = {
      .qy = 0.70710678f,
      .qz = 0.70710678f,
      .cubeSpec = nullptr},
+    {.name = "pumpkin",
+     .filename = "assets/pumpkin/pumpkin.obj",
+     .qw = 1.0f,
+     .qx = 0.0f,
+     .qy = 0.0f,
+     .qz = 0.0f,
+     .cubeSpec = nullptr},
     // DAE export is Y-up; rotate +90° about X so the vampire stands upright
     // in the game's Z-up world. Skinned mesh — Animator will drive it.
     {.name = "vampire",

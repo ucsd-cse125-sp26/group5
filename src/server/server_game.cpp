@@ -112,15 +112,20 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    if (input.keys_newly_pressed & KEY_JUMP &&
-        !maze_puzzle::shouldConfinePlayersToMazeTrigger(game)) {
-      verticalVel = 10.0f;
-      shared::SoundEventPacket pkt;
-      pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
-      pkt.x = position.x;
-      pkt.y = position.y;
-      pkt.z = position.z;
-      net::broadcastPacket(game.network->getHost(), pkt);
+    if (game.registry.all_of<shared::Grounded>(entity)) {
+      auto& g = game.registry.get<shared::Grounded>(entity);
+      if (g.isGrounded) g.jumpsRemaining = 2;
+
+      if ((input.keys_newly_pressed & KEY_JUMP) && g.jumpsRemaining > 0) {
+        verticalVel = 10.0f;
+        g.jumpsRemaining--;
+        shared::SoundEventPacket pkt;
+        pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
+        pkt.x = position.x;
+        pkt.y = position.y;
+        pkt.z = position.z;
+        net::broadcastPacket(game.network->getHost(), pkt);
+      }
     }
 
     bool knocked =
