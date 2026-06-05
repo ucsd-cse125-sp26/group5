@@ -97,14 +97,6 @@ bool AudioEngine::init() {
   loadMusicStream(
       static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
       "assets/sounds/AfterSpring.mp3");
-  auto afterSpringIt = musicStreams_.find(static_cast<uint32_t>(
-      shared::SoundId::SECTION_AFTER_SPRING_AMBIENT));
-  if (afterSpringIt != musicStreams_.end() && afterSpringIt->second != nullptr) {
-    auto* afterSpring = afterSpringIt->second;
-    afterSpring->setLooping(true);
-    afterSpring->setLoopPoint(
-        shared::music_config::kAfterSpringLoopStartSeconds);
-  }
   return true;
 }
 
@@ -340,11 +332,6 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   globalMusicVolume_ = 0.0f;
   soloud_->setVolume(globalMusicHandle_, 0.0f);
 
-  if (soundId ==
-      static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT)) {
-    soloud_->seek(globalMusicHandle_,
-                  shared::music_config::kAfterSpringLoopStartSeconds);
-  }
 }
 
 void AudioEngine::stopGlobalLoop(uint32_t soundId) {

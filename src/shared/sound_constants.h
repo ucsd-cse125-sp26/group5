@@ -34,8 +34,8 @@ enum class SoundId : uint32_t {
 // Overworld seasonal loop playback (client AudioEngine).
 // Each season track is one file looped continuously (setLooping).
 namespace music_config {
-// AfterSpring.wav: start / loop from this timestamp (seconds).
-// 1:12 => 72. Edit here if you re-export the WAV.
+// Reserved for WAV loop-point tuning. MP3 seasonal music currently starts at
+// the beginning to avoid backend-specific stream seek issues.
 inline constexpr float kAfterSpringLoopStartSeconds = 72.0f;
 inline constexpr float kSeasonMusicVolume = 0.80f;
 }  // namespace music_config
