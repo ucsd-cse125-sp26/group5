@@ -118,7 +118,7 @@ static void drawFallChallengeHUD(const shared::FallChallengeState& cs) {
                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
                    ImGuiWindowFlags_NoCollapse);
 
-  ImGui::TextUnformatted("Survive the falling cubes!");
+  ImGui::TextUnformatted("Stay on the platform!");
 
   ImVec2 p = ImGui::GetCursorScreenPos();
   ImDrawList* dl = ImGui::GetWindowDrawList();

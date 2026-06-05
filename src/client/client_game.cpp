@@ -411,23 +411,22 @@ void processInput(GLFWwindow* window, const ClientGame& game,
     return;
   }
   InputKeys keys = 0;
+  const bool mazePuzzleActive = isOverworldMazePuzzleActive(game);
   const bool mazeBoardControl = isLocalOverworldMazePuzzleControl(game);
 
-  if (!mazeBoardControl) {
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) keys |= KEY_FORWARD;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) keys |= KEY_LEFT;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) keys |= KEY_BACKWARD;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) keys |= KEY_RIGHT;
+  if (!mazePuzzleActive) {
     if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) keys |= KEY_SWAP_MODEL;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) keys |= KEY_PICKUP;
-    // F2 enables debug overlay; F starts music pickup test (server-side).
-    if (debugMode) {
-      if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-        keys |= KEY_DEBUG_SPAWN_FRAGMENT;
-    }
   }
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) keys |= KEY_JUMP;
+  if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) keys |= KEY_EXIT_MINIGAME;
+  // Gameplay debug shortcuts (B/N/G/V/Y/F) were removed in favor of the demo
+  // debug control panel (Ctrl+Shift+\); those actions now travel over the
+  // DEBUG_COMMAND packet instead of the input bitfield.
 
   if (mazeBoardControl) {
     // Send every arrow key pressed; server MazePadBinding picks the one
@@ -456,7 +455,7 @@ void processInput(GLFWwindow* window, const ClientGame& game,
   const bool tangramActive = isOverworldTangramPuzzleActive(game);
   const uint32_t rotateTargetId =
       tangramActive ? game.tangramCrosshairTargetId : 0;
-  const bool lockCamera = mazeBoardControl;
+  const bool lockCamera = false;
   bool captured = glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_DISABLED;
   if (captured && !lockCamera) {
     double mouseX, mouseY;

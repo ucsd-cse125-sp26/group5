@@ -431,14 +431,28 @@ void initWorldEntities(ServerGame& game) {
   //     /*pos=*/glm::vec3(0.0f, 0.0f, 0.0f),
   //     /*halfExtents=*/glm::vec3(1.0f, 20.0f, 5.0f));
   // add more per section as needed
+
+  // Rect is the same size as the block but sits slightly toward +X/+Y. Nudge
+  // its center back toward the origin to line them up; leave half-extents full.
+  // constexpr float kShiftX = 0.2f;  // how far it pokes past the block on +X
+  // constexpr float kShiftY = 0.2f;  // ... on +Y
+  // spawnFallingHazardZoneRect<shared::OverworldTag>(
+  //       game,
+  //       /*center=*/
+  //       glm::vec3(game.fallLayout.playCenterX - kShiftX,
+  //                 game.fallLayout.playCenterY - kShiftY,
+  //                 game.fallLayout.playCenterZ),
+  //       /*halfX=*/game.fallLayout.playHalfX,
+  //       /*halfY=*/game.fallLayout.playHalfY,
+  //       /*spawnHeight=*/game.fallLayout.spawnHeight,
+  //       /*interval=*/0.15f);
   spawnFallingHazardZone<shared::OverworldTag>(
       game,
-      /*center=*/
       glm::vec3(game.fallLayout.playCenterX, game.fallLayout.playCenterY,
                 game.fallLayout.playCenterZ),
-      /*radius=*/std::min(game.fallLayout.playHalfX, game.fallLayout.playHalfY),
-      /*spawnHeight=*/game.fallLayout.spawnHeight,
-      /*interval=*/0.4f);
+      std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.3f,
+      game.fallLayout.spawnHeight, 0.12f);
+
   // Autumn fall arena: one green play surface (collision). Orange rim/trigger
   // markers removed — challenge bounds still use game.fallLayout floats.
   spawnStaticEntities<shared::OverworldTag>(
@@ -661,6 +675,7 @@ void OverworldState::update(ServerGame& game, float dt) {
   }
 
   if (maze_puzzle::isPuzzleActive(game)) {
+    movement_system(game, dt, StateType::OVERWORLD);
     maze_puzzle::updatePuzzle(game, dt);
     render_model_change(game, dt);
 
@@ -697,7 +712,6 @@ void OverworldState::update(ServerGame& game, float dt) {
     game.overworldMazeFocusTimer = 0.0f;
   } else if (!summer_escape::isActive(game) && game.overworldMazeTriggerArmed &&
              maze_trigger::canTriggerMaze(game)) {
-    maze_camera::snapOverworldAvatarsFaceMazePreview(game);
     game.overworldMazeFocusTimer += dt;
     if (game.overworldMazeFocusTimer >= maze_camera::kFocusHoldSeconds) {
       game.overworldMazeTriggerArmed = false;
