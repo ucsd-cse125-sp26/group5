@@ -262,7 +262,13 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   }
 
   auto it = sounds_.find(soundId);
-  if (it == sounds_.end()) return;
+  if (it == sounds_.end()) {
+    std::fprintf(stderr,
+                 "AudioEngine: global loop sound id %u not loaded "
+                 "(missing assets/sounds?)\n",
+                 soundId);
+    return;
+  }
 
   if (globalMusicHandle_ != 0) {
     globalMusicFadeOutHandle_ = globalMusicHandle_;
