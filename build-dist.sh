@@ -68,17 +68,10 @@ esac
 
 if [[ $do_build -eq 1 ]]; then
 	echo "==> Configuring $variant Windows build in $build_dir"
-	# macOS ships Bash 3.2; "${array[@]}" on an empty array trips `set -u`.
-	if [[ ${#cmake_extra[@]} -gt 0 ]]; then
-		cmake -B "$build_dir" -G Ninja \
-			-DCMAKE_TOOLCHAIN_FILE=toolchains/windows.cmake \
-			-DCMAKE_BUILD_TYPE=Release \
-			"${cmake_extra[@]}"
-	else
-		cmake -B "$build_dir" -G Ninja \
-			-DCMAKE_TOOLCHAIN_FILE=toolchains/windows.cmake \
-			-DCMAKE_BUILD_TYPE=Release
-	fi
+	cmake -B "$build_dir" -G Ninja \
+		-DCMAKE_TOOLCHAIN_FILE=toolchains/windows.cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		"${cmake_extra[@]}"
 	echo "==> Building"
 	(cd "$build_dir" && ninja)
 fi
