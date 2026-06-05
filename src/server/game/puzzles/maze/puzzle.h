@@ -10,7 +10,8 @@ void initOverworldMazePuzzleController(ServerGame& game);
 
 [[nodiscard]] bool isPuzzleActive(const ServerGame& game);
 
-// True while the winter maze countdown or puzzle is running — players stay on pad.
+// True while the winter maze countdown or puzzle is running — players stay on
+// pad.
 [[nodiscard]] bool shouldConfinePlayersToMazeTrigger(const ServerGame& game);
 
 void beginPuzzle(ServerGame& game);
