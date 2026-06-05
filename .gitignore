@@ -9,6 +9,7 @@ latex/
 /assets/
 .DS_Store
 /maps/
+/scripts/dist/
 /.mapsync.local.json
 __pycache__/
 node_modules
