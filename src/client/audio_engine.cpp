@@ -57,11 +57,10 @@ bool AudioEngine::init() {
 #endif
 
   if (result != SoLoud::SO_NO_ERROR) {
-    std::fprintf(
-        stderr,
-        "AudioEngine ERROR: real audio backend failed on %s (%d: %s). "
-        "Trying NULLDRIVER; music will be silent if this succeeds.\n",
-        kAudioPlatform, result, soloud_->getErrorString(result));
+    std::fprintf(stderr,
+                 "AudioEngine ERROR: real audio backend failed on %s (%d: %s). "
+                 "Trying NULLDRIVER; music will be silent if this succeeds.\n",
+                 kAudioPlatform, result, soloud_->getErrorString(result));
     result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
                            SoLoud::Soloud::NULLDRIVER);
     if (result != SoLoud::SO_NO_ERROR) {
@@ -93,8 +92,9 @@ bool AudioEngine::init() {
             "assets/sounds/Summer.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
             "assets/sounds/Spring.mp3");
-  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
-            "assets/sounds/AfterSpring.mp3");
+  loadSound(
+      static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
+      "assets/sounds/AfterSpring.mp3");
   return true;
 }
 
@@ -299,7 +299,6 @@ void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   globalMusicTargetVolume_ = volume;
   globalMusicVolume_ = 0.0f;
   soloud_->setVolume(globalMusicHandle_, 0.0f);
-
 }
 
 void AudioEngine::stopGlobalLoop(uint32_t soundId) {

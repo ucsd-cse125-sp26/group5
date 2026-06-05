@@ -351,8 +351,9 @@ void syncOverworldSeasonMusic(ServerGame& game,
   shared::SeasonMusicPacket pkt;
   pkt.soundId = static_cast<uint32_t>(soundId);
   pkt.volume = shared::music_config::kSeasonMusicVolume;
-  std::printf("[Music] Server broadcasting %s music (soundId=%u, volume=%.2f)\n",
-              seasonMusicName(soundId), pkt.soundId, pkt.volume);
+  std::printf(
+      "[Music] Server broadcasting %s music (soundId=%u, volume=%.2f)\n",
+      seasonMusicName(soundId), pkt.soundId, pkt.volume);
   net::broadcastPacket(game.network->getHost(), pkt);
 }
 
