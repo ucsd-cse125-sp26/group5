@@ -140,21 +140,6 @@ static void movement_system_for_world(ServerGame& game, float dt) {
           bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
     }
 
-    // ── Landing detection (ECS-driven via Grounded component) ──
-    if (game.registry.all_of<shared::Grounded>(entity)) {
-      auto& g = game.registry.get<shared::Grounded>(entity);
-      if (!g.wasGrounded && g.isGrounded) {
-        shared::SoundEventPacket pkt;
-        pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
-        pkt.x = position.x;
-        pkt.y = position.y;
-        pkt.z = position.z;
-        pkt.volume = 0.7f;
-        pkt.positional = true;
-        net::broadcastPacket(game.network->getHost(), pkt);
-      }
-    }
-
     // ── Footsteps ──
     bool isMoving = (fwdInput != 0.0f || strafeInput != 0.0f);
     bool isGrounded = std::abs(verticalVel) < 0.5f;

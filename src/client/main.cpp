@@ -72,6 +72,10 @@ int main() {
     return EXIT_SUCCESS;
   }
 
+  // Init audio before the network thread so SEASON_MUSIC on connect is heard.
+  if (!game.audio.init()) {
+    printf("Audio init failed; continuing without audio\n");
+  }
   // Back to mouselook for gameplay.
   glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -86,18 +90,11 @@ int main() {
   game.mazeLayout.applyHeightBoost();
   game.tangramArena.applyHeightBoost();
 
-  // if (!game.audio.init()) {
-  //   game.running.store(false, std::memory_order_release);
-  //   networkThread.join();
-  //   return EXIT_FAILURE;
-  // }
-
-  if (!game.audio.init()) {
-    printf("Audio init failed; continuing without audio\n");
-  }
-
   if (shared::dev_spawn::kOverworldSpawn ==
       shared::dev_spawn::OverworldSpawn::Tangram) {
+    applyPreset(graphics.settings, GraphicsPreset::Performance);
+    graphics.settings.shadowsEnabled = false;
+    graphics.settings.outlineMode = OutlineMode::None;
     printf("[DevSpawn] Client fallback camera: tangram pad\n");
   } else {
     printf("[DevSpawn] Client fallback camera: winter maze\n");
@@ -139,7 +136,6 @@ int main() {
     VideoRequest videoReq;
     while (game.videoQueue.tryPop(videoReq))
       graphics.handleVideoRequest(videoReq);
-
     graphics.render(game, network);
     {
       SIMPLE_PROFILE_SCOPE("Audio Update");
@@ -207,7 +203,9 @@ int main() {
       glfwSetInputMode(graphics.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     }
 
-    processInput(graphics.window, game, game.inputQueue, prevKeys);
+    processInput(
+        graphics.window, game, game.inputQueue, prevKeys,
+        graphics.debugChannel != DebugChannel::Off || graphics.debugPanelOpen);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 

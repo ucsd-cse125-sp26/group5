@@ -263,7 +263,8 @@ void spawnPlayerAvatar(ServerGame& game, entt::entity entity,
         entity, modelName, scale.x, scale.y, scale.z);
     ri.colorExempt = true;
   }
-  game.registry.emplace<shared::Camera>(entity, 0.0f, 2.0f);
+  game.registry.emplace<shared::Camera>(entity, 0.0f,
+                                        shared::kDefaultPlayerCameraHeight);
   game.registry.emplace<shared::PlayerInput>(entity, InputKeys(0), InputKeys(0),
                                              InputKeys(0), 0.0f, 0.0f);
   game.registry.emplace<Tag>(entity);
@@ -575,6 +576,18 @@ static std::vector<entt::entity> getEntitiesHelper(ServerGame& game) {
   return existing;
 }
 
+static bool shouldSkipTangramDevInitialEntity(ServerGame& game,
+                                              entt::entity ent) {
+  if (shared::dev_spawn::kOverworldSpawn !=
+      shared::dev_spawn::OverworldSpawn::Tangram) {
+    return false;
+  }
+
+  if (!game.registry.all_of<shared::RenderInfo>(ent)) return false;
+  const auto& render = game.registry.get<shared::RenderInfo>(ent);
+  return render.modelName.rfind("map:", 0) == 0;
+}
+
 // ── OverworldState ───────────────────────────────────────
 
 void OverworldState::onEnter(ServerGame& game) {
@@ -619,6 +632,7 @@ void OverworldState::onEnter(ServerGame& game) {
   }
   enterStateHelper<shared::OverworldTag, &PlayerAvatars::overworld_avatar>(
       game, "Overworld");
+  syncOverworldSeasonMusic(game);
 }
 
 void OverworldState::onExit(ServerGame& game) {
@@ -640,7 +654,11 @@ entt::entity OverworldState::getClientAvatar(const PlayerAvatars& slots) const {
 
 std::vector<entt::entity> OverworldState::getStateEntities(
     ServerGame& game) const {
-  return getEntitiesHelper<shared::OverworldTag>(game);
+  auto entities = getEntitiesHelper<shared::OverworldTag>(game);
+  std::erase_if(entities, [&](entt::entity ent) {
+    return shouldSkipTangramDevInitialEntity(game, ent);
+  });
+  return entities;
 }
 
 void OverworldState::update(ServerGame& game, float dt) {
@@ -721,6 +739,26 @@ void OverworldState::update(ServerGame& game, float dt) {
   // snap to summer pad, toggle barriers) moved to the demo debug control panel;
   // they now arrive as DEBUG_COMMAND packets and run in
   // server_debug::processPendingCommands.
+
+  // F2 then F — first F starts music pickup test; later F re-spawns fragment.
+  auto inputView = game.registry.view<shared::PlayerInput>();
+  for (auto ent : inputView) {
+    auto& input = game.registry.get<shared::PlayerInput>(ent);
+    if (!(input.keys_newly_pressed & KEY_DEBUG_SPAWN_FRAGMENT)) continue;
+    if (!game.registry.all_of<shared::Position>(ent)) break;
+
+    if (!game.musicFragmentPickupTestActive) {
+      game.musicFragmentPickupTestActive = true;
+      printf(
+          "DEBUG: music pickup test ON — Winter music playing; first fragment "
+          "spawned (pick winter→fall→summer→spring with E)\n");
+      debugRevealActiveSeasonFragmentNearPlayer(game, ent);
+      break;
+    }
+
+    debugRevealActiveSeasonFragmentNearPlayer(game, ent);
+    break;
+  }
 
   scene_cycle_system(game.registry, StateType::OVERWORLD);
 }
