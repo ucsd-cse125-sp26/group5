@@ -139,6 +139,7 @@ struct SoundEmitter {
 struct Grounded {
   bool isGrounded = false;
   bool wasGrounded = false;  // last frame's value, for edge detection
+  int jumpsRemaining = 2;
 };
 
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
