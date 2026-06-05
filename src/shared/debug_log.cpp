@@ -148,7 +148,7 @@ void logf(const char* fmt, ...) {
   if (line.empty() || line.back() != '\n') line.push_back('\n');
 
   {
-    std::lock_guard<std::mutex> lk(g_mutex);
+    std::scoped_lock lk(g_mutex);
     g_queue.push_back(std::move(line));
   }
   g_cv.notify_one();

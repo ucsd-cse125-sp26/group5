@@ -71,7 +71,7 @@ JPH::BodyID PhysicsEngine::createPlayerBody(const std::string& modelName,
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
   JPH::Body* body = createBodyChecked(settings, "createPlayerBody");
-  if (!body) return JPH::BodyID();
+  if (!body) return {};
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
   bodyFootOffset_[body->GetID().GetIndexAndSequenceNumber()] = footOffset;
   return body->GetID();
@@ -94,7 +94,7 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
   settings.mMotionQuality = JPH::EMotionQuality::Discrete;
 
   JPH::Body* body = createBodyChecked(settings, "createMazeBoardPieceBody");
-  if (!body) return JPH::BodyID();
+  if (!body) return {};
   return body->GetID();
 }
 
@@ -149,7 +149,7 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
 
   JPH::Body* body = createBodyChecked(settings, "createTangramPieceBody");
-  if (!body) return JPH::BodyID();
+  if (!body) return {};
   return body->GetID();
 }
 
@@ -193,7 +193,7 @@ JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
   settings.mRestitution = 0.2f;  // ← optional: a little bounce on landing
 
   JPH::Body* body = createBodyChecked(settings, "createFallingObjectBody");
-  if (!body) return JPH::BodyID();
+  if (!body) return {};
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
   return body->GetID();
 }
@@ -277,7 +277,7 @@ JPH::BodyID PhysicsEngine::createStaticBody(const JPH::ShapeRefC& shape,
     settings.mFriction = frictionOrNegative;
   }
   JPH::Body* body = createBodyChecked(settings, "createStaticBody");
-  if (!body) return JPH::BodyID();
+  if (!body) return {};
   getBodyInterface().AddBody(body->GetID(), JPH::EActivation::DontActivate);
   return body->GetID();
 }
