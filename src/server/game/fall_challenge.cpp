@@ -187,6 +187,12 @@ static std::vector<glm::vec3> burstPositions(
 // scale is separate (it scales the mesh, not a world radius).
 constexpr float kFallingObjectHalf = 1.1f;         // physics + knockback
 constexpr float kFallingObjectRenderScale = 1.2f;  // visual mesh scale
+constexpr float kKnockbackPush = 16.0f;            // horizontal shove force
+constexpr float kKnockbackUpPush = 8.0f;           // vertical pop on side hit
+constexpr float kKnockbackDuration = 0.6f;         // seconds the shove lasts
+constexpr float kKnockbackHitRadius = 2.0f;  // horizontal detection radius
+constexpr float kCleanUpDroppings =
+    4.0f;  // jhust how long objects live once dropped
 
 void falling_objects_system(ServerGame& game, float dt) {
   static std::mt19937 rng(1337);
@@ -301,7 +307,7 @@ void falling_objects_system(ServerGame& game, float dt) {
     auto& fo = falling.get<shared::FallingObject>(ent);
     fo.age += dt;
     bool belowWorld = falling.get<shared::Position>(ent).z < -5.0f;
-    if (fo.age > 4.0f || belowWorld) dead.push_back(ent);
+    if (fo.age > kCleanUpDroppings || belowWorld) dead.push_back(ent);
   }
   for (auto ent : dead) {
     shared::DespawnPacket pkt;
@@ -349,7 +355,8 @@ void knockback_system(ServerGame& game, float dt) {
     bool contact = false;
     bool overhead = false;
     float bestD2 = 1e9f, bestDx = 0.0f, bestDy = 0.0f;
-    const float hitRadius = 2.0f;  // horizontal reach; tune up if needed
+    const float hitRadius =
+        kKnockbackHitRadius;  // horizontal reach; tune up if needed
     for (auto c : cubes) {
       auto& cpos = cubes.get<shared::Position>(c);
       float dx = ppos.x - cpos.x;
@@ -396,17 +403,17 @@ void knockback_system(ServerGame& game, float dt) {
         }
       }
 
-      const float push = 12.0f;
+      const float push = kKnockbackPush;
       // Overhead hits push purely horizontally — adding upward velocity every
       // frame the block sits on you is what made you fly away. Side hits still
       // get a single upward pop on the first frame (never repeated, so it can't
       // accumulate).
-      float upPush = (newHit && !overhead) ? 4.0f : 0.0f;
+      float upPush = (newHit && !overhead) ? kKnockbackUpPush : 0.0f;
       JPH::Vec3 v = bi.GetLinearVelocity(pid);
       bi.SetLinearVelocity(
           pid,
           JPH::Vec3(kb.lastDirX * push, kb.lastDirY * push, v.GetZ() + upPush));
-      kb.remaining = 0.4f;
+      kb.remaining = kKnockbackDuration;
     }
 
     kb.justHit = contact && !kb.contact;  // rising edge = one discrete hit
@@ -516,7 +523,7 @@ void fall_challenge_system(ServerGame& game, float dt) {
       // a player would need to stand still taking hits to empty the bar) to get
       // a per-second drain rate that feels equivalent.
       constexpr float kOffPlatformDrainSeconds =
-          10.0f;  // empty bar in 10s if AFK off-platform
+          6.0f;  // empty bar in 10s if AFK off-platform
       cs.fill[i] = std::max(
           0.0f, cs.fill[i] - (cs.hitPenalty / kOffPlatformDrainSeconds) * dt);
       continue;
@@ -527,12 +534,15 @@ void fall_challenge_system(ServerGame& game, float dt) {
     if (justHit) {
       win.times[win.head] = clock;
       win.head = (win.head + 1) % 4;
-      cs.fill[i] = std::max(0.0f, cs.fill[i] - cs.hitPenalty);
 
-      int recent = 0;
-      for (float th : win.times)
-        if (clock - th <= 4.0f) ++recent;
-      if (recent >= 4) cs.fill[i] = 0.0f;
+      // when hit by falling object progress bar decrements,
+      // if hit multiple times in sliding window even more decrement
+      // cs.fill[i] = std::max(0.0f, cs.fill[i] - cs.hitPenalty);
+
+      // int recent = 0;
+      // for (float th : win.times)
+      //   if (clock - th <= 4.0f) ++recent;
+      // if (recent >= 4) cs.fill[i] = 0.0f;
     } else {
       cs.fill[i] = std::min(1.0f, cs.fill[i] + cs.fillRate * dt);
     }
@@ -565,6 +575,27 @@ void fall_challenge_system(ServerGame& game, float dt) {
   if (solved) {
     cs.active = false;
     cs.completed = true;
+
+    // Clear in-flight knockback. Once cs.active is false, update()
+    // early-returns and knockback_system never runs again, so kb.remaining can
+    // no longer tick down. Any player mid-knockback on this frame would be
+    // stuck (input ignored, drifting) permanently. Zero it here and kill
+    // residual XY velocity.
+    auto& bi = game.physics.getBodyInterface();
+    auto kbView = game.registry.view<shared::Knockback>();
+    for (auto e : kbView) {
+      auto& kb = kbView.get<shared::Knockback>(e);
+      kb.remaining = 0.0f;
+      kb.contact = false;
+      kb.justHit = false;
+      if (game.registry.all_of<shared::PhysicsBody>(e)) {
+        JPH::BodyID bid(game.registry.get<shared::PhysicsBody>(e).bodyId);
+        if (bi.IsAdded(bid)) {
+          JPH::Vec3 v = bi.GetLinearVelocity(bid);
+          bi.SetLinearVelocity(bid, JPH::Vec3(0.0f, 0.0f, v.GetZ()));
+        }
+      }
+    }
 
     // Stop spawning new cubes.
     std::vector<entt::entity> zoneEnts;

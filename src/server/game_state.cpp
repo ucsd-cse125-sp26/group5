@@ -449,7 +449,7 @@ void initWorldEntities(ServerGame& game) {
       game,
       glm::vec3(game.fallLayout.playCenterX, game.fallLayout.playCenterY,
                 game.fallLayout.playCenterZ),
-      std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.4f,
+      std::max(game.fallLayout.playHalfX, game.fallLayout.playHalfY) * 1.3f,
       game.fallLayout.spawnHeight, 0.12f);
 
   // Autumn fall arena: one green play surface (collision). Orange rim/trigger
