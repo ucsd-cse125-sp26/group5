@@ -73,7 +73,7 @@ void slotRelPose(const ServerGame& game,
 
 namespace tangram_puzzle {
 
-void endPuzzle(ServerGame& game);
+void endPuzzle(ServerGame& game, bool releasePlayers);
 
 namespace {
 
@@ -545,18 +545,11 @@ void rollRandomPieceSpawns(ServerGame& game) {
 bool allPiecesSolved(const ServerGame& game) {
   int count = 0;
   int aligned = 0;
-  std::array<uint8_t, shared::tangram_puzzle::kPieceCount> missing{};
-  int missingCount = 0;
   auto view = game.registry.view<shared::TangramPiece, shared::Position>();
   for (auto ent : view) {
     ++count;
     if (pieceAlignedWithSlot(game, ent)) {
       ++aligned;
-      continue;
-    }
-    const auto& piece = view.get<shared::TangramPiece>(ent);
-    if (missingCount < static_cast<int>(missing.size())) {
-      missing[static_cast<size_t>(missingCount++)] = piece.pieceId;
     }
   }
   if (count != shared::tangram_puzzle::kPieceCount) {
@@ -564,41 +557,6 @@ bool allPiecesSolved(const ServerGame& game) {
   }
   if (aligned == shared::tangram_puzzle::kPieceCount) {
     return true;
-  }
-  static float logCooldown = 0.0f;
-  logCooldown -= 1.0f / 60.0f;
-  if (logCooldown <= 0.0f) {
-    logCooldown = 3.0f;
-    LOG_DEBUG("[Tangram] Win progress: %d/%d aligned", aligned,
-           shared::tangram_puzzle::kPieceCount);
-    if (missingCount > 0) {
-      LOG_DEBUG(" — still off:");
-      for (int i = 0; i < missingCount; ++i) {
-        const shared::tangram_puzzle::PieceDef* def =
-            shared::tangram_puzzle::pieceDefForId(
-                missing[static_cast<size_t>(i)]);
-        if (def == nullptr) continue;
-        entt::entity bad = entt::null;
-        for (auto ent : view) {
-          if (view.get<shared::TangramPiece>(ent).pieceId ==
-              missing[static_cast<size_t>(i)]) {
-            bad = ent;
-            break;
-          }
-        }
-        if (bad == entt::null) continue;
-        float relX = 0.0f;
-        float relY = 0.0f;
-        float targetRot = 0.0f;
-        slotRelPose(game, *def, relX, relY, targetRot);
-        const float mismatch = pieceFootprintMismatch(
-            game, *def, view.get<shared::Position>(bad), relX, relY, targetRot);
-        LOG_DEBUG(" #%u(%.2fm)",
-               static_cast<unsigned>(missing[static_cast<size_t>(i)]),
-               mismatch);
-      }
-    }
-    LOG_DEBUG("\n");
   }
   return false;
 }
@@ -660,10 +618,10 @@ void tryCompletePuzzle(ServerGame& game) {
   }
 
   LOG_DEBUG(
-      "[Tangram] Puzzle complete — spring fragment spawned at (%.1f, %.1f, "
-      "%.1f)\n",
+      "[Tangram] Puzzle complete — spring fragment spawned at trigger (%.1f, "
+      "%.1f, %.1f). Pick it up to restore spring.\n",
       fragmentX, fragmentY, fragmentZ);
-  endPuzzle(game);
+  endPuzzle(game, /*releasePlayers=*/false);
 }
 
 }  // namespace
@@ -813,10 +771,12 @@ void beginPuzzle(ServerGame& game) {
                                             ghostPos.z, ghostRot.w, ghostRot.x,
                                             ghostRot.y, ghostRot.z);
     {
-      auto& ri = game.registry.emplace<shared::RenderInfo>(
+      auto& ghostRi = game.registry.emplace<shared::RenderInfo>(
           ghostEnt, shared::tangram_puzzle::ghostModelForId(def.id), def.scaleX,
           def.scaleY, shared::tangram_puzzle::kGhostSlotThickness);
-      ri.colorExempt = true;
+      // Same as the pieces: puzzle objects opt out of the color-restoration
+      // desaturation so the slot guides keep their tint instead of greying out.
+      ghostRi.colorExempt = true;
     }
     game.overworldTangramGhostSlotEntities[static_cast<size_t>(i)] = ghostEnt;
     spawned.push_back(ghostEnt);
@@ -861,23 +821,12 @@ void beginPuzzle(ServerGame& game) {
   }
 }
 
-void endPuzzle(ServerGame& game) {
+void endPuzzle(ServerGame& game, bool releasePlayers) {
   if (!game.overworldTangramActive) return;
 
   game.overworldTangramActive = false;
   tangram_role_server::revertCollisionRoles(game);
   setActiveFlag(game, false);
-
-  // The controller carries no per-frame-synced component, so it never rides the
-  // tick UPDATE_ENTITY broadcast; push it explicitly or clients keep
-  // OverworldTangramPuzzleState.active == true forever (stuck crosshair / R).
-  if (game.network != nullptr &&
-      game.registry.valid(game.overworldTangramController)) {
-    auto buf = serializeEntities(game.registry, game.componentRegistry,
-                                 shared::PacketType::UPDATE_ENTITY,
-                                 {game.overworldTangramController}, false);
-    net::broadcastRaw(game.network->getHost(), buf.data(), buf.size());
-  }
 
   auto despawnEnt = [&](entt::entity ent) {
     if (!game.registry.valid(ent)) return;
@@ -905,8 +854,14 @@ void endPuzzle(ServerGame& game) {
   // instant restart).
   game.overworldTangramTriggerArmed = false;
   game.overworldTangramFocusTimer = 0.0f;
-  releasePlayersAfterExit(game);
-  LOG_DEBUG("[Tangram] Puzzle ended — walk onto green pad to play again\n");
+  if (releasePlayers) {
+    releasePlayersAfterExit(game);
+    LOG_DEBUG("[Tangram] Puzzle ended — walk onto green pad to play again\n");
+  } else {
+    LOG_DEBUG(
+        "[Tangram] Puzzle complete — players stay on board; pick up the "
+        "fragment to restore spring\n");
+  }
 }
 
 void clampPieceToArena(ServerGame& game, entt::entity ent) {
@@ -983,7 +938,7 @@ void updatePuzzle(ServerGame& game, float dt) {
     if (game.registry.all_of<shared::OverworldTangramPiece>(ent)) continue;
     const auto& input = game.registry.get<shared::PlayerInput>(ent);
     if (input.keys_newly_pressed & KEY_EXIT_MINIGAME) {
-      endPuzzle(game);
+      endPuzzle(game, /*releasePlayers=*/true);
       return;
     }
   }

@@ -16,7 +16,20 @@ bool AudioEngine::init() {
   soloud_ = new SoLoud::Soloud();
   LOG_DEBUG("AudioEngine: attempting init...\n");
 
-  SoLoud::result result = soloud_->init();
+  SoLoud::result result = SoLoud::UNKNOWN_ERROR;
+#if defined(__APPLE__)
+  // Prefer native Core Audio on macOS (miniaudio often fails with error 7).
+  result =
+      soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF, SoLoud::Soloud::COREAUDIO);
+  if (result != SoLoud::SO_NO_ERROR) {
+    LOG_DEBUG("AudioEngine: CoreAudio init failed (%d: %s), trying miniaudio\n",
+              result, soloud_->getErrorString(result));
+    result = soloud_->init(SoLoud::Soloud::CLIP_ROUNDOFF,
+                           SoLoud::Soloud::MINIAUDIO, 48000, 1024, 2);
+  }
+#else
+  result = soloud_->init();
+#endif
 
   if (result != SoLoud::SO_NO_ERROR) {
     LOG_DEBUG(
@@ -31,15 +44,14 @@ bool AudioEngine::init() {
     }
     LOG_DEBUG("AudioEngine: running in silent mode (no audio output)\n");
   }
+  LOG_DEBUG("AudioEngine: backend %s, %u Hz\n", soloud_->getBackendString(),
+            soloud_->getBackendSamplerate());
 
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
 
-  loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
-            "assets/sounds/oof.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
             "assets/sounds/scattered.wav");
-  // uncomment when you have the files:
   loadSound(static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC),
             "assets/sounds/angel.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC),
@@ -47,38 +59,26 @@ bool AudioEngine::init() {
   // Placeholder credits track — swap for a dedicated file when available.
   loadSound(static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC),
             "assets/sounds/angel.mp3");
-  loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
-            "assets/sounds/oof.mp3");  // temporary, reuses jump sound
 
-  // in AudioEngine::init(), around the other puzzle sound loadSound calls:
   loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
             "assets/sounds/angel.mp3");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_1),
-  // "assets/sounds/oof.mp3");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_2),
-  // "assets/sounds/oof.mp3");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_3),
-  // "assets/sounds/footstep_3.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::FOOTSTEP_4),
-  // "assets/sounds/footstep_4.wav"); Section ambients — replace paths with your
-  // actual files
-  // loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
-  //           "assets/sounds/winter_ambient.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
-  //           "assets/sounds/fall_ambient.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
-  //           "assets/sounds/summer_ambient.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
-  //           "assets/sounds/spring_ambient.wav");
-  // // Puzzle sounds
-  // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SWITCH_FLIP),
-  //           "assets/sounds/switch.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_DOOR_OPEN),
-  //           "assets/sounds/door.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
-  //           "assets/sounds/solved.wav");
-  // loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_FAILED),
-  //           "assets/sounds/failed.wav");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_WINTER_AMBIENT),
+            "assets/sounds/Winter.wav");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_FALL_AMBIENT),
+            "assets/sounds/Fall.wav");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SUMMER_AMBIENT),
+            "assets/sounds/Summer.wav");
+  loadSound(static_cast<uint32_t>(shared::SoundId::SECTION_SPRING_AMBIENT),
+            "assets/sounds/Spring.wav");
+  loadSound(
+      static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT),
+      "assets/sounds/AfterSpring.wav");
+  if (auto* afterSpring = sounds_[static_cast<uint32_t>(
+          shared::SoundId::SECTION_AFTER_SPRING_AMBIENT)]) {
+    afterSpring->setLooping(true);
+    afterSpring->setLoopPoint(
+        shared::music_config::kAfterSpringLoopStartSeconds);
+  }
   return true;
 }
 
@@ -96,6 +96,25 @@ void AudioEngine::shutdown() {
 void AudioEngine::update(float dt) {
   std::scoped_lock lock(mutex_);
   soloud_->update3dAudio();
+
+  if (globalMusicFadeOutHandle_ != 0) {
+    globalMusicFadeOutVolume_ -= kGlobalMusicFadeSpeed * dt;
+    if (globalMusicFadeOutVolume_ <= 0.0f) {
+      soloud_->stop(globalMusicFadeOutHandle_);
+      globalMusicFadeOutHandle_ = 0;
+      globalMusicFadeOutVolume_ = 0.0f;
+    } else {
+      soloud_->setVolume(globalMusicFadeOutHandle_, globalMusicFadeOutVolume_);
+    }
+  }
+
+  if (globalMusicHandle_ != 0 &&
+      globalMusicVolume_ < globalMusicTargetVolume_) {
+    globalMusicVolume_ =
+        std::min(globalMusicVolume_ + kGlobalMusicFadeSpeed * dt,
+                 globalMusicTargetVolume_);
+    soloud_->setVolume(globalMusicHandle_, globalMusicVolume_);
+  }
 }
 
 void AudioEngine::setMasterVolume(float volume) {
@@ -159,25 +178,20 @@ void AudioEngine::updateEmitter(uint32_t entityId,
 
     if (layer.trigger == shared::SoundTriggerType::ON_EVENT) continue;
 
-    // start the layer if not already running — starts silent, fade handles
-    // volume
     if (!isLayerActive(entityId, layer.soundId)) {
       startLayer(entityId, layer.soundId, x, y, z, layer.playMode);
     }
 
-    // calculate target volume based on trigger type
     float targetVolume = 0.0f;
     if (layer.trigger == shared::SoundTriggerType::ALWAYS) {
       targetVolume = layer.volume;
     } else if (layer.trigger == shared::SoundTriggerType::PROXIMITY) {
       if (dist < layer.proximityRange) {
-        // full volume at center, fades to 0 at edge
         float t = 1.0f - (dist / layer.proximityRange);
         targetVolume = layer.volume * std::clamp(t, 0.0f, 1.0f);
       }
     }
 
-    // lerp current volume toward target
     float& currentVol = layerVolumes_[entityId][layer.soundId];
     float delta = layer.fadeSpeed * dt;
     if (currentVol < targetVolume) {
@@ -186,7 +200,6 @@ void AudioEngine::updateEmitter(uint32_t entityId,
       currentVol = std::max(currentVol - delta, targetVolume);
     }
 
-    // apply volume and update position
     auto& handles = activeHandles_[entityId];
     auto it = handles.find(layer.soundId);
     if (it != handles.end()) {
@@ -220,7 +233,7 @@ void AudioEngine::startLayer(uint32_t entityId, uint32_t soundId, float x,
   } else {
     h = soloud_->play3d(*it->second, x, y, z);
   }
-  soloud_->setVolume(h, 0.0f);  // start silent, fade in
+  soloud_->setVolume(h, 0.0f);
   activeHandles_[entityId][soundId] = h;
   layerVolumes_[entityId][soundId] = 0.0f;
 }
@@ -243,16 +256,46 @@ bool AudioEngine::isLayerActive(uint32_t entityId, uint32_t soundId) const {
 
 void AudioEngine::playGlobalLoop(uint32_t soundId, float volume) {
   std::scoped_lock lock(mutex_);
+  if (globalMusicSoundId_ == soundId && globalMusicHandle_ != 0) {
+    globalMusicTargetVolume_ = volume;
+    return;
+  }
+
   auto it = sounds_.find(soundId);
   if (it == sounds_.end()) return;
+
+  if (globalMusicHandle_ != 0) {
+    globalMusicFadeOutHandle_ = globalMusicHandle_;
+    globalMusicFadeOutVolume_ = globalMusicVolume_;
+    globalMusicHandle_ = 0;
+    globalMusicSoundId_ = 0;
+    globalMusicVolume_ = 0.0f;
+  }
+
   it->second->setLooping(true);
-  unsigned int h = soloud_->play(*it->second);
-  soloud_->setVolume(h, volume);
-  globalHandles_[soundId] = h;
+  globalMusicHandle_ = soloud_->play(*it->second);
+  globalMusicSoundId_ = soundId;
+  globalMusicTargetVolume_ = volume;
+  globalMusicVolume_ = 0.0f;
+  soloud_->setVolume(globalMusicHandle_, 0.0f);
+
+  if (soundId ==
+      static_cast<uint32_t>(shared::SoundId::SECTION_AFTER_SPRING_AMBIENT)) {
+    soloud_->seek(globalMusicHandle_,
+                  shared::music_config::kAfterSpringLoopStartSeconds);
+  }
 }
 
 void AudioEngine::stopGlobalLoop(uint32_t soundId) {
   std::scoped_lock lock(mutex_);
+  if (globalMusicSoundId_ == soundId && globalMusicHandle_ != 0) {
+    soloud_->stop(globalMusicHandle_);
+    globalMusicHandle_ = 0;
+    globalMusicSoundId_ = 0;
+    globalMusicVolume_ = 0.0f;
+    globalMusicTargetVolume_ = 0.0f;
+    return;
+  }
   auto it = globalHandles_.find(soundId);
   if (it == globalHandles_.end()) return;
   soloud_->stop(it->second);
@@ -265,4 +308,16 @@ void AudioEngine::stopAllGlobalLoops() {
     soloud_->stop(handle);
   }
   globalHandles_.clear();
+  if (globalMusicFadeOutHandle_ != 0) {
+    soloud_->stop(globalMusicFadeOutHandle_);
+    globalMusicFadeOutHandle_ = 0;
+  }
+  if (globalMusicHandle_ != 0) {
+    soloud_->stop(globalMusicHandle_);
+    globalMusicHandle_ = 0;
+  }
+  globalMusicSoundId_ = 0;
+  globalMusicVolume_ = 0.0f;
+  globalMusicTargetVolume_ = 0.0f;
+  globalMusicFadeOutVolume_ = 0.0f;
 }

@@ -8,7 +8,7 @@ namespace tangram_puzzle {
 
 void initController(ServerGame& game);
 void beginPuzzle(ServerGame& game);
-void endPuzzle(ServerGame& game);
+void endPuzzle(ServerGame& game, bool releasePlayers = true);
 void clampPlayersToPlayArena(ServerGame& game);
 
 void updatePuzzle(ServerGame& game, float dt);

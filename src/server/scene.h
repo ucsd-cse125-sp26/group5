@@ -76,15 +76,41 @@ void spawnInvisibleWall(ServerGame& game, const glm::vec3& pos,
       entity, bodyId.GetIndexAndSequenceNumber());
 }
 
+// Disk coverage: cubes rain uniformly over a circle of `radius`.
 template <typename WorldTag>
-void spawnFallingHazardZone(ServerGame& game, const glm::vec3& center,
-                            float radius, float spawnHeight, float interval) {
+void spawnFallingHazardZone(
+    ServerGame& game, const glm::vec3& center, float radius, float spawnHeight,
+    float interval,
+    shared::FallingHazardZone::AttackPattern pattern =
+        shared::FallingHazardZone::AttackPattern::Random) {
   auto [id, entity] = new_entity(game);
   game.registry.template emplace<shared::Position>(
       entity, center.x, center.y, center.z, 1.0f, 0.0f, 0.0f, 0.0f);
   game.registry.template emplace<WorldTag>(entity);
-  game.registry.template emplace<shared::FallingHazardZone>(
-      entity, radius, spawnHeight, interval, 0.0f);
+  auto& z = game.registry.template emplace<shared::FallingHazardZone>(entity);
+  z.shape = shared::FallingHazardZone::Shape::Disk;
+  z.radius = radius;
+  z.spawnHeight = spawnHeight;
+  z.interval = interval;
+  z.pattern = pattern;
+}
+
+// Rectangle coverage: cubes rain uniformly over an axis-aligned box of
+// halfX x halfY — use this to cover a square platform completely.
+template <typename WorldTag>
+void spawnFallingHazardZoneRect(ServerGame& game, const glm::vec3& center,
+                                float halfX, float halfY, float spawnHeight,
+                                float interval) {
+  auto [id, entity] = new_entity(game);
+  game.registry.template emplace<shared::Position>(
+      entity, center.x, center.y, center.z, 1.0f, 0.0f, 0.0f, 0.0f);
+  game.registry.template emplace<WorldTag>(entity);
+  auto& z = game.registry.template emplace<shared::FallingHazardZone>(entity);
+  z.shape = shared::FallingHazardZone::Shape::Rect;
+  z.halfX = halfX;
+  z.halfY = halfY;
+  z.spawnHeight = spawnHeight;
+  z.interval = interval;
 }
 
 template <typename WorldTag>

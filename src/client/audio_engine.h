@@ -33,7 +33,7 @@ class AudioEngine {
   void setListenerPosition(float x, float y, float z, float forwardX,
                            float forwardY, float forwardZ);
 
-  // Global non-positional loops
+  // Global non-positional loops (crossfades when switching tracks).
   void playGlobalLoop(uint32_t soundId, float volume);
   void stopGlobalLoop(uint32_t soundId);
   void stopAllGlobalLoops();
@@ -63,8 +63,17 @@ class AudioEngine {
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, float>>
       layerVolumes_;
 
-  // soundId → SoLoud handle for global loops
+  // soundId → SoLoud handle for global loops (legacy one-shots)
   std::unordered_map<uint32_t, unsigned int> globalHandles_;
+
+  // Crossfaded overworld / maze background music
+  unsigned int globalMusicHandle_ = 0;
+  unsigned int globalMusicFadeOutHandle_ = 0;
+  uint32_t globalMusicSoundId_ = 0;
+  float globalMusicVolume_ = 0.0f;
+  float globalMusicTargetVolume_ = 0.0f;
+  float globalMusicFadeOutVolume_ = 0.0f;
+  static constexpr float kGlobalMusicFadeSpeed = 0.35f;
 
   void loadSound(uint32_t soundId, const std::string& path);
   void startLayer(uint32_t entityId, uint32_t soundId, float x, float y,

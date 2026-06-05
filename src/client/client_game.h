@@ -27,7 +27,6 @@ struct VideoRequest {
   uint32_t targetEntityId = 0;
   bool stop = false;
 };
-
 struct ClientGame {
   shared::ComponentRegistry componentRegistry;
 
@@ -42,11 +41,12 @@ struct ClientGame {
   std::mutex snapshotMutex;
   std::atomic<bool> snapshotDirty = false;
   std::atomic<bool> running = true;
+
+  SpscQueue<shared::InputPacket, 256> inputQueue;
   // Set by the network thread on server disconnect; the render thread shows a
   // "lost connection" overlay instead of a frozen world.
   std::atomic<bool> serverLost = false;
 
-  SpscQueue<shared::InputPacket, 256> inputQueue;
   // Demo debug-panel commands, produced on the render thread (button clicks in
   // the debug control panel) and drained on the network thread (see main.cpp).
   SpscQueue<shared::DebugCommandPacket, 64> debugQueue;
@@ -81,7 +81,7 @@ void registerClientHandlers(ClientNetwork& network);
 
 void processInput(GLFWwindow* window, const ClientGame& game,
                   SpscQueue<shared::InputPacket, 256>& inputQueue,
-                  InputKeys& prevKeys);
+                  InputKeys& prevKeys, bool debugMode);
 void updateWinterMazeWindowTitle(GLFWwindow* window, const ClientGame& game);
 void printEntityPositions(const ClientGame& game);
 void updateSoundEmitters(ClientGame& game, float listenerX, float listenerY,

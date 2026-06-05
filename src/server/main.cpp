@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "game_state.h"
+#include "server/game/overworld.h"
 #include "server/game/puzzles/maze/camera.h"
 #include "server/game/puzzles/maze/puzzle.h"
 #include "server/game/puzzles/maze/trigger.h"
@@ -173,6 +174,9 @@ int main() {
       statePkt.state = shared::GameStateType::MAZE;
     }
     net::sendPacket(peer, statePkt);
+    if (statePkt.state == shared::GameStateType::OVERWORLD) {
+      syncOverworldSeasonMusic(g);
+    }
   };
 
   network.onDisconnect = [&network](ServerGame& g, ENetPeer* peer) {
@@ -221,6 +225,9 @@ int main() {
     }
     g.unused_player_slots.push_back(slots);
     g.active_players.erase(it);
+    if (g.active_players.empty()) {
+      g.nextPlayerJoinSlot = 1;
+    }
     peer->data = nullptr;
   };
 
@@ -323,6 +330,9 @@ int main() {
       }
       if (game.overworldTangramActive) {
         tangram_puzzle::clampPlayersToPlayArena(game);
+      }
+      if (maze_puzzle::shouldConfinePlayersToMazeTrigger(game)) {
+        maze_puzzle::clampPlayersToMazeTrigger(game);
       }
       maze_puzzle::tryCompleteOnGoal(game);
       accumulator -= fixedDt;

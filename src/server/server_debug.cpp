@@ -107,8 +107,9 @@ void setSeason(ServerGame& game, Season season) {
   game.debugSeasonOverride = true;
   section_puzzle::setActiveSeason(game, season);
   colorizeSection(game, season);
+  syncOverworldSeasonMusic(game);
   LOG_DEBUG("[DebugPanel] set season to %s\n",
-         section_puzzle::sceneNameForSeason(season));
+            section_puzzle::sceneNameForSeason(season));
 }
 
 void cycleSeason(ServerGame& game) {

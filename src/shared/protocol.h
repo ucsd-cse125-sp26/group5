@@ -14,6 +14,7 @@ enum class PacketType : uint8_t {
   DESPAWN_ENTITY,
   SOUND_EVENT,
   STATE_CHANGE,
+  SEASON_MUSIC,
   // Server-driven video playback. Append-only: keep these last so existing
   // packet byte values stay stable across separately built server/clients.
   VIDEO_PLAY,
@@ -79,6 +80,13 @@ struct SoundEventPacket {
   float volume = 1.0f;
   float pitch = 1.0f;
   bool positional = true;
+};
+
+// Overworld seasonal loop (client crossfades between tracks).
+struct SeasonMusicPacket {
+  PacketType type = PacketType::SEASON_MUSIC;
+  uint32_t soundId = 0;
+  float volume = 0.35f;
 };
 
 // Fixed-size POD, framed by sizeof+memcpy like SoundEventPacket. uint32 first

@@ -81,24 +81,48 @@ JPH::BodyID PhysicsEngine::createMazeBoardPieceBody(
 JPH::BodyID PhysicsEngine::createTangramPieceBody(
     const std::string& modelName, const glm::vec3& pos, const glm::quat& rot,
     const glm::vec3& scale, JPH::ObjectLayer objectLayer) {
+  (void)modelName;
   auto& bodyInterface = getBodyInterface();
-  JPH::ShapeRefC shape = playerShapeForAsset(modelName, scale);
+  // Tall collision proxy. The visual piece is a thin slab lying on the
+  // platform, but players stand with their collision feet floating ~0.6 above
+  // the surface, so a thin piece collision never overlaps them and can't be
+  // pushed. Extend the collision box well upward (visual stays thin via
+  // RenderInfo) so a standing player contacts the piece's side. XY matches the
+  // former unit-box-times-scale footprint; the bottom stays at the slab bottom.
+  const float halfX = 0.5f * scale.x;
+  const float halfY = 0.5f * scale.y;
+  const float belowOrigin = 0.5f * scale.z;  // original slab bottom
+  const float aboveOrigin = 1.5f;            // reach above floating player feet
+  const float halfZ = 0.5f * (belowOrigin + aboveOrigin);
+  const float zOffset = aboveOrigin - halfZ;  // shift box up from the origin
+  JPH::BoxShapeSettings boxSettings(JPH::Vec3(halfX, halfY, halfZ));
+  boxSettings.SetEmbedded();
+  JPH::ShapeRefC boxShape = boxSettings.Create().Get();
+  JPH::RotatedTranslatedShapeSettings rtSettings(
+      JPH::Vec3(0.0f, 0.0f, zOffset), JPH::Quat::sIdentity(), boxShape);
+  rtSettings.SetEmbedded();
+  JPH::ShapeRefC shape = rtSettings.Create().Get();
 
   JPH::Quat joltRot(rot.x, rot.y, rot.z, rot.w);
   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
                                      joltRot, JPH::EMotionType::Dynamic,
                                      objectLayer);
   settings.mGravityFactor = 0.0f;
-  // Heavy slabs: hard to shove, high damping kills glide after you stop
-  // pushing.
+  // Weighty but pushable. The pusher avatar is velocity-controlled (~70 kg);
+  // at 550 kg the contact shoved the *player* back instead of the slab, so it
+  // read as "can't push". Mass near the player's lets the contact actually
+  // drive the piece, while moderate damping still kills glide quickly after
+  // you stop pushing. (Tunable — raise mass / damping for a heavier feel.)
   settings.mOverrideMassProperties =
       JPH::EOverrideMassProperties::CalculateInertia;
-  settings.mMassPropertiesOverride.mMass = 550.0f;
+  settings.mMassPropertiesOverride.mMass = 70.0f;
   settings.mFriction = 1.15f;
   settings.mRestitution = 0.0f;
-  settings.mLinearDamping = 48.0f;
+  settings.mLinearDamping = 6.0f;
   settings.mAngularDamping = 10.0f;
-  settings.mMaxLinearVelocity = 1.6f;
+  // Let a pushed piece nearly keep pace with the player (overworld speed 4.0)
+  // so it visibly tracks the pusher instead of lagging far behind.
+  settings.mMaxLinearVelocity = 3.5f;
   settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
                           JPH::EAllowedDOFs::TranslationY |
                           JPH::EAllowedDOFs::RotationZ;
@@ -108,19 +132,44 @@ JPH::BodyID PhysicsEngine::createTangramPieceBody(
   return body->GetID();
 }
 
+// CUBE
+//  JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3&
+//  halfExtents,
+//                                                     const glm::vec3& pos) {
+//    auto& bodyInterface = getBodyInterface();
+//    JPH::BoxShapeSettings boxSettings(
+//        JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
+//    boxSettings.SetEmbedded();
+//    JPH::ShapeRefC shape = boxSettings.Create().Get();
+
+//   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
+//                                      JPH::Quat::sIdentity(),
+//                                      JPH::EMotionType::Dynamic,
+//                                      Layers::MOVING);
+//   settings.mGravityFactor = 1.0f;
+//   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+
+//   JPH::Body* body = bodyInterface.CreateBody(settings);
+//   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+//   return body->GetID();
+// }
+
+// SPHERE
 JPH::BodyID PhysicsEngine::createFallingObjectBody(const glm::vec3& halfExtents,
                                                    const glm::vec3& pos) {
   auto& bodyInterface = getBodyInterface();
-  JPH::BoxShapeSettings boxSettings(
-      JPH::Vec3(halfExtents.x, halfExtents.y, halfExtents.z));
-  boxSettings.SetEmbedded();
-  JPH::ShapeRefC shape = boxSettings.Create().Get();
+  JPH::SphereShapeSettings sphereSettings(
+      halfExtents.x);  // radius = 0.25 from caller
+  sphereSettings.SetEmbedded();
+  JPH::ShapeRefC shape = sphereSettings.Create().Get();
 
   JPH::BodyCreationSettings settings(shape, JPH::RVec3(pos.x, pos.y, pos.z),
                                      JPH::Quat::sIdentity(),
                                      JPH::EMotionType::Dynamic, Layers::MOVING);
   settings.mGravityFactor = 1.0f;
   settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+  settings.mFriction = 0.3f;     // ← lower = slides more, higher = grips/rolls
+  settings.mRestitution = 0.2f;  // ← optional: a little bounce on landing
 
   JPH::Body* body = bodyInterface.CreateBody(settings);
   bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
@@ -472,6 +521,9 @@ JPH::ShapeRefC PhysicsEngine::convexHullForAsset(const std::string& modelName,
 
 JPH::ShapeRefC PhysicsEngine::playerShapeForAsset(const std::string& modelName,
                                                   const glm::vec3& scale) {
+  // Fallback for procedural assets (no mesh, e.g. the spirit cube) and any
+  // model whose convex hull fails to build. Mesh-backed players get a convex
+  // hull via convexHullForAsset (see createPlayerBody / the model-swap path).
   // Z-only center offset: aligns the asset's mesh-origin feet with the box
   // bottom. Without it the bear settles 9 units above the floor (and a
   // previous floor-penetration segfaulted Jolt's contact resolver). XY

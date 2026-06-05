@@ -457,15 +457,6 @@ std::optional<CameraState> computeCamera(const ClientGame& game) {
     }
   }
 
-  // During the preview-board puzzle only; after exit, normal FPS view
-  // immediately.
-  if (isOverworldMazePuzzleActive(game)) {
-    const glm::vec3 target(game.mazeLayout.lookAtX(), game.mazeLayout.lookAtY(),
-                           game.mazeLayout.lookAtZ());
-    glm::mat4 view = glm::lookAt(pos, target, worldUp);
-    return CameraState{.position = pos, .view = view};
-  }
-
   glm::quat playerRot(p.qw, p.qx, p.qy, p.qz);
   // Yaw-only so entity pitch/roll doesn't tilt the camera.
   glm::vec3 flat = playerRot * glm::vec3(0.0f, 1.0f, 0.0f);

@@ -10,6 +10,7 @@
 #include "glm/gtc/constants.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "server/game/puzzles/maze/layout_editor.h"
+#include "server/game/puzzles/maze/puzzle.h"
 #include "server_network.h"
 #include "shared/assets.h"
 #include "shared/log.h"
@@ -112,14 +113,20 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     JPH::Vec3 currentVel = bodyInterface.GetLinearVelocity(bodyId);
     float verticalVel = currentVel.GetZ();
 
-    if (input.keys_newly_pressed & KEY_JUMP) {
-      verticalVel = 10.0f;
-      shared::SoundEventPacket pkt;
-      pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
-      pkt.x = position.x;
-      pkt.y = position.y;
-      pkt.z = position.z;
-      net::broadcastPacket(game.network->getHost(), pkt);
+    if (game.registry.all_of<shared::Grounded>(entity)) {
+      auto& g = game.registry.get<shared::Grounded>(entity);
+      if (g.isGrounded) g.jumpsRemaining = 2;
+
+      if ((input.keys_newly_pressed & KEY_JUMP) && g.jumpsRemaining > 0) {
+        verticalVel = 10.0f;
+        g.jumpsRemaining--;
+        shared::SoundEventPacket pkt;
+        pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
+        pkt.x = position.x;
+        pkt.y = position.y;
+        pkt.z = position.z;
+        net::broadcastPacket(game.network->getHost(), pkt);
+      }
     }
 
     bool knocked =
@@ -132,21 +139,6 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     } else {
       bodyInterface.SetLinearVelocity(
           bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
-    }
-
-    // ── Landing detection (ECS-driven via Grounded component) ──
-    if (game.registry.all_of<shared::Grounded>(entity)) {
-      auto& g = game.registry.get<shared::Grounded>(entity);
-      if (!g.wasGrounded && g.isGrounded) {
-        shared::SoundEventPacket pkt;
-        pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
-        pkt.x = position.x;
-        pkt.y = position.y;
-        pkt.z = position.z;
-        pkt.volume = 0.7f;
-        pkt.positional = true;
-        net::broadcastPacket(game.network->getHost(), pkt);
-      }
     }
 
     // ── Footsteps ──

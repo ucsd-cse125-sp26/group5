@@ -102,6 +102,9 @@ void ClientNetwork::drainInputQueue(
     SpscQueue<shared::InputPacket, 256>& inputQueue) {
   shared::InputPacket pkt;
   while (inputQueue.tryPop(pkt)) {
+    // Input is high-frequency state. Send it like movement snapshots: recent
+    // packets matter more than guaranteed delivery of stale key states.
+    send(pkt, /*reliable=*/false, /*channel=*/1);
     send(pkt);
   }
   if (client_) {
