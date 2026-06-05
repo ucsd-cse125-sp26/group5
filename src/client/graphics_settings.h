@@ -126,12 +126,12 @@ struct GraphicsSettings {
   // geometry AND the same texels cover less area (crisper near shadows). Raise
   // toward farPlane if long-range shadows are needed.
   float shadowDistance =
-      250.0f;  // clamped to farPlane; cascades cover near..this
+      300.0f;  // clamped to farPlane; cascades cover near..this
   float shadowNearOffset =
       2.0f;  // split-scheme near, decoupled from camera near
   float cascadeSplitLambda = 0.7f;  // 0 = uniform splits, 1 = logarithmic
   float cascadeCasterPullback =
-      50.0f;                      // light-space depth for off-slice casters
+      100.0f;                     // light-space depth for off-slice casters
   float cascadeBlendBand = 0.0f;  // 0 = hard switch; fraction of range to blend
   bool visualizeCascades =
       false;  // tint each cascade band in the lighting pass
