@@ -5,13 +5,17 @@
 // clang-format on
 
 #include <cassert>
+#include <filesystem>
 #include <iostream>
+#include <system_error>
 #include <thread>
 
 #include "client/client_graphics.h"
 #include "client_game.h"
 #include "client_network.h"
 #include "imgui.h"
+#include "shared/crash_handler.h"
+#include "shared/debug_log.h"
 #include "shared/dev_spawn.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
@@ -30,6 +34,11 @@ int main() {
   shared::hello();
   shared::log::initFromEnvironment();
 
+  std::error_code logDirEc;
+  std::filesystem::create_directories(exeDir() / "logs", logDirEc);
+  shared::debug_log::init((exeDir() / "logs" / "client.log").string());
+  shared::crash_handler::install("client");
+
   ClientGame game;
   game.componentRegistry = shared::createDefaultRegistry();
   ClientNetwork network;
@@ -37,6 +46,7 @@ int main() {
 
   Graphics graphics;
   if (!graphics.load(960, 600)) {
+    shared::debug_log::shutdown();
     return EXIT_FAILURE;
   }
 
@@ -71,6 +81,7 @@ int main() {
   }
 
   if (!connected) {
+    shared::debug_log::shutdown();
     return EXIT_SUCCESS;
   }
 
@@ -219,6 +230,7 @@ int main() {
   game.running.store(false, std::memory_order_release);
   networkThread.join();
   game.audio.shutdown();
+  shared::debug_log::shutdown();
   return 0;
 }
 

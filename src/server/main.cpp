@@ -2,9 +2,11 @@
 #include <chrono>
 #include <cinttypes>
 #include <cmath>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <memory>
+#include <system_error>
 #include <thread>
 
 #include "game_state.h"
@@ -21,12 +23,15 @@
 #include "server_level_loader.h"
 #include "server_network.h"
 #include "shared/components.h"
+#include "shared/crash_handler.h"
+#include "shared/debug_log.h"
 #include "shared/dev_spawn.h"
 #include "shared/hello.h"
 #include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
 #include "shared/simple_profiler.h"
+#include "shared/util.h"
 
 namespace {
 
@@ -48,12 +53,18 @@ int main() {
   shared::hello();
   shared::log::initFromEnvironment();
 
+  std::error_code logDirEc;
+  std::filesystem::create_directories(exeDir() / "logs", logDirEc);
+  shared::debug_log::init((exeDir() / "logs" / "server.log").string());
+  shared::crash_handler::install("server");
+
   ServerGame game;
   game.componentRegistry = shared::createDefaultRegistry();
   initServerGame(game);
 
   ServerNetwork network;
   if (!network.init(7777, 4)) {
+    shared::debug_log::shutdown();
     return EXIT_FAILURE;
   }
   game.network = &network;
@@ -246,6 +257,18 @@ int main() {
     float dt = std::chrono::duration<float>(currentTime - previousTime).count();
     previousTime = currentTime;
     accumulator += dt;
+    // Bound catch-up after a stall: cap substeps so one long frame (laptop
+    // sleep/resume, a scheduler hitch, a blocking call) can't spiral physics
+    // hundreds of steps in a single pass while network.poll() goes unserviced
+    // and every client times out to "Lost connection". Discard the excess time.
+    constexpr int kMaxSubsteps = 5;  // ~28ms of catch-up at 180 Hz
+    const float maxAccum = kMaxSubsteps * fixedDt;
+    if (accumulator > maxAccum) {
+      if (dt > 0.1f)  // a genuine stall, not mild steady overload
+        LOG_FILE("[server] frame stall dt=%.0fms; discarding %.0fms catch-up",
+                 dt * 1000.0, (accumulator - maxAccum) * 1000.0);
+      accumulator = maxAccum;
+    }
     while (accumulator >= fixedDt) {
       game.physics.step(fixedDt);
       update_grounded_system(game);
@@ -371,5 +394,6 @@ int main() {
   }
 
   network.shutdown();
+  shared::debug_log::shutdown();
   return EXIT_SUCCESS;
 }

@@ -137,6 +137,11 @@ class PhysicsEngine {
  public:
   JPH::PhysicsSystem physicsSystem;
 
+  // Jolt preallocates a fixed body pool; CreateBody returns nullptr once it is
+  // full. Sized with headroom over peak demand (avatars + map + maze/tangram
+  // pieces + falling hazards) so the autumn challenge can't exhaust it.
+  static constexpr unsigned kMaxBodies = 4096;
+
   PhysicsEngine() {
     JPH::RegisterDefaultAllocator();
     JPH::Factory::sInstance = new JPH::Factory();
@@ -145,7 +150,8 @@ class PhysicsEngine {
     jobSystem_ = new JPH::JobSystemThreadPool(
         JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers,
         std::thread::hardware_concurrency() - 1);
-    physicsSystem.Init(1024, 0, 1024, 1024, broadPhaseLayerInterface_,
+    physicsSystem.Init(kMaxBodies, 0, kMaxBodies, kMaxBodies,
+                       broadPhaseLayerInterface_,
                        objectVsBroadPhaseLayerFilter_, objectLayerPairFilter_);
     physicsSystem.SetGravity(JPH::Vec3(0.0f, 0.0f, -18.0f));
   }
@@ -168,6 +174,7 @@ class PhysicsEngine {
 
   void destroyBody(uint32_t bodyId) {
     JPH::BodyID joltId(bodyId);
+    if (joltId.IsInvalid()) return;  // body creation degraded gracefully
     bodyFootOffset_.erase(joltId.GetIndexAndSequenceNumber());
     getBodyInterface().RemoveBody(joltId);
     getBodyInterface().DestroyBody(joltId);
@@ -249,6 +256,12 @@ class PhysicsEngine {
                             const glm::quat& rot, const glm::vec3& scale);
 
  private:
+  // CreateBody + null check in one place: on pool exhaustion Jolt returns
+  // nullptr, and dereferencing it (GetID/AddBody) is the silent server crash.
+  // Logs a diagnostic and returns nullptr so callers degrade gracefully.
+  JPH::Body* createBodyChecked(const JPH::BodyCreationSettings& settings,
+                               const char* what);
+
   std::unordered_map<uint32_t, float> bodyFootOffset_;
   struct BoxExtents {
     glm::vec3 center;

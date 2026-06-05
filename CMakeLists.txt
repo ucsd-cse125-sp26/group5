@@ -17,6 +17,8 @@ endif()
 add_library(shared
     src/shared/hello.cpp
     src/shared/log.cpp
+    src/shared/debug_log.cpp
+    src/shared/crash_handler.cpp
     src/shared/util.cpp
     src/shared/mesh_loader.cpp
     src/shared/puzzles/maze/layout.cpp
@@ -26,6 +28,14 @@ add_library(shared
 target_include_directories(shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# debug_log spawns a writer thread; crash_handler symbolizes via dbghelp on
+# Windows. backtrace() on POSIX needs exported symbols (-rdynamic) for names.
+find_package(Threads REQUIRED)
+target_link_libraries(shared PUBLIC Threads::Threads)
+if(WIN32)
+    target_link_libraries(shared PUBLIC dbghelp)
+endif()
 
 add_subdirectory(lib/glm)
 target_link_libraries(shared PUBLIC glm::glm)
@@ -251,6 +261,13 @@ target_include_directories(server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/jol
 add_executable(server)
 target_sources(server PRIVATE src/server/main.cpp)
 target_link_libraries(server PRIVATE server_lib)
+
+# Export symbols so crash_handler's backtrace() prints function names, not just
+# addresses, on Linux/macOS. (Windows resolves symbols from the PDB via dbghelp.)
+if(NOT MSVC)
+    target_link_options(client PRIVATE -rdynamic)
+    target_link_options(server PRIVATE -rdynamic)
+endif()
 
 # Server resolves assets via exeDir() at runtime; mirror the client copy.
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/assets)
