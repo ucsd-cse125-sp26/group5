@@ -263,8 +263,10 @@ target_sources(server PRIVATE src/server/main.cpp)
 target_link_libraries(server PRIVATE server_lib)
 
 # Export symbols so crash_handler's backtrace() prints function names, not just
-# addresses, on Linux/macOS. (Windows resolves symbols from the PDB via dbghelp.)
-if(NOT MSVC)
+# addresses, on Linux/macOS. -rdynamic is an ELF/Mach-O concept; the mingw-w64
+# PE toolchain rejects it outright, so it must be gated on NOT WIN32 (not just
+# NOT MSVC). On Windows the handler symbolizes via dbghelp instead.
+if(NOT WIN32)
     target_link_options(client PRIVATE -rdynamic)
     target_link_options(server PRIVATE -rdynamic)
 endif()
