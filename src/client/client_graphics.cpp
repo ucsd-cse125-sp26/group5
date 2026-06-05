@@ -1752,13 +1752,13 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
 static glm::vec3 seasonFogTint(shared::SectionSeasonMap season) {
   switch (season) {
     case shared::SectionSeasonMap::WINTER:
-      return glm::vec3(0.80f, 0.87f, 0.96f);
+      return {0.80f, 0.87f, 0.96f};
     case shared::SectionSeasonMap::FALL:
-      return glm::vec3(0.85f, 0.55f, 0.30f);
+      return {0.85f, 0.55f, 0.30f};
     case shared::SectionSeasonMap::SUMMER:
-      return glm::vec3(0.95f, 0.86f, 0.45f);
+      return {0.95f, 0.86f, 0.45f};
     case shared::SectionSeasonMap::SPRING:
-      return glm::vec3(0.58f, 0.85f, 0.55f);
+      return {0.58f, 0.85f, 0.55f};
   }
   return glm::vec3(0.8f);
 }
