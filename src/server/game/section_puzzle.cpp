@@ -88,7 +88,7 @@ void completeSection(ServerGame& game, shared::SectionSeasonMap season) {
     setActiveSeason(game, shared::SectionSeasonMap::FALL);
   }
   LOG_DEBUG("[Section] %s section completed\n",
-         season == shared::SectionSeasonMap::FALL ? "Fall" : "Season");
+            season == shared::SectionSeasonMap::FALL ? "Fall" : "Season");
 }
 
 }  // namespace section_puzzle

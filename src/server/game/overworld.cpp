@@ -15,9 +15,9 @@
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
-#include "shared/log.h"
 #include "shared/sound_constants.h"  // music_config, SoundId
 
 namespace {

@@ -20,9 +20,9 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
-#include "shared/log.h"
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
@@ -322,7 +322,7 @@ void trySnapPiecesToSlots(ServerGame& game) {
     tangram_role_server::syncPieceCollisionLayer(game, ent, stage);
 
     LOG_DEBUG("[Tangram] Piece %u snapped to slot (use R to align rotation)\n",
-           static_cast<unsigned>(piece.pieceId));
+              static_cast<unsigned>(piece.pieceId));
   }
 }
 
@@ -465,7 +465,7 @@ void tryRotateNearbyPiece(ServerGame& game) {
       if (shared::tangram_puzzle::yawMatchesTarget(newYaw, qTarget)) {
         applyPieceTransform(game, best, slotPos, flatQuatFromYaw(qTarget));
         LOG_DEBUG("[Tangram] Piece %u aligned with ghost slot\n",
-               static_cast<unsigned>(piece.pieceId));
+                  static_cast<unsigned>(piece.pieceId));
       } else {
         applyPieceTransform(game, best, slotPos, q);
       }
@@ -802,21 +802,21 @@ void beginPuzzle(ServerGame& game) {
         "empties spring_tangram_slot_1..7 to override)\n");
   }
   LOG_DEBUG("[Tangram] %d ghost slots (one per piece, ids 1–7)\n",
-         shared::tangram_puzzle::kPieceCount);
+            shared::tangram_puzzle::kPieceCount);
   if (shared::tangram_roles::rolesActive(isolationStage)) {
     LOG_DEBUG("[Tangram] Role isolation stage %u (0=off, 5=full split)\n",
-           static_cast<unsigned>(isolationStage));
+              static_cast<unsigned>(isolationStage));
     if (shared::tangram_roles::rotateRestricted(isolationStage)) {
       LOG_DEBUG("[Tangram]   rotate: slot %u only\n",
-             static_cast<unsigned>(shared::tangram_roles::kRotateSlot));
+                static_cast<unsigned>(shared::tangram_roles::kRotateSlot));
     }
     if (shared::tangram_roles::slotsRestricted(isolationStage)) {
       LOG_DEBUG("[Tangram]   ghost slots visible: slot %u only\n",
-             static_cast<unsigned>(shared::tangram_roles::kSlotsSlot));
+                static_cast<unsigned>(shared::tangram_roles::kSlotsSlot));
     }
     if (shared::tangram_roles::colorRestricted(isolationStage)) {
       LOG_DEBUG("[Tangram]   piece color visible: slot %u only (others grey)\n",
-             static_cast<unsigned>(shared::tangram_roles::kColorSlot));
+                static_cast<unsigned>(shared::tangram_roles::kColorSlot));
     }
   }
 }

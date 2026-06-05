@@ -10,8 +10,8 @@
 #include "physics_engine.h"
 #include "server_game.h"
 #include "shared/components.h"
-#include "shared/log.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/map_gamelogic_layout.h"
 #include "shared/mesh_loader.h"
@@ -44,7 +44,7 @@ bool loadMap(ServerGame& game, const std::string& path,
   shared::ParsedModel parsed;
   if (!parsed.load(path, shared::MAP_LOAD_FLAGS)) {
     LOG_DEBUG("loadMap: failed to load \"%s\": %s\n", path.c_str(),
-           parsed.lastError().c_str());
+              parsed.lastError().c_str());
     return false;
   }
   const aiScene* scene = parsed.scene();
@@ -87,7 +87,7 @@ bool loadMap(ServerGame& game, const std::string& path,
     const aiMatrix4x4* world = parsed.worldTransform(light->mName.C_Str());
     if (!world) {
       LOG_DEBUG("loadMap: light \"%s\" has no matching node, skipping\n",
-             light->mName.C_Str());
+                light->mName.C_Str());
       ++skippedLights;
       continue;
     }
@@ -123,7 +123,7 @@ bool loadMap(ServerGame& game, const std::string& path,
       ++skippedLights;
     } else {
       LOG_DEBUG("loadMap: unsupported light type %d on node \"%s\", skipping\n",
-             static_cast<int>(light->mType), light->mName.C_Str());
+                static_cast<int>(light->mType), light->mName.C_Str());
       ++skippedLights;
     }
   }

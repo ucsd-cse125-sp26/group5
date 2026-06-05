@@ -189,10 +189,11 @@ void applyLayout(ServerGame& game, shared::maze_layout::Config layout) {
   }
   broadcastSpawnEntities(game, spawned);
   printLayoutSnippet(game.mazeLayout);
-  LOG_DEBUG("[MazeLayout] Applied trigger (%.2f, %.2f) board (%.2f, %.2f, %.2f)\n",
-         game.mazeLayout.triggerCenterX, game.mazeLayout.triggerCenterY,
-         game.mazeLayout.boardCenterX, game.mazeLayout.boardCenterY,
-         game.mazeLayout.boardCenterZ);
+  LOG_DEBUG(
+      "[MazeLayout] Applied trigger (%.2f, %.2f) board (%.2f, %.2f, %.2f)\n",
+      game.mazeLayout.triggerCenterX, game.mazeLayout.triggerCenterY,
+      game.mazeLayout.boardCenterX, game.mazeLayout.boardCenterY,
+      game.mazeLayout.boardCenterZ);
 }
 
 void printLayoutSnippet(const shared::maze_layout::Config& layout) {

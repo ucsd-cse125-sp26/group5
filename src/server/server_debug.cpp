@@ -232,7 +232,7 @@ void finishPuzzle(ServerGame& game, Season season) {
     net::broadcastPacket(game.network->getHost(), s);
   }
   LOG_DEBUG("[DebugPanel] finished (revealed fragment for) season %d\n",
-         static_cast<int>(season));
+            static_cast<int>(season));
 }
 
 // "Pickup Fragment" — run the EXACT organic pickup chain for this season's
@@ -386,7 +386,7 @@ void printPositions(ServerGame& game) {
             ? game.registry.get<shared::RenderInfo>(a).playerSlot
             : 0;
     LOG_DEBUG("[DebugPanel] slot=%u pos=(%.2f, %.2f, %.2f)\n",
-           static_cast<unsigned>(slot), pos.x, pos.y, pos.z);
+              static_cast<unsigned>(slot), pos.x, pos.y, pos.z);
   }
 }
 

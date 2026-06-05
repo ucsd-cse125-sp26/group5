@@ -11,8 +11,8 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
-#include "shared/log.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 #include "shared/puzzles/maze/defaults.h"
 
@@ -338,7 +338,7 @@ void beginPuzzle(ServerGame& game) {
       "[OverworldMaze] Puzzle started — slot 1=Up 2=Down 3=Left 4=Right "
       "(all 4 players on pad required)\n");
   LOG_DEBUG("[OverworldMaze] Green piece at (%.2f, %.2f, %.2f)\n",
-         layout.startPos.x, layout.startPos.y, layout.startPos.z);
+            layout.startPos.x, layout.startPos.y, layout.startPos.z);
 }
 
 void endPuzzle(ServerGame& game) {

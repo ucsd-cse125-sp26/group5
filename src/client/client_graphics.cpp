@@ -37,12 +37,12 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "shared/assets.h"
-#include "shared/log.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/draw_stats.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/mesh_loader.h"
 #include "shared/puzzles/maze/layout.h"
@@ -832,7 +832,7 @@ bool Graphics::load(int width, int height) {
 
   int version = gladLoadGL(glfwGetProcAddress);
   LOG_DEBUG("GL %d.%d\n", GLAD_VERSION_MAJOR(version),
-         GLAD_VERSION_MINOR(version));
+            GLAD_VERSION_MINOR(version));
 
   if (glDebugMessageCallback) {
     glEnable(GL_DEBUG_OUTPUT);
@@ -1059,7 +1059,7 @@ bool Graphics::load(int width, int height) {
       ghostColored->orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
       models[ghostName + "_colored"] = ghostColored;
       LOG_DEBUG("Loaded tangram ghost: %s (colored slot guide)\n",
-             ghostName.c_str());
+                ghostName.c_str());
     }
   }
 
@@ -1086,7 +1086,7 @@ bool Graphics::load(int width, int height) {
       renderLoadingFrame(std::string("Loading skybox: ") + dir);
       skyboxes[dir] = loadSkybox(dir, pump);
       LOG_DEBUG("Loaded skybox: %s (%s)\n", std::string(sc.name).c_str(),
-             dir.c_str());
+                dir.c_str());
     }
   }
 
@@ -1438,7 +1438,7 @@ void Graphics::reloadShaders() {
     if (candidate.valid()) {
       r.slot.emplace(std::move(candidate));
       LOG_DEBUG("Reloaded: %s + %s%s%s\n", r.vert, r.frag,
-             (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
+                (r.geom && *r.geom) ? " + " : "", r.geom ? r.geom : "");
     } else {
       fprintf(stderr, "Reload failed, keeping previous: %s + %s\n", r.vert,
               r.frag);

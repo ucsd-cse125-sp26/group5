@@ -8,8 +8,8 @@
 
 #include "server/game/section_puzzle.h"
 #include "server/server_game.h"
-#include "shared/puzzles/tangram/defaults.h"
 #include "shared/log.h"
+#include "shared/puzzles/tangram/defaults.h"
 #include "shared/puzzles/tangram/puzzle_data.h"
 
 namespace tangram_trigger {
@@ -98,7 +98,7 @@ void snapAllPlayersToTangramPad(ServerGame& game) {
     }
   }
   LOG_DEBUG("[Tangram] Snapped %zu players to tangram pad\n",
-         game.active_players.size());
+            game.active_players.size());
 }
 
 void keepPlayersOnTangramPlatform(ServerGame& game) {

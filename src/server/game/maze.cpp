@@ -13,8 +13,8 @@
 #include "server/server_game.h"
 #include "server/server_network.h"
 #include "shared/components.h"
-#include "shared/log.h"
 #include "shared/input.h"
+#include "shared/log.h"
 #include "shared/net/packet_utils.h"
 
 namespace {
@@ -120,8 +120,8 @@ void EnterMazePuzzle(ServerGame& game) {
 
   game.registry.emplace_or_replace<shared::MazeUIState>(puzzleEnt, true);
   LOG_DEBUG("[GameLogic] EnterMazePuzzle: puzzle id %" PRIu32
-         " -> INPROGRESS, maze UI on\n",
-         section.puzzleID);
+            " -> INPROGRESS, maze UI on\n",
+            section.puzzleID);
 }
 
 void ExitMazePuzzle(ServerGame& game) {
@@ -140,7 +140,8 @@ void ExitMazePuzzle(ServerGame& game) {
   if (game.registry.all_of<shared::MazeUIState>(puzzleEnt)) {
     game.registry.get<shared::MazeUIState>(puzzleEnt).open = false;
   }
-  LOG_DEBUG("[GameLogic] ExitMazePuzzle: maze UI cleared (puzzle was FINISHED)\n");
+  LOG_DEBUG(
+      "[GameLogic] ExitMazePuzzle: maze UI cleared (puzzle was FINISHED)\n");
 }
 
 bool StepMemorySpirit(ServerGame& game, uint32_t puzzleEntityId,
@@ -281,8 +282,8 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
     return;
 
   LOG_DEBUG("[GameLogic] ClaimPadsForActivePlayers puzzle %" PRIu32
-         " (facing from join slot, matches client camera)\n",
-         puzzleEntityId);
+            " (facing from join slot, matches client camera)\n",
+            puzzleEntityId);
   for (auto& kv : game.active_players) {
     entt::entity m = kv.second.maze_avatar;
     if (m == entt::null || !game.registry.valid(m)) continue;
@@ -293,8 +294,8 @@ void ClaimPadsForActivePlayers(ServerGame& game, uint32_t puzzleEntityId) {
     game.registry.emplace_or_replace<shared::MazePadBinding>(m, pad);
     uint32_t eid = game.registry.get<shared::Entity>(m).id;
     LOG_DEBUG("[GameLogic]   entity %" PRIu32 " slot=%" PRIu8
-           " pad=%d (UP key = this facing)\n",
-           eid, slot, static_cast<int>(pad));
+              " pad=%d (UP key = this facing)\n",
+              eid, slot, static_cast<int>(pad));
   }
 }
 

@@ -75,7 +75,7 @@ int main() {
 
   network.onConnect = [&network](ServerGame& g, ENetPeer* peer) {
     LOG_DEBUG("A new client connected from %x:%u.\n", peer->address.host,
-           peer->address.port);
+              peer->address.port);
 
     if (g.unused_player_slots.empty()) {
       enet_peer_disconnect(peer, 0);

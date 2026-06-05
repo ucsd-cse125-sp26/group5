@@ -10,7 +10,7 @@ void initFromEnvironment();
 
 }  // namespace shared::log
 
-#define LOG_DEBUG(...)                                       \
-  do {                                                       \
+#define LOG_DEBUG(...)                                         \
+  do {                                                         \
     if (::shared::log::debugEnabled) std::printf(__VA_ARGS__); \
   } while (0)

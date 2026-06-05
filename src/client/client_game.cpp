@@ -496,7 +496,7 @@ void printEntityPositions(const ClientGame& game) {
     auto& e = view.get<shared::Entity>(ent);
     auto& p = view.get<shared::Position>(ent);
     LOG_DEBUG("entity %u @ (%f, %f)%s\n", e.id, p.x, p.y,
-           e.id == game.renderEntityId ? " (me)" : "");
+              e.id == game.renderEntityId ? " (me)" : "");
   }
 }
 

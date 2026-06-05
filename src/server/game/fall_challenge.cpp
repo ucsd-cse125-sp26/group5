@@ -684,7 +684,8 @@ void CollectFallFragment(ServerGame& game) {
     auto& gs = game.registry.get<shared::GameSection>(e);
     if (gs.sectionsCompleted < 255) gs.sectionsCompleted++;
   }
-  LOG_DEBUG("[GameLogic] CollectFallFragment: fall done, sections completed++\n");
+  LOG_DEBUG(
+      "[GameLogic] CollectFallFragment: fall done, sections completed++\n");
 }
 
 void update(ServerGame& game, float dt) {

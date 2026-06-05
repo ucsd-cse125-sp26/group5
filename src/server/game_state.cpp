@@ -27,11 +27,11 @@
 #include "server_memory_system.h"
 #include "server_network.h"
 #include "shared/assets.h"
-#include "shared/log.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/input.h"
 #include "shared/lighting.h"
+#include "shared/log.h"
 #include "shared/map_format.h"
 #include "shared/net/packet_utils.h"
 #include "shared/protocol.h"
@@ -214,7 +214,7 @@ static void debugPrintRequestedPlayerPosition(ServerGame& game) {
           playerPos.y - arena.triggerCenterY);
     }
     LOG_DEBUG("[TangramDebug] connected=%d insideTrigger=%d required=4\n",
-           connected, inside);
+              connected, inside);
   }
 }
 
@@ -586,7 +586,7 @@ static bool shouldSkipTangramDevInitialEntity(ServerGame& game,
 
   if (!game.registry.all_of<shared::RenderInfo>(ent)) return false;
   const auto& render = game.registry.get<shared::RenderInfo>(ent);
-  return render.modelName.rfind("map:", 0) == 0;
+  return render.modelName.starts_with("map:");
 }
 
 // ── OverworldState ───────────────────────────────────────
