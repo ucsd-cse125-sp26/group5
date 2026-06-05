@@ -385,16 +385,17 @@ void tryRotateNearbyPiece(ServerGame& game) {
     if (!(input.keys_newly_pressed & KEY_ROTATE_PIECE)) continue;
 
     uint8_t stage = 0;
+    uint8_t grantRotate = 0;
     if (game.registry.valid(game.overworldTangramController) &&
         game.registry.all_of<shared::OverworldTangramPuzzleState>(
             game.overworldTangramController)) {
-      stage = game.registry
-                  .get<shared::OverworldTangramPuzzleState>(
-                      game.overworldTangramController)
-                  .roleIsolationStage;
+      const auto& st = game.registry.get<shared::OverworldTangramPuzzleState>(
+          game.overworldTangramController);
+      stage = st.roleIsolationStage;
+      grantRotate = st.grantRotate;
     }
     const uint8_t slot = tangram_role_server::playerSlotForAvatar(game, avatar);
-    if (!shared::tangram_roles::canRotate(stage, slot)) continue;
+    if (!shared::tangram_roles::canRotate(stage, slot, grantRotate)) continue;
 
     const auto& ppos = game.registry.get<shared::Position>(avatar);
     entt::entity best = entt::null;
@@ -694,6 +695,51 @@ void initController(ServerGame& game) {
 
 bool isPuzzleActive(const ServerGame& game) {
   return game.overworldTangramActive;
+}
+
+void setIsolationStage(ServerGame& game, uint8_t stage) {
+  if (!game.overworldTangramActive) return;
+  if (!game.registry.valid(game.overworldTangramController)) return;
+  auto& state = game.registry.get<shared::OverworldTangramPuzzleState>(
+      game.overworldTangramController);
+  state.roleIsolationStage = stage;
+  tangram_role_server::syncCollisionRoles(game, stage);
+}
+
+void setPlayerGrant(ServerGame& game, uint8_t slot, uint8_t ability,
+                    bool enable) {
+  if (!game.overworldTangramActive) return;
+  if (slot < 1 || slot > 4) return;
+  if (!game.registry.valid(game.overworldTangramController)) return;
+  auto& state = game.registry.get<shared::OverworldTangramPuzzleState>(
+      game.overworldTangramController);
+  const uint8_t bit = static_cast<uint8_t>(1u << (slot - 1));
+  uint8_t* mask = nullptr;
+  switch (ability) {
+    case 0:
+      mask = &state.grantPush;
+      break;
+    case 1:
+      mask = &state.grantRotate;
+      break;
+    case 2:
+      mask = &state.grantColor;
+      break;
+    case 3:
+      mask = &state.grantSlots;
+      break;
+    default:
+      return;
+  }
+  if (enable) {
+    *mask = static_cast<uint8_t>(*mask | bit);
+  } else {
+    *mask = static_cast<uint8_t>(*mask & ~bit);
+  }
+  // Push is a physics-collision ability — re-sync layers so it applies now.
+  if (ability == 0) {
+    tangram_role_server::syncCollisionRoles(game, state.roleIsolationStage);
+  }
 }
 
 void beginPuzzle(ServerGame& game) {

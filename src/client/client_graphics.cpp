@@ -551,12 +551,13 @@ static bool isTangramPlayPieceModelName(const std::string& name) {
 static bool shouldDrawTangramEntity(const ClientGame& game,
                                     const std::string& modelName) {
   if (!isOverworldTangramPuzzleActive(game)) return true;
-  const uint8_t stage = tangramRoleIsolationStage(game);
-  if (!shared::tangram_roles::rolesActive(stage)) return true;
+  const auto st = tangramRoleState(game);
+  if (!shared::tangram_roles::rolesActive(st.roleIsolationStage)) return true;
 
   const uint8_t slot = localOverworldPlayerSlot(game);
   if (isTangramGhostModelName(modelName) &&
-      !shared::tangram_roles::canSeeSlots(stage, slot)) {
+      !shared::tangram_roles::canSeeSlots(st.roleIsolationStage, slot,
+                                          st.grantSlots)) {
     return false;
   }
   return true;
@@ -709,10 +710,11 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       variantKey = renderInfo.modelName + "_colored";
       variant = true;
     } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
-      const uint8_t stage = tangramRoleIsolationStage(game);
+      const auto st = tangramRoleState(game);
       const uint8_t slot = localOverworldPlayerSlot(game);
-      if (shared::tangram_roles::colorRestricted(stage) &&
-          !shared::tangram_roles::canSeeColor(stage, slot)) {
+      if (shared::tangram_roles::colorRestricted(st.roleIsolationStage) &&
+          !shared::tangram_roles::canSeeColor(st.roleIsolationStage, slot,
+                                              st.grantColor)) {
         variantKey = renderInfo.modelName + "_mute";
         variant = true;
       }
@@ -2521,9 +2523,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   }
 
   if (isOverworldTangramPuzzleActive(game)) {
-    const uint8_t stage = tangramRoleIsolationStage(game);
+    const auto st = tangramRoleState(game);
     const uint8_t slot = localOverworldPlayerSlot(game);
-    if (shared::tangram_roles::canRotate(stage, slot)) {
+    if (shared::tangram_roles::canRotate(st.roleIsolationStage, slot,
+                                         st.grantRotate)) {
       drawTangramCrosshair(fbWidth, fbHeight);
     }
   }
@@ -2938,6 +2941,12 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
   if (!ImGui::GetCurrentContext()) return;
 
   const double now = glfwGetTime();
+  // Restart the scroll when the server (re)entered CREDITS since we last drew.
+  const uint32_t epoch = game.creditsEpoch.load(std::memory_order_acquire);
+  if (epoch != lastCreditsEpoch) {
+    lastCreditsEpoch = epoch;
+    creditsStartTime = -1.0;
+  }
   if (creditsStartTime < 0.0) creditsStartTime = now;
   const auto elapsed = static_cast<float>(now - creditsStartTime);
 

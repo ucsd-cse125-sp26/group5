@@ -240,6 +240,9 @@ void registerClientHandlers(ClientNetwork& network) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
+          // Bump the epoch so the render thread restarts the scroll — supports
+          // re-rolling credits from the debug panel mid-roll.
+          game.creditsEpoch.fetch_add(1, std::memory_order_release);
           game.audio.stopAllGlobalLoops();
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
@@ -331,12 +334,16 @@ bool isOverworldTangramPuzzleActive(const ClientGame& game) {
 }
 
 uint8_t tangramRoleIsolationStage(const ClientGame& game) {
+  return tangramRoleState(game).roleIsolationStage;
+}
+
+shared::OverworldTangramPuzzleState tangramRoleState(const ClientGame& game) {
   auto view = game.renderRegistry.view<shared::OverworldTangramPuzzleState>();
   for (auto ent : view) {
     const auto& st = view.get<shared::OverworldTangramPuzzleState>(ent);
-    if (st.active) return st.roleIsolationStage;
+    if (st.active) return st;
   }
-  return 0;
+  return {};
 }
 
 uint8_t localOverworldPlayerSlot(const ClientGame& game) {
@@ -451,9 +458,10 @@ void processInput(GLFWwindow* window, const ClientGame& game,
 
   if (isOverworldTangramPuzzleActive(game) &&
       glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
-    const uint8_t stage = tangramRoleIsolationStage(game);
+    const auto st = tangramRoleState(game);
     const uint8_t slot = localOverworldPlayerSlot(game);
-    if (shared::tangram_roles::canRotate(stage, slot)) {
+    if (shared::tangram_roles::canRotate(st.roleIsolationStage, slot,
+                                         st.grantRotate)) {
       keys |= KEY_ROTATE_PIECE;
     }
   }
