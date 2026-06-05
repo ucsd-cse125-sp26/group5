@@ -145,6 +145,11 @@ struct Grounded {
   int jumpsRemaining = 2;
 };
 
+// Debug "fly" tag: presence lifts the jump budget so the player can keep
+// jumping in mid-air (tap jump to rise). Server-only; set via the debug panel
+// (DebugCommand::SET_PLAYER_FLY), not replicated.
+struct FlyMode {};
+
 enum class RunPhase : uint8_t { LOBBY, INPROGRESS, FINISHED };
 
 enum class Outcome : uint8_t { UNDECIDED, WIN, LOSE };

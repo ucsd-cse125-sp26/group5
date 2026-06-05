@@ -84,13 +84,17 @@ bool AudioEngine::init() {
 
 void AudioEngine::shutdown() {
   std::scoped_lock lock(mutex_);
-  if (soloud_) {
-    soloud_->deinit();
-    delete soloud_;
-    soloud_ = nullptr;
-  }
+  // Order matters: ~Wav -> AudioSource::stop() calls back into the engine
+  // (soloud_->stopAudioSource) through a back-pointer set when the sound was
+  // played. deinit() stops the mixer thread and nulls the audio mutex, after
+  // which that callback is a safe no-op — but the engine object must still be
+  // alive. Deleting soloud_ before the Wavs left the back-pointer dangling and
+  // locked a destroyed mutex (glibc robust-mutex ESRCH abort at exit).
+  if (soloud_) soloud_->deinit();
   for (auto& [id, wav] : sounds_) delete wav;
   sounds_.clear();
+  delete soloud_;
+  soloud_ = nullptr;
 }
 
 void AudioEngine::update(float dt) {

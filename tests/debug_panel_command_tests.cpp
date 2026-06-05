@@ -10,6 +10,7 @@
 
 #include "server/game/puzzles/tangram/puzzle.h"
 #include "server/server_debug.h"
+#include "shared/assets.h"
 #include "server/server_game.h"
 #include "shared/components.h"
 #include "shared/protocol.h"
@@ -248,6 +249,47 @@ TEST(DebugPanelCommands, SetSummerParamTunesLayout) {
     EXPECT_NEAR(game.summerLayout.waveDurationSec[i], 15.0f, 0.0001f);
   }
   EXPECT_NEAR(game.summerLayout.startGraceSec, 2.0f, 0.0001f);
+}
+
+// ── Per-player model swap ──────────────────────────────────────────────────
+TEST(DebugPanelCommands, SetPlayerModelChangesOnlyTargetSlot) {
+  ServerGame game;
+  auto p1 = makePlayer(game, 1, {0, 0, 0});
+  auto p2 = makePlayer(game, 2, {0, 0, 0});
+
+  // arg2 = 2 -> shared::PLAYER_MODEL_CYCLE[2] ("goose").
+  runCmd(game, shared::DebugCommand::SET_PLAYER_MODEL, /*slot=*/2, /*idx=*/2);
+
+  EXPECT_EQ(game.registry.get<shared::RenderInfo>(p2).modelName,
+            std::string(shared::PLAYER_MODEL_CYCLE[2]));
+  // Slot 1 untouched.
+  EXPECT_EQ(game.registry.get<shared::RenderInfo>(p1).modelName, "cube");
+}
+
+TEST(DebugPanelCommands, SetPlayerModelIgnoresOutOfRangeIndex) {
+  ServerGame game;
+  auto p = makePlayer(game, 1, {0, 0, 0});
+
+  runCmd(game, shared::DebugCommand::SET_PLAYER_MODEL, /*slot=*/1,
+         /*idx=*/static_cast<uint32_t>(shared::PLAYER_MODEL_CYCLE_COUNT));
+
+  EXPECT_EQ(game.registry.get<shared::RenderInfo>(p).modelName, "cube");
+}
+
+// ── Per-player fly (unlimited jumping) ─────────────────────────────────────
+TEST(DebugPanelCommands, SetPlayerFlyTogglesOnlyTargetSlot) {
+  ServerGame game;
+  auto p1 = makePlayer(game, 1, {0, 0, 0});
+  auto p2 = makePlayer(game, 2, {0, 0, 0});
+
+  runCmd(game, shared::DebugCommand::SET_PLAYER_FLY, /*slot=*/2, 0,
+         /*enable=*/1.0f);
+  EXPECT_TRUE(game.registry.all_of<shared::FlyMode>(p2));
+  EXPECT_FALSE(game.registry.all_of<shared::FlyMode>(p1));
+
+  runCmd(game, shared::DebugCommand::SET_PLAYER_FLY, /*slot=*/2, 0,
+         /*enable=*/0.0f);
+  EXPECT_FALSE(game.registry.all_of<shared::FlyMode>(p2));
 }
 
 // ── Credits re-roll: latch no longer blocks repeat triggers ────────────────
