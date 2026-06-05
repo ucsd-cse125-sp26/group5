@@ -27,6 +27,11 @@ class VideoPlayer {
   // by the menu background ("play once, then loop the last few seconds"). 0
   // disables (the default). Ignored when the clip was opened with loop=true.
   void setLoopTail(double seconds) { loopTailSeconds_ = seconds; }
+  // After a non-looping clip reaches its end, hold on the final decoded frame
+  // forever instead of stopping (isPlaying() stays true so the frame keeps
+  // drawing). Used by the credits screen. Takes precedence over setLoopTail;
+  // ignored when the clip was opened with loop=true.
+  void setFreezeAtEnd(bool freeze) { freezeAtEnd_ = freeze; }
   void update(double dt);  // decodes + uploads the frame(s) for elapsed dt
   void bindPlanes(int unitY, int unitCb, int unitCr) const;
   void stop() { playing_ = false; }
@@ -48,10 +53,13 @@ class VideoPlayer {
   float texScaleX_ = 1.0f, texScaleY_ = 1.0f;
   double frameTime_ = 1.0 / 30.0;  // seconds per frame (1 / framerate)
   double timeAccum_ = 0.0;
-  double loopTailSeconds_ = 0.0;  // >0 = loop only the final tail (see setLoopTail)
+  double loopTailSeconds_ =
+      0.0;  // >0 = loop only the final tail (see setLoopTail)
   bool playing_ = false;
   bool looping_ = false;
   bool allocated_ = false;
+  bool freezeAtEnd_ = false;  // hold the last frame at end (see setFreezeAtEnd)
+  bool frozen_ = false;       // reached the end with freezeAtEnd_ set
 };
 
 // Well-known clip ids — indices into kVideoPaths[] in video_player.cpp.

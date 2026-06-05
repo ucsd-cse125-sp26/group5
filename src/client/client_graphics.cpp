@@ -1634,7 +1634,8 @@ void Graphics::playFullscreenCutscene(uint16_t videoId, bool loop,
     fprintf(stderr, "playFullscreenCutscene: unknown videoId %u\n", videoId);
     return;
   }
-  videoPlayer.emplace();  // destroys any previous player (frees its GL textures)
+  videoPlayer
+      .emplace();  // destroys any previous player (frees its GL textures)
   if (!videoPlayer->open(path, loop)) {
     videoPlayer.reset();
     videoMode = VideoMode::None;
@@ -2986,17 +2987,23 @@ void Graphics::renderCreditsScreen(ClientGame& game) {
 
   // The end "exit" clip replaces the old scrolling-text roll. Opened lazily on
   // the first credits frame (creditsStartTime is the sentinel, reset to -1 on
-  // dismiss in main.cpp so it reopens next time) and looped so the screen stays
-  // alive until the player presses Enter to return. Deliberately NOT routed
-  // through videoMode/Fullscreen so the generic Enter-skip can't fight the
-  // credits' own dismiss handler.
+  // dismiss in main.cpp so it reopens next time). It plays through once and
+  // then freezes on its final frame (setFreezeAtEnd) so the screen stays alive
+  // until the player presses Enter to return — instead of replaying the clip.
+  // Deliberately NOT routed through videoMode/Fullscreen so the generic
+  // Enter-skip can't fight the credits' own dismiss handler.
   const double now = glfwGetTime();
   if (creditsStartTime < 0.0) {
     creditsStartTime = now;
     const std::string path = videoPathFor(static_cast<uint16_t>(VideoId::Exit));
     if (!path.empty()) {
       videoPlayer.emplace();
-      if (!videoPlayer->open(path, /*loop=*/true)) videoPlayer.reset();
+      if (videoPlayer->open(path, /*loop=*/false)) {
+        videoPlayer->setFreezeAtEnd(
+            true);  // hold the last frame, don't re-roll
+      } else {
+        videoPlayer.reset();
+      }
       videoMode = VideoMode::None;
     }
   }
@@ -3104,11 +3111,12 @@ Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
   // connect cutscene later replaces this player. Drawn behind the ImGui dialog.
   if (!menuVideoOpened) {
     menuVideoOpened = true;
-    const std::string path = videoPathFor(static_cast<uint16_t>(VideoId::Intro));
+    const std::string path =
+        videoPathFor(static_cast<uint16_t>(VideoId::Intro));
     if (!path.empty()) {
       videoPlayer.emplace();
       if (videoPlayer->open(path, /*loop=*/false)) {
-        videoPlayer->setLoopTail(3.0);
+        videoPlayer->setLoopTail(3.0);  // loop the final 3s of the intro
       } else {
         videoPlayer.reset();
       }
