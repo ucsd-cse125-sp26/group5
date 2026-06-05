@@ -29,6 +29,66 @@
 #include "shared/shader_constants.h"
 #include "shared/util.h"
 
+// EXT/ARB anisotropic-filtering tokens (absent from the GL 4.1 core headers).
+#ifndef GL_TEXTURE_MAX_ANISOTROPY
+#define GL_TEXTURE_MAX_ANISOTROPY 0x84FE
+#endif
+#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY 0x84FF
+#endif
+
+namespace {
+// Anisotropy level last applied to model textures. 1 == current behavior
+// (nearest-mipmap-linear min filter, no anisotropy).
+int g_modelTextureAnisotropy = 1;
+// Model textures that own a full mip chain (the success path below). Only
+// these are touched by the runtime re-apply pass, so procedural / 1x1 fallback
+// textures never become mip-incomplete.
+std::vector<GLuint> g_mippedModelTextures;
+
+float maxSupportedAnisotropy() {
+  static float maxA = -1.0f;
+  if (maxA < 0.0f) {
+    maxA = 1.0f;
+    while (glGetError() != GL_NO_ERROR) {
+    }
+    GLfloat v = 1.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &v);
+    if (glGetError() == GL_NO_ERROR && v > 1.0f) maxA = v;
+    while (glGetError() != GL_NO_ERROR) {
+    }
+  }
+  return maxA;
+}
+
+// level>1: trilinear + anisotropy. level<=1: the GL default
+// nearest-mipmap-linear / linear (today's look). Binds tex to GL_TEXTURE_2D.
+void applyMippedFilter(GLuint tex, int level) {
+  glBindTexture(GL_TEXTURE_2D, tex);
+  if (level > 1) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    const float maxA = maxSupportedAnisotropy();
+    if (maxA > 1.0f) {
+      glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY,
+                      std::min(static_cast<float>(level), maxA));
+    }
+  } else {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  }
+}
+}  // namespace
+
+void setModelTextureAnisotropy(int level) {
+  level = std::max(1, level);
+  if (level == g_modelTextureAnisotropy) return;
+  g_modelTextureAnisotropy = level;
+  for (GLuint tex : g_mippedModelTextures) applyMippedFilter(tex, level);
+}
+
 static inline glm::vec3 vec3_cast(const aiVector3D& v) {
   return {v.x, v.y, v.z};
 }
@@ -427,6 +487,10 @@ MaterialSlot loadMaterial(const aiMaterial* mat, aiTextureType type,
                    GL_UNSIGNED_BYTE, pixels);
       glGenerateMipmap(GL_TEXTURE_2D);
       GPU_MEM_TEX2D_MIPPED("ModelTextures", internal, w, h);
+      // Register for runtime anisotropy re-apply and set the current level
+      // (level 1 reproduces the GL-default filtering used before this change).
+      g_mippedModelTextures.push_back(id);
+      applyMippedFilter(id, g_modelTextureAnisotropy);
     } else {
       std::fprintf(stderr,
                    "loadMaterial: failed to decode texture \"%s\" "
@@ -1211,16 +1275,32 @@ void Draw(const Shader& shader, const Model& model,
   Draw(shader, model, transform, nullptr, 0);
 }
 
+// Depth-only mesh draw for shadow passes. The dir/point depth shaders sample
+// only material.diffuse (alpha cutout), so skip the other four samplers and
+// material.shininess that the main-pass Draw(mesh, material) binds.
+static void DrawDepth(const Shader& shader, const Mesh& mesh,
+                      const Material& material) {
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, material.diffuse.texture);
+  shader.setInt("material.diffuse", 0);
+  glBindVertexArray(mesh.vao);
+  glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
+  glBindVertexArray(0);
+}
+
 void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
-          const glm::mat4* bones, int count) {
+          const glm::mat4* bones, int count, bool depthOnly) {
   // Per-model palette uniform — paletteSize == 0 short-circuits the
-  // quantizer in fragment_gbuffer.glsl. Setting these on shaders that
-  // don't declare the uniforms (shadow/outline) is a cached -1 no-op.
-  const int paletteSize = static_cast<int>(model.palette.size());
-  shader.setInt("paletteSize", paletteSize);
-  if (paletteSize > 0) {
-    shader.setVec3Array("palette", paletteSize,
-                        reinterpret_cast<const float*>(model.palette.data()));
+  // quantizer in fragment_gbuffer.glsl. Depth shaders don't declare it, so the
+  // shadow path skips it entirely (the old code spent a string-hashed setInt to
+  // a cached -1 location per draw).
+  if (!depthOnly) {
+    const int paletteSize = static_cast<int>(model.palette.size());
+    shader.setInt("paletteSize", paletteSize);
+    if (paletteSize > 0) {
+      shader.setVec3Array("palette", paletteSize,
+                          reinterpret_cast<const float*>(model.palette.data()));
+    }
   }
 
   // useSkinning gates the bone path in the vertex shader. We only upload
@@ -1240,10 +1320,16 @@ void Draw(const Shader& shader, const Model& model, const glm::mat4& transform,
     // space; applying the per-mesh node transform on top double-applies the
     // skeleton's root scale/rotation.
     glm::mat4 final = useSkinning ? transform : transform * instanceTransform;
-    glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
     shader.setMat4("model", final);
-    shader.setMat3("normalMatrix", normalMatrix);
-    Draw(shader, mesh, material);
+    if (depthOnly) {
+      // Shadow vertex shaders have no normalMatrix; skip the per-mesh 3x3
+      // inverse (it was computed and uploaded every cascade for nothing).
+      DrawDepth(shader, mesh, material);
+    } else {
+      glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(final)));
+      shader.setMat3("normalMatrix", normalMatrix);
+      Draw(shader, mesh, material);
+    }
   }
 }
 
@@ -1395,6 +1481,13 @@ Skybox loadSkybox(const std::string& directory,
   Skybox skybox{.vao = vao};
   skybox.cubemapTexture =
       loadCubemap(directory, skybox.diffuseSamples, progress);
+  // Mean linear-RGB of the sampled cubemap pixels for the IBL-ambient tint.
+  if (!skybox.diffuseSamples.empty()) {
+    glm::vec3 sum(0.0f);
+    for (const auto& s : skybox.diffuseSamples) sum += s.color;
+    skybox.averageColor =
+        sum / static_cast<float>(skybox.diffuseSamples.size());
+  }
   return skybox;
 }
 

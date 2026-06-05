@@ -159,6 +159,20 @@ int main() {
     }
     graphics.keySettingsMenuPrev = menuKeyNow;
 
+    // Ctrl+Shift+\ toggles the demo debug control panel. Deliberately a
+    // nonintuitive chord so it can't be hit by accident on stage; debounced on
+    // the backslash key.
+    bool dbgChord =
+        (glfwGetKey(graphics.window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
+         glfwGetKey(graphics.window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) &&
+        (glfwGetKey(graphics.window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+         glfwGetKey(graphics.window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) &&
+        glfwGetKey(graphics.window, GLFW_KEY_BACKSLASH) == GLFW_PRESS;
+    if (dbgChord && !graphics.keyDebugPanelPrev) {
+      graphics.debugPanelOpen = !graphics.debugPanelOpen;
+    }
+    graphics.keyDebugPanelPrev = dbgChord;
+
     // Enter dismisses the credits roll back to the overworld view. The server
     // never froze gameplay, so this is a purely local view/music swap.
     bool dismissNow = glfwGetKey(graphics.window, GLFW_KEY_ENTER) == GLFW_PRESS;
@@ -171,17 +185,18 @@ int main() {
           static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC), 0.3f);
     }
     creditsDismissPrev = dismissNow;
-    // Sync cursor mode whenever the menu state changes — whether from H or
-    // the in-UI Close button (which flipped the flag during render).
-    if (graphics.settingsMenuOpen != graphics.prevSyncedMenuOpen) {
+
+    // Sync cursor mode whenever a cursor-freeing menu opens/closes — settings
+    // (H) or the debug panel — whether toggled by key or by an in-UI Close box.
+    bool anyMenuOpen = graphics.settingsMenuOpen || graphics.debugPanelOpen;
+    if (anyMenuOpen != graphics.prevSyncedMenuOpen) {
       glfwSetInputMode(graphics.window, GLFW_CURSOR,
-                       graphics.settingsMenuOpen ? GLFW_CURSOR_NORMAL
-                                                 : GLFW_CURSOR_DISABLED);
-      graphics.prevSyncedMenuOpen = graphics.settingsMenuOpen;
+                       anyMenuOpen ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+      graphics.prevSyncedMenuOpen = anyMenuOpen;
     }
 
     // Click-to-recapture for edge cases (e.g. cursor was freed externally).
-    if (!graphics.settingsMenuOpen && !ImGui::GetIO().WantCaptureMouse &&
+    if (!anyMenuOpen && !ImGui::GetIO().WantCaptureMouse &&
         glfwGetMouseButton(graphics.window, GLFW_MOUSE_BUTTON_LEFT) ==
             GLFW_PRESS &&
         glfwGetInputMode(graphics.window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
@@ -189,7 +204,8 @@ int main() {
     }
 
     processInput(graphics.window, game, game.inputQueue, prevKeys,
-                 graphics.debugChannel != DebugChannel::Off);
+                 graphics.debugChannel != DebugChannel::Off ||
+                     graphics.debugPanelOpen);
     SIMPLE_PROFILE_FRAME_END("Client");
   }
 
@@ -206,6 +222,7 @@ void runNetworkLoop(ClientGame& game, ClientNetwork& network) {
       network.poll(game);
     }
     network.drainInputQueue(game.inputQueue);
+    network.drainDebugQueue(game.debugQueue);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   network.disconnect();

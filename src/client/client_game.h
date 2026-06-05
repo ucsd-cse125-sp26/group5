@@ -47,6 +47,9 @@ struct ClientGame {
   // "lost connection" overlay instead of a frozen world.
   std::atomic<bool> serverLost = false;
 
+  // Demo debug-panel commands, produced on the render thread (button clicks in
+  // the debug control panel) and drained on the network thread (see main.cpp).
+  SpscQueue<shared::DebugCommandPacket, 64> debugQueue;
   // Server-driven video play/stop requests, produced on the network thread and
   // consumed on the render thread (see main.cpp).
   SpscQueue<VideoRequest, 8> videoQueue;

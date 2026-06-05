@@ -113,12 +113,6 @@ static void movement_system_for_world(ServerGame& game, float dt) {
 
     if (input.keys_newly_pressed & KEY_JUMP) {
       verticalVel = 10.0f;
-      shared::SoundEventPacket pkt;
-      pkt.soundId = static_cast<uint32_t>(shared::SoundId::JUMP);
-      pkt.x = position.x;
-      pkt.y = position.y;
-      pkt.z = position.z;
-      net::broadcastPacket(game.network->getHost(), pkt);
     }
 
     bool knocked =
@@ -131,21 +125,6 @@ static void movement_system_for_world(ServerGame& game, float dt) {
     } else {
       bodyInterface.SetLinearVelocity(
           bodyId, JPH::Vec3(velocity.dx, velocity.dy, verticalVel));
-    }
-
-    // ── Landing detection (ECS-driven via Grounded component) ──
-    if (game.registry.all_of<shared::Grounded>(entity)) {
-      auto& g = game.registry.get<shared::Grounded>(entity);
-      if (!g.wasGrounded && g.isGrounded) {
-        shared::SoundEventPacket pkt;
-        pkt.soundId = static_cast<uint32_t>(shared::SoundId::LAND);
-        pkt.x = position.x;
-        pkt.y = position.y;
-        pkt.z = position.z;
-        pkt.volume = 0.7f;
-        pkt.positional = true;
-        net::broadcastPacket(game.network->getHost(), pkt);
-      }
     }
 
     // ── Footsteps ──
@@ -353,6 +332,19 @@ void registerServerHandlers(ServerNetwork& network) {
         playerInput.mouseDx += pkt.mouseDx;
         playerInput.mouseDy += pkt.mouseDy;
         playerInput.rotateTargetId = pkt.rotateTargetId;
+      });
+
+  // Demo debug control panel. Deferred: just record the command; the fixed-step
+  // loop drains pendingDebugCommands via server_debug::processPendingCommands
+  // so game logic runs on the game thread at a safe point.
+  network.dispatcher().on(
+      shared::PacketType::DEBUG_COMMAND,
+      [](ServerGame& game, ENetPeer* sender, const uint8_t* data, size_t len) {
+        (void)sender;
+        if (len < sizeof(shared::DebugCommandPacket)) return;
+        shared::DebugCommandPacket pkt;
+        std::memcpy(&pkt, data, sizeof(pkt));
+        game.pendingDebugCommands.push_back(pkt);
       });
 }
 

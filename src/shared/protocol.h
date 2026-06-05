@@ -19,6 +19,27 @@ enum class PacketType : uint8_t {
   // packet byte values stay stable across separately built server/clients.
   VIDEO_PLAY,
   VIDEO_STOP,
+  // Client→server demo debug-panel command. Append-only: keep last.
+  DEBUG_COMMAND,
+};
+
+// Demo debug-control-panel commands. The active season / target puzzle is
+// encoded in DebugCommandPacket::arg as a shared::SectionSeasonMap value
+// (WINTER=0, FALL=1, SUMMER=2, SPRING=3); commands that ignore it pass 0.
+enum class DebugCommand : uint8_t {
+  SET_SEASON,              // arg = SectionSeasonMap
+  CYCLE_SEASON,            // arg ignored
+  SPAWN_FRAGMENT_CURRENT,  // arg ignored (current active season)
+  SPAWN_FRAGMENT_ALL,      // arg ignored (reveal all four fragments)
+  START_PUZZLE,            // arg = SectionSeasonMap
+  FINISH_PUZZLE,           // arg = SectionSeasonMap (pretend-win: reveal frag)
+  PICKUP_FRAGMENT,         // arg = SectionSeasonMap (organic collect+progress)
+  TELEPORT_TO_PUZZLE,      // arg = SectionSeasonMap
+  TOGGLE_BARRIER_COLLISION,   // arg ignored
+  TOGGLE_BARRIER_VISIBILITY,  // arg ignored
+  RESET_TO_OVERWORLD_SPAWN,   // arg ignored
+  TRIGGER_CREDITS,            // arg ignored
+  PRINT_POSITIONS,            // arg ignored
 };
 
 enum class GameStateType : uint8_t {
@@ -79,5 +100,15 @@ struct VideoPlayPacket {
 
 struct VideoStopPacket {
   PacketType type = PacketType::VIDEO_STOP;
+};
+
+// Fixed-size POD framed by sizeof+memcpy. uint32 `arg` placed right after the
+// type byte (matching VideoPlayPacket's ordering) so the 1+3pad+4 layout is
+// identical across MinGW/Linux builds.
+struct DebugCommandPacket {
+  PacketType type = PacketType::DEBUG_COMMAND;
+  DebugCommand cmd = DebugCommand::PRINT_POSITIONS;
+  uint8_t _pad[2] = {0, 0};
+  uint32_t arg = 0;
 };
 }  // namespace shared

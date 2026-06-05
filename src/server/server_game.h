@@ -89,15 +89,19 @@ struct ServerGame {
   int overworldMazeGoalTileY = 0;
   bool overworldMazeReachGoalPending = false;
 
-  // Set by KEY_DEBUG_CYCLE_SEASON (Y). When true, the per-tick
+  // Set by the debug panel's season commands. When true, the per-tick
   // "force winter while winter unlocked+incomplete" clamp in MoveInMainMap is
-  // skipped so the debug-cycled season actually sticks. One-way: stays on for
+  // skipped so the chosen season actually sticks. One-way: stays on for
   // the rest of the run.
   bool debugSeasonOverride = false;
 
   // F2 then F (debug): skip puzzle gates and spawn fragments one-by-one for
   // seasonal music testing. Off until a player presses F while debug is on.
   bool musicFragmentPickupTestActive = false;
+
+  // Debug-control-panel commands received from a client this poll, drained and
+  // executed once per fixed-step tick by server_debug::processPendingCommands.
+  std::vector<shared::DebugCommandPacket> pendingDebugCommands;
 
   shared::maze_layout::Config mazeLayout =
       shared::maze_layout::Config::defaults();

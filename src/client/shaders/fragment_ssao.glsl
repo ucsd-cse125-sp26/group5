@@ -10,7 +10,8 @@ uniform sampler2D texNoise;
 layout(std140) uniform CameraBlock {
   mat4 view;
   mat4 projection;
-  mat4 lightSpaceMatrix;
+  mat4 lightSpaceMatrices[K_SHADOW_CASCADE_COUNT];
+  vec4 cascadeSplits;
   vec3 viewPos;
   float pointFarPlane;
 } camera;
@@ -20,6 +21,8 @@ uniform int kernelSize;
 uniform float radius;
 uniform float bias;
 uniform vec2 noiseScale;
+// Exponent on the final occlusion term; 2.0 reproduces the original behavior.
+uniform float ssaoPower;
 
 void main() {
   vec4 worldSample = texture(gPosition, vUV);
@@ -55,5 +58,5 @@ void main() {
     occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;
   }
   occlusion = 1.0 - occlusion / float(kernelSize);
-  FragColor = pow(occlusion, 2.0);
+  FragColor = pow(occlusion, ssaoPower);
 }

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <filesystem>
 #include <future>
 #include <iostream>
@@ -23,6 +24,7 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "client/asset.h"
 #include "client/client_game.h"
+#include "client/debug_panel.h"
 #include "client/puzzle_hud.h"
 #include "client/ui_settings.h"
 #include "client_network.h"
@@ -37,6 +39,7 @@
 #include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
+#include "shared/draw_stats.h"
 #include "shared/gpu_mem_profiler.h"
 #include "shared/gpu_profiler.h"
 #include "shared/map_format.h"
@@ -52,16 +55,30 @@
 // Skybox images are Y-up; the game is Z-up.
 static const glm::mat3 kCubemapToGame(1, 0, 0, 0, 0, 1, 0, -1, 0);
 
-// std140 layout — must match CameraBlock in the deferred-lighting,
-// vertex_gbuffer, and ssao shaders.
+// std140 layout — must match the CameraBlock uniform block in all shaders that
+// declare it: fragment_lighting_deferred, fragment_lighting_cel,
+// vertex_gbuffer, fragment_ssao, fragment_ssao_blur, fragment_outline_sobel,
+// vertex_video_quad. (Layout is computed per-shader, so every copy must stay
+// byte-identical.)
 struct alignas(16) CameraUBOData {
   glm::mat4 view;
   glm::mat4 projection;
-  glm::mat4 lightSpaceMatrix;
+  glm::mat4 lightSpaceMatrices[shared::kShadowCascadeCount];
+  glm::vec4 cascadeSplits;  // per-cascade FAR view-space depth (positive)
   glm::vec3 viewPos;
   float pointFarPlane;
 };
-static_assert(sizeof(CameraUBOData) == 208);
+// std140: view@0, projection@64, lightSpaceMatrices@128 (stride 64),
+// cascadeSplits@(128+64N), viewPos@(+16), pointFarPlane packs into viewPos's
+// 16-byte slot. == 416 for N == 4. Offsets are asserted so the C++ mirror and
+// the GLSL block can't silently drift.
+static_assert(sizeof(CameraUBOData) ==
+              128 + 64 * shared::kShadowCascadeCount + 32);
+static_assert(offsetof(CameraUBOData, lightSpaceMatrices) == 128);
+static_assert(offsetof(CameraUBOData, cascadeSplits) ==
+              128 + 64 * shared::kShadowCascadeCount);
+static_assert(offsetof(CameraUBOData, viewPos) ==
+              128 + 64 * shared::kShadowCascadeCount + 16);
 
 static constexpr GLuint kCameraUBOBinding = 0;
 
@@ -133,17 +150,37 @@ static int collectPointLights(const ClientGame& game,
 
 static void uploadPointLights(const Shader& shader, const LightUpload* lights,
                               int count) {
+  // Uniform member names are built once and reused every frame — the old path
+  // heap-allocated `pointLights[i].member` strings per light per frame. The
+  // Shader location cache already keys on these names, so behavior is
+  // identical; only the per-frame allocations are gone.
+  struct Names {
+    std::string position, constant, linear, quadratic, ambient, diffuse,
+        specular, shadowIdx;
+  };
+  static const std::vector<Names> names = [] {
+    std::vector<Names> n(kMaxLightingShaderLights);
+    for (int i = 0; i < kMaxLightingShaderLights; ++i) {
+      const std::string base = "pointLights[" + std::to_string(i) + "].";
+      n[i] = {base + "position",  base + "constant", base + "linear",
+              base + "quadratic", base + "ambient",  base + "diffuse",
+              base + "specular",  base + "shadowIdx"};
+    }
+    return n;
+  }();
+
   shader.setInt("numPointLights", count);
-  for (int i = 0; i < count; ++i) {
-    std::string base = "pointLights[" + std::to_string(i) + "].";
-    shader.setVec3(base + "position", lights[i].position);
-    shader.setFloat(base + "constant", lights[i].constant);
-    shader.setFloat(base + "linear", lights[i].linear);
-    shader.setFloat(base + "quadratic", lights[i].quadratic);
-    shader.setVec3(base + "ambient", lights[i].ambient);
-    shader.setVec3(base + "diffuse", lights[i].diffuse);
-    shader.setVec3(base + "specular", lights[i].specular);
-    shader.setInt(base + "shadowIdx", lights[i].shadowIdx);
+  const int n = std::min(count, kMaxLightingShaderLights);
+  for (int i = 0; i < n; ++i) {
+    const Names& nm = names[i];
+    shader.setVec3(nm.position, lights[i].position);
+    shader.setFloat(nm.constant, lights[i].constant);
+    shader.setFloat(nm.linear, lights[i].linear);
+    shader.setFloat(nm.quadratic, lights[i].quadratic);
+    shader.setVec3(nm.ambient, lights[i].ambient);
+    shader.setVec3(nm.diffuse, lights[i].diffuse);
+    shader.setVec3(nm.specular, lights[i].specular);
+    shader.setInt(nm.shadowIdx, lights[i].shadowIdx);
   }
 }
 
@@ -221,29 +258,105 @@ static void computePointShadowMatrices(
   }
 }
 
-// Camera-following ortho frustum. lightPos is texel-snapped to the light's
-// tangent plane so static geometry doesn't shimmer as the camera moves.
-static glm::mat4 computeDirectionalLightMatrix(const glm::vec3& cameraPos,
-                                               const glm::vec3& lightDir,
-                                               float halfExtent,
-                                               float backDistance,
-                                               float farPlane, int mapSize) {
-  glm::vec3 dir = glm::normalize(lightDir);
-  glm::vec3 up = glm::abs(dir.z) > 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f)
-                                        : glm::vec3(0.0f, 0.0f, 1.0f);
-  glm::vec3 right = glm::normalize(glm::cross(dir, up));
-  glm::vec3 lightUp = glm::cross(right, dir);
-  const float texelWorld = (2.0f * halfExtent) / static_cast<float>(mapSize);
-  float u = glm::dot(cameraPos, right);
-  float v = glm::dot(cameraPos, lightUp);
-  u = std::floor(u / texelWorld) * texelWorld;
-  v = std::floor(v / texelWorld) * texelWorld;
-  glm::vec3 snapped = right * u + lightUp * v + dir * glm::dot(cameraPos, dir);
-  glm::vec3 lightPos = snapped - dir * backDistance;
-  glm::mat4 view = glm::lookAt(lightPos, snapped, up);
-  glm::mat4 proj = glm::ortho(-halfExtent, halfExtent, -halfExtent, halfExtent,
-                              1.0f, farPlane);
-  return proj * view;
+// Builds per-cascade light-space matrices for cascaded shadow maps. Each
+// cascade fits the minimal enclosing sphere of its view-frustum slice — the
+// sphere is rotation-invariant, so the ortho box size doesn't change as the
+// camera turns — then texel-snaps the projected sphere centre so it doesn't
+// swim as the camera translates. The slice shape (hence its sphere radius)
+// depends only on fov/aspect/splits, so the texel size is stable frame to
+// frame.
+//
+// outSplits[c] is the FAR view-space depth of cascade c (positive forward
+// distance), which the fragment shader compares against -(view*worldPos).z to
+// pick a cascade. Inactive cascades (when activeCascades < count) collapse onto
+// cascade 0 so the toggle-off path can render a single layer.
+static void computeCascadeMatrices(
+    const glm::mat4& view, float fovDeg, float aspect, float camNear,
+    float camFar, float shadowNear, float shadowFar, float lambda,
+    float pullback, const glm::vec3& lightDir, int mapSize, int activeCascades,
+    glm::mat4 outMatrices[shared::kShadowCascadeCount], glm::vec4& outSplits) {
+  const int n =
+      std::max(1, std::min(activeCascades, shared::kShadowCascadeCount));
+
+  // Inverse of the REAL camera view-projection so unprojected corners match the
+  // camera frustum exactly. GL clip-z is [-1, 1] (no
+  // GLM_FORCE_DEPTH_ZERO_TO_ONE).
+  const glm::mat4 invVP = glm::inverse(
+      glm::perspective(glm::radians(fovDeg), aspect, camNear, camFar) * view);
+  glm::vec3 nearC[4];
+  glm::vec3 farC[4];
+  const glm::vec2 ndc[4] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+  for (int i = 0; i < 4; ++i) {
+    glm::vec4 wn = invVP * glm::vec4(ndc[i], -1.0f, 1.0f);
+    glm::vec4 wf = invVP * glm::vec4(ndc[i], 1.0f, 1.0f);
+    nearC[i] = glm::vec3(wn) / wn.w;
+    farC[i] = glm::vec3(wf) / wf.w;
+  }
+
+  // Practical split scheme (Zhang): blend logarithmic and uniform splits. The
+  // shadowNear is decoupled from the tiny camera near so the near cascades
+  // don't collapse to a sliver. d[0] = shadowNear, d[n] = shadowFar.
+  float d[shared::kShadowCascadeCount + 1];
+  d[0] = shadowNear;
+  for (int i = 1; i <= n; ++i) {
+    float p = static_cast<float>(i) / static_cast<float>(n);
+    float logd = shadowNear * std::pow(shadowFar / shadowNear, p);
+    float unid = shadowNear + (shadowFar - shadowNear) * p;
+    d[i] = lambda * logd + (1.0f - lambda) * unid;
+  }
+  d[n] = shadowFar;
+
+  const glm::vec3 dir = glm::normalize(lightDir);
+  const glm::vec3 up = std::abs(dir.z) > 0.9f ? glm::vec3(0.0f, 1.0f, 0.0f)
+                                              : glm::vec3(0.0f, 0.0f, 1.0f);
+  const float denom = camFar - camNear;
+  const float half = mapSize * 0.5f;
+
+  for (int c = 0; c < shared::kShadowCascadeCount; ++c) {
+    if (c >= n) {  // collapse unused cascades onto cascade 0
+      outMatrices[c] = outMatrices[0];
+      outSplits[c] = shadowFar;
+      continue;
+    }
+    const float tNear = (d[c] - camNear) / denom;
+    const float tFar = (d[c + 1] - camNear) / denom;
+    glm::vec3 corners[8];
+    glm::vec3 center(0.0f);
+    for (int i = 0; i < 4; ++i) {
+      // World position varies affinely along each frustum edge, so a
+      // world-space lerp lands exactly on the slice corner at the given
+      // view-space depth.
+      corners[i] = nearC[i] + (farC[i] - nearC[i]) * tNear;
+      corners[i + 4] = nearC[i] + (farC[i] - nearC[i]) * tFar;
+      center += corners[i] + corners[i + 4];
+    }
+    center /= 8.0f;
+    float radius = 0.0f;
+    for (const glm::vec3& corner : corners)
+      radius = std::max(radius, glm::length(corner - center));
+    // Quantize the radius so float jitter can't change the texel size (which
+    // would defeat the texel snap below).
+    radius = std::ceil(radius * 16.0f) / 16.0f;
+
+    glm::mat4 lightView =
+        glm::lookAt(center - dir * (radius + pullback), center, up);
+    // ortho near 0 is precision-safe (no perspective divide); far covers the
+    // slice plus `pullback` of casters behind it.
+    glm::mat4 lightProj = glm::ortho(-radius, radius, -radius, radius, 0.0f,
+                                     2.0f * radius + pullback);
+
+    // Texel-snap: round the projected centre to the shadow-map grid and fold
+    // the rounding delta back into the ortho translation (proj[3].xy).
+    glm::vec4 originLS = lightProj * lightView * glm::vec4(center, 1.0f);
+    glm::vec2 originTexels = glm::vec2(originLS) * half;  // ortho → w == 1
+    glm::vec2 rounded(std::round(originTexels.x), std::round(originTexels.y));
+    glm::vec2 offset = (rounded - originTexels) / half;
+    lightProj[3][0] += offset.x;
+    lightProj[3][1] += offset.y;
+
+    outMatrices[c] = lightProj * lightView;
+    outSplits[c] = d[c + 1];  // far view-space depth (positive)
+  }
 }
 
 static std::optional<CameraState> tangramLobbyFallbackCamera(
@@ -593,22 +706,38 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       if (!sc || sc->name != bodyScene) continue;
     }
 
-    std::string modelKey = renderInfo.modelName;
+    // Compute any name variant once (only allocates when a variant applies).
+    // With cacheModelLookup on, the common no-variant case references
+    // renderInfo.modelName directly instead of copying it into a key string
+    // each frame; off reproduces the original always-copy path. Output is
+    // identical either way.
+    std::string variantKey;
+    bool variant = false;
     if (isTangramGhostModelName(renderInfo.modelName)) {
-      modelKey = renderInfo.modelName + "_colored";
+      variantKey = renderInfo.modelName + "_colored";
+      variant = true;
     } else if (isTangramPlayPieceModelName(renderInfo.modelName)) {
       const uint8_t stage = tangramRoleIsolationStage(game);
       const uint8_t slot = localOverworldPlayerSlot(game);
       if (shared::tangram_roles::colorRestricted(stage) &&
           !shared::tangram_roles::canSeeColor(stage, slot)) {
-        modelKey = renderInfo.modelName + "_mute";
+        variantKey = renderInfo.modelName + "_mute";
+        variant = true;
       }
     }
     if (renderInfo.playerSlot >= 1 && renderInfo.playerSlot <= 4 &&
         renderInfo.modelName == "cube") {
-      modelKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+      variantKey = "cube_slot" + std::to_string(renderInfo.playerSlot);
+      variant = true;
     }
-    auto it = models.find(modelKey);
+    const std::string* keyPtr;
+    if (gfx.settings.cacheModelLookup) {
+      keyPtr = variant ? &variantKey : &renderInfo.modelName;
+    } else {
+      if (!variant) variantKey = renderInfo.modelName;
+      keyPtr = &variantKey;
+    }
+    auto it = models.find(*keyPtr);
     Model* modelAsset = it != models.end() ? it->second : nullptr;
     if (!modelAsset) {
       auto fallbackIt = models.find(renderInfo.modelName);
@@ -646,7 +775,10 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
       float maxScale =
           std::max({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
       float worldRadius = modelAsset->localBoundsRadius * maxScale;
-      if (culler->reject(worldCenter, worldRadius)) continue;
+      if (culler->reject(worldCenter, worldRadius)) {
+        if (!forShadowPass) ++shared::draw_stats::entitiesCulled;
+        continue;
+      }
     }
 
     auto model = glm::identity<glm::mat4>();
@@ -668,7 +800,9 @@ static void renderEntities(const Shader& shader, Graphics& gfx,
         boneCount = std::min(modelAsset->boneCount, MAX_BONES);
       }
     }
-    Draw(shader, *modelAsset, model, bones, boneCount);
+    Draw(shader, *modelAsset, model, bones, boneCount,
+         /*depthOnly=*/forShadowPass);
+    if (!forShadowPass) ++shared::draw_stats::entitiesDrawn;
   }
 }
 
@@ -752,6 +886,13 @@ bool Graphics::load(int width, int height) {
                         "shaders/fragment_fxaa.glsl");
   blurShader.emplace("shaders/vertex_present.glsl",
                      "shaders/fragment_blur.glsl");
+  // Optional mip-chain bloom shaders — not in the required[] list below, so a
+  // compile failure leaves the renderer fully functional (the toggle just
+  // falls back to the Gaussian path).
+  bloomDownShader.emplace("shaders/vertex_present.glsl",
+                          "shaders/fragment_bloom_down.glsl");
+  bloomUpShader.emplace("shaders/vertex_present.glsl",
+                        "shaders/fragment_bloom_up.glsl");
   tonemapShader.emplace("shaders/vertex_present.glsl",
                         "shaders/fragment_tonemap.glsl");
   ssaoShader.emplace("shaders/vertex_present.glsl",
@@ -1174,10 +1315,50 @@ void Graphics::resizeBuffers(int width, int height) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Graphics::ensureBloomMips() {
+  // Already sized for the current render resolution.
+  if (bloomMipCount > 0 && bloomMipBaseW == renderWidth &&
+      bloomMipBaseH == renderHeight) {
+    return;
+  }
+  bloomMipBaseW = renderWidth;
+  bloomMipBaseH = renderHeight;
+  GPU_MEM_CLEAR("BloomMip");
+  int w = std::max(1, renderWidth / 2);
+  int h = std::max(1, renderHeight / 2);
+  bloomMipCount = 0;
+  for (int i = 0; i < kBloomMips; ++i) {
+    if (w < 2 || h < 2) break;
+    if (!bloomMipFBO[i]) glGenFramebuffers(1, &bloomMipFBO[i]);
+    if (!bloomMipTex[i]) glGenTextures(1, &bloomMipTex[i]);
+    glBindTexture(GL_TEXTURE_2D, bloomMipTex[i]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT,
+                 nullptr);
+    GPU_MEM_TEX2D("BloomMip", GL_RGBA16F, w, h);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i]);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           bloomMipTex[i], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      fprintf(stderr, "bloomMipFBO[%d] incomplete\n", i);
+    }
+    bloomMipW[i] = w;
+    bloomMipH[i] = h;
+    ++bloomMipCount;
+    w = std::max(1, w / 2);
+    h = std::max(1, h / 2);
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void Graphics::initShaderUniforms() {
   // Re-bind CameraBlock after hot-reload produces a fresh program object.
-  for (auto* s : {&gbufferShader, &lightingShader, &lightingCelShader,
-                  &outlineSobelShader, &ssaoShader, &videoQuadShader}) {
+  for (auto* s :
+       {&gbufferShader, &lightingShader, &lightingCelShader,
+        &outlineSobelShader, &ssaoShader, &ssaoBlurShader, &videoQuadShader}) {
     if (*s && (*s)->valid()) bindCameraBlock((*s)->id());
   }
 }
@@ -1217,6 +1398,14 @@ void Graphics::reloadShaders() {
       {.slot = blurShader,
        .vert = "shaders/vertex_present.glsl",
        .frag = "shaders/fragment_blur.glsl",
+       .geom = ""},
+      {.slot = bloomDownShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_bloom_down.glsl",
+       .geom = ""},
+      {.slot = bloomUpShader,
+       .vert = "shaders/vertex_present.glsl",
+       .frag = "shaders/fragment_bloom_up.glsl",
        .geom = ""},
       {.slot = tonemapShader,
        .vert = "shaders/vertex_present.glsl",
@@ -1336,12 +1525,17 @@ void Graphics::cycleDebugChannel() {
 void Graphics::processDebugKeys() {
   if (!window) return;
   bool f2 = glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS;
+  bool f3 = glfwGetKey(window, GLFW_KEY_F3) == GLFW_PRESS;
   bool f5 = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
   bool f11 = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
   if (f2 && !keyF2Prev) cycleDebugChannel();
+  // F3 cycles which CSM cascade layer the DirShadowMap debug overlay shows.
+  if (f3 && !keyF3Prev && debugChannel == DebugChannel::DirShadowMap)
+    debugCascadeLayer = (debugCascadeLayer + 1) % shared::kShadowCascadeCount;
   if (f5 && !keyF5Prev) reloadShaders();
   if (f11 && !keyF11Prev) toggleFullscreen();
   keyF2Prev = f2;
+  keyF3Prev = f3;
   keyF5Prev = f5;
   keyF11Prev = f11;
 
@@ -1385,13 +1579,14 @@ void Graphics::drawDebugOverlay() {
   if (debugChannel == DebugChannel::Off) return;
   if (!debugOverlay || !debugOverlay->valid() || !fullscreenVAO) return;
 
-  // mode: 0=direct rgb, 1=normal-vis, 2=HDR tonemap, 3=single R as gray.
+  // mode: 0=direct rgb, 1=normal-vis, 2=HDR tonemap, 3=single R as gray,
+  // 4=single R of dirShadowMap array layer (CSM cascade viewer).
   GLuint texToShow = 0;
   int mode = 0;
   switch (debugChannel) {
     case DebugChannel::DirShadowMap:
-      texToShow = dirShadowMap;
-      mode = 3;
+      texToShow = dirShadowMap;  // sampled via srcArray in mode 4 (see below)
+      mode = 4;
       break;
     case DebugChannel::GPosition:
       texToShow = gPosition;
@@ -1448,13 +1643,26 @@ void Graphics::drawDebugOverlay() {
   glDisable(GL_DEPTH_TEST);
   glViewport(cornerX, cornerY, cornerW, cornerH);
   debugOverlay->use();
-  glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_2D, texToShow);
-  // Shadow textures use COMPARE_REF_TO_TEXTURE for hardware PCF, but the
-  // overlay samples as plain sampler2D — temporarily flip compare off.
-  bool isDirShadow = (debugChannel == DebugChannel::DirShadowMap);
+  // dirShadowMap is a GL_TEXTURE_2D_ARRAY and can't be bound to the sampler2D
+  // `src`; sample a chosen cascade layer through the sampler2DArray `srcArray`
+  // path (mode 4). Other channels are plain 2D textures on `src`.
+  const bool isDirShadow = (debugChannel == DebugChannel::DirShadowMap);
   if (isDirShadow) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    // Keep `src` complete with any 2D texture (mode 4 doesn't read it).
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, gAlbedo);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, dirShadowMap);
+    // Shadow textures use COMPARE_REF_TO_TEXTURE for hardware PCF; flip it off
+    // so the overlay reads the raw depth value.
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    debugOverlay->setInt("srcArray", 1);
+    debugOverlay->setInt(
+        "srcLayer",
+        std::clamp(debugCascadeLayer, 0, shared::kShadowCascadeCount - 1));
+  } else {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texToShow);
   }
   debugOverlay->setInt("src", 0);
   debugOverlay->setInt("mode", mode);
@@ -1462,7 +1670,7 @@ void Graphics::drawDebugOverlay() {
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glBindVertexArray(0);
   if (isDirShadow) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE,
                     GL_COMPARE_REF_TO_TEXTURE);
   }
   glViewport(0, 0, fbWidth, fbHeight);
@@ -1491,6 +1699,14 @@ static void drawTangramCrosshair(int fbWidth, int fbHeight) {
 }
 
 void Graphics::render(ClientGame& game, ClientNetwork& network) {
+  // Gate GPU timer queries: always on in a profiling build, otherwise only
+  // while the on-screen perf HUD is enabled (zero cost when off).
+#ifdef ENABLE_PROFILING
+  shared::gpu_profiler::g_active = true;
+#else
+  shared::gpu_profiler::g_active = settings.showPerfHUD;
+#endif
+  shared::draw_stats::reset();
   SIMPLE_PROFILE_SCOPE("Render");
   GPU_PROFILE_SCOPE("Render");
 
@@ -1556,6 +1772,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     if (!settings.shadowsEnabled) clearShadowMaps();
     prevShadowsEnabled = settings.shadowsEnabled;
   }
+  // Re-applies trilinear/anisotropic filtering to model textures only when the
+  // level changes; cheap no-op otherwise.
+  setModelTextureAnisotropy(settings.textureAnisotropy);
 
   // Advance per-entity animators using real wallclock dt (independent of the
   // server tick). Only animated, skinned entities pay any work here.
@@ -1577,6 +1796,14 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       static_cast<float>(fbWidth) / static_cast<float>(fbHeight),
       settings.nearPlane, settings.farPlane);
 
+  // Camera-frustum culler for the main G-buffer pass. Reuses the same
+  // sphere-vs-frustum machinery the point-shadow faces already use. Null
+  // (cull nothing) unless explicitly enabled, so default behavior is exact.
+  ShadowCuller camCuller;
+  extractFrustumPlanes(projection * camera->view, camCuller.planes);
+  const ShadowCuller* mainCuller =
+      settings.mainFrustumCulling ? &camCuller : nullptr;
+
   // Collect lights up front so shadow passes and the lighting pass agree
   // on shadow-slot assignments.
   LightUpload lights[kMaxLightingShaderLights];
@@ -1585,16 +1812,34 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     for (int i = 0; i < numLights; ++i) lights[i].shadowIdx = -1;
   }
 
-  lightSpaceMatrix = computeDirectionalLightMatrix(
-      camera->position, directionalLightDir(game), settings.dirShadowHalfExtent,
-      settings.dirShadowBackDistance, settings.dirShadowFarPlane,
-      settings.dirShadowMapSize);
+  // Cascaded directional shadows: one light-space ortho per view-frustum slice.
+  // With cascadedShadows off, a single cascade covers the whole shadow range.
+  const int activeCascades =
+      settings.cascadedShadows ? shared::kShadowCascadeCount : 1;
+  glm::mat4 cascadeMatrices[shared::kShadowCascadeCount];
+  glm::vec4 cascadeSplits(0.0f);
+  {
+    const float aspect =
+        static_cast<float>(fbWidth) / static_cast<float>(fbHeight);
+    const float shadowFar =
+        std::min(settings.farPlane, settings.shadowDistance);
+    const float shadowNear =
+        std::max(settings.nearPlane, settings.shadowNearOffset);
+    computeCascadeMatrices(camera->view, settings.fovDegrees, aspect,
+                           settings.nearPlane, settings.farPlane, shadowNear,
+                           shadowFar, settings.cascadeSplitLambda,
+                           settings.cascadeCasterPullback,
+                           directionalLightDir(game), settings.dirShadowMapSize,
+                           activeCascades, cascadeMatrices, cascadeSplits);
+  }
 
   {
     CameraUBOData ubo{};
     ubo.view = camera->view;
     ubo.projection = projection;
-    ubo.lightSpaceMatrix = lightSpaceMatrix;
+    for (int c = 0; c < shared::kShadowCascadeCount; ++c)
+      ubo.lightSpaceMatrices[c] = cascadeMatrices[c];
+    ubo.cascadeSplits = cascadeSplits;
     ubo.viewPos = camera->position;
     ubo.pointFarPlane = settings.pointShadowFarPlane;
     glBindBuffer(GL_UNIFORM_BUFFER, cameraUBO);
@@ -1606,16 +1851,30 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
     glViewport(0, 0, settings.dirShadowMapSize, settings.dirShadowMapSize);
     glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
     // Polygon offset only; front-face culling here causes peter-panning
     // on the single-sided floor/walls.
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(settings.dirShadowPolyFactor, settings.dirShadowPolyUnits);
     shadowDirShader->use();
-    shadowDirShader->setMat4("lightSpaceMatrix", lightSpaceMatrix);
     shadowDirShader->setFloat("alphaCutoff", settings.shadowAlphaCutoff);
-    renderEntities(*shadowDirShader, *this, game, models,
-                   /*forShadowPass=*/true);
+    // One depth pass per cascade, each rebinding the matching array layer —
+    // mirrors the per-face point-shadow loop below.
+    for (int c = 0; c < activeCascades; ++c) {
+      glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                dirShadowMap, 0, c);
+      glClear(GL_DEPTH_BUFFER_BIT);
+      shadowDirShader->setMat4("lightSpaceMatrix", cascadeMatrices[c]);
+      // Per-cascade caster culler (the ortho light frustum). Same gate as the
+      // main pass; null preserves draw-everything behavior.
+      ShadowCuller cascadeCuller;
+      const ShadowCuller* dirCuller = nullptr;
+      if (settings.mainFrustumCulling) {
+        extractFrustumPlanes(cascadeMatrices[c], cascadeCuller.planes);
+        dirCuller = &cascadeCuller;
+      }
+      renderEntities(*shadowDirShader, *this, game, models,
+                     /*forShadowPass=*/true, dirCuller);
+    }
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
 
@@ -1644,16 +1903,20 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       int slot = lights[i].shadowIdx;
       if (slot < 0 || slot >= kMaxPointLights) continue;
       shadowPointShader->setVec3("lightPos", lights[i].position);
+      // Plane extraction hoisted out of the per-face loop (one normalize set
+      // per face, computed once instead of mixed into the draw submission).
+      ShadowCuller faceCullers[6];
+      for (int f = 0; f < 6; ++f) {
+        extractFrustumPlanes(pointMats[slot * 6 + f], faceCullers[f].planes);
+      }
       for (int f = 0; f < 6; ++f) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                   pointShadowMaps, 0, slot * 6 + f);
         glClear(GL_DEPTH_BUFFER_BIT);
         const glm::mat4& vp = pointMats[slot * 6 + f];
         shadowPointShader->setMat4("lightSpaceMatrix", vp);
-        ShadowCuller culler;
-        extractFrustumPlanes(vp, culler.planes);
         renderEntities(*shadowPointShader, *this, game, models,
-                       /*forShadowPass=*/true, &culler);
+                       /*forShadowPass=*/true, &faceCullers[f]);
       }
     }
     glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1674,7 +1937,8 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     gbufferShader->setInt("textureQuantizeLevels",
                           settings.textureQuantizeLevels);
     // paletteSize + palette uniforms are bound per Model inside Draw().
-    renderEntities(*gbufferShader, *this, game, models);
+    renderEntities(*gbufferShader, *this, game, models, /*forShadowPass=*/false,
+                   mainCuller);
   }
 
   if (settings.ssaoEnabled && ssaoShader && ssaoShader->valid()) {
@@ -1699,6 +1963,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     ssaoShader->setInt("kernelSize", settings.ssaoKernelSize);
     ssaoShader->setFloat("radius", settings.ssaoRadius);
     ssaoShader->setFloat("bias", settings.ssaoBias);
+    ssaoShader->setFloat("ssaoPower", settings.ssaoPower);
     // Noise tile size is in the SSAO render's own pixel space.
     ssaoShader->setVec2("noiseScale", static_cast<float>(ssaoWidth) / 4.0f,
                         static_cast<float>(ssaoHeight) / 4.0f);
@@ -1727,6 +1992,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, ssaoColor);
     ssaoBlurShader->setInt("src", 0);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    ssaoBlurShader->setInt("gPosition", 1);
+    ssaoBlurShader->setInt("bilateral", settings.ssaoBilateralBlur ? 1 : 0);
     glBindVertexArray(fullscreenVAO);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindVertexArray(0);
@@ -1753,6 +2022,20 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       lighting->setFloat("bloomThreshold", settings.bloomEnabled
                                                ? settings.bloomThreshold
                                                : 1e9f);
+      lighting->setInt("dirPcfRadius", std::max(1, settings.shadowPcfRadius));
+      lighting->setFloat("dirShadowSoftness", settings.shadowSoftness);
+      lighting->setInt("cascadeDebug", settings.visualizeCascades ? 1 : 0);
+      // No cross-cascade blend in single-map mode (the other layers are stale).
+      lighting->setFloat("cascadeBlendBand", settings.cascadedShadows
+                                                 ? settings.cascadeBlendBand
+                                                 : 0.0f);
+      glm::vec3 iblColor(0.2f);
+      if (const auto* sc = currentScene(game)) {
+        auto sbIt = skyboxes.find(std::string(sc->skyboxDirectory));
+        if (sbIt != skyboxes.end()) iblColor = sbIt->second.averageColor;
+      }
+      lighting->setVec3("iblAmbientColor", iblColor);
+      lighting->setFloat("iblAmbientStrength", settings.iblAmbientStrength);
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, gPosition);
       lighting->setInt("gPosition", 0);
@@ -1772,7 +2055,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glBindTexture(GL_TEXTURE_2D, ssaoBlurColor);
       lighting->setInt("ssao", 5);
       glActiveTexture(GL_TEXTURE6);
-      glBindTexture(GL_TEXTURE_2D, dirShadowMap);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, dirShadowMap);
       lighting->setInt("dirShadowMap", 6);
       glActiveTexture(GL_TEXTURE7);
       glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, pointShadowMaps);
@@ -1794,6 +2077,10 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
         const bool rampOk = settings.celUseRampTexture &&
                             !settings.celRampPath.empty() && celRampTexture;
         lighting->setInt("useRampTexture", rampOk ? 1 : 0);
+        lighting->setFloat("celRimStrength", settings.celRimStrength);
+        lighting->setVec3("celRimColor", settings.celRimColor);
+        lighting->setFloat("celRimPower", settings.celRimPower);
+        lighting->setFloat("celRimThreshold", settings.celRimThreshold);
       }
       uploadDirectionalLight(*lighting, game, settings);
       uploadPointLights(*lighting, lights, numLights);
@@ -1881,9 +2168,57 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
   }
 
   GLuint finalBloomColor = brightColor;
+  const bool mipBloom = settings.bloomEnabled && settings.bloomMipChain &&
+                        bloomDownShader && bloomDownShader->valid() &&
+                        bloomUpShader && bloomUpShader->valid();
+  // Gaussian path only runs when mip-chain is off (or unavailable).
   const int effectiveBloomIters =
-      settings.bloomEnabled ? settings.bloomBlurIterations : 0;
-  if (blurShader && blurShader->valid() && effectiveBloomIters > 0) {
+      (settings.bloomEnabled && !mipBloom) ? settings.bloomBlurIterations : 0;
+  if (mipBloom) {
+    SIMPLE_PROFILE_SCOPE("Bloom");
+    GPU_PROFILE_SCOPE("Bloom");
+    ensureBloomMips();
+    if (bloomMipCount > 0) {
+      glDisable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+      glBindVertexArray(fullscreenVAO);
+      glActiveTexture(GL_TEXTURE0);
+
+      // Downsample brightColor through the pyramid (13-tap each step).
+      bloomDownShader->use();
+      bloomDownShader->setInt("src", 0);
+      for (int i = 0; i < bloomMipCount; ++i) {
+        const int srcW = i == 0 ? renderWidth : bloomMipW[i - 1];
+        const int srcH = i == 0 ? renderHeight : bloomMipH[i - 1];
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i]);
+        glViewport(0, 0, bloomMipW[i], bloomMipH[i]);
+        glBindTexture(GL_TEXTURE_2D, i == 0 ? brightColor : bloomMipTex[i - 1]);
+        bloomDownShader->setVec2("srcTexel", 1.0f / static_cast<float>(srcW),
+                                 1.0f / static_cast<float>(srcH));
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+      }
+
+      // Upsample + additively accumulate back up the pyramid (9-tap tent).
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE);
+      glBlendEquation(GL_FUNC_ADD);
+      bloomUpShader->use();
+      bloomUpShader->setInt("src", 0);
+      bloomUpShader->setFloat("filterRadius", 1.0f);
+      for (int i = bloomMipCount - 1; i > 0; --i) {
+        glBindFramebuffer(GL_FRAMEBUFFER, bloomMipFBO[i - 1]);
+        glViewport(0, 0, bloomMipW[i - 1], bloomMipH[i - 1]);
+        glBindTexture(GL_TEXTURE_2D, bloomMipTex[i]);
+        bloomUpShader->setVec2("srcTexel",
+                               1.0f / static_cast<float>(bloomMipW[i]),
+                               1.0f / static_cast<float>(bloomMipH[i]));
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+      }
+      glDisable(GL_BLEND);
+      glBindVertexArray(0);
+      finalBloomColor = bloomMipTex[0];
+    }
+  } else if (blurShader && blurShader->valid() && effectiveBloomIters > 0) {
     SIMPLE_PROFILE_SCOPE("Bloom");
     GPU_PROFILE_SCOPE("Bloom");
     glDisable(GL_DEPTH_TEST);
@@ -1930,6 +2265,7 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glBindTexture(GL_TEXTURE_2D, gAlbedo);
       tonemapShader->setInt("gAlbedo", 3);
       tonemapShader->setFloat("exposure", settings.exposure);
+      tonemapShader->setInt("tonemapMode", settings.tonemapMode);
       tonemapShader->setFloat("bloomStrength", settings.bloomEnabled
                                                    ? settings.bloomStrength
                                                    : 0.0f);
@@ -2010,7 +2346,9 @@ void Graphics::render(ClientGame& game, ClientNetwork& network) {
       glBindTexture(GL_TEXTURE_2D, finalLDR);
       presentShader->setInt("src", 0);
       presentShader->setInt("fxaaEnabled", settings.fxaaEnabled ? 1 : 0);
+      presentShader->setInt("fxaaQuality", settings.fxaaQuality);
       presentShader->setInt("postQuantizeLevels", settings.postQuantizeLevels);
+      presentShader->setFloat("ditherStrength", settings.ditherStrength);
       glBindVertexArray(fullscreenVAO);
       glDrawArrays(GL_TRIANGLES, 0, 3);
       glBindVertexArray(0);
@@ -2076,35 +2414,46 @@ Graphics::~Graphics() {
 }
 
 void Graphics::allocateDirShadowMap(int size) {
+  // Cascaded shadow maps: one GL_TEXTURE_2D_ARRAY with kShadowCascadeCount
+  // depth layers, each rendered/sampled as a separate cascade.
   if (!dirShadowFBO) glGenFramebuffers(1, &dirShadowFBO);
   if (!dirShadowMap) glGenTextures(1, &dirShadowMap);
-  glBindTexture(GL_TEXTURE_2D, dirShadowMap);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, size, size, 0,
-               GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, dirShadowMap);
+  glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT24, size, size,
+               shared::kShadowCascadeCount, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
+               nullptr);
   GPU_MEM_CLEAR("ShadowDir");
-  GPU_MEM_TEX2D("ShadowDir", GL_DEPTH_COMPONENT24, size, size);
+  GPU_MEM_TEX3D("ShadowDir", GL_DEPTH_COMPONENT24, size, size,
+                shared::kShadowCascadeCount);
   // LINEAR + COMPARE_REF_TO_TEXTURE → 2×2 hardware PCF per tap.
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE,
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE,
                   GL_COMPARE_REF_TO_TEXTURE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-  // Outside the frustum returns visibility=1.0 (fully lit).
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+  // Border applies to S/T per cascade: samples outside a cascade's box read
+  // visibility=1.0 (fully lit).
   float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-  glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, white);
+  glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, white);
   glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D,
-                         dirShadowMap, 0);
+  // Attach layer 0 for the completeness check; the render loop rebinds per
+  // layer.
+  glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, dirShadowMap,
+                            0, 0);
   glDrawBuffer(GL_NONE);
   glReadBuffer(GL_NONE);
   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     fprintf(stderr, "dirShadowFBO incomplete\n");
   }
-  // Initialize to depth=1.0 so a sample before the first shadow pass returns
-  // "fully lit" instead of undefined.
-  glClear(GL_DEPTH_BUFFER_BIT);
+  // Initialize every layer to depth=1.0 so a sample before the first shadow
+  // pass returns "fully lit" instead of undefined.
+  for (int layer = 0; layer < shared::kShadowCascadeCount; ++layer) {
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, dirShadowMap,
+                              0, layer);
+    glClear(GL_DEPTH_BUFFER_BIT);
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
@@ -2153,7 +2502,12 @@ void Graphics::clearShadowMaps() {
   if (dirShadowFBO) {
     glBindFramebuffer(GL_FRAMEBUFFER, dirShadowFBO);
     glViewport(0, 0, lastDirShadowSize, lastDirShadowSize);
-    glClear(GL_DEPTH_BUFFER_BIT);
+    // Layered attachment: clear every cascade layer, not just the bound one.
+    for (int layer = 0; layer < shared::kShadowCascadeCount; ++layer) {
+      glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                dirShadowMap, 0, layer);
+      glClear(GL_DEPTH_BUFFER_BIT);
+    }
   }
   if (pointShadowFBO) {
     glBindFramebuffer(GL_FRAMEBUFFER, pointShadowFBO);
@@ -2627,6 +2981,48 @@ static void drawFPSOverlay() {
   ImGui::End();
 }
 
+static void drawPerfHUDWindow() {
+  const auto& stats = shared::gpu_profiler::hud_stats();
+  ImGui::SetNextWindowPos(ImVec2(8.0f, 56.0f), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowBgAlpha(0.5f);
+  if (ImGui::Begin("GPU (ms/pass)", nullptr,
+                   ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoNav |
+                       ImGuiWindowFlags_NoSavedSettings)) {
+    if (stats.empty()) {
+      ImGui::TextUnformatted("collecting samples…");
+    } else {
+      std::vector<std::pair<std::string, double>> rows(stats.begin(),
+                                                       stats.end());
+      std::ranges::sort(rows, [](const auto& a, const auto& b) {
+        return a.second > b.second;
+      });
+      double passSum = 0.0;
+      if (ImGui::BeginTable(
+              "gpu", 2,
+              ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg)) {
+        for (const auto& [name, ms] : rows) {
+          if (name != "Render") passSum += ms;
+          ImGui::TableNextRow();
+          ImGui::TableNextColumn();
+          ImGui::TextUnformatted(name.c_str());
+          ImGui::TableNextColumn();
+          ImGui::Text("%.3f", ms);
+        }
+        ImGui::EndTable();
+      }
+      ImGui::Separator();
+      ImGui::Text("sum(passes): %.3f ms", passSum);
+    }
+    ImGui::Separator();
+    ImGui::Text("main pass: %d drawn / %d culled",
+                shared::draw_stats::entitiesDrawn,
+                shared::draw_stats::entitiesCulled);
+  }
+  ImGui::End();
+}
+
 void Graphics::drawSettingsUIFrame(ClientGame& game) {
   if (!ImGui::GetCurrentContext()) return;
   ImGui_ImplOpenGL3_NewFrame();
@@ -2634,7 +3030,9 @@ void Graphics::drawSettingsUIFrame(ClientGame& game) {
   ImGui::NewFrame();
   drawPuzzleHUDs(game);
   if (settings.showFPS) drawFPSOverlay();
+  if (settings.showPerfHUD) drawPerfHUDWindow();
   if (settingsMenuOpen) drawSettingsUI(settings, settingsMenuOpen);
+  drawDebugPanel(*this, game, debugPanelOpen);
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

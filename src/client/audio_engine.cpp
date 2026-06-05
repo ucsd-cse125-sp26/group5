@@ -48,8 +48,6 @@ bool AudioEngine::init() {
   // raise voice limit to 32 for more simultaneous sounds
   soloud_->setMaxActiveVoiceCount(32);
 
-  loadSound(static_cast<uint32_t>(shared::SoundId::JUMP),
-            "assets/sounds/oof.mp3");
   loadSound(static_cast<uint32_t>(shared::SoundId::AMBIENT_HUM),
             "assets/sounds/scattered.wav");
   loadSound(static_cast<uint32_t>(shared::SoundId::OVERWORLD_MUSIC),
@@ -59,8 +57,6 @@ bool AudioEngine::init() {
   // Placeholder credits track — swap for a dedicated file when available.
   loadSound(static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC),
             "assets/sounds/angel.mp3");
-  loadSound(static_cast<uint32_t>(shared::SoundId::LAND),
-            "assets/sounds/oof.mp3");  // temporary, reuses jump sound
 
   loadSound(static_cast<uint32_t>(shared::SoundId::PUZZLE_SOLVED),
             "assets/sounds/angel.mp3");
