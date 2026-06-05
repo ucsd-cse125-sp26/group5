@@ -240,12 +240,12 @@ void registerClientHandlers(ClientNetwork& network) {
           game.audio.playGlobalLoop(
               static_cast<uint32_t>(shared::SoundId::MAZE_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::CREDITS) {
-          // Bump the epoch so the render thread restarts the scroll — supports
-          // re-rolling credits from the debug panel mid-roll.
+          // Bump the epoch so the render thread restarts the exit clip —
+          // supports re-rolling credits from the debug panel mid-roll. Audio is
+          // deliberately left untouched: the end ("exit") scene is silent and
+          // any accompanying audio is owned by the audio subsystem, so we must
+          // not stop whatever is currently playing on entering CREDITS.
           game.creditsEpoch.fetch_add(1, std::memory_order_release);
-          game.audio.stopAllGlobalLoops();
-          game.audio.playGlobalLoop(
-              static_cast<uint32_t>(shared::SoundId::CREDITS_MUSIC), 0.3f);
         } else if (pkt.state == shared::GameStateType::OVERWORLD) {
           // Stop minigame/credits loops only. Season loops come from
           // SEASON_MUSIC; do not stopAll here or a reordered packet can mute

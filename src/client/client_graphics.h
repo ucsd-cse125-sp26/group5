@@ -225,6 +225,12 @@ struct Graphics {
   std::optional<VideoPlayer> videoPlayer;
   VideoMode videoMode = VideoMode::None;
   uint32_t videoTargetEntityId = 0;  // in-world screen entity (0 = fixed quad)
+  // Whether Enter may skip the active fullscreen cutscene. The connect cutscene
+  // sets this false so it plays through (and covers network loading).
+  bool videoDismissable = true;
+  // The menu background clip is opened lazily on the first menu frame; this
+  // guards against reopening it every frame.
+  bool menuVideoOpened = false;
   // Unit quad (XY plane, z=0) for the in-world screen; pos@0, uv@2.
   GLuint videoQuadVAO = 0;
   GLuint videoQuadVBO = 0;
@@ -272,6 +278,14 @@ struct Graphics {
 
   // Creates/replaces (or stops) the active video on the render/GL thread.
   void handleVideoRequest(const VideoRequest& req);
+  // Opens a clip as a fullscreen cutscene immediately (no server round-trip).
+  // dismissable=false makes Enter ignore it (used for the connect cutscene).
+  void playFullscreenCutscene(uint16_t videoId, bool loop, bool dismissable);
+  // Stops and tears down the active clip (e.g. when dismissing the end scene).
+  void stopActiveVideo();
+  // Draws the active videoPlayer as a letterboxed fullscreen quad into the
+  // currently-bound framebuffer. Caller binds the FBO and sets the viewport.
+  void drawFullscreenVideo();
 
   void initImGui();
   void shutdownImGui();
