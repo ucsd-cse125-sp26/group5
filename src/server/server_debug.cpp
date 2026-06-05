@@ -23,6 +23,7 @@
 #include "server/server_game.h"
 #include "server/server_memory_system.h"
 #include "server/server_network.h"
+#include "shared/assets.h"
 #include "shared/components.h"
 #include "shared/dev_spawn.h"
 #include "shared/log.h"
@@ -532,6 +533,63 @@ void printPositions(ServerGame& game) {
   }
 }
 
+// Run `fn` for every avatar (overworld + maze) belonging to join slot 1..4.
+void forEachAvatarOfSlot(ServerGame& game, uint8_t slot,
+                         const std::function<void(entt::entity)>& fn) {
+  if (slot < 1 || slot > 4) return;
+  for (auto& [peer, slots] : game.active_players) {
+    (void)peer;
+    for (entt::entity avatar : {slots.overworld_avatar, slots.maze_avatar}) {
+      if (!game.registry.valid(avatar) ||
+          !game.registry.all_of<shared::RenderInfo>(avatar)) {
+        continue;
+      }
+      if (game.registry.get<shared::RenderInfo>(avatar).playerSlot != slot) {
+        continue;
+      }
+      fn(avatar);
+    }
+  }
+}
+
+// ── Swap a player's character model (both avatars), updating the Jolt shape so
+// collision matches the new mesh. Mirrors render_model_change's shape swap. ──
+void setPlayerModel(ServerGame& game, uint8_t slot, uint8_t modelIdx) {
+  if (modelIdx >= shared::PLAYER_MODEL_CYCLE_COUNT) return;
+  const std::string modelName(shared::PLAYER_MODEL_CYCLE[modelIdx]);
+  auto& bi = game.physics.getBodyInterface();
+  forEachAvatarOfSlot(game, slot, [&](entt::entity avatar) {
+    auto& ri = game.registry.get<shared::RenderInfo>(avatar);
+    ri.modelName = modelName;
+    if (game.registry.all_of<shared::PhysicsBody>(avatar)) {
+      const auto& pb = game.registry.get<shared::PhysicsBody>(avatar);
+      const glm::vec3 scale(ri.sx, ri.sy, ri.sz);
+      JPH::ShapeRefC shape = game.physics.convexHullForAsset(modelName, scale);
+      if (!shape) shape = game.physics.playerShapeForAsset(modelName, scale);
+      if (shape) {
+        bi.SetShape(JPH::BodyID(pb.bodyId), shape, /*update mass*/ false,
+                    JPH::EActivation::Activate);
+      }
+    }
+  });
+  LOG_DEBUG("[DebugPanel] slot %u model -> %s\n", static_cast<unsigned>(slot),
+            modelName.c_str());
+}
+
+// ── Grant/revoke fly (unlimited jumping) for a player, both avatars.
+// ──────────
+void setPlayerFly(ServerGame& game, uint8_t slot, bool enable) {
+  forEachAvatarOfSlot(game, slot, [&](entt::entity avatar) {
+    if (enable) {
+      game.registry.emplace_or_replace<shared::FlyMode>(avatar);
+    } else {
+      game.registry.remove<shared::FlyMode>(avatar);
+    }
+  });
+  LOG_DEBUG("[DebugPanel] slot %u fly -> %s\n", static_cast<unsigned>(slot),
+            enable ? "on" : "off");
+}
+
 }  // namespace
 
 void processPendingCommands(ServerGame& game) {
@@ -610,6 +668,13 @@ void processPendingCommands(ServerGame& game) {
         setTangramGrant(game, static_cast<uint8_t>(c.arg),
                         static_cast<shared::DebugTangramAbility>(c.arg2),
                         c.farg > 0.5f);
+        break;
+      case SET_PLAYER_MODEL:
+        setPlayerModel(game, static_cast<uint8_t>(c.arg),
+                       static_cast<uint8_t>(c.arg2));
+        break;
+      case SET_PLAYER_FLY:
+        setPlayerFly(game, static_cast<uint8_t>(c.arg), c.farg > 0.5f);
         break;
     }
   }

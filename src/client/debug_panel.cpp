@@ -227,6 +227,55 @@ void drawDebugPanel(Graphics& g, ClientGame& game, bool& open) {
     }
   }
 
+  // ── Player model + fly (per player) ──────────────────────
+  // Model dropdown reflects the live replicated RenderInfo.modelName for each
+  // join slot; "Fly" grants unlimited jumping (tap jump in mid-air to rise).
+  // Fly is server-only state, so its checkbox tracks what was last sent here.
+  ImGui::SeparatorText("PLAYERS  (model / fly)");
+  {
+    // Order matches shared::PLAYER_MODEL_CYCLE; index = arg2 sent to server.
+    const char* kModels[4] = {"gurf", "rat", "goose", "dog"};
+    static bool fly[5] = {false, false, false, false, false};  // index by slot
+    for (int slot = 1; slot <= 4; ++slot) {
+      ImGui::PushID(4000 + slot);
+      // Look up this slot's current model from replicated RenderInfo.
+      int cur = -1;
+      bool present = false;
+      auto view = game.renderRegistry.view<shared::RenderInfo>();
+      for (auto ent : view) {
+        const auto& ri = view.get<shared::RenderInfo>(ent);
+        if (ri.playerSlot != slot) continue;
+        present = true;
+        for (int i = 0; i < 4; ++i) {
+          if (ri.modelName == kModels[i]) {
+            cur = i;
+            break;
+          }
+        }
+        break;
+      }
+      ImGui::AlignTextToFramePadding();
+      if (present) {
+        ImGui::Text("P%d", slot);
+      } else {
+        ImGui::TextDisabled("P%d", slot);
+      }
+      ImGui::SameLine(48.0f);
+      int sel = cur < 0 ? 0 : cur;
+      ImGui::SetNextItemWidth(150.0f);
+      if (ImGui::Combo("##model", &sel, kModels, 4) && sel != cur) {
+        pushCmd(game, shared::DebugCommand::SET_PLAYER_MODEL,
+                static_cast<uint32_t>(slot), static_cast<uint32_t>(sel));
+      }
+      ImGui::SameLine();
+      if (ImGui::Checkbox("Fly", &fly[slot])) {
+        pushCmd(game, shared::DebugCommand::SET_PLAYER_FLY,
+                static_cast<uint32_t>(slot), 0, fly[slot] ? 1.0f : 0.0f);
+      }
+      ImGui::PopID();
+    }
+  }
+
   // ── Fall challenge difficulty (live) ─────────────────────
   ImGui::SeparatorText("FALL DIFFICULTY  (live)");
   {

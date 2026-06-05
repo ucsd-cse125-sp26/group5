@@ -62,6 +62,12 @@ enum class DebugCommand : uint8_t {
   // the stage rules. arg = join slot (1..4), arg2 = ability (see
   // DebugTangramAbility), farg = enable (>0.5 grant, else revoke).
   SET_TANGRAM_GRANT,
+  // Swap a player's character model. arg = join slot (1..4), arg2 = index into
+  // shared::PLAYER_MODEL_CYCLE (0=gurf 1=rat 2=goose 3=dog).
+  SET_PLAYER_MODEL,
+  // Grant/revoke "fly" (unlimited jumping — tap jump in mid-air to keep rising)
+  // for one player. arg = join slot (1..4), farg = enable (>0.5 grant).
+  SET_PLAYER_FLY,
 };
 
 // SET_TANGRAM_GRANT::arg2 selector — which per-player ability to grant/revoke.
