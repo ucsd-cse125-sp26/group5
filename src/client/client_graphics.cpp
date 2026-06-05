@@ -3128,8 +3128,8 @@ Graphics::ServerMenuResult Graphics::renderServerMenuFrame(
         videoPathFor(static_cast<uint16_t>(VideoId::Intro));
     if (!path.empty()) {
       videoPlayer.emplace();
-      if (videoPlayer->open(path, /*loop=*/false)) {
-        videoPlayer->setLoopTail(3.0);  // loop the final 3s of the intro
+      if (videoPlayer->open(path, /*loop=*/true)) {
+        // loop the full intro clip
       } else {
         videoPlayer.reset();
       }
