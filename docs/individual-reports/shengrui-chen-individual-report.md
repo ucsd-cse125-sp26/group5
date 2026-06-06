@@ -8,10 +8,70 @@ permalink: /project-spec/shengrui-chen-individual-report/
 
 ## Weekly Notes
 
+f## Week 9
+
+1. What were your concrete goals for the week?  
+Get seasonal music actually working end to end, merge in whatever landed on main, and make sure teammates could pull assets and run a build without everything silently breaking.
+
+2. What goals were you able to accomplish?  
+I got the music branch in decent shape: overworld tracks switch by season, credits no longer kills the song immediately, and I uploaded the sound assets to the server. Also resolved a couple merge conflicts with main and fixed clang-format so CI would stop yelling at us.
+
+3. If the week went differently than you had planned, what were the reasons?  
+Hard to fully test without a Windows machine in the loop. A lot of time went into reading audio logs and guessing whether something would crash on someone else's setup rather than just playing through the game normally.
+
+4. What are your specific goals for the next week?  
+Demo. If anything is still broken in the music path or puzzle flow, fix only what blocks the playthrough.
+
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+Loading five full MP3s into memory is heavier than I thought, and client audio init behaves differently on macOS vs Windows. I kind of expected cross-platform pain but not the "sometimes works sometimes doesn't" feeling.
+
+6. What is your individual morale (which might be different from the overall group morale)?  
+Tired but okay. The game is mostly there; I am more anxious about last-minute integration than about any one feature.
+
+## Week 8
+
+1. What were your concrete goals for the week?  
+Finish tangram puzzle feel (picking pieces, snapping, rotation), keep fragment/section progression wired correctly, and stay merged with main enough that other people's work did not pile up behind me.
+
+2. What goals were you able to accomplish?  
+Tangram got more playable: screen-center picking, snap behavior, server-side rotation fixes, lower piece mass so physics was less chaotic. Fragment pickup and section unlock logic stayed hooked up through the overworld flow.
+
+3. If the week went differently than you had planned, what were the reasons?  
+Merge and testing ate more time than new feature work. Coordinating placement with Rebecca's map also meant going back and forth on trigger positions instead of just coding in isolation.
+
+4. What are your specific goals for the next week?  
+Music and audio cleanup, plus whatever polish the group needs for a full run-through.
+
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+Puzzle code touches a lot of systems at once (physics, network, render thread). Small changes on the server can look like client bugs if you are not careful about what packet runs when.
+
+6. What is your individual morale (which might be different from the overall group morale)?  
+Steady. Progress felt real even when the branch was messy.
+
+## Week 7
+
+1. What were your concrete goals for the week?  
+Get the winter maze solid for four players, hook fragments into section completion, and start on spring/tangram so we were not stuck on only one minigame.
+
+2. What goals were you able to accomplish?  
+Four players can finish the maze and exit cleanly. Fragment entity shows up after a solve (placeholder cube for a while). Maze trigger region went in so people can actually enter the puzzle from the overworld. Started tangram layout and trigger wiring with the map team.
+
+3. If the week went differently than you had planned, what were the reasons?  
+Fragment logic was split across a few people so I spent time aligning with Philip on who owns what instead of just implementing the whole chain myself. Also the usual debugging when four clients spawn on top of each other in the maze.
+
+4. What are your specific goals for the next week?  
+Tangram playable enough to test, barriers and section gating feeling correct when you pick up fragments.
+
+5. What did you learn this week, if anything (and did you expect to learn it)?  
+It helps a lot when server phase and client view stay in sync for puzzles. I knew that in theory from earlier weeks but felt it again when testing multiplayer maze runs.
+
+6. What is your individual morale (which might be different from the overall group morale)?  
+Pretty good. Maze finally felt like a real slice instead of a solo test harness.
+
 ## Week 6 (May 13)
 
 1. What were your concrete goals for the week?  
-I wanted the Winter maze space to feel less like a one-off demo and more like something we can iterate on: layouts that can vary in a predictable way, a hub-side preview so people understand the puzzle before they drop in, and enough automated checks that we do not break connectivity or basic layout rules by accident. I also hoped to keep the scope tight so the team could actually play with it soon rather than chasing edge cases forever.
+I wanted the Winter maze space to feel less like a one-off demo and more like something we can iterate on: layouts that can vary in a predictable way, a hub-side preview so people understand the puzzle before they drop in, and enough automated checks that we do not break connectivity or basic layout rules by accident. I also hoped to keep the scope tight so the team could actually play with it soon rather than chasing edge cases orever.
 
 2. What goals were you able to accomplish?  
 The maze area is now driven by generated layouts instead of a fixed toy arrangement, which makes it easier to reason about difficulty and repeatability. The overworld gained a compact preview that echoes the same structure, with clearer cues for where you start and where you are headed. 
