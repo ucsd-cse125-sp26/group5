@@ -20,7 +20,7 @@ Thinking back, it was quite interesting that we decided on this theme; it works 
 
 **Rebecca:** The main design based off of concept did not change that much. If anything, we just had to narrow down the scope of the game. For example, as Saarah mentioned in the demo, we had to collect less items/fragments (only one per map); the map became much smaller (it was harder to model than imagined for me); game logic development only had time to support simpler and not randomized puzzles; Could not implement a great puzzle idea that we had about description merely because of the difficulty of projecting text onto surfaces. However, with all my hackathon and project cramming experience, this is within the normal range of scope shrink and is totally expected.
 
-**[Phillip]** The only things the changed at the end were the puzzles that we implemented, mainly because we realized we were low on time and needed to figure out contingency plans in case we were not able to finish all the puzzles planned. We went through a few different ideas for puzzles that may be easier/faster to implement, and we also considered making all the seasons just have a maze puzzle since that was the first puzzle we implemented, but in the end we took Alain's idea for a puzzle with falling objects and used Tim's last minute puzzle implementation about the shrinking zone that you have to stay within.
+**Phillip:** The only things the changed at the end were the puzzles that we implemented, mainly because we realized we were low on time and needed to figure out contingency plans in case we were not able to finish all the puzzles planned. We went through a few different ideas for puzzles that may be easier/faster to implement, and we also considered making all the seasons just have a maze puzzle since that was the first puzzle we implemented, but in the end we took Alain's idea for a puzzle with falling objects and used Tim's last minute puzzle implementation about the shrinking zone that you have to stay within.
 
 **Alain:** From the beginning, at least from a game design perspective, it stayed mostly the same, spearheaded by Rebecca's idea on having a cozy walking simulator with occasional puzzles along the way (at least that was my interpretation). The plot/theme of the story was contentious, however, and took a few weeks to resolve among the people interested in storyboarding (the engine people were excluded).
 
@@ -58,11 +58,11 @@ Most people used vscode-based editors for development (vscode, antigravity, curs
 
 I setup nix for the builds and various dependencies, but I didn't make it mandatory for people to use, as in I made sure macos could build everything just by installing a bunch of homebrew packages. We also had a pretty complex CI setup that did a bunch of different kinds of builds (native windows build, cross-compiled windows, native macos, nix-based linux, not-nix linux). We ultimately ended up demoing a "by hand" build from me since it was easier and we hadn't tested extensively with using actions builds. Using actions fixed a lot of the cross-platform compatibility issues, and although there were some platform-specific issues (like the physics library causing crashes on windows), we were able to work around them. I think there were some initial issues on macos that were related to opengl versioning as well. It also helped that we used libraries that were generally cross-platform.
 
-**[Jacob]:** Unfortunately with how I setup cross compiling (depended on people having nix setup) meant that I was on the critical path for any fast iteration on windows (alternatively, people could wait 7-10 minutes for windows builds from actions, which was too slow). This was largely only a problem on the last few days of the project, but I think its important to make this capability distributed across the group. I think using nix was pretty helpful, and I would recommend using it more widely to the next group.
+**Jacob:** Unfortunately with how I setup cross compiling (depended on people having nix setup) meant that I was on the critical path for any fast iteration on windows (alternatively, people could wait 7-10 minutes for windows builds from actions, which was too slow). This was largely only a problem on the last few days of the project, but I think its important to make this capability distributed across the group. I think using nix was pretty helpful, and I would recommend using it more widely to the next group.
 
 ### What group mechanics decisions worked out well, and which ones (if any) did not? Why?
 
-**[Ziyue]:** Our team's asynchronous coding model worked exceptionally well. By leveraging individual AI tools, we eliminated the scheduling friction of pair programming, allowing developers to work efficiently and independently while using multi-tiered weekly meetings to lock in design consensus and assign short-term tasks.
+**Ziyue:** Our team's asynchronous coding model worked exceptionally well. By leveraging individual AI tools, we eliminated the scheduling friction of pair programming, allowing developers to work efficiently and independently while using multi-tiered weekly meetings to lock in design consensus and assign short-term tasks.
 
 However, the Tuesday sync meetings deteriorated after the high-level design was finalized in Week 2. Spotty attendance and a lack of structured agendas caused these sessions to lose productivity, resulting in information asymmetry. (We did not even come up with all 4 minigame before week 10)
 
@@ -70,11 +70,11 @@ However, the Tuesday sync meetings deteriorated after the high-level design was 
 
 ### Which aspects of the implementation were more difficult than you expected, and which were easier? Why?
 
-**[Jacob]** I think getting a minimum viable project (cube rotates + movement is network synchronized) was really easy. Unfortunately we stalled for a while around that "level" of functionality (basic movement, etc), because implementing the puzzles proved harder than expected.
+**Jacob:** I think getting a minimum viable project (cube rotates + movement is network synchronized) was really easy. Unfortunately we stalled for a while around that "level" of functionality (basic movement, etc), because implementing the puzzles proved harder than expected.
 
 ### Which aspects of the project are you particularly proud of? Why?
 
-**[Jacob]** I think the fog is pretty cool. It originally looked really bad, but I got it to look way better.
+**Jacob:** I think the fog is pretty cool. It originally looked really bad, but I got it to look way better.
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
   <div>
@@ -91,9 +91,9 @@ However, the Tuesday sync meetings deteriorated after the high-level design was 
 
 ### What was the most difficult software problem you faced, and how did you overcome it (if you did)?
 
-**[Shengrui]** The hardest problem we ran into was the spring tangram puzzle, where all four players work on the same board but each person can only see or move certain pieces depending on their role. That part was already tricky to keep in sync between server and clients, but we also hit weird physics bugs that we never fully understood. The same snap and collision setup would work on Mac and then break on Linux or Windows for no obvious reason. We mostly got it playable by keeping one role state on the server and fixing collision after each snap, but those cross platform physics issues ate a lot of time and we were often debugging by trial and error instead of knowing exactly why it behaved differently.
+**Shengrui:** The hardest problem we ran into was the spring tangram puzzle, where all four players work on the same board but each person can only see or move certain pieces depending on their role. That part was already tricky to keep in sync between server and clients, but we also hit weird physics bugs that we never fully understood. The same snap and collision setup would work on Mac and then break on Linux or Windows for no obvious reason. We mostly got it playable by keeping one role state on the server and fixing collision after each snap, but those cross platform physics issues ate a lot of time and we were often debugging by trial and error instead of knowing exactly why it behaved differently.
 
-**[Jacob]** We had some noticeable microstutter, which we were not able to resolve. I think it happens due to a desync of some kind between the server and client rendering, which interacts unpredictably with the display driver, vsync, and vrr. This is probably solvable but probably would've required lots of trial and error, or implementing something fancy like interpolation.
+**Jacob:** We had some noticeable microstutter, which we were not able to resolve. I think it happens due to a desync of some kind between the server and client rendering, which interacts unpredictably with the display driver, vsync, and vrr. This is probably solvable but probably would've required lots of trial and error, or implementing something fancy like interpolation.
 
 ### Please detail your tool chain for modeling, exporting, and loading meshes, textures, and animations. What is your opinion of the tools you used?
 
@@ -116,7 +116,7 @@ We used assimp to load the models.
 
 ### Which networking, physics, audio, or GUI libraries did you use, and would you use them again if you were starting over knowing what you know now?
 
-**[Ziyue]:** Network:
+**Ziyue:** Network:
 
 We used the ENet package, a reliable UDP network package, to transmit information between client and server. We designed the protocol, such that the client sends the user's actions (like mouse movement / key type) and the server processes the user's actions and syncs with the client 60 times every second. Using ENet gives us the performance bonus (since it is udp) while also gives security guarantees with its reliable option (behaving like tcp, where each packet will be received reliably, in-order). One lesson we learnt is that profiling is critical. When we refactor the client to use two threads to process network package and graphics rendering, vsync is turned off implicitly, resulting in significant stuttering. Having a simple profiling log to record cycle length really helped us identify the cause.
 
@@ -130,19 +130,19 @@ Our experience with Soloud was more mixed. As an open-source alternative to FMOD
 
 **Rebecca:** LLM was used to refine weekly meeting notes into the actual weekly report when it's 3AM of Thursday. Fact check and de-ai is done afterwards. Also used claude to research online for blender issue, surprisingly it works fairly well most of the time. But it takes some base knowledge.
 
-**[Jacob]** I started off not really using LLMs but ramped up how much I "vibe coded" over the quarter. I exclusively used claude code, but others in my group used vscode, cursor, and antigravity. It was able to complete most of the tasks I asked it to do with minimal intervention. For example, it wrote all the imgui stuff, but it was limited somewhat when implementing features like fog because it couldn't see the game. I think it would be interesting for a future team to try and hook an LLM up into a harness that also lets it play the game, and I expect that would also make the LLMs more useful.
+**Jacob:** I started off not really using LLMs but ramped up how much I "vibe coded" over the quarter. I exclusively used claude code, but others in my group used vscode, cursor, and antigravity. It was able to complete most of the tasks I asked it to do with minimal intervention. For example, it wrote all the imgui stuff, but it was limited somewhat when implementing features like fog because it couldn't see the game. I think it would be interesting for a future team to try and hook an LLM up into a harness that also lets it play the game, and I expect that would also make the LLMs more useful.
 
 The tradeoff for LLMs is they can increase your velocity at the cost of understanding (both the codebase and the underlying concepts). I personally would recommend ramping up LLM use as the quarter goes by, and going full "vibe coder" at around week 8 or 9 since you'll need to get a lot done quickly in that timespan. I would have probably used LLMs less than I did in the project.
 
 Also keep in mind that when you take the course, the state of the art will be roughly 10 months ahead of where it was today, so the models will probably have gotten better and cheaper.
 
-**[Phillip]** I used gemini, Copilot (went through a few models, or whichever one powers copilot by default), as well as Claude at the very end. It think LLMs work great as long as you use them integrated into your IDE, because that way they at least have codebase context. Claude was great towards the end when I started using it, I wouldn't have been able to get the things I got done without it. I just think that it really hinders your understanding because the LLM is able to do so much that you don't really have to understand what it's doing. You just need to test continuously to make sure what it's adding to the codebase isn't slop.
+**Phillip:** I used gemini, Copilot (went through a few models, or whichever one powers copilot by default), as well as Claude at the very end. It think LLMs work great as long as you use them integrated into your IDE, because that way they at least have codebase context. Claude was great towards the end when I started using it, I wouldn't have been able to get the things I got done without it. I just think that it really hinders your understanding because the LLM is able to do so much that you don't really have to understand what it's doing. You just need to test continuously to make sure what it's adding to the codebase isn't slop.
 
-**[Ziyue]:** design the architecture with LLM, fully understand its intention and the architecture it proposed. Implement infrastructure yourselves. Do vibe coding if you run out of time.
+**Ziyue:** design the architecture with LLM, fully understand its intention and the architecture it proposed. Implement infrastructure yourselves. Do vibe coding if you run out of time.
 
 **Alain:** I didn't like using llms at first. But my programming velocity was sorely lacking compare to jacob and tim, so in order to ramp up at first, I've used claude to help design and understand the architecture, then personally implement it. However, towards the end, I've started vibecoding the implementations as well.
 
-**[Shengrui]** I've used both Codex and ClaudeCode, and I think starting with "No Vibe Code" to set up the infrastructure is a solid approach. I used it to understand existing code and add my own. However, as the logic grew more complex, I needed a way to quickly test new features, so around weeks 8–9, I started using LLMs to implement demo functionality. My advice is to verify the code using simple logic flows after completing a full feature; this makes debugging much easier. There were times I rushed things, which led to issues that were hard to pin down.
+**Shengrui:** I've used both Codex and ClaudeCode, and I think starting with "No Vibe Code" to set up the infrastructure is a solid approach. I used it to understand existing code and add my own. However, as the logic grew more complex, I needed a way to quickly test new features, so around weeks 8–9, I started using LLMs to implement demo functionality. My advice is to verify the code using simple logic flows after completing a full feature; this makes debugging much easier. There were times I rushed things, which led to issues that were hard to pin down.
 
 ### If you used an implementation language other than C++, describe the environments, libraries, and tools you used to support development in that language.
 
@@ -176,21 +176,21 @@ We counted with cloc, run over the files tracked in git, excluding our vendored 
 
 **Alain:** Someone should take on the role of a product manager, coordinator, or team lead to keep the project organized and maintain visibility into ongoing technical and artistic developments. At the same time, team members need to make a conscious effort to attend meetings and communicate progress regularly. Without consistent participation and coordination, information coherence is lost, leading to misalignment, duplicated effort, and reduced overall efficiency. This role requires maintaining a high-level understanding of both the technical and artistic aspects of the project so that dependencies and communication gaps can be identified early.
 
-**[Ziyue]:** communication frameworks must evolve with the project lifecycle. High-level, synchronous alignment is vital early on, but during production, general meetings lose efficacy and breed information asymmetry if attendance falters.
+**Ziyue:** communication frameworks must evolve with the project lifecycle. High-level, synchronous alignment is vital early on, but during production, general meetings lose efficacy and breed information asymmetry if attendance falters.
 
-**[Phillip]** I think it is hard to make sure everyone is on the same page and hard to split work up sometimes. There are some tasks that are just better done all by 1 person, maybe because the tasks are connected or they depend on each other or they require context from other tasks. Sometimes when you do a task and you know someone else is doing another task that is related, it's very hard to just regurgitate all your information onto the other person so that they know what you have in mind and what you want them to do with their task or what could help them with their task. Or, sometimes you split tasks up and people end up stepping on each other's work. So it's really important delegating work to each person and having constant communication, either individually or during meetings to make sure everyone is on the same page.
+**Phillip:** I think it is hard to make sure everyone is on the same page and hard to split work up sometimes. There are some tasks that are just better done all by 1 person, maybe because the tasks are connected or they depend on each other or they require context from other tasks. Sometimes when you do a task and you know someone else is doing another task that is related, it's very hard to just regurgitate all your information onto the other person so that they know what you have in mind and what you want them to do with their task or what could help them with their task. Or, sometimes you split tasks up and people end up stepping on each other's work. So it's really important delegating work to each person and having constant communication, either individually or during meetings to make sure everyone is on the same page.
 
-**[Rebecca]:** The most prominent albeit none critical feedback we have gotten is to make sure our separately assigned work tasks can be cohesive at important points of development during our project. I think our team is full of wonderful people who are good at their respective tasks, but slightly bad at communicating and making things together. I am not the main tech person, but I was managing the website, and I made the decision to talk about the pipeline of writing to the website right after everything is done, which has proven to work nicely. As the group coordinator, I did wish our technical crew would work more closely together, but it turned out fine too as for now.
+**Rebecca:** The most prominent albeit none critical feedback we have gotten is to make sure our separately assigned work tasks can be cohesive at important points of development during our project. I think our team is full of wonderful people who are good at their respective tasks, but slightly bad at communicating and making things together. I am not the main tech person, but I was managing the website, and I made the decision to talk about the pipeline of writing to the website right after everything is done, which has proven to work nicely. As the group coordinator, I did wish our technical crew would work more closely together, but it turned out fine too as for now.
 
 Another thing is about project ideas. At the beginning, our team experienced some friction because of undefined project scope and ideas. We decided to go with a majority vote for every major design choice. We can't have all the features everyone wants, and I am completely alright with that. But that also means some people get less portion of game elements they want in the game, and depending on what the technical crew can actually handle and create, that proportion is shifted further. Sometimes it is just unfortunate.
 
 ### Looking back over the past 10 weeks, is there anything you would do differently, and what would you do again in the same situation?
 
-**[Jacob]:** I would've done more work in the start and middle of the quarter. Doing more work earlier would've finished the engine faster which would've helped unblock the implementation of puzzles, and doing more work in the middle would've made week 10 be less stressful and potentially improved the quality of the final game.
+**Jacob:** I would've done more work in the start and middle of the quarter. Doing more work earlier would've finished the engine faster which would've helped unblock the implementation of puzzles, and doing more work in the middle would've made week 10 be less stressful and potentially improved the quality of the final game.
 
-**[Phillip]** I guess I just wish I had put in more time to really learn things and maybe code some stuff myself so I could get more out of it, rather than relying heavily on LLMs. I think it was just hard because the first few weeks, we didn't have enough of a structure and framework in place for the game logic people (me and Leon) to begin implementing. And towards the end I didn't really code that much myself, so that's where I could have gotten more out of it if I had coded more myself.
+**Phillip:** I guess I just wish I had put in more time to really learn things and maybe code some stuff myself so I could get more out of it, rather than relying heavily on LLMs. I think it was just hard because the first few weeks, we didn't have enough of a structure and framework in place for the game logic people (me and Leon) to begin implementing. And towards the end I didn't really code that much myself, so that's where I could have gotten more out of it if I had coded more myself.
 
-**[Rebecca]:** For obvious reasons, if I go back right now with my current amount of knowledge, I will be able to model much faster and put more assets. I would have also refined the landscape so it's easier for me to work with when putting bridges etc, and I would be able to handle the 2 full weeks I have basically wasted being anxious about the scatter object issue.
+**Rebecca:** For obvious reasons, if I go back right now with my current amount of knowledge, I will be able to model much faster and put more assets. I would have also refined the landscape so it's easier for me to work with when putting bridges etc, and I would be able to handle the 2 full weeks I have basically wasted being anxious about the scatter object issue.
 
 **Alain:** Be more outspoken on group dynamic issues and to also push my ideas to the group.
 
@@ -198,15 +198,15 @@ Another thing is about project ideas. At the beginning, our team experienced som
 
 **Rebecca:** Since I am the art person of the team, I would have to say no classes. But for the context, mostly cse 120 and cse 160, helpful for getting a good view of what the project is doing. Blender is completely self taught.
 
-**[Jacob]:** CSE 148, 110, and 132B were helpful insofar as they were "term group project" classes. 223B was pretty helpful because it increased the size of my brain. CSE 167 was slightly useful, but I think I forgot almost everything that would've been relevant to 125.
+**Jacob:** CSE 148, 110, and 132B were helpful insofar as they were "term group project" classes. 223B was pretty helpful because it increased the size of my brain. CSE 167 was slightly useful, but I think I forgot almost everything that would've been relevant to 125.
 
-**[Phillip]** I think any group project class was helpful. So a few CSE 190 classes,maybe ece 196, at least for me. Any class that truly forces you to work as a team and come together as a group to get things done is helpful, rather than the classes that have "groups" but the work is still doable by 1-2 people.
+**Phillip:** I think any group project class was helpful. So a few CSE 190 classes,maybe ece 196, at least for me. Any class that truly forces you to work as a team and come together as a group to get things done is helpful, rather than the classes that have "groups" but the work is still doable by 1-2 people.
 
 ### What were the most valuable things that you learned in the class?
 
-**[Phillip]** I learned about ECS and how it works. Given how widely used ECS is, it's probably valuable. I also used Claude for the first time in 125, so I guess I learned how useful Claude is and why everyone uses it. That seems important too, given the direction the industry is moving.
+**Phillip:** I learned about ECS and how it works. Given how widely used ECS is, it's probably valuable. I also used Claude for the first time in 125, so I guess I learned how useful Claude is and why everyone uses it. That seems important too, given the direction the industry is moving.
 
-**[Jacob]** I think learning more about graphics was pretty cool. I never actually understood how rendering worked, and in my research I learned about lots of cool techniques that we didn't end up implementing like unreal engine's nanite.
+**Jacob:** I think learning more about graphics was pretty cool. I never actually understood how rendering worked, and in my research I learned about lots of cool techniques that we didn't end up implementing like unreal engine's nanite.
 
 **Rebecca:** 1. The modeling and brainstorming where to put what; I learned a decent amount of skill here. I think it's great. 2. It is always good to check in with our teammates to know what they are doing. Around the first few weeks, when I realize the project repo is getting increasingly complicated, I set up a meeting with our tech lead to understand what exactly those files are doing, so when I am writing things down for the group report, I would be able to ask some basic questions knowing how the project came together.
 
@@ -224,13 +224,13 @@ Our group site (including all weekly reports, the project spec, and this final r
 
 **Alain:** It was great pls do again.
 
-**[Rebecca]** I think it's great! It was a lot of fun and it should definitely be a tradition.
+**Rebecca:** I think it's great! It was a lot of fun and it should definitely be a tradition.
 
 ### What advice/tips/suggestions would you give students who will take the course next year?
 
-**[Jacob]** Make sure everyone on your team can build both for their device and for windows, and make sure most people can run 4 copies of the game simultaneously at >=10fps (unless they have a potato). It is probably better to spend time in the basement working together (not necessarily on the same thing) compared to working asynchronously at your homes.
+**Jacob:** Make sure everyone on your team can build both for their device and for windows, and make sure most people can run 4 copies of the game simultaneously at >=10fps (unless they have a potato). It is probably better to spend time in the basement working together (not necessarily on the same thing) compared to working asynchronously at your homes.
 
-**[Rebecca]**
+**Rebecca:**
 
 1. For art people:
 
