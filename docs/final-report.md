@@ -26,7 +26,7 @@ Thinking back, it was quite interesting that we decided on this theme; it works 
 
 **Alain:** From the beginning, at least from a game design perspective, it stayed mostly the same, spearheaded by Rebecca's idea on having a cozy walking simulator with occasional puzzles along the way (at least that was my interpretation). The plot/theme of the story was contentious, however, and took a few weeks to resolve among the people interested in storyboarding (the engine people were excluded).
 
-**Sarah:**: The overall look of the game was pretty close to what we had in mind at the very start, with the toon shading and the low poly characters. For the puzzles, I was kinda sad we weren't able to get the decrypt puzzle implemented since I had that idea at the start. I had the static screen for the game designed, as well as a font if it was usable, but I understand that we were low on time for implementation. I'm glad the (simplified) made it into the game though, that one I'm very certain would've been hard to implement with the original rules. 
+**Sarah:**: The overall look of the game was pretty close to what we had in mind at the very start, with the toon shading and the low poly characters. For the puzzles, I was kinda sad we weren't able to get the decrypt puzzle implemented since I had that idea at the start. I had the static screen for the game designed, as well as a font if it was usable, but I understand that we were low on time for implementation. I'm glad the (simplified) tangram made it into the game though, that one I'm very certain would've been hard to implement with the original rules. 
 
 ### Schedule: How does your final schedule compare with your projected schedule, and what are the reasons for the differences, if any?
 
