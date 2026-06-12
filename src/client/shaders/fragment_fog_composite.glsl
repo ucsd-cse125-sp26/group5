@@ -1,3 +1,4 @@
+git log --oneline
 #version 410 core
 // Composites the reduced-resolution barrier-fog march over the full-res scene.
 // The march stored a premultiplied fog color in .rgb and the remaining
