@@ -16,13 +16,17 @@ The purpose of this document is to summarize the software design and implementat
 
 Thinking back, it was quite interesting that we decided on this theme; it works perfectly for the final demo timeline wise.
 
+**Sarah**: I think it changed quite a lot, we originally had a bigger focus on collecting the fragments rather than an emphasis on puzzles. Each person had their own ideas of what the game should look like based on their prior experiences -- Rebecca had A Short Hike and other scenic puzzle-based games in mind while I thought of timed co-op games like Overcooked. In the end, the look and feel of the game turned out great, and I loved the memory theme we went with. The story Leon and the others had sounded great to me, and the puzzles were well worth the effort.
+
 ### Design: How does your final project design compare to the initial design, and what are the reasons for the differences, if any?
 
-**Rebecca:** The main design based off of concept did not change that much. If anything, we just had to narrow down the scope of the game. For example, as Saarah mentioned in the demo, we had to collect less items/fragments (only one per map); the map became much smaller (it was harder to model than imagined for me); game logic development only had time to support simpler and not randomized puzzles; Could not implement a great puzzle idea that we had about description merely because of the difficulty of projecting text onto surfaces. However, with all my hackathon and project cramming experience, this is within the normal range of scope shrink and is totally expected.
+**Rebecca:** The main design based off of concept did not change that much. If anything, we just had to narrow down the scope of the game. For example, as Sarah mentioned in the demo, we had to collect less items/fragments (only one per map); the map became much smaller (it was harder to model than imagined for me); game logic development only had time to support simpler and not randomized puzzles; Could not implement a great puzzle idea that we had about description merely because of the difficulty of projecting text onto surfaces. However, with all my hackathon and project cramming experience, this is within the normal range of scope shrink and is totally expected.
 
 **[Phillip]** The only things the changed at the end were the puzzles that we implemented, mainly because we realized we were low on time and needed to figure out contingency plans in case we were not able to finish all the puzzles planned. We went through a few different ideas for puzzles that may be easier/faster to implement, and we also considered making all the seasons just have a maze puzzle since that was the first puzzle we implemented, but in the end we took Alain's idea for a puzzle with falling objects and used Tim's last minute puzzle implementation about the shrinking zone that you have to stay within.
 
 **Alain:** From the beginning, at least from a game design perspective, it stayed mostly the same, spearheaded by Rebecca's idea on having a cozy walking simulator with occasional puzzles along the way (at least that was my interpretation). The plot/theme of the story was contentious, however, and took a few weeks to resolve among the people interested in storyboarding (the engine people were excluded).
+
+**Sarah:**: The overall look of the game was pretty close to what we had in mind at the very start, with the toon shading and the low poly characters. For the puzzles, I was kinda sad we weren't able to get the decrypt puzzle implemented since I had that idea at the start. I had the static screen for the game designed, as well as a font if it was usable, but I understand that we were low on time for implementation. I'm glad the (simplified) made it into the game though, that one I'm very certain would've been hard to implement with the original rules. 
 
 ### Schedule: How does your final schedule compare with your projected schedule, and what are the reasons for the differences, if any?
 
@@ -58,6 +62,8 @@ Most people used vscode-based editors for development (vscode, antigravity, curs
 
 I setup nix for the builds and various dependencies, but I didn't make it mandatory for people to use, as in I made sure macos could build everything just by installing a bunch of homebrew packages. We also had a pretty complex CI setup that did a bunch of different kinds of builds (native windows build, cross-compiled windows, native macos, nix-based linux, not-nix linux). We ultimately ended up demoing a "by hand" build from me since it was easier and we hadn't tested extensively with using actions builds. Using actions fixed a lot of the cross-platform compatibility issues, and although there were some platform-specific issues (like the physics library causing crashes on windows), we were able to work around them. I think there were some initial issues on macos that were related to opengl versioning as well. It also helped that we used libraries that were generally cross-platform.
 
+**Sarah**: For characters, the workflow was: hand sketch -> cleaned 2D reference using Inkscape -> Blender modeling, rigging, and texturing. I was using the set up Jacob made for uploading assets, but eventually just emailed them to him directly since it was easier for us both that way.
+
 **[Jacob]:** Unfortunately with how I setup cross compiling (depended on people having nix setup) meant that I was on the critical path for any fast iteration on windows (alternatively, people could wait 7-10 minutes for windows builds from actions, which was too slow). This was largely only a problem on the last few days of the project, but I think its important to make this capability distributed across the group. I think using nix was pretty helpful, and I would recommend using it more widely to the next group.
 
 ### What group mechanics decisions worked out well, and which ones (if any) did not? Why?
@@ -67,6 +73,8 @@ I setup nix for the builds and various dependencies, but I didn't make it mandat
 However, the Tuesday sync meetings deteriorated after the high-level design was finalized in Week 2. Spotty attendance and a lack of structured agendas caused these sessions to lose productivity, resulting in information asymmetry. (We did not even come up with all 4 minigame before week 10)
 
 **Alain:** Adding to what Ziyue (Tim) mentioned, our team lacked a strong process or incentive for providing regular updates and maintaining documentation. While some level of coordination was necessary to keep everyone aligned, it was often difficult to track remaining objectives or understand changes that others had made to the game logic and engine. In practice, the only reliable way to stay informed was to read pull requests, which was time-consuming and inefficient. Brief progress summaries or update reports from team members would likely have improved communication and reduced information asymmetry. Due to this, we couldn't fully flesh out our game as much as we'd wanted to, and were missing quite a few sound assets towards the final demo.
+
+**Sarah**: I think the group meetings that we had weekly led by Rebecca were helpful. The art side in general only had two people (me and Rebecca) so it was much easier to keep each other updated. We had a channel for what we were working on, and we'd post screenshots of whatever we had whenever we had them done. I also sought her input on my designs most of the time. As for everything else, I wasn't super in the loop wth the engine implementation so I wasn't always sure what to expect with what was feasible. It might've been helpful to be more in the know if there was a dedicated updates channel for the tech stack to quickly read through, as others have pointed out.
 
 ### Which aspects of the implementation were more difficult than you expected, and which were easier? Why?
 
@@ -88,6 +96,19 @@ However, the Tuesday sync meetings deteriorated after the high-level design was 
 </div>
 
 **Alain:** I liked it when everything worked for the falling pumpkins puzzle
+
+**Sarah**: I am particularly proud of my son Gurf. He was based off a cat design of the same name that I made for teaching in EDS 124BR. He looks goofy in 3d and that was on purpose since he looks goofy in 2d anyways. I've wanted to see him as a playable character so I'm very proud he is now one.
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+  <div>
+    <img src="{{ '/assets/weeklast/gurf-og.png' | relative_url }}" alt="Original Gurf from EDS 124BR">
+    <em>EDS 124BR Gurf</em>
+  </div>
+  <div>
+    <img src="{{ '/assets/weeklast/gurf-demo.png' | relative_url }}" alt="In-game Gurf at the demo">
+    <em>Demo Gurf</em>
+  </div>
+</div>
 
 ### What was the most difficult software problem you faced, and how did you overcome it (if you did)?
 
@@ -144,6 +165,8 @@ Also keep in mind that when you take the course, the state of the art will be ro
 
 **[Shengrui]** I've used both Codex and ClaudeCode, and I think starting with "No Vibe Code" to set up the infrastructure is a solid approach. I used it to understand existing code and add my own. However, as the logic grew more complex, I needed a way to quickly test new features, so around weeks 8–9, I started using LLMs to implement demo functionality. My advice is to verify the code using simple logic flows after completing a full feature; this makes debugging much easier. There were times I rushed things, which led to issues that were hard to pin down.
 
+**Sarah**: Did not use any.
+
 ### If you used an implementation language other than C++, describe the environments, libraries, and tools you used to support development in that language.
 
 N/A
@@ -184,6 +207,10 @@ We counted with cloc, run over the files tracked in git, excluding our vendored 
 
 Another thing is about project ideas. At the beginning, our team experienced some friction because of undefined project scope and ideas. We decided to go with a majority vote for every major design choice. We can't have all the features everyone wants, and I am completely alright with that. But that also means some people get less portion of game elements they want in the game, and depending on what the technical crew can actually handle and create, that proportion is shifted further. Sometimes it is just unfortunate.
 
+**Sarah**: I already knew from previous projects that the communication is usually the roughest part in group dynamics, and that seems to ring true again. Our status updates were mainly during the group meetings, which may not be enough for keeping up with what is current, especially if you're someone that had to attend to something and need to catch up. I could've stepped up more in terms of administrative stuff also, like setting up more Agile/sprint-based workflows to keep communication a constant stream, but I ended up more busy than anticipated and depended a lot on Rebecca for admin.
+
+Having design friction was also familiar but uncomfortable nonetheless. I expected it to happen, but still a bit sad some of my ideas couldn't be implemented because of timing or other issues. It's disappointing, but it's just something to bear with.
+
 ### Looking back over the past 10 weeks, is there anything you would do differently, and what would you do again in the same situation?
 
 **[Jacob]:** I would've done more work in the start and middle of the quarter. Doing more work earlier would've finished the engine faster which would've helped unblock the implementation of puzzles, and doing more work in the middle would've made week 10 be less stressful and potentially improved the quality of the final game.
@@ -194,6 +221,8 @@ Another thing is about project ideas. At the beginning, our team experienced som
 
 **Alain:** Be more outspoken on group dynamic issues and to also push my ideas to the group.
 
+**Sarah**: I think I would've stepped up more with group management, since it was a skill I built in CSE 110 anyway. I also would've not cared as much with CSE 123 and put more focus on this class, which I've wanted to do ever since my 2nd year in UCSD when I first heard of it. I would've been faster with modeling also. and not have been so anxious about the new things I was being challenged with learning.
+
 ### Which courses at UCSD do you think best prepared you for CSE 125?
 
 **Rebecca:** Since I am the art person of the team, I would have to say no classes. But for the context, mostly cse 120 and cse 160, helpful for getting a good view of what the project is doing. Blender is completely self taught.
@@ -202,6 +231,8 @@ Another thing is about project ideas. At the beginning, our team experienced som
 
 **[Phillip]** I think any group project class was helpful. So a few CSE 190 classes,maybe ece 196, at least for me. Any class that truly forces you to work as a team and come together as a group to get things done is helpful, rather than the classes that have "groups" but the work is still doable by 1-2 people.
 
+**Sarah**: CSE 110 is my main point of reference for group project, since that was where I had to step up for group lead and expected how group dynamics went. I focused on art though, so that was entirely self taught. If I was doing networks, then I think CSE 123 could be helpful, but alas I didn't do that part so I can't say for sure.
+
 ### What were the most valuable things that you learned in the class?
 
 **[Phillip]** I learned about ECS and how it works. Given how widely used ECS is, it's probably valuable. I also used Claude for the first time in 125, so I guess I learned how useful Claude is and why everyone uses it. That seems important too, given the direction the industry is moving.
@@ -209,6 +240,8 @@ Another thing is about project ideas. At the beginning, our team experienced som
 **[Jacob]** I think learning more about graphics was pretty cool. I never actually understood how rendering worked, and in my research I learned about lots of cool techniques that we didn't end up implementing like unreal engine's nanite.
 
 **Rebecca:** 1. The modeling and brainstorming where to put what; I learned a decent amount of skill here. I think it's great. 2. It is always good to check in with our teammates to know what they are doing. Around the first few weeks, when I realize the project repo is getting increasingly complicated, I set up a meeting with our tech lead to understand what exactly those files are doing, so when I am writing things down for the group report, I would be able to ask some basic questions knowing how the project came together.
+
+**Sarah**: I think the most valuable thing I learned was learning to just accept that not every idea I bring up will end up in the final. Everyone had cool ideas, but we simply cannot implement them all. I also had to learn that literally anything can go wrong at any time, and I can't beat myself up over things I can't control (sickness, injury, etc). And lastly, I've been wanting to learn how to model with Blender so getting to learn how to do that was very valuable to me, especially since I'm planning on doing game development after this.
 
 ---
 
@@ -244,13 +277,25 @@ Our group site (including all weekly reports, the project spec, and this final r
 
 2. For team leaders: Make sure to have a good idea of what's going on with the project overall. People might just disagree with you, and that's bound to happen. Try your best to make every teammate feel included. Try your best to implement an average amount of everyone's ideas into the game. At the end of development, if you realize the scope is too big for the time, do not hesitate to talk to your teammates about narrowing the scope. My personal design principle is, youd rather make something small and good, than make something big that breaks.
 
+**Sarah**:
+
+- If you're afraid to start anything, tutorials will help. This is mainly aimed at art people since I did art, but look for something you *would* want to make and then follow a tutorial for that (or a tutorial that would teach you things to make that). The motivation is key.
+- If you don't like a class as much as this one, but you can pass that class, then just put enough effort to pass in that one and have as much fun as possible in this one.
+- Please go eat, drink water, and sleep. Take care of yourself so you do not catch multiple sicknesses or get into a scooter accident because you're sleep deprived and in a rush. Totally not speaking from experience or anything. Also wear your helmet in case that happens.
+- Recommend doing some form of Agile for iterative design to manage development and staying updated with each other's progress. Weekly updates are good, more frequent updates are great.
+- HAVE !! FUN !!!
+
 ### Do you have any suggestions for improving the course?
 
-**Rebecca:** The only small thing that kinda sucks was the team matching phase. We did not really get to talk to each other, and the whole team creation just happened so quickly. We got slightly lost with what's going on the sceen.
+**Rebecca:** The only small thing that kinda sucks was the team matching phase. We did not really get to talk to each other, and the whole team creation just happened so quickly. We got slightly lost with what's going on the screen.
+
+**Sarah**: I agree with the team matching thing Rebecca said. I think this would be a department thing, but having a TA for this class would be great if feasible. Just having more people that can help with wrangling us would be good.
 
 ### Any other comments or feedback?
 
 **Alain:** Please keep this course running for future years.
+
+**Sarah**: Thank you for this course. It's been so much fun, and I hope to see more of what comes out of it.
 
 ---
 
