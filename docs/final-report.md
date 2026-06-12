@@ -64,7 +64,7 @@ I setup nix for the builds and various dependencies, but I didn't make it mandat
 
 **Sarah**: For characters, the workflow was: hand sketch -> cleaned 2D reference using Inkscape -> Blender modeling, rigging, and texturing. I was using the set up Jacob made for uploading assets, but eventually just emailed them to him directly since it was easier for us both that way.
 
-**[Jacob]:** Unfortunately with how I setup cross compiling (depended on people having nix setup) meant that I was on the critical path for any fast iteration on windows (alternatively, people could wait 7-10 minutes for windows builds from actions, which was too slow). This was largely only a problem on the last few days of the project, but I think its important to make this capability distributed across the group. I think using nix was pretty helpful, and I would recommend using it more widely to the next group.
+**Jacob:** Unfortunately with how I setup cross compiling (depended on people having nix setup) meant that I was on the critical path for any fast iteration on windows (alternatively, people could wait 7-10 minutes for windows builds from actions, which was too slow). This was largely only a problem on the last few days of the project, but I think its important to make this capability distributed across the group. I think using nix was pretty helpful, and I would recommend using it more widely to the next group.
 
 ### What group mechanics decisions worked out well, and which ones (if any) did not? Why?
 
