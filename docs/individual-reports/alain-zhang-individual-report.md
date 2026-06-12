@@ -10,32 +10,129 @@ permalink: /project-spec/alain-zhang-individual-report/
 
 ### Week 9
 
-Hi
+#### Goals
 
-Currently it is 2 am and I have an upcoming (moved to remote luckily) final at 9 am. HAHAHAHHAHAHAHA
+- [x] Complete the falling-object survival challenge end to end (activation → survival → completion)
+- [x] Replace the placeholder offset trigger box with a platform-based activation check
+- [x] Implement per-participant progress tracking and a multi-segment HUD
+- [x] Wire challenge completion to fragment reveal and section progression
+- [x] Diagnose the post-merge regression where the challenge stopped behaving correctly
+- [~] Notifications / QoL overlay system (mostly in place, back-burnered behind the regression hunt)
+- [ ] Spawn fences/barriers when the challenge is triggered
+- [ ] Move the trigger onto Rebecca's finalized platform instead of my placeholder
 
-Some updates: 
-- Finished the puzzle/challenge with a dynamic progress bar/HUD where players have to dodge objects from the sky to progress to the next section. Since the latest project changes, the puzzle doesn't seem to work anymore, so I'll need to track down what's happening.
-- Mostly have the notifications/QoL system in place for learning the game, but currently on the back burner. Will see how much progress I can make after my final tomorrow, but I definitely have enough time to perform the necessary patches.
+#### Achieved
 
-Todo:
-- Fix up whatever happened to the puzzle and spawn fences/barriers when the puzzle is triggered
-- Change the puzzle trigger to be in the platform rebecca provided isntead of my placeholder (i dont even know what this is...)
-- Help with sound and movement system if necessary, then finish whatever I was working on
-- Edit my week 8 and week 9 report to reflect more on what i've done technically before the quarter ends
+**Dynamic activation trigger (`maybeActivateFallChallenge` — `fall_challenge.cpp`)**
 
-Apologies for the sparse reporting, but currently, I am drained of mind, body, and soul. Also a leg. 
+Replaced the original placeholder trigger with a platform-based activation check. The old approach used a small trigger box offset from the visible play platform, which meant a single player could wander into it but getting several bodies to crowd into it simultaneously was nearly impossible. Since the platform itself is the natural gather point, activation now fires when *every connected player* is standing on the play platform (`playCenter` ± `playHalf`, plus a `1.5` entry margin so a player on the very edge still counts). The check is player-count agnostic — it fires whenever `insideCount == connected`, so it works for any lobby size rather than a hardcoded number. A `completed` guard prevents a finished challenge from re-arming.
+
+**Per-participant progress + completion (`fall_challenge_system` — `fall_challenge.cpp`)**
+
+- Each enrolled player gets a permanent slot in a 4-wide `fill[]` array tracked on `FallChallengeState`, with enrollment managed through a `participantMask` that is OR'd with everyone currently in-zone and AND'd against the connected set each tick (so disconnects cleanly drop a player and never deadlock completion).
+- Survival accrues progress at `fillRate * dt`; leaving the platform drains it via a time-normalized `hitPenalty / kOffPlatformDrainSeconds * dt` so the penalty is framerate-independent rather than a per-frame flat subtraction.
+- The challenge resolves only when every enrolled participant reaches `fill >= 1.0`, making it a genuinely cooperative survival objective.
+
+**Completion → fragment reveal → section progression**
+
+On solve, the system stops spawning, despawns all remaining cubes, tears down the hazard zones, plays the completion sound, and reveals the fall fragment by emplacing `RenderInfo` on the matching `FragmentComponent` (created render-less in the level so it only appears once earned). `CollectFallFragment` then increments the completed-section count, slotting the challenge into the overall map progression flow.
+
+**Multi-segment HUD (`drawFallChallengeHUD` — `puzzle_hud.cpp`)**
+
+Reworked the HUD into a single 600×44 bar split into one segment per active participant, each filling independently from its `fill[]` value (clamped to `[0,1]`) with per-slot dividers and labels, under a "Survive the falling cubes!" banner. Because it reads straight from the replicated `FallChallengeState` on the render registry, every client sees the whole team's live progress without any extra networking.
+
+**Debugging / Issues — the post-merge regression**
+
+After the latest merges, completing the challenge left players unable to move and drifting backwards. Root-caused it to a lifecycle ordering bug between the challenge and the movement system:
+
+- `Knockback.remaining` (the timer during which physics, not input, owns a player's horizontal velocity) is only ticked down inside `knockback_system`.
+- `knockback_system` only runs while the challenge is active — `update` early-returns on `if (!isActive(game)) return;`.
+- On the solve frame, `fall_challenge_system` flips `active = false`. Any player who took a cube hit within `kKnockbackDuration` (`0.4s`) of solving has their `remaining` frozen above zero forever, because the system that would have counted it back down never runs again.
+- The movement system then permanently treats them as `knocked`: WASD is discarded on X/Y and the body coasts on residual knockback velocity — exactly the "can't move / drift backwards" symptom.
+
+Fix identified: clear `Knockback` (zero `remaining` and kill residual horizontal velocity) for all participants in the solve block, mirroring the existing one-shot cube despawn that already guards against the same "frozen on completion" failure mode. Notably the cube-cleanup path was already protected this way; the knockback path was the one spot that was missed.
+
+**Notifications / QoL overlay system (in progress)**
+
+Continued groundwork on an in-world notification/overlay system for teaching players how to interact with the world, building on the same ImGui HUD layer the puzzle overlays use. Functional but back-burnered this week so the regression could take priority.
+
+**Tooling**
+
+Fixed a silently-broken disable in `.clang-tidy`: a missing comma between two entries in the folded `Checks:` block was merging them into one space-joined token, which matched nothing and quietly re-enabled `clang-analyzer-core.BitwiseShift` (a false positive originating in the vendored `pl_mpeg` decoder). Restored the comma so the intended suppressions actually apply.
+
+#### Progress Evaluation
+
+Most of the week split between finishing the challenge's completion flow and hunting the movement regression. The activation-trigger refactor was the cleanest win — moving from an offset box to "everyone on the platform" removed a whole class of flakiness around getting multiple bodies into a small region. The regression was the time sink: the symptom (can't move after winning) looked unrelated to knockback until I traced *which system owns the velocity* and *when it stops running*, at which point the early-return ordering made it obvious. Good reminder that completion transitions need to actively reset transient per-player state, not just stop the systems that maintain it.
+
+#### Upcoming Goals
+
+- [ ] Land the knockback-clear fix in the solve path and verify across a multi-player lobby
+- [ ] Spawn fences/barriers on challenge trigger to physically gate the arena
+- [ ] Migrate the trigger onto Rebecca's finalized platform geometry
+- [ ] Finish the notifications/QoL overlay pass now that the regression is understood
+- [ ] Help with sound and movement-system integration as needed
+
+#### Lessons Learned
+
+The big one: when a system both *owns* a piece of state (here, horizontal velocity during knockback) and is the *only* thing that resets it, any code path that disables that system mid-effect strands the state. The cube-despawn path already accounted for this; the knockback path didn't, and the inconsistency is what produced the bug. Also reinforced that "framerate-independent" penalties (`/ dt`-normalized drains) matter even for gameplay feel, not just physics. And on tooling: a folded YAML scalar will happily swallow a missing comma and turn two list entries into one nonsense glob with zero errors — worth grepping for whenever a suppression "isn't working."
+
+#### Individual Morale
+
+[3/10] — Writing this at 2 a.m. before a 9 a.m. final (mercifully moved to remote). The challenge works, the bug is understood, and I have not yet started studying. I believe in Jacob who believes in me.
+
+---
 
 ### Week 8
 
-Working on a puzzle where the players have to dodge falling objects for a certain duration of time. Will update 
-progress and specifics in this portion of the report in detail when I awake (currently writing this placeholder at 6:00 am) but should be done before demo day.
-Other tasks I have been assigned are notifications, i.e pop-ups or overlays to let the players know how to interact with the world or other things that may be of importance. Also need to source audio files, but I'll be leaving that for the artists.
+#### Goals
 
-Suffice to say, my current stack should be doable before presentation.
+- [x] Prototype a survival challenge where players dodge objects falling from the sky for a fixed duration
+- [x] Implement server-side spawning of falling hazards with even arena coverage
+- [x] Implement knockback when a hazard strikes a player, integrated with the movement system
+- [x] Implement the survive-to-progress mechanic and a first-pass HUD
+- [~] Begin the notifications/overlay system for teaching in-world interactions
+- [ ] Source audio assets (deferred to the artists)
 
-Also, I've unfortunately been crippled (sprain) for the next 2-3 weeks due to a bad fall on 5/25.
+#### Achieved
 
+**Falling-object hazard system (`falling_objects_system` — `fall_challenge.cpp`)**
+
+Built the server-authoritative hazard spawner that rains objects ("pumpkins") onto the play arena. Spawn positions come from a lattice/spiral burst pattern (`burstPositions`, seeded `mt19937(1337)` for reproducibility) so coverage stays even across the disk instead of clustering, which keeps the dodging fair regardless of where a player stands. Spawns are deferred into a buffer and applied after the zone view is iterated, since emplacing `Position`/`OverworldTag` mid-iteration would invalidate the view over those same pools.
+
+Each hazard carries a `FallingObject` component with an `age` timer. Cleanup runs every tick and retires an object when either `age > 4.0s` (so landed objects don't pile up on the floor forever) or its `z < -5.0` (a kill-plane catch for anything that misses the platform and falls into the void), broadcasting a `DESPAWN_ENTITY` packet and tearing down the Jolt body via the existing `on_destroy<PhysicsBody>` hook.
+
+**Knockback system + movement integration (`knockback_system` — `fall_challenge.cpp`, `server_game.cpp`)**
+
+Implemented the hit response: when a falling object comes within `kKnockbackHitRadius` (`2.0`) of a player, it applies a horizontal shove (`kKnockbackPush = 13.0`) plus a small vertical pop on side hits (`kKnockbackUpPush = 5.0`) and sets `Knockback.remaining = kKnockbackDuration` (`0.4s`). The physics and knockback half-extents deliberately share one constant (`kFallingObjectHalf = 1.0`) so the visual hit radius and the collision radius can't silently drift apart; render scale is kept separate (`1.1`) so the mesh can look right without changing the world-space hit size.
+
+Integrated this with `movement_system_for_world` so that while `Knockback.remaining > 0`, physics owns the player's X/Y velocity and player input is intentionally ignored — you get *shoved* across the platform instead of being able to instantly walk against the hit. Once the timer counts down, input control returns. (The interaction between this hand-off and challenge completion is what surfaced the Week 9 regression.)
+
+**Survive-to-progress mechanic + first-pass HUD**
+
+Stood up the core loop on `FallChallengeState`: players accrue progress for time spent surviving on the platform and the challenge advances toward completion as that progress fills. Added the initial HUD overlay on the client ImGui layer so players can actually see their survival progress fill in real time rather than guessing.
+
+**Notifications / overlay groundwork**
+
+Started the notifications system — pop-ups/overlays to tell players how to interact with the world or flag things of importance — on the same HUD layer the puzzle overlays use. Early but functional groundwork. Audio sourcing for hazard impacts and ambience was scoped to the artists per the team split.
+
+#### Progress Evaluation
+
+The week went into getting the hazard loop to *feel* fair, which was mostly a coverage and tuning problem: an even spawn distribution and sane knockback constants matter more to the experience than the raw mechanic. The trickiest non-obvious bit was the deferred-spawn requirement — emplacing onto pools mid-view-iteration is the kind of thing that works until it randomly doesn't, so buffering spawns up front saved a lot of future pain. Letting physics own velocity during knockback (rather than fighting it from the input path) made the shove feel right, though it set up the completion-state edge case I'd chase down the following week.
+
+#### Upcoming Goals
+
+- [ ] Finish the challenge's completion flow (participant tracking, fragment reveal, section progression)
+- [ ] Replace the placeholder trigger with a platform-based activation check
+- [ ] Polish the HUD into per-participant segments
+- [ ] Continue the notifications/overlay system
+
+#### Lessons Learned
+
+ECS iteration has sharp edges: mutating the pools a view is iterating (even just emplacing new entities) can invalidate it, so deferring structural changes until after the loop is the safe pattern. Sharing a single source-of-truth constant between the physics radius and the gameplay hit radius is worth it — two "obviously equal" magic numbers will eventually disagree. And giving physics authority over velocity during a knockback window produces much better game feel than trying to override it from input every frame.
+
+#### Individual Morale
+
+[2/10] — Drained of mind, body, soul, and one leg (sprained on 5/25, crippled for 2–3 weeks). The pumpkins fall, even if I currently cannot stand.
 ### Week 5 + 6 + 7
 
 #### Goals
