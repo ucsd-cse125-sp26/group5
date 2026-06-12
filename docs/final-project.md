@@ -4,12 +4,9 @@ title: Final Project
 permalink: /final-project/
 ---
 
-Put your final deliverables here (or link to them):
+Final deliverables:
 
-- Final build/download link
-- Final report
-- Trailer/demo video
-- Postmortem / lessons learned
+- [Final Project Review]({{ '/final-report/' | relative_url }})
 
 ---
 
